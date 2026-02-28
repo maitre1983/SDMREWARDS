@@ -286,6 +286,7 @@ def main():
     try:
         # Run all tests in sequence
         tester.test_health_endpoints()
+        tester.test_analytics_tracking()
         tester.test_contact_submission()
         tester.test_admin_setup()
         
