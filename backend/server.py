@@ -455,14 +455,22 @@ async def setup_admin():
     """Create default admin if none exists"""
     existing = await db.admins.find_one({"username": "admin"}, {"_id": 0})
     if existing:
-        return {"message": "Admin already exists"}
+        # Update existing admin with new password
+        new_hash = hash_password("Gerard0103@")
+        await db.admins.update_one(
+            {"username": "admin"},
+            {"$set": {"password_hash": new_hash, "email": "emileparfait2003@gmail.com"}}
+        )
+        return {"message": "Admin password updated"}
     
     admin = AdminUser(
         username="admin",
-        password_hash=hash_password("admin123")
+        password_hash=hash_password("Gerard0103@")
     )
-    await db.admins.insert_one(admin.model_dump())
-    return {"message": "Admin created", "username": "admin", "password": "admin123"}
+    doc = admin.model_dump()
+    doc["email"] = "emileparfait2003@gmail.com"
+    await db.admins.insert_one(doc)
+    return {"message": "Admin created", "username": "admin"}
 
 @api_router.get("/admin/messages", response_model=List[ContactMessage])
 async def get_all_messages(admin: dict = Depends(get_current_admin)):
