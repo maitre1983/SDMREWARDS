@@ -26,7 +26,7 @@ export const Footer = () => {
               <img 
                 src={LOGO_URL} 
                 alt="Smart Digital Solutions" 
-                className="h-16 w-auto object-contain bg-white rounded-lg p-2"
+                className="h-16 w-auto object-contain rounded-lg"
               />
             </div>
             <p className="text-sm text-slate-400 mb-6 leading-relaxed">
