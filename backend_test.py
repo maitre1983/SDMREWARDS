@@ -116,6 +116,28 @@ class SmartDigitalAPITester:
         
         return success
 
+    def test_analytics_tracking(self):
+        """Test analytics visit tracking"""
+        print("\n" + "="*50)
+        print("TESTING ANALYTICS TRACKING")
+        print("="*50)
+        
+        # Test visit tracking endpoint
+        visit_data = {
+            "page": "/",
+            "referrer": "https://google.com"
+        }
+        
+        success, response = self.run_test(
+            "Visit Tracking",
+            "POST",
+            "/api/track",
+            200,
+            data=visit_data
+        )
+        
+        return success
+
     def test_admin_setup(self):
         """Test admin setup"""
         print("\n" + "="*50)
