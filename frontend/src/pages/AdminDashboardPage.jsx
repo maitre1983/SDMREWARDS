@@ -40,12 +40,14 @@ export default function AdminDashboardPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [messagesRes, statsRes] = await Promise.all([
+      const [messagesRes, statsRes, analyticsRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/messages`, { headers }),
         axios.get(`${API_URL}/api/admin/stats`, { headers }),
+        axios.get(`${API_URL}/api/admin/analytics`, { headers }),
       ]);
       setMessages(messagesRes.data);
       setStats(statsRes.data);
+      setAnalytics(analyticsRes.data);
     } catch (error) {
       console.error('Fetch error:', error);
       if (error.response?.status === 401) {
