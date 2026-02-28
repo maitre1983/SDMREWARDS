@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Loader2, CheckCircle2, MessageCircle, FileText, Rocket } from 'lucide-react';
+import { Send, Loader2, CheckCircle2, MessageCircle, FileText, Rocket, Phone } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
