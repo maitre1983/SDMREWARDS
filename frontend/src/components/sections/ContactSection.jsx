@@ -92,16 +92,26 @@ export const ContactSection = () => {
             </div>
 
             {/* WhatsApp CTA */}
-            <a
-              href="https://wa.me/233555861556?text=Hello!%20I%20am%20interested%20in%20your%20services."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-6 py-4 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#20BD5A] transition-colors shadow-lg shadow-green-500/20"
-              data-testid="contact-whatsapp-button"
-            >
-              <MessageCircle size={22} />
-              WhatsApp: +233 55 586 1556
-            </a>
+            <div className="space-y-3">
+              <a
+                href="https://wa.me/233555861556?text=Hello!%20I%20am%20interested%20in%20your%20services."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-6 py-4 bg-[#25D366] text-white font-semibold rounded-xl hover:bg-[#20BD5A] transition-colors shadow-lg shadow-green-500/20 w-full sm:w-auto"
+                data-testid="contact-whatsapp-button"
+              >
+                <MessageCircle size={22} />
+                WhatsApp: +233 55 586 1556
+              </a>
+              <a
+                href="tel:+233244774451"
+                className="inline-flex items-center gap-3 px-6 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 w-full sm:w-auto"
+                data-testid="contact-phone-button"
+              >
+                <Phone size={22} />
+                Appel: +233 24 477 4451
+              </a>
+            </div>
           </motion.div>
 
           {/* Form */}

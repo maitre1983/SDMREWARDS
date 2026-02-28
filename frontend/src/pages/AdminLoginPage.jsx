@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
       const response = await axios.post(`${API_URL}/api/admin/login`, credentials);
       login(response.data.access_token);
       toast.success('Login successful');
-      navigate('/admin/dashboard');
+      navigate('/admin280226');
     } catch (error) {
       console.error('Login error:', error);
       toast.error('Invalid credentials');
