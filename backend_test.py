@@ -195,6 +195,9 @@ class SmartDigitalAPITester:
         # Test get stats
         self.run_test("Get Admin Stats", "GET", "/api/admin/stats", 200)
         
+        # Test get analytics
+        self.run_test("Get Admin Analytics", "GET", "/api/admin/analytics", 200)
+        
         # Test admin operations on created message if available
         if self.created_message_id:
             print(f"\n📧 Testing operations on message: {self.created_message_id}")
