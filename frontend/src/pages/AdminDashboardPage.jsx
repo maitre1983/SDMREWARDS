@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Zap, Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
+  Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
-  ChevronRight, X
+  ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/v049n7cg_WhatsApp%20Image%202026-02-28%20at%2014.31.59.jpeg";
 
 export default function AdminDashboardPage() {
   const { t } = useLanguage();
@@ -20,11 +21,13 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   
   const [messages, setMessages] = useState([]);
-  const [stats, setStats] = useState({ total_messages: 0, unread_messages: 0, replied_messages: 0, read_messages: 0 });
+  const [stats, setStats] = useState({ total_messages: 0, unread_messages: 0, replied_messages: 0, read_messages: 0, total_visits: 0 });
+  const [analytics, setAnalytics] = useState(null);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [activeTab, setActiveTab] = useState('messages');
 
   const headers = { Authorization: `Bearer ${token}` };
 

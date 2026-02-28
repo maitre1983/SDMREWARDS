@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Zap } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Button } from './ui/button';
+
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/v049n7cg_WhatsApp%20Image%202026-02-28%20at%2014.31.59.jpeg";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -55,13 +57,11 @@ export const Navbar = () => {
             className="flex items-center gap-2 group"
             data-testid="logo-link"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
-              <Zap size={22} className="text-white" />
-            </div>
-            <div className="hidden sm:block">
-              <span className="font-bold text-lg text-slate-900">Smart Digital</span>
-              <span className="block text-xs text-slate-500 -mt-1">Solutions</span>
-            </div>
+            <img 
+              src={LOGO_URL} 
+              alt="Smart Digital Solutions" 
+              className="h-12 md:h-14 w-auto object-contain"
+            />
           </Link>
 
           {/* Desktop Nav */}

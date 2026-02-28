@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/v049n7cg_WhatsApp%20Image%202026-02-28%20at%2014.31.59.jpeg";
 
 export default function AdminLoginPage() {
   const { t } = useLanguage();
@@ -48,9 +49,11 @@ export default function AdminLoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Zap size={26} className="text-white" />
-            </div>
+            <img 
+              src={LOGO_URL} 
+              alt="Smart Digital Solutions" 
+              className="h-20 w-auto object-contain bg-white rounded-xl p-2"
+            />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">{t('admin_login')}</h1>
           <p className="text-slate-400">Smart Digital Solutions</p>

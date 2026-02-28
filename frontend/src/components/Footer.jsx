@@ -1,7 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
+import { Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/v049n7cg_WhatsApp%20Image%202026-02-28%20at%2014.31.59.jpeg";
 
 export const Footer = () => {
   const { t } = useLanguage();
@@ -20,14 +22,12 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="lg:col-span-1">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
-                <Zap size={22} className="text-white" />
-              </div>
-              <div>
-                <span className="font-bold text-lg text-white">Smart Digital</span>
-                <span className="block text-xs text-slate-400 -mt-1">by GIT NFT GHANA LTD</span>
-              </div>
+            <div className="mb-6">
+              <img 
+                src={LOGO_URL} 
+                alt="Smart Digital Solutions" 
+                className="h-16 w-auto object-contain bg-white rounded-lg p-2"
+              />
             </div>
             <p className="text-sm text-slate-400 mb-6 leading-relaxed">
               {t('footer_description')}
