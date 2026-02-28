@@ -133,24 +133,31 @@ export default function AdminDashboardPage() {
 
   if (!isAuthenticated) return null;
 
+  const getDeviceIcon = (device) => {
+    switch (device) {
+      case 'mobile': return <Smartphone size={16} />;
+      case 'tablet': return <Tablet size={16} />;
+      default: return <Monitor size={16} />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100" data-testid="admin-dashboard">
       {/* Sidebar */}
       <aside className="fixed top-0 left-0 h-full w-64 bg-slate-950 text-white z-30">
         <div className="p-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
-              <Zap size={20} className="text-white" />
-            </div>
-            <div>
-              <span className="font-bold text-sm">Smart Digital</span>
-              <span className="block text-xs text-slate-400">Admin Panel</span>
-            </div>
-          </div>
+          <img 
+            src={LOGO_URL} 
+            alt="Smart Digital Solutions" 
+            className="h-12 w-auto object-contain bg-white rounded-lg p-1"
+          />
         </div>
 
-        <nav className="p-4">
-          <div className="admin-sidebar-item active rounded-lg">
+        <nav className="p-4 space-y-2">
+          <button
+            onClick={() => setActiveTab('messages')}
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'messages' ? 'active' : ''}`}
+          >
             <Mail size={18} />
             <span>{t('admin_messages')}</span>
             {stats.unread_messages > 0 && (
@@ -158,7 +165,14 @@ export default function AdminDashboardPage() {
                 {stats.unread_messages}
               </span>
             )}
-          </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'analytics' ? 'active' : ''}`}
+          >
+            <BarChart3 size={18} />
+            <span>Analytics</span>
+          </button>
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
