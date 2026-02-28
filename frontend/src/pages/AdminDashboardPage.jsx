@@ -209,12 +209,13 @@ export default function AdminDashboardPage() {
 
         <div className="p-8">
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-5 gap-6 mb-8">
             {[
               { key: 'total', value: stats.total_messages, icon: Inbox, color: 'bg-slate-100 text-slate-600' },
               { key: 'unread', value: stats.unread_messages, icon: Mail, color: 'bg-blue-100 text-blue-600' },
               { key: 'read', value: stats.read_messages, icon: CheckCircle, color: 'bg-amber-100 text-amber-600' },
               { key: 'replied', value: stats.replied_messages, icon: MessageSquare, color: 'bg-emerald-100 text-emerald-600' },
+              { key: 'visits', value: stats.total_visits || 0, icon: Globe, color: 'bg-violet-100 text-violet-600', label: 'Total Visits' },
             ].map((stat) => (
               <div 
                 key={stat.key}
@@ -225,11 +226,116 @@ export default function AdminDashboardPage() {
                   <stat.icon size={20} />
                 </div>
                 <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
-                <p className="text-sm text-slate-500">{t(`admin_${stat.key}`)}</p>
+                <p className="text-sm text-slate-500">{stat.label || t(`admin_${stat.key}`)}</p>
               </div>
             ))}
           </div>
 
+          {activeTab === 'analytics' && analytics && (
+            <div className="space-y-6 mb-8">
+              {/* Analytics Grid */}
+              <div className="grid grid-cols-3 gap-6">
+                {/* Devices */}
+                <div className="bg-white rounded-xl border border-slate-200 p-6">
+                  <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <Monitor size={18} /> Devices
+                  </h3>
+                  <div className="space-y-3">
+                    {analytics.devices.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {getDeviceIcon(d.name)}
+                          <span className="text-sm text-slate-600 capitalize">{d.name}</span>
+                        </div>
+                        <span className="font-semibold text-slate-900">{d.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Browsers */}
+                <div className="bg-white rounded-xl border border-slate-200 p-6">
+                  <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <Globe size={18} /> Browsers
+                  </h3>
+                  <div className="space-y-3">
+                    {analytics.browsers.map((b, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{b.name}</span>
+                        <span className="font-semibold text-slate-900">{b.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* OS */}
+                <div className="bg-white rounded-xl border border-slate-200 p-6">
+                  <h3 className="font-semibold text-slate-900 mb-4">Operating Systems</h3>
+                  <div className="space-y-3">
+                    {analytics.os_stats.map((o, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{o.name}</span>
+                        <span className="font-semibold text-slate-900">{o.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Visits */}
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-semibold text-slate-900">Recent Visits</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-slate-600 font-medium">Time</th>
+                        <th className="px-4 py-3 text-left text-slate-600 font-medium">Page</th>
+                        <th className="px-4 py-3 text-left text-slate-600 font-medium">Device</th>
+                        <th className="px-4 py-3 text-left text-slate-600 font-medium">Browser</th>
+                        <th className="px-4 py-3 text-left text-slate-600 font-medium">OS</th>
+                        <th className="px-4 py-3 text-left text-slate-600 font-medium">IP</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {analytics.recent_visits.slice(0, 10).map((visit, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 text-slate-500">{formatDate(visit.timestamp)}</td>
+                          <td className="px-4 py-3 text-slate-900">{visit.page}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 text-slate-600 capitalize">
+                              {getDeviceIcon(visit.device_type)} {visit.device_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{visit.browser}</td>
+                          <td className="px-4 py-3 text-slate-600">{visit.os}</td>
+                          <td className="px-4 py-3 text-slate-500 font-mono text-xs">{visit.ip_address}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Pages */}
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="font-semibold text-slate-900 mb-4">Top Pages</h3>
+                <div className="space-y-3">
+                  {analytics.pages.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600">{p.name}</span>
+                      <span className="font-semibold text-slate-900">{p.count} visits</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'messages' && (
+          <>
           {/* Messages list */}
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
