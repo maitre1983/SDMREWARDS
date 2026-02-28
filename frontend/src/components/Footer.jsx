@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, ExternalLink } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/v049n7cg_WhatsApp%20Image%202026-02-28%20at%2014.31.59.jpeg";
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/ke4bukaf_WhatsApp%20Image%202026-02-28%20at%2014.47.22.jpeg";
 
 export const Footer = () => {
   const { t } = useLanguage();
