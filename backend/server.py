@@ -1848,11 +1848,22 @@ async def admin_complete_withdrawal(
 ):
     """Admin: Mark withdrawal as paid (after Mobile Money confirmation)"""
     try:
-        withdrawal = await ledger_service.complete_withdrawal(
+        result = await ledger_service.complete_withdrawal_with_momo(
             withdrawal_id,
             provider_reference=provider_reference
         )
-        return {"message": "Withdrawal completed", "withdrawal": withdrawal.model_dump()}
+        return {
+            "message": "Withdrawal completed and paid via Mobile Money",
+            "withdrawal_id": result["withdrawal_id"],
+            "transaction_id": result["transaction_id"],
+            "reference": result["reference"],
+            "status": result["status"],
+            "amount": result["amount"],
+            "fee": result["fee"],
+            "net_amount": result["net_amount"],
+            "provider": result["provider"],
+            "provider_reference": result["provider_reference"]
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
