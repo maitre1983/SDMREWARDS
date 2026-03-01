@@ -92,6 +92,15 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const fetchPushStats = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/push/stats`, { headers });
+      setPushStats(res.data);
+    } catch (error) {
+      console.error('Push stats error:', error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
