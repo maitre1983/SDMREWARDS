@@ -1803,14 +1803,23 @@ async def admin_approve_withdrawal(
     request: ApproveWithdrawalRequest,
     admin: dict = Depends(get_current_admin)
 ):
-    """Admin: Approve a withdrawal request"""
+    """Admin: Approve a withdrawal request with float balance verification"""
     try:
-        withdrawal = await ledger_service.approve_withdrawal(
+        # Use the new method with float check
+        result = await ledger_service.approve_withdrawal_with_float_check(
             withdrawal_id,
             approved_by=admin["username"],
             admin_notes=request.admin_notes
         )
-        return {"message": "Withdrawal approved", "withdrawal": withdrawal.model_dump()}
+        return {
+            "message": "Withdrawal approved",
+            "withdrawal_id": result["withdrawal_id"],
+            "status": result["status"],
+            "amount": result["amount"],
+            "net_amount": result["net_amount"],
+            "float_reserved": result["float_reserved"],
+            "float_balance_remaining": result["float_balance_remaining"]
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
