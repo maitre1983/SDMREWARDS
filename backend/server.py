@@ -726,6 +726,43 @@ async def get_user_profile(user: dict = Depends(get_current_user)):
         "qr_code_image": f"data:image/png;base64,{qr_base64}"
     }
 
+@sdm_router.get("/user/referral")
+async def get_user_referral(user: dict = Depends(get_current_user)):
+    """Get user referral info and stats"""
+    # Get referrals made by this user
+    referrals = await db.sdm_users.find(
+        {"referred_by": user["id"]},
+        {"_id": 0, "id": 1, "phone": 1, "first_name": 1, "last_name": 1, "created_at": 1}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Get referral bonuses earned
+    bonuses = await db.referral_bonuses.find(
+        {"referrer_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Get who referred this user
+    referrer = None
+    if user.get("referred_by"):
+        referrer_data = await db.sdm_users.find_one(
+            {"id": user["referred_by"]},
+            {"_id": 0, "first_name": 1, "last_name": 1}
+        )
+        if referrer_data:
+            referrer = f"{referrer_data.get('first_name', '')} {referrer_data.get('last_name', '')}".strip() or "SDM User"
+    
+    return {
+        "referral_code": user.get("referral_code"),
+        "referral_link": f"https://smartdigitalsolutions.com/sdm/client?ref={user.get('referral_code')}",
+        "total_referrals": user.get("referral_count", 0),
+        "total_bonus_earned": user.get("referral_bonus_earned", 0),
+        "bonus_per_referral": REFERRAL_BONUS,
+        "welcome_bonus_amount": REFERRAL_WELCOME_BONUS,
+        "referrals": referrals,
+        "bonus_history": bonuses,
+        "referred_by": referrer
+    }
+
 @sdm_router.put("/user/profile")
 async def update_user_profile(first_name: Optional[str] = None, last_name: Optional[str] = None, email: Optional[str] = None, user: dict = Depends(get_current_user)):
     """Update user profile"""
