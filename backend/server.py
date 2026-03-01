@@ -77,6 +77,11 @@ DEFAULT_SDM_CONFIG = {
     "withdrawal_fee": 1.0,          # GHS fee for withdrawals
     "float_low_threshold": 5000.0,  # Alert when float below this
     "float_critical_threshold": 1000.0,  # Critical alert threshold
+    # Alert configuration
+    "float_alert_webhook_url": None,  # Webhook URL for float alerts
+    "float_alert_emails": [],  # Email addresses for float alerts
+    "alert_on_low_threshold": True,  # Send alert on low threshold
+    "alert_on_critical_threshold": True,  # Send alert on critical threshold
 }
 
 if RESEND_API_KEY:
