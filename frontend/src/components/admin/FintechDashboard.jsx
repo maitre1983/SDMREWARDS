@@ -966,7 +966,8 @@ export default function FintechDashboard({ token }) {
                     ))
                   )}
                 </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
       )}
