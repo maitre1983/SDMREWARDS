@@ -73,6 +73,24 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const fetchNotifications = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/notifications?limit=50`, { headers });
+      setNotifications(res.data);
+    } catch (error) {
+      console.error('Notifications error:', error);
+    }
+  };
+
+  const fetchFloatAlerts = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/float-alerts?limit=50`, { headers });
+      setFloatAlerts(res.data);
+    } catch (error) {
+      console.error('Float alerts error:', error);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
