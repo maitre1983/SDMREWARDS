@@ -344,7 +344,15 @@ export default function SDMClientPage() {
 
           {/* Balance Card */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-            <p className="text-sm opacity-80 mb-1">Available Balance</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm opacity-80">Available Balance</p>
+              {user?.referral_level && (
+                <span className={`px-2 py-1 text-xs font-medium rounded-full border capitalize ${getReferralLevelColor(user.referral_level)}`}>
+                  <Award size={12} className="inline mr-1" />
+                  {user.referral_level}
+                </span>
+              )}
+            </div>
             <p className="text-4xl font-bold mb-4">
               GHS {wallet?.wallet_available?.toFixed(2) || '0.00'}
             </p>
