@@ -330,6 +330,42 @@ class ReferralBonus(BaseModel):
     status: str = "credited"  # credited, pending
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+class Notification(BaseModel):
+    """User/Client Notification"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    recipient_type: str  # "all", "clients", "merchants", "specific"
+    recipient_ids: List[str] = Field(default_factory=list)  # Specific user/merchant IDs
+    title: str
+    message: str
+    notification_type: str = "system"  # system, promo, transaction, alert, info
+    priority: str = "normal"  # low, normal, high, urgent
+    action_url: Optional[str] = None  # Deep link or URL to open
+    image_url: Optional[str] = None
+    is_read: Dict[str, bool] = Field(default_factory=dict)  # {user_id: True/False}
+    is_active: bool = True
+    expires_at: Optional[str] = None
+    sent_by: str = "admin"
+    sent_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class FloatAlert(BaseModel):
+    """Float threshold alert record"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    alert_type: str  # "low", "critical"
+    float_balance: float
+    threshold: float
+    message: str
+    is_acknowledged: bool = False
+    acknowledged_by: Optional[str] = None
+    acknowledged_at: Optional[str] = None
+    webhook_sent: bool = False
+    webhook_response: Optional[str] = None
+    email_sent: bool = False
+    email_recipients: List[str] = Field(default_factory=list)
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
 # ============== REQUEST/RESPONSE MODELS ==============
 
 class SendOTPRequest(BaseModel):
