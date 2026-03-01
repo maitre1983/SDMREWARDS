@@ -82,6 +82,9 @@ DEFAULT_SDM_CONFIG = {
     "float_alert_emails": [],  # Email addresses for float alerts
     "alert_on_low_threshold": True,  # Send alert on low threshold
     "alert_on_critical_threshold": True,  # Send alert on critical threshold
+    # Service configuration (Airtime, Data, Bills)
+    "monthly_service_limit": 2500.0,  # Monthly limit for services
+    "service_commission_rate": 0.001,  # 0.1% commission on services
 }
 
 if RESEND_API_KEY:
