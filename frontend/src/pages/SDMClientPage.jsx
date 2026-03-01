@@ -335,6 +335,7 @@ export default function SDMClientPage() {
         <div className="max-w-lg mx-auto flex">
           {[
             { id: 'wallet', icon: QrCode, label: 'My QR' },
+            { id: 'referral', icon: Gift, label: 'Invite' },
             { id: 'withdraw', icon: ArrowDownToLine, label: 'Withdraw' },
             { id: 'history', icon: History, label: 'History' },
           ].map((tab) => (
