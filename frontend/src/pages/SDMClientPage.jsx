@@ -212,6 +212,26 @@ export default function SDMClientPage() {
                     data-testid="sdm-phone-input"
                   />
                 </div>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Referral Code <span className="text-slate-500">(optional)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="e.g., SDM1A2B3C"
+                    className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl uppercase"
+                    data-testid="sdm-referral-input"
+                  />
+                  {referralCode && (
+                    <p className="text-xs text-emerald-400 mt-1">
+                      Get GHS 2 welcome bonus!
+                    </p>
+                  )}
+                </div>
+
                 <Button
                   type="submit"
                   disabled={isLoading || !phone}
