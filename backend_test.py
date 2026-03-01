@@ -185,8 +185,8 @@ class SmartDigitalAPITester:
         )
         
         if success and 'access_token' in response:
-            self.token = response['access_token']
-            print(f"✅ Admin token acquired: {self.token[:20]}...")
+            self.admin_token = response['access_token']
+            print(f"✅ Admin token acquired: {self.admin_token[:20]}...")
             return True
         else:
             print("❌ Failed to get admin token")
