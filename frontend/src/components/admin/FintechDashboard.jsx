@@ -110,6 +110,7 @@ export default function FintechDashboard({ token }) {
       fetchAuditLogs();
     } else if (activeSubTab === 'notifications') {
       fetchNotifications();
+      fetchPushStats();
     } else if (activeSubTab === 'alerts') {
       fetchFloatAlerts();
     }
