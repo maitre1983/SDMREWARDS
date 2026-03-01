@@ -1088,7 +1088,13 @@ async def remove_staff(staff_id: str, merchant: dict = Depends(get_current_merch
 
 @sdm_router.post("/merchant/transaction")
 async def create_transaction(request: CreateTransactionRequest, merchant: dict = Depends(get_current_merchant)):
-    """Create cashback transaction (scan QR + amount)"""
+    """Create cashback transaction (scan QR + amount) - Direct Payment Flow
+    
+    The client pays directly and the system automatically splits:
+    - Merchant receives: payment - cashback
+    - Client receives: cashback - SDM commission (pending)
+    - SDM receives: commission
+    """
     # Find user by QR code
     user = await db.sdm_users.find_one({"qr_code": request.user_qr_code}, {"_id": 0})
     if not user:
@@ -1096,12 +1102,6 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
     
     if not user["is_active"]:
         raise HTTPException(status_code=400, detail="User account inactive")
-    
-    # Calculate cashback
-    cashback_amount = request.amount * merchant["cashback_rate"]
-    sdm_commission = cashback_amount * SDM_COMMISSION_RATE
-    net_cashback = cashback_amount - sdm_commission
-    available_date = (datetime.now(timezone.utc) + timedelta(days=CASHBACK_PENDING_DAYS)).isoformat()
     
     # Get staff info
     staff_name = None
@@ -1111,43 +1111,69 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
                 staff_name = s["name"]
                 break
     
-    # Create transaction
-    transaction = SDMTransaction(
-        user_id=user["id"],
-        merchant_id=merchant["id"],
-        merchant_name=merchant["business_name"],
-        amount=request.amount,
-        cashback_rate=merchant["cashback_rate"],
-        cashback_amount=cashback_amount,
-        sdm_commission=sdm_commission,
-        net_cashback=net_cashback,
-        available_date=available_date,
-        staff_id=request.staff_id,
-        staff_name=staff_name,
-        notes=request.notes
-    )
-    await db.sdm_transactions.insert_one(transaction.model_dump())
-    
-    # Update user wallet (pending)
-    await db.sdm_users.update_one(
-        {"id": user["id"]},
-        {"$inc": {"wallet_pending": net_cashback, "total_earned": net_cashback}}
-    )
-    
-    # Update merchant stats
-    await db.sdm_merchants.update_one(
-        {"id": merchant["id"]},
-        {"$inc": {"total_transactions": 1, "total_cashback_given": net_cashback}}
-    )
-    
-    return {
-        "message": "Transaction created",
-        "transaction_id": transaction.transaction_id,
-        "amount": request.amount,
-        "cashback_amount": round(net_cashback, 2),
-        "available_date": available_date,
-        "user_name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM User"
-    }
+    try:
+        # Use the new direct payment flow via ledger service
+        result = await ledger_service.process_direct_payment_transaction(
+            merchant_id=merchant["id"],
+            client_id=user["id"],
+            payment_amount=request.amount,
+            cashback_rate=merchant["cashback_rate"],
+            commission_rate=SDM_COMMISSION_RATE,
+            pending_days=CASHBACK_PENDING_DAYS,
+            payment_method="QR_SCAN",
+            metadata={
+                "staff_id": request.staff_id,
+                "staff_name": staff_name,
+                "notes": request.notes,
+                "merchant_name": merchant["business_name"]
+            },
+            created_by=f"merchant:{merchant['id']}"
+        )
+        
+        # Also record in sdm_transactions for backward compatibility
+        transaction = SDMTransaction(
+            user_id=user["id"],
+            merchant_id=merchant["id"],
+            merchant_name=merchant["business_name"],
+            amount=request.amount,
+            cashback_rate=merchant["cashback_rate"],
+            cashback_amount=result["splits"]["client_cashback"] + result["splits"]["sdm_commission"],
+            sdm_commission=result["splits"]["sdm_commission"],
+            net_cashback=result["splits"]["client_cashback"],
+            available_date=result["available_date"],
+            staff_id=request.staff_id,
+            staff_name=staff_name,
+            notes=request.notes
+        )
+        transaction.transaction_id = result["reference"]
+        await db.sdm_transactions.insert_one(transaction.model_dump())
+        
+        # Update user wallet (pending) - sync with ledger
+        await db.sdm_users.update_one(
+            {"id": user["id"]},
+            {"$inc": {"wallet_pending": result["splits"]["client_cashback"], "total_earned": result["splits"]["client_cashback"]}}
+        )
+        
+        # Update merchant stats
+        await db.sdm_merchants.update_one(
+            {"id": merchant["id"]},
+            {"$inc": {"total_transactions": 1, "total_cashback_given": result["splits"]["client_cashback"]}}
+        )
+        
+        return {
+            "message": "Transaction created - Direct Payment Flow",
+            "transaction_id": result["reference"],
+            "ledger_transaction_id": result["transaction_id"],
+            "amount": request.amount,
+            "splits": result["splits"],
+            "cashback_amount": round(result["splits"]["client_cashback"], 2),
+            "merchant_receives": round(result["splits"]["merchant_receives"], 2),
+            "sdm_commission": round(result["splits"]["sdm_commission"], 2),
+            "available_date": result["available_date"],
+            "user_name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM User"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @sdm_router.get("/merchant/transactions")
 async def get_merchant_transactions(merchant: dict = Depends(get_current_merchant), limit: int = 100):
