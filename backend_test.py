@@ -7,11 +7,18 @@ import json
 class SmartDigitalAPITester:
     def __init__(self, base_url="https://web-boost-seo.preview.emergentagent.com"):
         self.base_url = base_url
-        self.token = None
+        self.admin_token = None
+        self.user_token = None
+        self.merchant_token = None
         self.tests_run = 0
         self.tests_passed = 0
         self.test_results = []
         self.created_message_id = None
+        self.sdm_user_id = None
+        self.sdm_merchant_id = None
+        self.test_phone = "+233244774451"
+        self.test_qr_code = "F5DB92FD-1AE"
+        self.test_merchant_api_key = "sdk_7f74de932ade5a6e9bb0a38b5cdaa49b"
 
     def log_result(self, test_name, success, details=""):
         """Log test result"""
