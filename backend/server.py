@@ -595,8 +595,15 @@ async def send_otp(request: SendOTPRequest):
     otp_code = generate_otp()
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
     
-    # Store OTP
-    otp_record = OTPRecord(phone=phone, otp_code=otp_code, expires_at=expires_at)
+    # Validate referral code if provided
+    referral_code = None
+    if request.referral_code:
+        referrer = await db.sdm_users.find_one({"referral_code": request.referral_code.upper()}, {"_id": 0})
+        if referrer:
+            referral_code = request.referral_code.upper()
+    
+    # Store OTP with referral code
+    otp_record = OTPRecord(phone=phone, otp_code=otp_code, referral_code=referral_code, expires_at=expires_at)
     await db.otp_records.delete_many({"phone": phone})  # Remove old OTPs
     await db.otp_records.insert_one(otp_record.model_dump())
     
@@ -609,6 +616,7 @@ async def send_otp(request: SendOTPRequest):
         "phone": phone,
         "expires_in": 600,
         "otp_id": otp_record.id,
+        "referral_valid": referral_code is not None if request.referral_code else None,
         # For testing only - remove in production
         "debug_otp": otp_code if not HUBTEL_CLIENT_ID else None
     }
@@ -641,8 +649,56 @@ async def verify_otp(request: VerifyOTPRequest):
     
     # Find or create user
     user = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
+    is_new_user = False
+    
     if not user:
+        is_new_user = True
         new_user = SDMUser(phone=phone, phone_verified=True)
+        
+        # Handle referral
+        referral_code = otp_record.get("referral_code")
+        if referral_code:
+            referrer = await db.sdm_users.find_one({"referral_code": referral_code}, {"_id": 0})
+            if referrer and referrer["phone"] != phone:  # Can't refer yourself
+                new_user.referred_by = referrer["id"]
+                
+                # Give welcome bonus to new user
+                new_user.wallet_available = REFERRAL_WELCOME_BONUS
+                new_user.total_earned = REFERRAL_WELCOME_BONUS
+                
+                # Record welcome bonus
+                welcome_bonus = ReferralBonus(
+                    referrer_id=referrer["id"],
+                    referred_id=new_user.id,
+                    referred_phone=phone,
+                    bonus_type="welcome_bonus",
+                    amount=REFERRAL_WELCOME_BONUS
+                )
+                await db.referral_bonuses.insert_one(welcome_bonus.model_dump())
+                
+                # Give bonus to referrer
+                await db.sdm_users.update_one(
+                    {"id": referrer["id"]},
+                    {
+                        "$inc": {
+                            "wallet_available": REFERRAL_BONUS,
+                            "total_earned": REFERRAL_BONUS,
+                            "referral_bonus_earned": REFERRAL_BONUS,
+                            "referral_count": 1
+                        }
+                    }
+                )
+                
+                # Record referrer bonus
+                referrer_bonus = ReferralBonus(
+                    referrer_id=referrer["id"],
+                    referred_id=new_user.id,
+                    referred_phone=phone,
+                    bonus_type="referrer_bonus",
+                    amount=REFERRAL_BONUS
+                )
+                await db.referral_bonuses.insert_one(referrer_bonus.model_dump())
+        
         await db.sdm_users.insert_one(new_user.model_dump())
         user = new_user.model_dump()
     else:
@@ -655,7 +711,9 @@ async def verify_otp(request: VerifyOTPRequest):
         "message": "Verification successful",
         "access_token": token,
         "token_type": "bearer",
-        "user": user
+        "user": user,
+        "is_new_user": is_new_user,
+        "welcome_bonus": REFERRAL_WELCOME_BONUS if is_new_user and user.get("referred_by") else 0
     }
 
 @sdm_router.get("/user/profile")
