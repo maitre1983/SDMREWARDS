@@ -173,7 +173,7 @@ class SmartDigitalAPITester:
         
         login_credentials = {
             "username": "admin",
-            "password": "admin123"
+            "password": "Gerard0103@"
         }
         
         success, response = self.run_test(
