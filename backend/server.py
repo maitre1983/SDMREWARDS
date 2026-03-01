@@ -360,9 +360,19 @@ class AddStaffRequest(BaseModel):
     role: str = "cashier"
 
 class PurchaseMembershipRequest(BaseModel):
+    card_type_id: str  # The merchant's card type to purchase
     payment_method: str = "wallet"  # wallet, mobile_money
     mobile_money_number: Optional[str] = None
     mobile_money_provider: Optional[str] = None
+
+class CreateCardTypeRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    validity_days: int = 365
+    cashback_bonus: float = 0.0
+    referral_bonus: float = 5.0
+    welcome_bonus: float = 2.0
 
 class UpdateSDMConfigRequest(BaseModel):
     membership_card_price: Optional[float] = None
@@ -374,6 +384,7 @@ class UpdateSDMConfigRequest(BaseModel):
     silver_min_referrals: Optional[int] = None
     gold_min_referrals: Optional[int] = None
     membership_validity_days: Optional[int] = None
+    require_membership_for_referral: Optional[bool] = None
 
 # ============== HELPER FUNCTIONS ==============
 
