@@ -267,6 +267,47 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const handleCreateNotification = async (notificationData) => {
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/notifications`, notificationData, { headers });
+      toast.success('Notification sent successfully');
+      setShowNewNotificationForm(false);
+      fetchNotifications();
+    } catch (error) {
+      toast.error('Failed to send notification');
+    }
+  };
+
+  const handleDeleteNotification = async (id) => {
+    if (!window.confirm('Delete this notification?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/sdm/admin/notifications/${id}`, { headers });
+      toast.success('Notification deleted');
+      fetchNotifications();
+    } catch (error) {
+      toast.error('Failed to delete');
+    }
+  };
+
+  const handleAcknowledgeAlert = async (id) => {
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/float-alerts/${id}/acknowledge`, {}, { headers });
+      toast.success('Alert acknowledged');
+      fetchFloatAlerts();
+    } catch (error) {
+      toast.error('Failed to acknowledge');
+    }
+  };
+
+  const handleTestFloatAlert = async () => {
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/float-alerts/test`, {}, { headers });
+      toast.success(`Test alert sent! Webhook: ${res.data.webhook_sent ? '✓' : '✗'} | Email: ${res.data.email_sent ? '✓' : '✗'}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send test alert');
+    }
+  };
+
   const formatCurrency = (amount) => `GHS ${(amount || 0).toFixed(2)}`;
   const formatDate = (date) => date ? new Date(date).toLocaleString() : '-';
 
