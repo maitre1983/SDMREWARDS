@@ -419,6 +419,112 @@ export default function SDMClientPage() {
           </div>
         )}
 
+        {activeTab === 'membership' && (
+          <div className="space-y-4">
+            {/* My Memberships */}
+            {userMemberships.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-900">My Membership Cards</h3>
+                {userMemberships.map((card) => (
+                  <div 
+                    key={card.id} 
+                    className={`bg-gradient-to-br ${
+                      card.status === 'active' 
+                        ? 'from-blue-600 to-cyan-500' 
+                        : 'from-slate-400 to-slate-500'
+                    } rounded-2xl p-5 text-white`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Store size={18} />
+                        <span className="font-semibold">{card.merchant_name}</span>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        card.status === 'active' ? 'bg-white/20' : 'bg-red-500/50'
+                      }`}>
+                        {card.status}
+                      </span>
+                    </div>
+                    <p className="text-lg font-bold mb-1">{card.card_type_name}</p>
+                    <p className="text-xs opacity-70 font-mono mb-3">{card.card_number}</p>
+                    <div className="flex justify-between text-xs opacity-80">
+                      <span>Purchased: {new Date(card.purchased_at).toLocaleDateString()}</span>
+                      <span>Expires: {new Date(card.expires_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Available Cards */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-slate-900">
+                {userMemberships.length > 0 ? 'More Cards Available' : 'Available Membership Cards'}
+              </h3>
+              
+              {availableCards.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center text-slate-500">
+                  <CreditCard size={40} className="mx-auto mb-3 opacity-30" />
+                  <p>No membership cards available yet</p>
+                  <p className="text-xs mt-2">Merchants will create cards soon!</p>
+                </div>
+              ) : (
+                availableCards
+                  .filter(card => !userMemberships.some(m => m.merchant_id === card.merchant_id && m.status === 'active'))
+                  .map((card) => (
+                    <div key={card.id} className="bg-white rounded-2xl p-5 border border-slate-200">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Store size={16} className="text-slate-400" />
+                            <span className="text-sm text-slate-600">{card.merchant_name}</span>
+                          </div>
+                          <h4 className="font-bold text-slate-900 text-lg">{card.name}</h4>
+                          {card.description && (
+                            <p className="text-sm text-slate-500 mt-1">{card.description}</p>
+                          )}
+                        </div>
+                        <span className="text-2xl font-bold text-blue-600">GHS {card.price}</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="bg-slate-50 rounded-lg p-2 text-center">
+                          <p className="text-xs text-slate-500">Validity</p>
+                          <p className="font-semibold text-slate-900">{card.validity_days}d</p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                          <p className="text-xs text-emerald-600">Welcome</p>
+                          <p className="font-semibold text-emerald-700">+GHS {card.welcome_bonus}</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <p className="text-xs text-blue-600">Referral</p>
+                          <p className="font-semibold text-blue-700">+GHS {card.referral_bonus}</p>
+                        </div>
+                      </div>
+                      
+                      <Button
+                        onClick={() => handlePurchaseMembership(card.id)}
+                        disabled={isPurchasing || wallet?.wallet_available < card.price}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {isPurchasing ? (
+                          <Loader2 className="animate-spin" size={18} />
+                        ) : wallet?.wallet_available < card.price ? (
+                          'Insufficient Balance'
+                        ) : (
+                          <>
+                            <CreditCard size={16} className="mr-2" />
+                            Purchase Card
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'referral' && referralData && (
           <div className="space-y-4">
             {/* Referral Card */}
