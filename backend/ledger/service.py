@@ -486,10 +486,11 @@ class LedgerService:
         net_cashback = round(cashback_amount - sdm_commission, 2)
         merchant_net = round(payment_amount - cashback_amount, 2)
         
-        # Get or create wallets
+        # Get or create wallets (auto-create if not exists)
         merchant_wallet = await self.get_wallet_by_entity(EntityType.MERCHANT, merchant_id)
         if not merchant_wallet:
-            raise ValueError("Merchant wallet not found")
+            # Auto-create merchant wallet for direct payment flow
+            merchant_wallet = await self.create_wallet(EntityType.MERCHANT, merchant_id)
         
         client_wallet = await self.get_wallet_by_entity(EntityType.CLIENT, client_id)
         if not client_wallet:
