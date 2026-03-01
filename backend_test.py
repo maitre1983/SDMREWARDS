@@ -524,8 +524,29 @@ def main():
         tester.test_contact_submission()
         tester.test_admin_setup()
         
+        # Test SDM authentication flow
+        if tester.test_sdm_auth_flow():
+            tester.test_sdm_user_endpoints()
+        else:
+            print("⚠️ SDM auth failed - skipping user endpoint tests")
+        
+        # Test SDM merchant registration and endpoints
+        if tester.test_sdm_merchant_registration():
+            tester.test_sdm_merchant_endpoints()
+            
+            # Test transaction creation (requires both user and merchant)
+            if tester.user_token and tester.merchant_token:
+                tester.test_sdm_transaction_creation()
+        else:
+            print("⚠️ Merchant registration failed - skipping merchant endpoint tests")
+            
+        # Test external API endpoints
+        tester.test_sdm_external_api()
+        
+        # Test admin functionality
         if tester.test_admin_login():
             tester.test_admin_endpoints()
+            tester.test_admin_sdm_endpoints()
             tester.test_unauthorized_access()
         else:
             print("⚠️ Admin login failed - skipping admin endpoint tests")
