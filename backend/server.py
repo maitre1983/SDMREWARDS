@@ -439,6 +439,31 @@ class UpdateSDMConfigRequest(BaseModel):
     withdrawal_fee: Optional[float] = None  # Fee for withdrawals in GHS
     float_low_threshold: Optional[float] = None  # Alert when float below this
     float_critical_threshold: Optional[float] = None  # Critical alert threshold
+    # Alert configuration
+    float_alert_webhook_url: Optional[str] = None  # Webhook URL for float alerts
+    float_alert_emails: Optional[List[str]] = None  # Email addresses for float alerts
+    alert_on_low_threshold: Optional[bool] = None  # Send alert on low threshold
+    alert_on_critical_threshold: Optional[bool] = None  # Send alert on critical threshold
+
+class CreateNotificationRequest(BaseModel):
+    recipient_type: str  # "all", "clients", "merchants", "specific"
+    recipient_ids: Optional[List[str]] = None  # For "specific" type
+    title: str
+    message: str
+    notification_type: str = "system"  # system, promo, transaction, alert, info
+    priority: str = "normal"  # low, normal, high, urgent
+    action_url: Optional[str] = None
+    image_url: Optional[str] = None
+    expires_at: Optional[str] = None
+
+class UpdateNotificationRequest(BaseModel):
+    title: Optional[str] = None
+    message: Optional[str] = None
+    notification_type: Optional[str] = None
+    priority: Optional[str] = None
+    action_url: Optional[str] = None
+    is_active: Optional[bool] = None
+    expires_at: Optional[str] = None
 
 # ============== HELPER FUNCTIONS ==============
 
