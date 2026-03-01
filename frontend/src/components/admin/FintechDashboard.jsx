@@ -1523,3 +1523,118 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
     </div>
   );
 }
+
+function NotificationForm({ onSubmit, onCancel }) {
+  const [formData, setFormData] = useState({
+    recipient_type: 'all',
+    title: '',
+    message: '',
+    notification_type: 'system',
+    priority: 'normal',
+    action_url: ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.title || !formData.message) {
+      toast.error('Title and message are required');
+      return;
+    }
+    onSubmit(formData);
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
+      <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+        <Send size={18} className="text-blue-600" />
+        New Notification
+      </h4>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Recipients</label>
+            <select
+              value={formData.recipient_type}
+              onChange={(e) => setFormData({...formData, recipient_type: e.target.value})}
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm"
+            >
+              <option value="all">All Users & Merchants</option>
+              <option value="clients">All Clients</option>
+              <option value="merchants">All Merchants</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Type</label>
+            <select
+              value={formData.notification_type}
+              onChange={(e) => setFormData({...formData, notification_type: e.target.value})}
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm"
+            >
+              <option value="system">System</option>
+              <option value="promo">Promo</option>
+              <option value="alert">Alert</option>
+              <option value="info">Info</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Priority</label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({...formData, priority: e.target.value})}
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm"
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+          <Input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData({...formData, title: e.target.value})}
+            placeholder="Notification title"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+          <textarea
+            value={formData.message}
+            onChange={(e) => setFormData({...formData, message: e.target.value})}
+            placeholder="Enter your message..."
+            rows={3}
+            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Action URL (optional)</label>
+          <Input
+            type="url"
+            value={formData.action_url}
+            onChange={(e) => setFormData({...formData, action_url: e.target.value})}
+            placeholder="https://..."
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+            <Send size={14} className="mr-2" />
+            Send Notification
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
