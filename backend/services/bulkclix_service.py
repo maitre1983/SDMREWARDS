@@ -498,12 +498,12 @@ class BulkClixService:
                             await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
                             raise ValueError(f"Airtime purchase failed: {result.get('message', 'Unknown error')}")
                         
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 # Network error - simulate instead of failing
                 api_success = False
             except ValueError:
                 raise
-            except Exception as e:
+            except Exception:
                 api_success = False
         
         # Simulation mode if API not configured or failed due to route issues
@@ -671,12 +671,12 @@ class BulkClixService:
                             await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
                             raise ValueError(f"Data purchase failed: {result.get('message', 'Unknown error')}")
                         
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 # Network error - simulate instead of failing
                 api_success = False
             except ValueError:
                 raise
-            except Exception as e:
+            except Exception:
                 api_success = False
         
         # Simulation mode if API not configured or failed due to route issues
@@ -821,12 +821,12 @@ class BulkClixService:
                             await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
                             raise ValueError(f"Bill payment failed: {result.get('message', 'Unknown error')}")
                         
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 # Network error - simulate instead of failing
                 api_success = False
             except ValueError:
                 raise
-            except Exception as e:
+            except Exception:
                 api_success = False
         
         # Simulation mode if API not configured or failed due to route issues
@@ -985,12 +985,12 @@ class BulkClixService:
                             await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
                             raise ValueError(f"MoMo withdrawal failed: {result.get('message', 'Unknown error')}")
                         
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 # Network error - simulate instead of failing
                 api_success = False
             except ValueError:
                 raise
-            except Exception as e:
+            except Exception:
                 api_success = False
         
         # Simulation mode if API not configured or failed due to route issues
