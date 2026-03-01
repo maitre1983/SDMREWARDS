@@ -391,6 +391,12 @@ class UpdateSDMConfigRequest(BaseModel):
     gold_min_referrals: Optional[int] = None
     membership_validity_days: Optional[int] = None
     require_membership_for_referral: Optional[bool] = None
+    # Fintech configuration
+    sdm_commission_rate: Optional[float] = None  # SDM commission on cashback (default 2%)
+    cashback_pending_days: Optional[int] = None  # Days before cashback becomes available
+    withdrawal_fee: Optional[float] = None  # Fee for withdrawals in GHS
+    float_low_threshold: Optional[float] = None  # Alert when float below this
+    float_critical_threshold: Optional[float] = None  # Critical alert threshold
 
 # ============== HELPER FUNCTIONS ==============
 
