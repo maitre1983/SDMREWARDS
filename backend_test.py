@@ -258,15 +258,15 @@ class SmartDigitalAPITester:
         print("="*50)
         
         # Temporarily clear token
-        temp_token = self.token
-        self.token = None
+        temp_token = self.admin_token
+        self.admin_token = None
         
         # These should fail with 403 or 401
         self.run_test("Unauthorized Messages Access", "GET", "/api/admin/messages", 403)
         self.run_test("Unauthorized Stats Access", "GET", "/api/admin/stats", 403)
         
         # Restore token
-        self.token = temp_token
+        self.admin_token = temp_token
 
     def print_summary(self):
         """Print test summary"""
