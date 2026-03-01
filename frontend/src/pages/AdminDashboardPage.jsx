@@ -516,6 +516,10 @@ export default function AdminDashboardPage() {
           </div>
           </>
           )}
+
+          {activeTab === 'sdm' && (
+            <SDMConfigPanel token={token} />
+          )}
         </div>
       </main>
     </div>
