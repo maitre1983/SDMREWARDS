@@ -177,6 +177,31 @@ export default function SDMClientPage() {
     }
   };
 
+  const handlePurchaseMembership = async (cardTypeId) => {
+    setIsPurchasing(true);
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/sdm/user/purchase-membership`,
+        { card_type_id: cardTypeId, payment_method: 'wallet' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(`Membership purchased! Welcome bonus: GHS ${response.data.welcome_bonus}`);
+      fetchUserData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Purchase failed');
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
+  const getReferralLevelColor = (level) => {
+    switch (level) {
+      case 'gold': return 'bg-amber-100 text-amber-700 border-amber-300';
+      case 'silver': return 'bg-slate-200 text-slate-700 border-slate-300';
+      default: return 'bg-orange-100 text-orange-700 border-orange-300';
+    }
+  };
+
   // Login/OTP Screen
   if (step !== 'dashboard') {
     return (
