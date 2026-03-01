@@ -700,34 +700,179 @@ export default function SDMMerchantPage() {
         )}
 
         {activeTab === 'transactions' && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-slate-900 mb-4">Recent Transactions</h3>
-            {transactions.length === 0 ? (
-              <div className="bg-white rounded-xl p-8 text-center text-slate-500">
-                <BarChart3 size={40} className="mx-auto mb-3 opacity-30" />
-                <p>No transactions yet</p>
-              </div>
-            ) : (
-              transactions.slice(0, 20).map((txn) => (
-                <div key={txn.id} className="bg-white rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-mono text-sm text-slate-600">{txn.transaction_id}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      txn.status === 'available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {txn.status}
-                    </span>
+          <div className="space-y-4">
+            {/* Filters & Search */}
+            <div className="bg-white rounded-2xl p-4">
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="relative">
+                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      value={txnSearch}
+                      onChange={(e) => setTxnSearch(e.target.value)}
+                      placeholder="Search by ID or customer..."
+                      className="pl-10 h-10"
+                    />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-900 font-semibold">GHS {txn.amount.toFixed(2)}</span>
-                    <span className="text-sm text-emerald-600">-GHS {txn.net_cashback.toFixed(2)} cashback</span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {new Date(txn.created_at).toLocaleString()}
-                  </p>
                 </div>
-              ))
+                <div className="flex gap-2">
+                  {['all', 'pending', 'available'].map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setTxnFilter(filter)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        txnFilter === filter 
+                          ? 'bg-cyan-500 text-slate-900' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            {report && (
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-900">{report.total_transactions}</p>
+                  <p className="text-xs text-slate-500">Total Transactions</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-900">GHS {report.total_amount?.toFixed(0)}</p>
+                  <p className="text-xs text-slate-500">Total Sales</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-600">GHS {report.total_cashback?.toFixed(2)}</p>
+                  <p className="text-xs text-slate-500">Cashback Given</p>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-900">GHS {report.average_transaction?.toFixed(2)}</p>
+                  <p className="text-xs text-slate-500">Avg Transaction</p>
+                </div>
+              </div>
             )}
+
+            {/* Transaction List */}
+            <div className="bg-white rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900">
+                  Transaction History ({transactions.length})
+                </h3>
+                <select
+                  value={txnLimit}
+                  onChange={(e) => {
+                    setTxnLimit(parseInt(e.target.value));
+                    fetchMerchantData();
+                  }}
+                  className="text-sm border rounded-lg px-3 py-1"
+                >
+                  <option value={20}>Last 20</option>
+                  <option value={50}>Last 50</option>
+                  <option value={100}>Last 100</option>
+                  <option value={500}>Last 500</option>
+                </select>
+              </div>
+              
+              {transactions.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  <BarChart3 size={40} className="mx-auto mb-3 opacity-30" />
+                  <p>No transactions yet</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                  {transactions
+                    .filter(txn => {
+                      // Filter by status
+                      if (txnFilter !== 'all' && txn.status !== txnFilter) return false;
+                      // Filter by search
+                      if (txnSearch) {
+                        const search = txnSearch.toLowerCase();
+                        return txn.transaction_id.toLowerCase().includes(search) ||
+                               (txn.notes && txn.notes.toLowerCase().includes(search));
+                      }
+                      return true;
+                    })
+                    .map((txn) => (
+                      <div 
+                        key={txn.id} 
+                        className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => setShowTxnDetails(showTxnDetails === txn.id ? null : txn.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              txn.status === 'available' ? 'bg-emerald-100' : 'bg-amber-100'
+                            }`}>
+                              <DollarSign size={18} className={
+                                txn.status === 'available' ? 'text-emerald-600' : 'text-amber-600'
+                              } />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-slate-900">GHS {txn.amount.toFixed(2)}</p>
+                              <p className="text-xs text-slate-500 font-mono">{txn.transaction_id}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-emerald-600">-GHS {txn.net_cashback.toFixed(2)}</p>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              txn.status === 'available' ? 'bg-emerald-100 text-emerald-700' : 
+                              txn.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {txn.status}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Expanded Details */}
+                        {showTxnDetails === txn.id && (
+                          <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-slate-500">Date & Time</p>
+                              <p className="font-medium text-slate-900">
+                                {new Date(txn.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Cashback Rate</p>
+                              <p className="font-medium text-slate-900">{(txn.cashback_rate * 100).toFixed(1)}%</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Gross Cashback</p>
+                              <p className="font-medium text-slate-900">GHS {txn.cashback_amount.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">SDM Commission</p>
+                              <p className="font-medium text-slate-900">GHS {txn.sdm_commission.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-500">Available Date</p>
+                              <p className="font-medium text-slate-900">
+                                {new Date(txn.available_date).toLocaleDateString()}
+                              </p>
+                            </div>
+                            {txn.staff_name && (
+                              <div>
+                                <p className="text-slate-500">Staff</p>
+                                <p className="font-medium text-slate-900">{txn.staff_name}</p>
+                              </div>
+                            )}
+                            {txn.notes && (
+                              <div className="col-span-2">
+                                <p className="text-slate-500">Notes</p>
+                                <p className="font-medium text-slate-900">{txn.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
