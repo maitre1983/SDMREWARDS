@@ -38,6 +38,19 @@ export default function SDMClientPage() {
   const [withdrawPhone, setWithdrawPhone] = useState('');
   const [withdrawProvider, setWithdrawProvider] = useState('MTN');
 
+  // Super App Services state
+  const [activeService, setActiveService] = useState(null); // null, 'airtime', 'data', 'bill', 'momo'
+  const [serviceBalance, setServiceBalance] = useState(null);
+  const [dataBundles, setDataBundles] = useState([]);
+  const [serviceHistory, setServiceHistory] = useState([]);
+  const [isServiceLoading, setIsServiceLoading] = useState(false);
+  
+  // Service form states
+  const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
+  const [dataForm, setDataForm] = useState({ phone: '', bundleId: '' });
+  const [billForm, setBillForm] = useState({ provider: 'ECG', accountNumber: '', amount: '' });
+  const [momoForm, setMomoForm] = useState({ phone: '', amount: '', network: '' });
+
   useEffect(() => {
     if (token) {
       setStep('dashboard');
