@@ -4,7 +4,8 @@ import {
   CheckCircle, XCircle, Clock, RefreshCw, Loader2,
   DollarSign, Users, Store, Building2, FileText, Shield,
   ChevronDown, ChevronUp, Search, Filter, AlertTriangle,
-  Download, BarChart3, PieChart, Activity, Zap, AlertCircle
+  Download, BarChart3, PieChart, Activity, Zap, AlertCircle,
+  Bell, Send, Trash2, Eye, Plus
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -23,11 +24,14 @@ export default function FintechDashboard({ token }) {
   const [wallets, setWallets] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [fintechConfig, setFintechConfig] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [floatAlerts, setFloatAlerts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('investor');
   const [processingId, setProcessingId] = useState(null);
   const [topUpAmount, setTopUpAmount] = useState('');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [showNewNotificationForm, setShowNewNotificationForm] = useState(false);
   
   const headers = { Authorization: `Bearer ${token}` };
 
