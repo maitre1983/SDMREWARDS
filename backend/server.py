@@ -2998,6 +2998,143 @@ async def mark_merchant_notification_read(
     
     return {"message": "Notification marked as read"}
 
+# ============== PUSH NOTIFICATIONS (OneSignal) ==============
+
+from push_notifications import OneSignalService, PushNotificationPayload, PushDevice
+
+# Initialize push service
+push_service = OneSignalService(db)
+
+class RegisterPushDeviceRequest(BaseModel):
+    player_id: str
+    platform: str = "web"
+    device_model: Optional[str] = None
+
+class SendPushNotificationRequest(BaseModel):
+    title: str
+    message: str
+    url: Optional[str] = None
+    image_url: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
+
+@sdm_router.post("/user/push/register")
+async def register_user_push_device(
+    request: RegisterPushDeviceRequest,
+    user: dict = Depends(get_current_user)
+):
+    """User: Register device for push notifications"""
+    result = await push_service.register_device(
+        user_id=user["id"],
+        user_type="client",
+        player_id=request.player_id,
+        platform=request.platform,
+        device_model=request.device_model
+    )
+    return result
+
+@sdm_router.post("/user/push/unregister")
+async def unregister_user_push_device(
+    player_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """User: Unregister device from push notifications"""
+    success = await push_service.unregister_device(player_id)
+    return {"success": success}
+
+@sdm_router.get("/user/push/devices")
+async def get_user_push_devices(user: dict = Depends(get_current_user)):
+    """User: Get registered push devices"""
+    devices = await push_service.get_user_devices(user["id"])
+    return {"devices": devices, "count": len(devices)}
+
+@sdm_router.post("/merchant/push/register")
+async def register_merchant_push_device(
+    request: RegisterPushDeviceRequest,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Merchant: Register device for push notifications"""
+    result = await push_service.register_device(
+        user_id=merchant["id"],
+        user_type="merchant",
+        player_id=request.player_id,
+        platform=request.platform,
+        device_model=request.device_model
+    )
+    return result
+
+@sdm_router.post("/merchant/push/unregister")
+async def unregister_merchant_push_device(
+    player_id: str,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Merchant: Unregister device from push notifications"""
+    success = await push_service.unregister_device(player_id)
+    return {"success": success}
+
+@sdm_router.get("/admin/push/stats")
+async def get_push_stats(admin: dict = Depends(get_current_admin)):
+    """Admin: Get push notification statistics"""
+    stats = await push_service.get_notification_stats()
+    return stats
+
+@sdm_router.post("/admin/push/send")
+async def admin_send_push_notification(
+    request: SendPushNotificationRequest,
+    recipient_type: str = "all",
+    user_id: Optional[str] = None,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Send push notification to users"""
+    payload = PushNotificationPayload(
+        title=request.title,
+        message=request.message,
+        url=request.url,
+        image_url=request.image_url,
+        data=request.data
+    )
+    
+    if user_id:
+        # Send to specific user
+        result = await push_service.send_to_user(user_id, payload)
+    else:
+        # Send to all or segment
+        user_type = None
+        if recipient_type == "clients":
+            user_type = "client"
+        elif recipient_type == "merchants":
+            user_type = "merchant"
+        result = await push_service.send_to_all(payload, user_type)
+    
+    # Also create in-app notification
+    notification = Notification(
+        recipient_type=recipient_type,
+        recipient_ids=[user_id] if user_id else [],
+        title=request.title,
+        message=request.message,
+        notification_type="push",
+        priority="normal",
+        action_url=request.url,
+        sent_by=admin["username"]
+    )
+    await db.notifications.insert_one(notification.model_dump())
+    
+    return {
+        "push_result": result,
+        "in_app_notification_id": notification.id
+    }
+
+@sdm_router.post("/admin/push/test")
+async def test_push_notification(admin: dict = Depends(get_current_admin)):
+    """Admin: Test push notification system"""
+    stats = await push_service.get_notification_stats()
+    
+    return {
+        "is_configured": stats["is_configured"],
+        "active_devices": stats["active_devices"],
+        "message": "OneSignal configured and ready!" if stats["is_configured"] else 
+                   "OneSignal not configured. Add ONESIGNAL_APP_ID and ONESIGNAL_API_KEY to .env"
+    }
+
 # Import for ledger models
 from ledger import LedgerEntry, LedgerTransaction, TransactionStatus, EntryType
 
