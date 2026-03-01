@@ -963,9 +963,9 @@ export default function FintechDashboard({ token }) {
                         </td>
                         <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(log.performed_at)}</td>
                       </tr>
-                  ))
-                )}
-              </tbody>
+                    ))
+                  )}
+                </tbody>
             </table>
           </div>
         </div>
