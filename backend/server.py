@@ -1722,6 +1722,322 @@ async def external_get_user(phone: str, request: Request):
         "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM User"
     }
 
+
+# ============== FINTECH LEDGER API ==============
+
+class CreateDepositRequest(BaseModel):
+    amount: float
+    deposit_method: str  # MOBILE_MONEY, BANK_TRANSFER, CASH
+    provider: Optional[str] = None
+    provider_reference: Optional[str] = None
+    notes: Optional[str] = None
+
+class ApproveWithdrawalRequest(BaseModel):
+    admin_notes: Optional[str] = None
+
+class RejectWithdrawalRequest(BaseModel):
+    rejection_reason: str
+
+class CreateWithdrawalRequest(BaseModel):
+    amount: float
+    provider: str  # MTN, VODAFONE, AIRTELTIGO
+    phone_number: str
+    account_name: Optional[str] = None
+
+# ----- Admin Fintech Endpoints -----
+
+@sdm_router.get("/admin/fintech/summary")
+async def admin_get_fintech_summary(admin: dict = Depends(get_current_admin)):
+    """Admin: Get complete financial summary of the platform"""
+    summary = await ledger_service.get_financial_summary()
+    return summary
+
+@sdm_router.get("/admin/fintech/wallets")
+async def admin_get_all_wallets(
+    admin: dict = Depends(get_current_admin),
+    entity_type: Optional[str] = None,
+    limit: int = 100
+):
+    """Admin: Get all wallets with balances"""
+    query = {}
+    if entity_type:
+        query["entity_type"] = entity_type
+    
+    wallets = await db.wallets.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return wallets
+
+@sdm_router.get("/admin/fintech/transactions")
+async def admin_get_ledger_transactions(
+    admin: dict = Depends(get_current_admin),
+    transaction_type: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100
+):
+    """Admin: Get ledger transactions"""
+    query = {}
+    if transaction_type:
+        query["transaction_type"] = transaction_type
+    if status:
+        query["status"] = status
+    
+    transactions = await db.ledger_transactions.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return transactions
+
+@sdm_router.get("/admin/fintech/withdrawals")
+async def admin_get_withdrawals(
+    admin: dict = Depends(get_current_admin),
+    status: Optional[str] = None,
+    limit: int = 100
+):
+    """Admin: Get withdrawal requests"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    withdrawals = await db.withdrawal_requests.find(query, {"_id": 0}).sort("requested_at", -1).limit(limit).to_list(limit)
+    return withdrawals
+
+@sdm_router.post("/admin/fintech/withdrawals/{withdrawal_id}/approve")
+async def admin_approve_withdrawal(
+    withdrawal_id: str,
+    request: ApproveWithdrawalRequest,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Approve a withdrawal request"""
+    try:
+        withdrawal = await ledger_service.approve_withdrawal(
+            withdrawal_id,
+            approved_by=admin["username"],
+            admin_notes=request.admin_notes
+        )
+        return {"message": "Withdrawal approved", "withdrawal": withdrawal.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.post("/admin/fintech/withdrawals/{withdrawal_id}/reject")
+async def admin_reject_withdrawal(
+    withdrawal_id: str,
+    request: RejectWithdrawalRequest,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Reject a withdrawal request"""
+    try:
+        withdrawal = await ledger_service.reject_withdrawal(
+            withdrawal_id,
+            rejected_by=admin["username"],
+            rejection_reason=request.rejection_reason
+        )
+        return {"message": "Withdrawal rejected", "withdrawal": withdrawal.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.post("/admin/fintech/withdrawals/{withdrawal_id}/complete")
+async def admin_complete_withdrawal(
+    withdrawal_id: str,
+    provider_reference: str,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Mark withdrawal as paid (after Mobile Money confirmation)"""
+    try:
+        withdrawal = await ledger_service.complete_withdrawal(
+            withdrawal_id,
+            provider_reference=provider_reference
+        )
+        return {"message": "Withdrawal completed", "withdrawal": withdrawal.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.get("/admin/fintech/deposits")
+async def admin_get_deposits(
+    admin: dict = Depends(get_current_admin),
+    status: Optional[str] = None,
+    limit: int = 100
+):
+    """Admin: Get merchant deposits"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    deposits = await db.merchant_deposits.find(query, {"_id": 0}).sort("requested_at", -1).limit(limit).to_list(limit)
+    return deposits
+
+@sdm_router.post("/admin/fintech/deposits/{deposit_id}/confirm")
+async def admin_confirm_deposit(
+    deposit_id: str,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Confirm a merchant deposit"""
+    try:
+        result = await ledger_service.confirm_merchant_deposit(
+            deposit_id,
+            confirmed_by=admin["username"]
+        )
+        return {"message": "Deposit confirmed", **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.get("/admin/fintech/audit-logs")
+async def admin_get_audit_logs(
+    admin: dict = Depends(get_current_admin),
+    action: Optional[str] = None,
+    limit: int = 100
+):
+    """Admin: Get audit logs"""
+    query = {}
+    if action:
+        query["action"] = action
+    
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("performed_at", -1).limit(limit).to_list(limit)
+    return logs
+
+@sdm_router.post("/admin/fintech/process-pending")
+async def admin_process_pending_cashback(admin: dict = Depends(get_current_admin)):
+    """Admin: Process pending cashback to available (manual trigger)"""
+    result = await ledger_service.process_pending_to_available()
+    return {"message": "Pending cashback processed", **result}
+
+# ----- Merchant Fintech Endpoints -----
+
+@sdm_router.get("/merchant/fintech/wallet")
+async def merchant_get_wallet(merchant: dict = Depends(get_current_merchant)):
+    """Merchant: Get wallet details"""
+    wallet = await ledger_service.get_or_create_wallet(
+        EntityType.MERCHANT,
+        merchant["id"],
+        merchant.get("business_name")
+    )
+    return wallet.model_dump()
+
+@sdm_router.post("/merchant/fintech/deposit")
+async def merchant_create_deposit(
+    request: CreateDepositRequest,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Merchant: Request a deposit (pre-funding)"""
+    try:
+        # Ensure wallet exists
+        await ledger_service.get_or_create_wallet(
+            EntityType.MERCHANT,
+            merchant["id"],
+            merchant.get("business_name")
+        )
+        
+        deposit = await ledger_service.create_merchant_deposit(
+            merchant_id=merchant["id"],
+            amount=request.amount,
+            deposit_method=request.deposit_method,
+            provider=request.provider,
+            provider_reference=request.provider_reference,
+            notes=request.notes,
+            created_by=merchant["id"]
+        )
+        return {"message": "Deposit request created", "deposit": deposit.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.get("/merchant/fintech/deposits")
+async def merchant_get_deposits(merchant: dict = Depends(get_current_merchant)):
+    """Merchant: Get deposit history"""
+    deposits = await db.merchant_deposits.find(
+        {"merchant_id": merchant["id"]},
+        {"_id": 0}
+    ).sort("requested_at", -1).to_list(100)
+    return deposits
+
+@sdm_router.post("/merchant/fintech/withdraw")
+async def merchant_create_withdrawal(
+    request: CreateWithdrawalRequest,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Merchant: Request a withdrawal"""
+    try:
+        withdrawal = await ledger_service.create_withdrawal_request(
+            entity_type=EntityType.MERCHANT,
+            entity_id=merchant["id"],
+            amount=request.amount,
+            provider=request.provider,
+            phone_number=request.phone_number,
+            account_name=request.account_name
+        )
+        return {"message": "Withdrawal request created", "withdrawal": withdrawal.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.get("/merchant/fintech/withdrawals")
+async def merchant_get_withdrawals(merchant: dict = Depends(get_current_merchant)):
+    """Merchant: Get withdrawal history"""
+    withdrawals = await db.withdrawal_requests.find(
+        {"entity_id": merchant["id"], "entity_type": EntityType.MERCHANT.value},
+        {"_id": 0}
+    ).sort("requested_at", -1).to_list(100)
+    return withdrawals
+
+@sdm_router.get("/merchant/fintech/ledger")
+async def merchant_get_ledger(merchant: dict = Depends(get_current_merchant), limit: int = 50):
+    """Merchant: Get ledger entries"""
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.MERCHANT, merchant["id"])
+    if not wallet:
+        return []
+    
+    entries = await db.ledger_entries.find(
+        {"wallet_id": wallet.id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    return entries
+
+# ----- Client Fintech Endpoints -----
+
+@sdm_router.get("/user/fintech/wallet")
+async def user_get_wallet(user: dict = Depends(get_current_user)):
+    """User: Get wallet details from ledger"""
+    wallet = await ledger_service.get_or_create_wallet(
+        EntityType.CLIENT,
+        user["id"],
+        f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+    )
+    return wallet.model_dump()
+
+@sdm_router.post("/user/fintech/withdraw")
+async def user_create_withdrawal(
+    request: CreateWithdrawalRequest,
+    user: dict = Depends(get_current_user)
+):
+    """User: Request a withdrawal"""
+    try:
+        withdrawal = await ledger_service.create_withdrawal_request(
+            entity_type=EntityType.CLIENT,
+            entity_id=user["id"],
+            amount=request.amount,
+            provider=request.provider,
+            phone_number=request.phone_number,
+            account_name=request.account_name
+        )
+        return {"message": "Withdrawal request created", "withdrawal": withdrawal.model_dump()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.get("/user/fintech/withdrawals")
+async def user_get_withdrawals(user: dict = Depends(get_current_user)):
+    """User: Get withdrawal history"""
+    withdrawals = await db.withdrawal_requests.find(
+        {"entity_id": user["id"], "entity_type": EntityType.CLIENT.value},
+        {"_id": 0}
+    ).sort("requested_at", -1).to_list(100)
+    return withdrawals
+
+@sdm_router.get("/user/fintech/ledger")
+async def user_get_ledger(user: dict = Depends(get_current_user), limit: int = 50):
+    """User: Get ledger entries"""
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user["id"])
+    if not wallet:
+        return []
+    
+    entries = await db.ledger_entries.find(
+        {"wallet_id": wallet.id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    return entries
+
 # Include routers
 app.include_router(api_router)
 app.include_router(sdm_router)
