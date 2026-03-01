@@ -83,6 +83,118 @@ export default function SDMClientPage() {
     }
   };
 
+  // Fetch service-related data
+  const fetchServiceData = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [balanceRes, bundlesRes, historyRes] = await Promise.all([
+        axios.get(`${API_URL}/api/sdm/user/services/balance`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/services/data-bundles`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/services/history`, { headers })
+      ]);
+      setServiceBalance(balanceRes.data);
+      setDataBundles(bundlesRes.data.bundles || []);
+      setServiceHistory(historyRes.data.transactions || []);
+    } catch (error) {
+      console.error('Service data fetch error:', error);
+    }
+  };
+
+  // Buy Airtime
+  const handleBuyAirtime = async (e) => {
+    e.preventDefault();
+    setIsServiceLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API_URL}/api/sdm/user/services/airtime`, {
+        phone_number: airtimeForm.phone,
+        amount: parseFloat(airtimeForm.amount),
+        network: airtimeForm.network || null
+      }, { headers });
+      
+      toast.success(`Airtime acheté! Référence: ${response.data.reference}`);
+      setAirtimeForm({ phone: '', amount: '', network: '' });
+      setActiveService(null);
+      fetchUserData();
+      fetchServiceData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+    } finally {
+      setIsServiceLoading(false);
+    }
+  };
+
+  // Buy Data Bundle
+  const handleBuyData = async (e) => {
+    e.preventDefault();
+    setIsServiceLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API_URL}/api/sdm/user/services/data`, {
+        phone_number: dataForm.phone,
+        bundle_id: dataForm.bundleId
+      }, { headers });
+      
+      toast.success(`Forfait data acheté! Référence: ${response.data.reference}`);
+      setDataForm({ phone: '', bundleId: '' });
+      setActiveService(null);
+      fetchUserData();
+      fetchServiceData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+    } finally {
+      setIsServiceLoading(false);
+    }
+  };
+
+  // Pay Bill
+  const handlePayBill = async (e) => {
+    e.preventDefault();
+    setIsServiceLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API_URL}/api/sdm/user/services/bill`, {
+        provider: billForm.provider,
+        account_number: billForm.accountNumber,
+        amount: parseFloat(billForm.amount)
+      }, { headers });
+      
+      toast.success(`Facture payée! Token: ${response.data.bill_reference || response.data.reference}`);
+      setBillForm({ provider: 'ECG', accountNumber: '', amount: '' });
+      setActiveService(null);
+      fetchUserData();
+      fetchServiceData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec du paiement');
+    } finally {
+      setIsServiceLoading(false);
+    }
+  };
+
+  // Withdraw to MoMo (via services)
+  const handleServiceWithdraw = async (e) => {
+    e.preventDefault();
+    setIsServiceLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API_URL}/api/sdm/user/services/withdraw`, {
+        phone_number: momoForm.phone,
+        amount: parseFloat(momoForm.amount),
+        network: momoForm.network || null
+      }, { headers });
+      
+      toast.success(`Retrait initié! Montant net: GHS ${response.data.net_amount}`);
+      setMomoForm({ phone: '', amount: '', network: '' });
+      setActiveService(null);
+      fetchUserData();
+      fetchServiceData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec du retrait');
+    } finally {
+      setIsServiceLoading(false);
+    }
+  };
+
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setIsLoading(true);
