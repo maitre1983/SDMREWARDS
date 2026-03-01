@@ -820,8 +820,18 @@ export default function FintechDashboard({ token }) {
       {/* Ledger Transactions */}
       {activeSubTab === 'ledger' && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-semibold text-slate-900">Ledger Transactions ({transactions.length})</h3>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleExportTransactions('csv')} className="gap-2">
+                <Download size={14} />
+                Export CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleExportTransactions('json')} className="gap-2">
+                <Download size={14} />
+                Export JSON
+              </Button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
