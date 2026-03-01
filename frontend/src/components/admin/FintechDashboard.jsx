@@ -264,6 +264,7 @@ export default function FintechDashboard({ token }) {
           { id: 'float', label: 'Float', icon: Zap },
           { id: 'wallets', label: 'Wallets', icon: Wallet },
           { id: 'ledger', label: 'Ledger', icon: FileText },
+          { id: 'config', label: 'Config', icon: Filter },
           { id: 'audit', label: 'Audit', icon: Shield },
         ].map((tab) => (
           <button
