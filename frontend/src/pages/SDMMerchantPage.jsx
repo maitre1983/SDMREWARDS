@@ -68,14 +68,18 @@ export default function SDMMerchantPage() {
   const fetchMerchantData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [profileRes, txnRes, reportRes] = await Promise.all([
+      const [profileRes, txnRes, reportRes, cardTypesRes, membershipsRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/merchant/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/transactions`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers })
+        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers }),
+        axios.get(`${API_URL}/api/sdm/merchant/card-types`, { headers }),
+        axios.get(`${API_URL}/api/sdm/merchant/memberships`, { headers })
       ]);
       setMerchant(profileRes.data);
       setTransactions(txnRes.data);
       setReport(reportRes.data);
+      setCardTypes(cardTypesRes.data);
+      setMemberships(membershipsRes.data);
     } catch (error) {
       if (error.response?.status === 401) {
         handleLogout();
