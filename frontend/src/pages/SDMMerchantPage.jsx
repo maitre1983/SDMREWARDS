@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   Store, ArrowLeft, Loader2, QrCode, Users, BarChart3,
   Settings, LogOut, DollarSign, TrendingUp, Plus, Trash2,
-  Check, X
+  Check, X, CreditCard, Edit2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
