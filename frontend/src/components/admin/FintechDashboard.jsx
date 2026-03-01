@@ -238,9 +238,11 @@ export default function FintechDashboard({ token }) {
       {/* Sub Tabs */}
       <div className="flex gap-2 bg-slate-100 p-1 rounded-lg overflow-x-auto">
         {[
+          { id: 'investor', label: 'Investor', icon: BarChart3 },
           { id: 'overview', label: 'Overview', icon: TrendingUp },
           { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
           { id: 'deposits', label: 'Deposits', icon: ArrowDownToLine },
+          { id: 'float', label: 'Float', icon: Zap },
           { id: 'wallets', label: 'Wallets', icon: Wallet },
           { id: 'ledger', label: 'Ledger', icon: FileText },
           { id: 'audit', label: 'Audit', icon: Shield },
@@ -259,6 +261,163 @@ export default function FintechDashboard({ token }) {
           </button>
         ))}
       </div>
+
+      {/* Investor Dashboard */}
+      {activeSubTab === 'investor' && investorData && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Investor Dashboard (30 days)</h3>
+            <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
+              <RefreshCw size={16} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Key Metrics */}
+          <div className="grid grid-cols-4 gap-4">
+            <MetricCard
+              title="GMV (Gross Merchandise Value)"
+              value={`GHS ${investorData.gmv.current.toLocaleString()}`}
+              change={investorData.gmv.growth_percent}
+              icon={DollarSign}
+            />
+            <MetricCard
+              title="Commission Earned"
+              value={`GHS ${investorData.commission_earned.current.toLocaleString()}`}
+              change={investorData.commission_earned.growth_percent}
+              icon={TrendingUp}
+            />
+            <MetricCard
+              title="Transaction Count"
+              value={investorData.transaction_count.current.toLocaleString()}
+              change={investorData.transaction_count.growth_percent}
+              icon={Activity}
+            />
+            <MetricCard
+              title="Avg Transaction"
+              value={`GHS ${investorData.average_transaction.toLocaleString()}`}
+              icon={BarChart3}
+            />
+          </div>
+
+          {/* Users & Revenue */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{investorData.total_users}</p>
+                  <p className="text-xs text-slate-500">Total Users</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-500">Merchants</p>
+                  <p className="font-semibold">{investorData.total_merchants}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Active</p>
+                  <p className="font-semibold text-emerald-600">{investorData.active_merchants}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <Wallet size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">GHS {investorData.memberships.revenue.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Membership Revenue</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-500">Total Cards</p>
+                  <p className="font-semibold">{investorData.memberships.total}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Active</p>
+                  <p className="font-semibold text-emerald-600">{investorData.memberships.active}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                  <ArrowDownToLine size={20} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">GHS {investorData.deposits.total_amount.toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Total Deposits</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-slate-500">Count</p>
+                  <p className="font-semibold">{investorData.deposits.count}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Cashback Given</p>
+                  <p className="font-semibold text-blue-600">GHS {investorData.total_cashback_given}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Daily Chart */}
+          {investorData.daily_breakdown && investorData.daily_breakdown.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h4 className="font-semibold text-slate-900 mb-4">Daily GMV & Commission</h4>
+              <div className="overflow-x-auto">
+                <div className="flex gap-2 min-w-max">
+                  {investorData.daily_breakdown.map((day) => (
+                    <div key={day.date} className="text-center min-w-[80px]">
+                      <div className="h-32 flex flex-col justify-end gap-1">
+                        <div 
+                          className="bg-blue-500 rounded-t"
+                          style={{ height: `${Math.min((day.gmv / Math.max(...investorData.daily_breakdown.map(d => d.gmv))) * 100, 100)}%` }}
+                          title={`GMV: GHS ${day.gmv}`}
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">{day.date.slice(5)}</p>
+                      <p className="text-xs font-semibold">{day.count}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Wallet Balances Summary */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h4 className="font-semibold text-slate-900 mb-4">Platform Wallet Balances</h4>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-xs text-slate-500">Client Wallets ({investorData.wallets.client.count})</p>
+                <p className="text-lg font-bold text-blue-600">GHS {(investorData.wallets.client.total_available || 0).toLocaleString()}</p>
+                <p className="text-xs text-amber-600">Pending: GHS {(investorData.wallets.client.total_pending || 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-xs text-slate-500">Merchant Wallets ({investorData.wallets.merchant.count})</p>
+                <p className="text-lg font-bold text-emerald-600">GHS {(investorData.wallets.merchant.total_available || 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-xs text-slate-500">SDM Commission</p>
+                <p className="text-lg font-bold text-purple-600">GHS {(investorData.wallets.sdm_commission.total_available || 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4">
+                <p className="text-xs text-slate-500">SDM Float (MoMo)</p>
+                <p className="text-lg font-bold text-cyan-600">GHS {(investorData.wallets.sdm_float.total_available || 0).toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Overview */}
       {activeSubTab === 'overview' && summary && (
