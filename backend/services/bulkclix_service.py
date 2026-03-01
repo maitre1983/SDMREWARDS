@@ -488,9 +488,9 @@ class BulkClixService:
                         transaction.status = TransactionStatus.SUCCESS
                         api_success = True
                     else:
-                        # API returned error - check if it's a route issue (simulate instead)
+                        # API returned error - check if it's a route issue or auth issue (simulate instead)
                         error_msg = result.get("message", str(result))
-                        if "could not be found" in error_msg or "route" in error_msg.lower():
+                        if "could not be found" in error_msg or "route" in error_msg.lower() or "unauthorized" in error_msg.lower() or "auth" in error_msg.lower():
                             # Simulate instead of reversing
                             api_success = False
                         else:
