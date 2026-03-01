@@ -1590,7 +1590,7 @@ async def admin_get_sdm_stats(admin: dict = Depends(get_current_admin)):
         "total_membership_revenue": round(total_membership_revenue, 2),
         "total_referral_bonuses": round(total_referral_bonuses, 2),
         "pending_withdrawals": pending_withdrawals,
-        "users_by_level": {l["_id"]: l["count"] for l in level_stats if l["_id"]}
+        "users_by_level": {level["_id"]: level["count"] for level in level_stats if level["_id"]}
     }
 
 @sdm_router.get("/admin/memberships")
