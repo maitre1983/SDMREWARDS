@@ -194,7 +194,7 @@ class SmartDigitalAPITester:
 
     def test_admin_endpoints(self):
         """Test admin-only endpoints"""
-        if not self.token:
+        if not self.admin_token:
             print("❌ No admin token available. Skipping admin endpoint tests.")
             return
         
