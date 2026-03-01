@@ -951,9 +951,62 @@ export default function FintechDashboard({ token }) {
             </Button>
           </div>
 
+          {/* Push Notification Stats */}
+          {pushStats && (
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${pushStats.is_configured ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                    <Smartphone size={20} className={pushStats.is_configured ? 'text-emerald-600' : 'text-amber-600'} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Push Status</p>
+                    <p className={`font-semibold ${pushStats.is_configured ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {pushStats.is_configured ? 'Active' : 'Not Configured'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Bell size={20} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Active Devices</p>
+                    <p className="text-xl font-bold text-slate-900">{pushStats.active_devices}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <Users size={20} className="text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Clients</p>
+                    <p className="text-xl font-bold text-slate-900">{pushStats.by_user_type?.client || 0}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                    <Store size={20} className="text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Merchants</p>
+                    <p className="text-xl font-bold text-slate-900">{pushStats.by_user_type?.merchant || 0}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showNewNotificationForm && (
             <NotificationForm 
-              onSubmit={handleCreateNotification} 
+              onSubmit={handleCreateNotification}
+              onSubmitPush={handleSendPushNotification}
               onCancel={() => setShowNewNotificationForm(false)} 
             />
           )}
