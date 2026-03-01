@@ -999,11 +999,15 @@ async def register_merchant(request: MerchantRegisterRequest):
         "token_type": "bearer"
     }
 
+class MerchantLoginRequest(BaseModel):
+    phone: str
+    api_key: str
+
 @sdm_router.post("/merchant/login")
-async def merchant_login(phone: str, api_key: str):
+async def merchant_login(request: MerchantLoginRequest):
     """Merchant login with phone and API key"""
-    phone = normalize_phone(phone)
-    merchant = await db.sdm_merchants.find_one({"phone": phone, "api_key": api_key}, {"_id": 0})
+    phone = normalize_phone(request.phone)
+    merchant = await db.sdm_merchants.find_one({"phone": phone, "api_key": request.api_key}, {"_id": 0})
     if not merchant:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
