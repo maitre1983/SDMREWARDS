@@ -49,9 +49,13 @@ SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
 CASHBACK_PENDING_DAYS = int(os.environ.get('CASHBACK_PENDING_DAYS', '7'))
 WITHDRAWAL_FEE = float(os.environ.get('WITHDRAWAL_FEE', '1.0'))  # GHS
 
+# Referral bonus constants (used before membership system)
+REFERRAL_BONUS = 5.0  # GHS for referrer
+REFERRAL_WELCOME_BONUS = 2.0  # GHS for new user
+
 # Default config (will be loaded from DB)
 DEFAULT_SDM_CONFIG = {
-    "membership_card_price": 50.0,  # GHS
+    "membership_card_price": 50.0,  # GHS - Default for platform cards
     "referral_bonus_bronze": 5.0,   # GHS per referral at Bronze level
     "referral_bonus_silver": 7.0,   # GHS per referral at Silver level  
     "referral_bonus_gold": 10.0,    # GHS per referral at Gold level
@@ -60,6 +64,7 @@ DEFAULT_SDM_CONFIG = {
     "silver_min_referrals": 5,
     "gold_min_referrals": 15,
     "membership_validity_days": 365,
+    "require_membership_for_referral": False,  # If true, only members can refer
 }
 
 if RESEND_API_KEY:
