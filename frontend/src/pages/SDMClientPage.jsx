@@ -58,6 +58,13 @@ export default function SDMClientPage() {
     }
   }, [token]);
 
+  // Load service data when services tab is active
+  useEffect(() => {
+    if (activeTab === 'services' && token) {
+      fetchServiceData();
+    }
+  }, [activeTab, token]);
+
   const fetchUserData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
