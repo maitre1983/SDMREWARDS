@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { 
   Store, ArrowLeft, Loader2, QrCode, Users, BarChart3,
   Settings, LogOut, DollarSign, TrendingUp, Plus, Trash2,
-  Check, X, CreditCard, Edit2
+  Check, X, CreditCard, Edit2, Camera, Calendar, Filter,
+  ChevronDown, ChevronUp, Clock, User, Search
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import axios from 'axios';
+import QRScanner from '../components/QRScanner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
