@@ -22,6 +22,9 @@ import bcrypt
 import resend
 import phonenumbers
 
+# Import Ledger Service
+from ledger import LedgerService, EntityType, TransactionType, WithdrawalStatus
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -29,6 +32,9 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Initialize Ledger Service
+ledger_service = LedgerService(db)
 
 # JWT Settings
 JWT_SECRET = os.environ.get('JWT_SECRET', 'smart-digital-solutions-secret-key-2024')
