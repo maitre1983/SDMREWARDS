@@ -41,10 +41,18 @@ export default function SDMMerchantPage() {
   // Scan form
   const [scanQR, setScanQR] = useState('');
   const [scanAmount, setScanAmount] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanNotes, setScanNotes] = useState('');
 
   // Staff form
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffPhone, setNewStaffPhone] = useState('');
+
+  // Transaction history filters
+  const [txnFilter, setTxnFilter] = useState('all'); // all, pending, available
+  const [txnSearch, setTxnSearch] = useState('');
+  const [txnLimit, setTxnLimit] = useState(50);
+  const [showTxnDetails, setShowTxnDetails] = useState(null);
 
   // Card types
   const [cardTypes, setCardTypes] = useState([]);
