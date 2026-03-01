@@ -508,6 +508,99 @@ export default function FintechDashboard({ token }) {
         </div>
       )}
 
+      {/* Float Management */}
+      {activeSubTab === 'float' && floatStatus && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Float Management (Mobile Money)</h3>
+            <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
+              <RefreshCw size={16} />
+              Refresh
+            </Button>
+          </div>
+
+          {/* Alert Banner */}
+          {floatStatus.alert_level !== 'OK' && (
+            <div className={`rounded-xl p-4 flex items-center gap-4 ${
+              floatStatus.alert_level === 'CRITICAL' ? 'bg-red-100 border border-red-200' : 'bg-amber-100 border border-amber-200'
+            }`}>
+              <AlertCircle size={24} className={floatStatus.alert_level === 'CRITICAL' ? 'text-red-600' : 'text-amber-600'} />
+              <div>
+                <p className={`font-semibold ${floatStatus.alert_level === 'CRITICAL' ? 'text-red-700' : 'text-amber-700'}`}>
+                  {floatStatus.alert_level === 'CRITICAL' ? '⚠️ CRITICAL: Float balance very low!' : '⚡ LOW: Float balance running low'}
+                </p>
+                <p className="text-sm">{floatStatus.recommendation}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Float Status Cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className={`rounded-xl p-6 ${
+              floatStatus.alert_level === 'OK' ? 'bg-emerald-50 border border-emerald-200' :
+              floatStatus.alert_level === 'LOW' ? 'bg-amber-50 border border-amber-200' :
+              'bg-red-50 border border-red-200'
+            }`}>
+              <p className="text-sm text-slate-600 mb-2">Float Balance</p>
+              <p className={`text-3xl font-bold ${
+                floatStatus.alert_level === 'OK' ? 'text-emerald-600' :
+                floatStatus.alert_level === 'LOW' ? 'text-amber-600' : 'text-red-600'
+              }`}>
+                GHS {floatStatus.float_balance.toLocaleString()}
+              </p>
+              <p className="text-xs text-slate-500 mt-2">
+                Threshold: Low &lt; GHS {floatStatus.thresholds.low} | Critical &lt; GHS {floatStatus.thresholds.critical}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <p className="text-sm text-slate-600 mb-2">Pending Withdrawals</p>
+              <p className="text-3xl font-bold text-slate-900">{floatStatus.pending_withdrawals.count}</p>
+              <p className="text-sm text-amber-600 mt-2">Total: GHS {floatStatus.pending_withdrawals.total_amount.toLocaleString()}</p>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <p className="text-sm text-slate-600 mb-2">Coverage Ratio</p>
+              <p className={`text-3xl font-bold ${
+                typeof floatStatus.coverage_ratio === 'number' && floatStatus.coverage_ratio < 1 ? 'text-red-600' : 'text-emerald-600'
+              }`}>
+                {floatStatus.coverage_ratio === '∞' ? '∞' : `${floatStatus.coverage_ratio}x`}
+              </p>
+              <p className="text-xs text-slate-500 mt-2">Float ÷ Pending Withdrawals</p>
+            </div>
+          </div>
+
+          {/* Top Up Form */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h4 className="font-semibold text-slate-900 mb-4">Top Up Float</h4>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm text-slate-600 mb-2">Amount (GHS)</label>
+                <Input
+                  type="number"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  placeholder="1000"
+                  min="1"
+                  step="0.01"
+                />
+              </div>
+              <Button 
+                onClick={handleTopUpFloat}
+                disabled={!topUpAmount}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              >
+                <ArrowDownToLine size={16} className="mr-2" />
+                Top Up Float
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              This records an incoming float top-up (e.g., from bank transfer to Mobile Money account).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Withdrawals */}
       {activeSubTab === 'withdrawals' && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
