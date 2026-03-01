@@ -1018,6 +1018,12 @@ async def register_merchant(request: MerchantRegisterRequest):
     )
     await db.sdm_merchants.insert_one(merchant.model_dump())
     
+    # Automatically create merchant wallet
+    try:
+        await ledger_service.create_wallet(EntityType.MERCHANT, merchant.id)
+    except Exception as e:
+        print(f"Warning: Failed to create merchant wallet: {e}")
+    
     # Generate token
     token = create_token({"sub": merchant.id, "type": "merchant"}, expires_hours=720)  # 30 days
     
