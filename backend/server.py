@@ -183,7 +183,11 @@ class SDMUser(BaseModel):
     referral_code: str = Field(default_factory=lambda: f"SDM{secrets.token_hex(3).upper()}")
     referred_by: Optional[str] = None  # User ID who referred this user
     referral_bonus_earned: float = 0.0
-    referral_count: int = 0
+    referral_count: int = 0  # Active members referred
+    referral_level: str = "bronze"  # bronze, silver, gold
+    has_membership: bool = False
+    membership_expires: Optional[str] = None
+    membership_card_id: Optional[str] = None
     wallet_pending: float = 0.0
     wallet_available: float = 0.0
     total_earned: float = 0.0
@@ -191,6 +195,20 @@ class SDMUser(BaseModel):
     is_active: bool = True
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class MembershipCard(BaseModel):
+    """SDM Membership Card"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    card_number: str = Field(default_factory=lambda: f"SDM{datetime.now().strftime('%Y%m%d')}{secrets.token_hex(4).upper()}")
+    price_paid: float
+    payment_method: str  # "wallet", "mobile_money", "card"
+    payment_reference: Optional[str] = None
+    status: str = "active"  # active, expired, cancelled
+    purchased_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    expires_at: str = ""
+    referrer_bonus_paid: bool = False  # Track if referrer got bonus
 
 class SDMMerchant(BaseModel):
     """SDM Merchant/Business"""
