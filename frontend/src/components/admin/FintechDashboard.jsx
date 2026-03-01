@@ -15,14 +15,17 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function FintechDashboard({ token }) {
   const [summary, setSummary] = useState(null);
+  const [investorData, setInvestorData] = useState(null);
+  const [floatStatus, setFloatStatus] = useState(null);
   const [withdrawals, setWithdrawals] = useState([]);
   const [deposits, setDeposits] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [wallets, setWallets] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState('overview');
+  const [activeSubTab, setActiveSubTab] = useState('investor');
   const [processingId, setProcessingId] = useState(null);
+  const [topUpAmount, setTopUpAmount] = useState('');
   
   const headers = { Authorization: `Bearer ${token}` };
 
