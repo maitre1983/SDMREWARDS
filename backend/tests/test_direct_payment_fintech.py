@@ -354,17 +354,20 @@ class TestDirectPaymentFintech:
         """Test that merchant wallet is auto-created and credited after Direct Payment"""
         
         # Create a merchant and perform a transaction (similar to above but focused on merchant wallet)
+        unique_id = uuid.uuid4().hex[:8]
         merchant_data = {
-            "business_name": f"TEST_MerchantWallet_{uuid.uuid4().hex[:8]}",
+            "business_name": f"TEST_MerchantWallet_{unique_id}",
             "business_type": "salon",
-            "phone": f"+23324{str(int(time.time()))[-7:]}",
-            "email": f"test_{uuid.uuid4().hex[:6]}@test.com",
+            "phone": f"+233{uuid.uuid4().int % 100000000:08d}",  # Use UUID for unique phone
+            "email": f"test_{unique_id}@test.com",
             "city": "Accra",
             "cashback_rate": 0.10  # 10% cashback
         }
         
         response = self.session.post(f"{BASE_URL}/api/sdm/merchant/register", json=merchant_data)
-        assert response.status_code == 200
+        if response.status_code != 200:
+            print(f"Merchant registration response: {response.text}")
+        assert response.status_code == 200, f"Merchant registration failed: {response.text}"
         
         merchant_result = response.json()
         merchant_token = merchant_result["access_token"]
