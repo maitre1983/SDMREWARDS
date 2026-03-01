@@ -28,6 +28,9 @@ export default function SDMClientPage() {
   const [transactions, setTransactions] = useState([]);
   const [referralData, setReferralData] = useState(null);
   const [activeTab, setActiveTab] = useState('wallet');
+  const [availableCards, setAvailableCards] = useState([]);
+  const [userMemberships, setUserMemberships] = useState([]);
+  const [isPurchasing, setIsPurchasing] = useState(false);
   
   // Withdrawal form
   const [withdrawAmount, setWithdrawAmount] = useState('');
