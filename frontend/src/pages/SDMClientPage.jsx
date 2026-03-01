@@ -553,6 +553,445 @@ export default function SDMClientPage() {
           </div>
         )}
 
+        {/* SUPER APP SERVICES TAB */}
+        {activeTab === 'services' && (
+          <div className="space-y-4" data-testid="services-tab">
+            {/* Service Balance Info */}
+            {serviceBalance && (
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-4 text-white">
+                <p className="text-sm opacity-80">Solde Cashback Disponible</p>
+                <p className="text-2xl font-bold">GHS {serviceBalance.cashback_balance?.toFixed(2) || '0.00'}</p>
+                <div className="flex gap-4 mt-2 text-xs">
+                  <span>Limite mensuelle: GHS {serviceBalance.monthly_limit}</span>
+                  <span>Utilisé: GHS {serviceBalance.monthly_used?.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Service Selection Menu */}
+            {!activeService && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-900">Utiliser mon Cashback</h3>
+                
+                {/* Airtime */}
+                <button
+                  onClick={() => setActiveService('airtime')}
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  data-testid="service-airtime"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <Phone className="text-orange-600" size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-slate-900">Acheter du Crédit</p>
+                    <p className="text-sm text-slate-500">Airtime MTN, Vodafone, AirtelTigo</p>
+                  </div>
+                  <ChevronRight className="text-slate-400" size={20} />
+                </button>
+
+                {/* Data Bundle */}
+                <button
+                  onClick={() => setActiveService('data')}
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  data-testid="service-data"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Wifi className="text-blue-600" size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-slate-900">Forfait Internet</p>
+                    <p className="text-sm text-slate-500">Data bundles pour tous réseaux</p>
+                  </div>
+                  <ChevronRight className="text-slate-400" size={20} />
+                </button>
+
+                {/* Bill Payment */}
+                <button
+                  onClick={() => setActiveService('bill')}
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  data-testid="service-bill"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
+                    <Zap className="text-yellow-600" size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-slate-900">Payer une Facture</p>
+                    <p className="text-sm text-slate-500">ECG, GWCL, DSTV, GOTV</p>
+                  </div>
+                  <ChevronRight className="text-slate-400" size={20} />
+                </button>
+
+                {/* MoMo Withdrawal */}
+                <button
+                  onClick={() => setActiveService('momo')}
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  data-testid="service-momo"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                    <Banknote className="text-green-600" size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-slate-900">Retrait Mobile Money</p>
+                    <p className="text-sm text-slate-500">Retirer vers MTN, Vodafone, AirtelTigo</p>
+                  </div>
+                  <ChevronRight className="text-slate-400" size={20} />
+                </button>
+
+                {/* Service History Summary */}
+                {serviceHistory.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Transactions Récentes</h4>
+                    <div className="space-y-2">
+                      {serviceHistory.slice(0, 3).map((tx) => (
+                        <div key={tx.id} className="bg-white rounded-lg p-3 border border-slate-100">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-slate-900">
+                                {tx.service_type === 'AIRTIME' && 'Crédit téléphonique'}
+                                {tx.service_type === 'DATA' && 'Forfait Internet'}
+                                {tx.service_type === 'BILL_PAYMENT' && 'Paiement facture'}
+                                {tx.service_type === 'MOMO_WITHDRAWAL' && 'Retrait MoMo'}
+                              </p>
+                              <p className="text-xs text-slate-500">{tx.phone_number || tx.bill_account_number}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-slate-900">GHS {tx.amount?.toFixed(2)}</p>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                tx.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' :
+                                tx.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                                tx.status === 'REVERSED' ? 'bg-red-100 text-red-700' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {tx.status}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AIRTIME FORM */}
+            {activeService === 'airtime' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="airtime-form">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <Phone className="text-orange-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Acheter du Crédit</h3>
+                    <p className="text-sm text-slate-500">Airtime pour tous les réseaux</p>
+                  </div>
+                </div>
+                
+                <form onSubmit={handleBuyAirtime} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro de téléphone</label>
+                    <Input
+                      type="tel"
+                      value={airtimeForm.phone}
+                      onChange={(e) => setAirtimeForm({...airtimeForm, phone: e.target.value})}
+                      placeholder="024 XXX XXXX"
+                      className="h-12"
+                      required
+                      data-testid="airtime-phone"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant (GHS)</label>
+                    <Input
+                      type="number"
+                      value={airtimeForm.amount}
+                      onChange={(e) => setAirtimeForm({...airtimeForm, amount: e.target.value})}
+                      placeholder="5.00"
+                      min="1"
+                      step="0.01"
+                      className="h-12"
+                      required
+                      data-testid="airtime-amount"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Réseau (optionnel)</label>
+                    <select
+                      value={airtimeForm.network}
+                      onChange={(e) => setAirtimeForm({...airtimeForm, network: e.target.value})}
+                      className="w-full h-12 rounded-lg border border-slate-200 px-4"
+                      data-testid="airtime-network"
+                    >
+                      <option value="">Auto-détecter</option>
+                      <option value="MTN">MTN</option>
+                      <option value="VODAFONE">Vodafone</option>
+                      <option value="AIRTELTIGO">AirtelTigo</option>
+                    </select>
+                  </div>
+
+                  {serviceBalance && parseFloat(airtimeForm.amount) > serviceBalance.cashback_balance && (
+                    <div className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 p-3 rounded-lg">
+                      <AlertCircle size={16} />
+                      Solde insuffisant
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={isServiceLoading || !airtimeForm.phone || !airtimeForm.amount}
+                    className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white"
+                    data-testid="airtime-submit"
+                  >
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Acheter le Crédit'}
+                  </Button>
+                </form>
+              </div>
+            )}
+
+            {/* DATA BUNDLE FORM */}
+            {activeService === 'data' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="data-form">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Wifi className="text-blue-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Forfait Internet</h3>
+                    <p className="text-sm text-slate-500">Choisissez votre bundle data</p>
+                  </div>
+                </div>
+                
+                <form onSubmit={handleBuyData} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro de téléphone</label>
+                    <Input
+                      type="tel"
+                      value={dataForm.phone}
+                      onChange={(e) => setDataForm({...dataForm, phone: e.target.value})}
+                      placeholder="024 XXX XXXX"
+                      className="h-12"
+                      required
+                      data-testid="data-phone"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Sélectionnez un forfait</label>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {dataBundles.map((bundle) => (
+                        <label
+                          key={bundle.id}
+                          className={`block p-3 rounded-lg border cursor-pointer transition-colors ${
+                            dataForm.bundleId === bundle.id 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="bundle"
+                            value={bundle.id}
+                            checked={dataForm.bundleId === bundle.id}
+                            onChange={(e) => setDataForm({...dataForm, bundleId: e.target.value})}
+                            className="sr-only"
+                          />
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-slate-900">{bundle.name}</p>
+                              <p className="text-xs text-slate-500">{bundle.data_amount} • {bundle.validity}</p>
+                            </div>
+                            <span className="font-bold text-blue-600">GHS {bundle.price}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isServiceLoading || !dataForm.phone || !dataForm.bundleId}
+                    className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"
+                    data-testid="data-submit"
+                  >
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Acheter le Forfait'}
+                  </Button>
+                </form>
+              </div>
+            )}
+
+            {/* BILL PAYMENT FORM */}
+            {activeService === 'bill' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="bill-form">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
+                    <Zap className="text-yellow-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Payer une Facture</h3>
+                    <p className="text-sm text-slate-500">Électricité, eau, TV</p>
+                  </div>
+                </div>
+                
+                <form onSubmit={handlePayBill} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Fournisseur</label>
+                    <select
+                      value={billForm.provider}
+                      onChange={(e) => setBillForm({...billForm, provider: e.target.value})}
+                      className="w-full h-12 rounded-lg border border-slate-200 px-4"
+                      data-testid="bill-provider"
+                    >
+                      <option value="ECG">ECG - Électricité</option>
+                      <option value="GWCL">GWCL - Eau</option>
+                      <option value="DSTV">DSTV</option>
+                      <option value="GOTV">GOTV</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro de compte / Meter</label>
+                    <Input
+                      type="text"
+                      value={billForm.accountNumber}
+                      onChange={(e) => setBillForm({...billForm, accountNumber: e.target.value})}
+                      placeholder="123456789"
+                      className="h-12"
+                      required
+                      data-testid="bill-account"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant (GHS)</label>
+                    <Input
+                      type="number"
+                      value={billForm.amount}
+                      onChange={(e) => setBillForm({...billForm, amount: e.target.value})}
+                      placeholder="50.00"
+                      min="1"
+                      step="0.01"
+                      className="h-12"
+                      required
+                      data-testid="bill-amount"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isServiceLoading || !billForm.accountNumber || !billForm.amount}
+                    className="w-full h-12 bg-yellow-500 hover:bg-yellow-600 text-white"
+                    data-testid="bill-submit"
+                  >
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Payer la Facture'}
+                  </Button>
+                </form>
+              </div>
+            )}
+
+            {/* MOMO WITHDRAWAL FORM */}
+            {activeService === 'momo' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="momo-form">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                    <Banknote className="text-green-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Retrait Mobile Money</h3>
+                    <p className="text-sm text-slate-500">Retirer vers votre MoMo</p>
+                  </div>
+                </div>
+                
+                <form onSubmit={handleServiceWithdraw} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro Mobile Money</label>
+                    <Input
+                      type="tel"
+                      value={momoForm.phone}
+                      onChange={(e) => setMomoForm({...momoForm, phone: e.target.value})}
+                      placeholder="024 XXX XXXX"
+                      className="h-12"
+                      required
+                      data-testid="momo-phone"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant (GHS)</label>
+                    <Input
+                      type="number"
+                      value={momoForm.amount}
+                      onChange={(e) => setMomoForm({...momoForm, amount: e.target.value})}
+                      placeholder="10.00"
+                      min="2"
+                      step="0.01"
+                      className="h-12"
+                      required
+                      data-testid="momo-amount"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Frais: GHS 1.00 | Vous recevrez: GHS {Math.max(0, (parseFloat(momoForm.amount) || 0) - 1).toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Réseau (optionnel)</label>
+                    <select
+                      value={momoForm.network}
+                      onChange={(e) => setMomoForm({...momoForm, network: e.target.value})}
+                      className="w-full h-12 rounded-lg border border-slate-200 px-4"
+                      data-testid="momo-network"
+                    >
+                      <option value="">Auto-détecter</option>
+                      <option value="MTN">MTN MoMo</option>
+                      <option value="VODAFONE">Vodafone Cash</option>
+                      <option value="AIRTELTIGO">AirtelTigo Money</option>
+                    </select>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={isServiceLoading || !momoForm.phone || !momoForm.amount}
+                    className="w-full h-12 bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="momo-submit"
+                  >
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Effectuer le Retrait'}
+                  </Button>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'membership' && (
           <div className="space-y-4">
             {/* My Memberships */}
