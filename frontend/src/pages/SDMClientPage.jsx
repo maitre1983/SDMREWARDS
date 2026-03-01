@@ -505,20 +505,21 @@ export default function SDMClientPage() {
 
       {/* Tabs */}
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex">
+        <div className="max-w-lg mx-auto flex overflow-x-auto">
           {[
             { id: 'wallet', icon: QrCode, label: 'My QR' },
+            { id: 'services', icon: Smartphone, label: 'Services' },
             { id: 'membership', icon: CreditCard, label: 'Cards' },
             { id: 'referral', icon: Gift, label: 'Invite' },
-            { id: 'withdraw', icon: ArrowDownToLine, label: 'Withdraw' },
             { id: 'history', icon: History, label: 'History' },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-4 flex flex-col items-center gap-1 text-sm transition-colors ${
+              onClick={() => { setActiveTab(tab.id); setActiveService(null); }}
+              className={`flex-1 py-4 flex flex-col items-center gap-1 text-sm transition-colors min-w-[70px] ${
                 activeTab === tab.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'
               }`}
+              data-testid={`tab-${tab.id}`}
             >
               <tab.icon size={20} />
               {tab.label}
