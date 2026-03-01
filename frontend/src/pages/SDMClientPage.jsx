@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Wallet, QrCode, ArrowLeft, Phone, Loader2, 
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
-  Copy, RefreshCw
+  Copy, RefreshCw, Gift, Users, Share2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,8 +14,10 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/ke4bukaf_WhatsApp%20Image%202026-02-28%20at%2014.47.22.jpeg";
 
 export default function SDMClientPage() {
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState('phone'); // phone, otp, dashboard
   const [phone, setPhone] = useState('');
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState('');
   const [debugOtp, setDebugOtp] = useState('');
@@ -24,6 +26,7 @@ export default function SDMClientPage() {
   const [user, setUser] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [referralData, setReferralData] = useState(null);
   const [activeTab, setActiveTab] = useState('wallet');
   
   // Withdrawal form
@@ -41,14 +44,16 @@ export default function SDMClientPage() {
   const fetchUserData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [profileRes, walletRes, txnRes] = await Promise.all([
+      const [profileRes, walletRes, txnRes, referralRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/user/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/wallet`, { headers }),
-        axios.get(`${API_URL}/api/sdm/user/transactions`, { headers })
+        axios.get(`${API_URL}/api/sdm/user/transactions`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/referral`, { headers })
       ]);
       setUser(profileRes.data);
       setWallet(walletRes.data);
       setTransactions(txnRes.data);
+      setReferralData(referralRes.data);
     } catch (error) {
       console.error('Fetch error:', error);
       if (error.response?.status === 401) {
