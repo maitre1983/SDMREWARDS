@@ -150,6 +150,26 @@ export default function SDMClientPage() {
     }
   };
 
+  const copyReferralLink = () => {
+    if (referralData?.referral_code) {
+      const link = `${window.location.origin}/sdm/client?ref=${referralData.referral_code}`;
+      navigator.clipboard.writeText(link);
+      toast.success('Referral link copied!');
+    }
+  };
+
+  const shareReferral = () => {
+    if (referralData?.referral_code && navigator.share) {
+      navigator.share({
+        title: 'Join SDM',
+        text: `Join SDM and get GHS ${referralData.welcome_bonus_amount} welcome bonus! Use my code: ${referralData.referral_code}`,
+        url: `${window.location.origin}/sdm/client?ref=${referralData.referral_code}`
+      });
+    } else {
+      copyReferralLink();
+    }
+  };
+
   // Login/OTP Screen
   if (step !== 'dashboard') {
     return (
@@ -178,7 +198,7 @@ export default function SDMClientPage() {
                 <label className="block text-sm font-medium text-slate-300 mb-2">
                   Phone Number
                 </label>
-                <div className="flex gap-2 mb-6">
+                <div className="flex gap-2 mb-4">
                   <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
                     +233
                   </div>
