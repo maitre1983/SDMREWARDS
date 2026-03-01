@@ -878,46 +878,62 @@ export default function FintechDashboard({ token }) {
 
       {/* Audit Logs */}
       {activeSubTab === 'audit' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-semibold text-slate-900">Audit Logs ({auditLogs.length})</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Action</th>
-                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Entity</th>
-                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Performed By</th>
-                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Changes</th>
-                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {auditLogs.length === 0 ? (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-900">Audit Logs ({auditLogs.length})</h3>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleExportAuditLogs('csv')} className="gap-2">
+                  <Download size={14} />
+                  Export CSV
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handlePurgeTestData} 
+                  className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <AlertTriangle size={14} />
+                  Purge Test Data
+                </Button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                      No audit logs yet
-                    </td>
+                    <th className="px-4 py-3 text-left text-slate-600 font-medium">Action</th>
+                    <th className="px-4 py-3 text-left text-slate-600 font-medium">Entity</th>
+                    <th className="px-4 py-3 text-left text-slate-600 font-medium">Performed By</th>
+                    <th className="px-4 py-3 text-left text-slate-600 font-medium">Changes</th>
+                    <th className="px-4 py-3 text-left text-slate-600 font-medium">Date</th>
                   </tr>
-                ) : (
-                  auditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
-                          {log.action}
-                        </span>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                        No audit logs yet
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="text-xs text-slate-600">{log.entity_type}</p>
-                        <p className="font-mono text-xs text-slate-400">{log.entity_id.substring(0, 12)}</p>
-                      </td>
-                      <td className="px-4 py-3 font-medium">{log.performed_by}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
-                        {log.new_values ? JSON.stringify(log.new_values).substring(0, 50) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(log.performed_at)}</td>
                     </tr>
+                  ) : (
+                    auditLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-xs text-slate-600">{log.entity_type}</p>
+                          <p className="font-mono text-xs text-slate-400">{log.entity_id.substring(0, 12)}</p>
+                        </td>
+                        <td className="px-4 py-3 font-medium">{log.performed_by}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate">
+                          {log.new_values ? JSON.stringify(log.new_values).substring(0, 50) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(log.performed_at)}</td>
+                      </tr>
                   ))
                 )}
               </tbody>
