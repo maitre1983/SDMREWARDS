@@ -2038,6 +2038,383 @@ async def user_get_ledger(user: dict = Depends(get_current_user), limit: int = 5
     ).sort("created_at", -1).limit(limit).to_list(limit)
     return entries
 
+
+# ============== ADMIN DATA MANAGEMENT ==============
+
+@sdm_router.post("/admin/fintech/purge-test-data")
+async def admin_purge_test_data(admin: dict = Depends(get_current_admin), confirm: bool = False):
+    """Admin: Purge all test data (USE WITH CAUTION)"""
+    if not confirm:
+        return {
+            "warning": "This will DELETE all fintech data. Set confirm=true to proceed.",
+            "affected_collections": ["wallets", "ledger_entries", "ledger_transactions", 
+                                     "withdrawal_requests", "merchant_deposits", "audit_logs"]
+        }
+    
+    # Delete all fintech data
+    results = {
+        "wallets_deleted": (await db.wallets.delete_many({})).deleted_count,
+        "ledger_entries_deleted": (await db.ledger_entries.delete_many({})).deleted_count,
+        "ledger_transactions_deleted": (await db.ledger_transactions.delete_many({})).deleted_count,
+        "withdrawal_requests_deleted": (await db.withdrawal_requests.delete_many({})).deleted_count,
+        "merchant_deposits_deleted": (await db.merchant_deposits.delete_many({})).deleted_count,
+        "audit_logs_deleted": (await db.audit_logs.delete_many({})).deleted_count
+    }
+    
+    return {"message": "Test data purged successfully", "results": results}
+
+
+# ============== EXPORT ENDPOINTS ==============
+
+@sdm_router.get("/admin/fintech/export/transactions")
+async def admin_export_transactions(
+    admin: dict = Depends(get_current_admin),
+    format: str = "json",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Admin: Export ledger transactions (JSON or CSV format)"""
+    query = {}
+    if start_date:
+        query["created_at"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("created_at", {})["$lte"] = end_date
+    
+    transactions = await db.ledger_transactions.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    if format == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        if transactions:
+            writer = csv.DictWriter(output, fieldnames=transactions[0].keys())
+            writer.writeheader()
+            writer.writerows(transactions)
+        return {
+            "format": "csv",
+            "data": output.getvalue(),
+            "count": len(transactions)
+        }
+    
+    return {"format": "json", "data": transactions, "count": len(transactions)}
+
+@sdm_router.get("/admin/fintech/export/audit-logs")
+async def admin_export_audit_logs(
+    admin: dict = Depends(get_current_admin),
+    format: str = "json",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """Admin: Export audit logs (JSON or CSV format)"""
+    query = {}
+    if start_date:
+        query["performed_at"] = {"$gte": start_date}
+    if end_date:
+        query.setdefault("performed_at", {})["$lte"] = end_date
+    
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("performed_at", -1).to_list(10000)
+    
+    if format == "csv":
+        import csv
+        import io
+        output = io.StringIO()
+        if logs:
+            # Flatten nested dicts for CSV
+            flat_logs = []
+            for log in logs:
+                flat_log = {**log}
+                flat_log["old_values"] = str(log.get("old_values", ""))
+                flat_log["new_values"] = str(log.get("new_values", ""))
+                flat_logs.append(flat_log)
+            writer = csv.DictWriter(output, fieldnames=flat_logs[0].keys())
+            writer.writeheader()
+            writer.writerows(flat_logs)
+        return {
+            "format": "csv",
+            "data": output.getvalue(),
+            "count": len(logs)
+        }
+    
+    return {"format": "json", "data": logs, "count": len(logs)}
+
+
+# ============== INVESTOR DASHBOARD / GMV STATS ==============
+
+@sdm_router.get("/admin/fintech/investor-dashboard")
+async def admin_get_investor_dashboard(
+    admin: dict = Depends(get_current_admin),
+    period_days: int = 30
+):
+    """Admin: Get investor-grade dashboard with GMV, commissions, growth metrics"""
+    
+    now = datetime.now(timezone.utc)
+    period_start = (now - timedelta(days=period_days)).isoformat()
+    prev_period_start = (now - timedelta(days=period_days * 2)).isoformat()
+    
+    # Current period transactions
+    current_txns = await db.sdm_transactions.find(
+        {"created_at": {"$gte": period_start}},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Previous period transactions (for growth comparison)
+    prev_txns = await db.sdm_transactions.find(
+        {"created_at": {"$gte": prev_period_start, "$lt": period_start}},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    # Calculate current period metrics
+    current_gmv = sum(t.get("amount", 0) for t in current_txns)
+    current_cashback = sum(t.get("net_cashback", 0) for t in current_txns)
+    current_commission = sum(t.get("sdm_commission", 0) for t in current_txns)
+    current_txn_count = len(current_txns)
+    
+    # Calculate previous period metrics
+    prev_gmv = sum(t.get("amount", 0) for t in prev_txns)
+    prev_commission = sum(t.get("sdm_commission", 0) for t in prev_txns)
+    prev_txn_count = len(prev_txns)
+    
+    # Growth rates
+    def calc_growth(current, previous):
+        if previous == 0:
+            return 100 if current > 0 else 0
+        return round(((current - previous) / previous) * 100, 1)
+    
+    # Total users and merchants
+    total_users = await db.sdm_users.count_documents({})
+    total_merchants = await db.sdm_merchants.count_documents({})
+    active_merchants = await db.sdm_merchants.count_documents({"is_verified": True, "is_active": True})
+    
+    # Membership stats
+    total_memberships = await db.membership_cards.count_documents({})
+    active_memberships = await db.membership_cards.count_documents({"status": "active"})
+    membership_revenue = 0
+    membership_pipeline = [{"$match": {"status": {"$ne": "cancelled"}}}, {"$group": {"_id": None, "total": {"$sum": "$price_paid"}}}]
+    membership_result = await db.membership_cards.aggregate(membership_pipeline).to_list(1)
+    if membership_result:
+        membership_revenue = membership_result[0].get("total", 0)
+    
+    # Wallet balances
+    wallet_pipeline = [
+        {"$group": {
+            "_id": "$entity_type",
+            "total_available": {"$sum": "$available_balance"},
+            "total_pending": {"$sum": "$pending_balance"},
+            "count": {"$sum": 1}
+        }}
+    ]
+    wallet_stats = await db.wallets.aggregate(wallet_pipeline).to_list(10)
+    wallet_by_type = {w["_id"]: w for w in wallet_stats}
+    
+    # Withdrawals stats
+    withdrawal_pipeline = [
+        {"$group": {
+            "_id": "$status",
+            "count": {"$sum": 1},
+            "total": {"$sum": "$amount"}
+        }}
+    ]
+    withdrawal_stats = await db.withdrawal_requests.aggregate(withdrawal_pipeline).to_list(10)
+    
+    # Deposit stats
+    deposit_pipeline = [
+        {"$match": {"status": "CONFIRMED"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
+    ]
+    deposit_result = await db.merchant_deposits.aggregate(deposit_pipeline).to_list(1)
+    total_deposits = deposit_result[0] if deposit_result else {"total": 0, "count": 0}
+    
+    # Daily breakdown for charts
+    daily_stats = {}
+    for txn in current_txns:
+        date = txn["created_at"][:10]
+        if date not in daily_stats:
+            daily_stats[date] = {"gmv": 0, "commission": 0, "cashback": 0, "count": 0}
+        daily_stats[date]["gmv"] += txn.get("amount", 0)
+        daily_stats[date]["commission"] += txn.get("sdm_commission", 0)
+        daily_stats[date]["cashback"] += txn.get("net_cashback", 0)
+        daily_stats[date]["count"] += 1
+    
+    return {
+        "period_days": period_days,
+        "generated_at": now.isoformat(),
+        
+        # Key Metrics
+        "gmv": {
+            "current": round(current_gmv, 2),
+            "previous": round(prev_gmv, 2),
+            "growth_percent": calc_growth(current_gmv, prev_gmv)
+        },
+        "commission_earned": {
+            "current": round(current_commission, 2),
+            "previous": round(prev_commission, 2),
+            "growth_percent": calc_growth(current_commission, prev_commission)
+        },
+        "total_cashback_given": round(current_cashback, 2),
+        "transaction_count": {
+            "current": current_txn_count,
+            "previous": prev_txn_count,
+            "growth_percent": calc_growth(current_txn_count, prev_txn_count)
+        },
+        "average_transaction": round(current_gmv / current_txn_count, 2) if current_txn_count > 0 else 0,
+        
+        # Users & Merchants
+        "total_users": total_users,
+        "total_merchants": total_merchants,
+        "active_merchants": active_merchants,
+        
+        # Memberships
+        "memberships": {
+            "total": total_memberships,
+            "active": active_memberships,
+            "revenue": round(membership_revenue, 2)
+        },
+        
+        # Wallets
+        "wallets": {
+            "client": wallet_by_type.get("CLIENT", {"total_available": 0, "total_pending": 0, "count": 0}),
+            "merchant": wallet_by_type.get("MERCHANT", {"total_available": 0, "count": 0}),
+            "sdm_commission": wallet_by_type.get("SDM_COMMISSION", {"total_available": 0}),
+            "sdm_float": wallet_by_type.get("SDM_FLOAT", {"total_available": 0})
+        },
+        
+        # Deposits & Withdrawals
+        "deposits": {
+            "total_amount": round(total_deposits.get("total", 0), 2),
+            "count": total_deposits.get("count", 0)
+        },
+        "withdrawals_by_status": {w["_id"]: {"count": w["count"], "total": round(w["total"], 2)} for w in withdrawal_stats},
+        
+        # Daily breakdown for charts
+        "daily_breakdown": [{"date": k, **{kk: round(vv, 2) if isinstance(vv, float) else vv for kk, vv in v.items()}} 
+                          for k, v in sorted(daily_stats.items())]
+    }
+
+
+# ============== FLOAT MANAGEMENT ==============
+
+class TopUpFloatRequest(BaseModel):
+    amount: float
+    source: str = "BANK_TRANSFER"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+
+@sdm_router.post("/admin/fintech/float/topup")
+async def admin_topup_float(
+    request: TopUpFloatRequest,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Top up SDM Float wallet (for Mobile Money payouts)"""
+    float_wallet = await ledger_service.get_sdm_float_wallet()
+    
+    # Create transaction
+    reference = ledger_service.generate_reference("FLT")
+    balance_before = float_wallet.available_balance
+    
+    # Credit float wallet
+    float_wallet = await ledger_service.update_wallet_balance(
+        float_wallet.id,
+        available_delta=request.amount
+    )
+    
+    # Create ledger transaction
+    transaction = LedgerTransaction(
+        reference_id=reference,
+        transaction_type=TransactionType.DEPOSIT,
+        status=TransactionStatus.COMPLETED,
+        destination_wallet_id=float_wallet.id,
+        amount=request.amount,
+        fee_amount=0,
+        net_amount=request.amount,
+        metadata={
+            "source": request.source,
+            "external_reference": request.reference,
+            "notes": request.notes,
+            "topped_up_by": admin["username"]
+        },
+        created_by=admin["username"],
+        completed_at=datetime.now(timezone.utc).isoformat()
+    )
+    
+    # Create ledger entry
+    entry = LedgerEntry(
+        transaction_id=transaction.id,
+        wallet_id=float_wallet.id,
+        wallet_entity_type=EntityType.SDM_FLOAT,
+        wallet_entity_id="SDM_FLOAT",
+        entry_type=EntryType.CREDIT,
+        amount=request.amount,
+        balance_before=balance_before,
+        balance_after=float_wallet.available_balance,
+        description=f"Float top-up {reference}"
+    )
+    
+    await db.ledger_transactions.insert_one(transaction.model_dump())
+    await db.ledger_entries.insert_one(entry.model_dump())
+    
+    # Audit log
+    await ledger_service._audit_log(
+        action="TOPUP_FLOAT",
+        entity_type="sdm_float",
+        entity_id=float_wallet.id,
+        new_values={"amount": request.amount, "source": request.source},
+        performed_by=admin["username"]
+    )
+    
+    return {
+        "message": "Float topped up successfully",
+        "reference": reference,
+        "amount": request.amount,
+        "new_balance": float_wallet.available_balance
+    }
+
+@sdm_router.get("/admin/fintech/float/status")
+async def admin_get_float_status(admin: dict = Depends(get_current_admin)):
+    """Admin: Get float wallet status and alert thresholds"""
+    float_wallet = await ledger_service.get_sdm_float_wallet()
+    
+    # Get pending withdrawals total
+    pending_withdrawals = await db.withdrawal_requests.aggregate([
+        {"$match": {"status": {"$in": ["PENDING", "APPROVED", "PROCESSING"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
+    ]).to_list(1)
+    
+    pending_total = pending_withdrawals[0] if pending_withdrawals else {"total": 0, "count": 0}
+    
+    # Calculate coverage
+    coverage_ratio = float_wallet.available_balance / pending_total["total"] if pending_total["total"] > 0 else float("inf")
+    
+    # Alert thresholds
+    LOW_BALANCE_THRESHOLD = 1000  # GHS
+    CRITICAL_THRESHOLD = 500  # GHS
+    
+    alert_level = "OK"
+    if float_wallet.available_balance < CRITICAL_THRESHOLD:
+        alert_level = "CRITICAL"
+    elif float_wallet.available_balance < LOW_BALANCE_THRESHOLD:
+        alert_level = "LOW"
+    
+    return {
+        "float_balance": float_wallet.available_balance,
+        "pending_withdrawals": {
+            "count": pending_total["count"],
+            "total_amount": round(pending_total["total"], 2)
+        },
+        "coverage_ratio": round(coverage_ratio, 2) if coverage_ratio != float("inf") else "∞",
+        "alert_level": alert_level,
+        "thresholds": {
+            "low": LOW_BALANCE_THRESHOLD,
+            "critical": CRITICAL_THRESHOLD
+        },
+        "recommendation": "Top up float immediately" if alert_level == "CRITICAL" else 
+                         "Consider topping up float" if alert_level == "LOW" else 
+                         "Float balance is healthy"
+    }
+
+
+# Import for ledger models
+from ledger import LedgerEntry, LedgerTransaction, TransactionStatus, EntryType
+
 # Include routers
 app.include_router(api_router)
 app.include_router(sdm_router)
