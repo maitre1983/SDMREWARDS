@@ -3135,6 +3135,227 @@ async def test_push_notification(admin: dict = Depends(get_current_admin)):
                    "OneSignal not configured. Add ONESIGNAL_APP_ID and ONESIGNAL_API_KEY to .env"
     }
 
+# ============== CASHBACK SERVICES (Airtime, Data, Bills, MoMo) ==============
+
+from services import (
+    BulkClixService, ServiceType, NetworkProvider, BillProvider,
+    DATA_BUNDLES, detect_network
+)
+
+# Initialize BulkClix service
+bulkclix_service = BulkClixService(db, ledger_service)
+
+class BuyAirtimeRequest(BaseModel):
+    phone_number: str
+    amount: float
+    network: Optional[str] = None  # MTN, VODAFONE, AIRTELTIGO
+
+class BuyDataRequest(BaseModel):
+    phone_number: str
+    bundle_id: str
+
+class PayBillRequest(BaseModel):
+    provider: str  # ECG, GWCL, DSTV, GOTV
+    account_number: str
+    amount: float
+    customer_name: Optional[str] = None
+
+class MoMoWithdrawalRequest(BaseModel):
+    phone_number: str
+    amount: float
+    network: Optional[str] = None
+
+# ==================== USER SERVICE ENDPOINTS ====================
+
+@sdm_router.get("/user/services/balance")
+async def get_user_service_balance(user: dict = Depends(get_current_user)):
+    """User: Get available cashback balance for services"""
+    balance = await bulkclix_service.get_user_cashback_balance(user["id"])
+    limit_check = await bulkclix_service.check_monthly_limit(user["id"], 0)
+    
+    return {
+        "cashback_balance": balance,
+        "monthly_limit": limit_check["monthly_limit"],
+        "monthly_used": limit_check["current_total"],
+        "monthly_remaining": limit_check["remaining"]
+    }
+
+@sdm_router.get("/user/services/data-bundles")
+async def get_data_bundles(network: Optional[str] = None):
+    """Get available data bundles"""
+    net = None
+    if network:
+        try:
+            net = NetworkProvider(network)
+        except ValueError:
+            pass
+    
+    bundles = bulkclix_service.get_data_bundles(net)
+    return {"bundles": bundles}
+
+@sdm_router.post("/user/services/airtime")
+async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_current_user)):
+    """User: Buy airtime using cashback balance"""
+    network = None
+    if request.network:
+        try:
+            network = NetworkProvider(request.network)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid network: {request.network}")
+    
+    try:
+        result = await bulkclix_service.buy_airtime(
+            user_id=user["id"],
+            phone_number=request.phone_number,
+            amount=request.amount,
+            network=network
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.post("/user/services/data")
+async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_user)):
+    """User: Buy data bundle using cashback balance"""
+    try:
+        result = await bulkclix_service.buy_data(
+            user_id=user["id"],
+            phone_number=request.phone_number,
+            bundle_id=request.bundle_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.post("/user/services/bill")
+async def pay_bill(request: PayBillRequest, user: dict = Depends(get_current_user)):
+    """User: Pay utility bill using cashback balance"""
+    try:
+        provider = BillProvider(request.provider)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid provider: {request.provider}")
+    
+    try:
+        result = await bulkclix_service.pay_bill(
+            user_id=user["id"],
+            provider=provider,
+            account_number=request.account_number,
+            amount=request.amount,
+            customer_name=request.customer_name
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.post("/user/services/withdraw")
+async def withdraw_to_momo(request: MoMoWithdrawalRequest, user: dict = Depends(get_current_user)):
+    """User: Withdraw cashback to Mobile Money"""
+    network = None
+    if request.network:
+        try:
+            network = NetworkProvider(request.network)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid network: {request.network}")
+    
+    try:
+        result = await bulkclix_service.withdraw_to_momo(
+            user_id=user["id"],
+            phone_number=request.phone_number,
+            amount=request.amount,
+            network=network
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@sdm_router.get("/user/services/history")
+async def get_service_history(
+    service_type: Optional[str] = None,
+    limit: int = 50,
+    user: dict = Depends(get_current_user)
+):
+    """User: Get service transaction history"""
+    svc_type = None
+    if service_type:
+        try:
+            svc_type = ServiceType(service_type)
+        except ValueError:
+            pass
+    
+    transactions = await bulkclix_service.get_user_service_history(
+        user_id=user["id"],
+        service_type=svc_type,
+        limit=limit
+    )
+    return {"transactions": transactions}
+
+# ==================== ADMIN SERVICE ENDPOINTS ====================
+
+@sdm_router.get("/admin/services/stats")
+async def get_admin_service_stats(
+    days: int = 30,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Get service statistics for reporting"""
+    stats = await bulkclix_service.get_service_stats(days=days)
+    stats["api_configured"] = bulkclix_service.is_configured()
+    return stats
+
+@sdm_router.get("/admin/services/transactions")
+async def get_admin_service_transactions(
+    service_type: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Get all service transactions"""
+    query = {}
+    if service_type:
+        query["service_type"] = service_type
+    if status:
+        query["status"] = status
+    
+    transactions = await db.service_transactions.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return {"transactions": transactions}
+
+@sdm_router.put("/admin/services/config")
+async def update_service_config(
+    monthly_limit: Optional[float] = None,
+    service_commission_rate: Optional[float] = None,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Update service configuration"""
+    update_data = {}
+    if monthly_limit is not None:
+        update_data["monthly_service_limit"] = monthly_limit
+    if service_commission_rate is not None:
+        update_data["service_commission_rate"] = service_commission_rate
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+    
+    await db.sdm_config.update_one(
+        {"key": "config"},
+        {"$set": update_data},
+        upsert=True
+    )
+    
+    return {"message": "Service configuration updated", "updates": update_data}
+
+@sdm_router.get("/admin/services/config")
+async def get_service_config(admin: dict = Depends(get_current_admin)):
+    """Admin: Get service configuration"""
+    config = await db.sdm_config.find_one({"key": "config"}, {"_id": 0})
+    
+    return {
+        "monthly_service_limit": config.get("monthly_service_limit", 2500) if config else 2500,
+        "service_commission_rate": config.get("service_commission_rate", 0.001) if config else 0.001,
+        "api_configured": bulkclix_service.is_configured()
+    }
+
 # Import for ledger models
 from ledger import LedgerEntry, LedgerTransaction, TransactionStatus, EntryType
 
