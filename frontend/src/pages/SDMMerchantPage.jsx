@@ -44,6 +44,20 @@ export default function SDMMerchantPage() {
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffPhone, setNewStaffPhone] = useState('');
 
+  // Card types
+  const [cardTypes, setCardTypes] = useState([]);
+  const [memberships, setMemberships] = useState([]);
+  const [showCardForm, setShowCardForm] = useState(false);
+  const [cardForm, setCardForm] = useState({
+    name: '',
+    description: '',
+    price: 50,
+    validity_days: 365,
+    cashback_bonus: 0,
+    referral_bonus: 5,
+    welcome_bonus: 2
+  });
+
   useEffect(() => {
     if (token) {
       setStep('dashboard');
