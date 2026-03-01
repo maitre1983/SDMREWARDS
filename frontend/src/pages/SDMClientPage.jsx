@@ -1195,66 +1195,6 @@ export default function SDMClientPage() {
           </div>
         )}
 
-        {activeTab === 'withdraw' && (
-          <div className="bg-white rounded-2xl p-6">
-            <h3 className="font-semibold text-slate-900 mb-4">Withdraw to Mobile Money</h3>
-            <form onSubmit={handleWithdraw}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Amount (GHS)</label>
-                <Input
-                  type="number"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  placeholder="0.00"
-                  min="1"
-                  step="0.01"
-                  max={wallet?.wallet_available || 0}
-                  className="h-12"
-                  required
-                />
-                <p className="text-xs text-slate-500 mt-1">Available: GHS {wallet?.wallet_available?.toFixed(2)}</p>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Mobile Money Number</label>
-                <Input
-                  type="tel"
-                  value={withdrawPhone}
-                  onChange={(e) => setWithdrawPhone(e.target.value)}
-                  placeholder="024 XXX XXXX"
-                  className="h-12"
-                  required
-                />
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Provider</label>
-                <select
-                  value={withdrawProvider}
-                  onChange={(e) => setWithdrawProvider(e.target.value)}
-                  className="w-full h-12 rounded-lg border border-slate-200 px-4"
-                >
-                  <option value="MTN">MTN Mobile Money</option>
-                  <option value="Vodafone">Vodafone Cash</option>
-                  <option value="AirtelTigo">AirtelTigo Money</option>
-                </select>
-              </div>
-
-              <p className="text-xs text-slate-500 mb-4">
-                Fee: GHS 1.00 | You'll receive: GHS {Math.max(0, (parseFloat(withdrawAmount) || 0) - 1).toFixed(2)}
-              </p>
-
-              <Button
-                type="submit"
-                disabled={isLoading || !withdrawAmount || !withdrawPhone}
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700"
-              >
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Request Withdrawal'}
-              </Button>
-            </form>
-          </div>
-        )}
-
         {activeTab === 'history' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between mb-4">
