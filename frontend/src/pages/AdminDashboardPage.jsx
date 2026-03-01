@@ -183,6 +183,13 @@ export default function AdminDashboardPage() {
             <CreditCard size={18} />
             <span>SDM Platform</span>
           </button>
+          <button
+            onClick={() => setActiveTab('fintech')}
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'fintech' ? 'active' : ''}`}
+          >
+            <Wallet size={18} />
+            <span>Fintech Ledger</span>
+          </button>
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
