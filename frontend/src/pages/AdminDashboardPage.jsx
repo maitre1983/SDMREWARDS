@@ -528,6 +528,10 @@ export default function AdminDashboardPage() {
           {activeTab === 'sdm' && (
             <SDMConfigPanel token={token} />
           )}
+
+          {activeTab === 'fintech' && (
+            <FintechDashboard token={token} />
+          )}
         </div>
       </main>
     </div>
