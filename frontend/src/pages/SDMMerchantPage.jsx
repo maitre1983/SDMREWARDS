@@ -125,7 +125,8 @@ export default function SDMMerchantPage() {
     setIsLoading(true);
     try {
       const response = await axios.post(
-        `${API_URL}/api/sdm/merchant/login?phone=${encodeURIComponent(loginPhone)}&api_key=${encodeURIComponent(loginApiKey)}`
+        `${API_URL}/api/sdm/merchant/login`,
+        { phone: loginPhone, api_key: loginApiKey }
       );
       localStorage.setItem('sdm_merchant_token', response.data.access_token);
       setToken(response.data.access_token);
