@@ -71,6 +71,12 @@ DEFAULT_SDM_CONFIG = {
     "gold_min_referrals": 15,
     "membership_validity_days": 365,
     "require_membership_for_referral": False,  # If true, only members can refer
+    # Fintech configuration
+    "sdm_commission_rate": 0.02,    # 2% SDM commission on cashback
+    "cashback_pending_days": 7,     # Days before cashback becomes available
+    "withdrawal_fee": 1.0,          # GHS fee for withdrawals
+    "float_low_threshold": 5000.0,  # Alert when float below this
+    "float_critical_threshold": 1000.0,  # Critical alert threshold
 }
 
 if RESEND_API_KEY:
