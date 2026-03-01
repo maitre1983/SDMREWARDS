@@ -896,6 +896,15 @@ export default function FintechDashboard({ token }) {
         </div>
       )}
 
+      {/* Fintech Configuration */}
+      {activeSubTab === 'config' && fintechConfig && (
+        <FintechConfigPanel 
+          config={fintechConfig} 
+          onSave={handleSaveConfig} 
+          isSaving={isSavingConfig} 
+        />
+      )}
+
       {/* Audit Logs */}
       {activeSubTab === 'audit' && (
         <div className="space-y-4">
