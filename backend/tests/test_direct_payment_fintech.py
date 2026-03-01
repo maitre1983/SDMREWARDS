@@ -430,7 +430,7 @@ class TestDirectPaymentFintech:
         merchant_data = {
             "business_name": f"TEST_SDMComm_{uuid.uuid4().hex[:8]}",
             "business_type": "spa",
-            "phone": f"+23324{str(int(time.time()))[-7:]}",
+            "phone": f"+233{uuid.uuid4().int % 100000000:08d}",  # Unique phone
             "city": "Accra",
             "cashback_rate": 0.05
         }
