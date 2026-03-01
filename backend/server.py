@@ -841,6 +841,12 @@ async def verify_otp(request: VerifyOTPRequest):
         
         await db.sdm_users.insert_one(new_user.model_dump())
         user = new_user.model_dump()
+        
+        # Automatically create client wallet in ledger
+        try:
+            await ledger_service.create_wallet(EntityType.CLIENT, new_user.id)
+        except Exception as e:
+            print(f"Warning: Failed to create client wallet: {e}")
     else:
         await db.sdm_users.update_one({"phone": phone}, {"$set": {"phone_verified": True}})
     
