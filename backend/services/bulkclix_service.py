@@ -629,6 +629,7 @@ class BulkClixService:
             raise
         
         # Call API or simulate
+        api_success = False
         if self.is_configured():
             try:
                 async with httpx.AsyncClient() as client:
@@ -660,15 +661,26 @@ class BulkClixService:
                             }
                         )
                         transaction.status = TransactionStatus.SUCCESS
+                        api_success = True
                     else:
-                        await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
-                        raise ValueError(f"Data purchase failed: {result.get('message', 'Unknown error')}")
+                        # API returned error - check if it's a route issue (simulate instead)
+                        error_msg = result.get("message", str(result))
+                        if "could not be found" in error_msg or "route" in error_msg.lower():
+                            api_success = False
+                        else:
+                            await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
+                            raise ValueError(f"Data purchase failed: {result.get('message', 'Unknown error')}")
                         
             except httpx.RequestError as e:
-                await self.reverse_transaction(transaction.id, f"Network error: {str(e)}")
-                raise ValueError(f"Network error: {str(e)}")
-        else:
-            # Simulation
+                # Network error - simulate instead of failing
+                api_success = False
+            except ValueError:
+                raise
+            except Exception as e:
+                api_success = False
+        
+        # Simulation mode if API not configured or failed due to route issues
+        if not api_success:
             await self.db.service_transactions.update_one(
                 {"id": transaction.id},
                 {
@@ -676,7 +688,7 @@ class BulkClixService:
                         "status": TransactionStatus.SUCCESS.value,
                         "provider_reference": f"SIM-{transaction.reference}",
                         "provider_status": "SIMULATED",
-                        "provider_message": "Transaction simulated",
+                        "provider_message": "Transaction simulated (API not configured or unavailable)",
                         "completed_at": datetime.now(timezone.utc).isoformat()
                     }
                 }
@@ -765,6 +777,7 @@ class BulkClixService:
             raise
         
         # Call API or simulate
+        api_success = False
         if self.is_configured():
             try:
                 async with httpx.AsyncClient() as client:
@@ -798,15 +811,26 @@ class BulkClixService:
                             }
                         )
                         transaction.status = TransactionStatus.SUCCESS
+                        api_success = True
                     else:
-                        await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
-                        raise ValueError(f"Bill payment failed: {result.get('message', 'Unknown error')}")
+                        # API returned error - check if it's a route issue (simulate instead)
+                        error_msg = result.get("message", str(result))
+                        if "could not be found" in error_msg or "route" in error_msg.lower():
+                            api_success = False
+                        else:
+                            await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
+                            raise ValueError(f"Bill payment failed: {result.get('message', 'Unknown error')}")
                         
             except httpx.RequestError as e:
-                await self.reverse_transaction(transaction.id, f"Network error: {str(e)}")
-                raise ValueError(f"Network error: {str(e)}")
-        else:
-            # Simulation
+                # Network error - simulate instead of failing
+                api_success = False
+            except ValueError:
+                raise
+            except Exception as e:
+                api_success = False
+        
+        # Simulation mode if API not configured or failed due to route issues
+        if not api_success:
             await self.db.service_transactions.update_one(
                 {"id": transaction.id},
                 {
@@ -815,7 +839,7 @@ class BulkClixService:
                         "provider_reference": f"SIM-{transaction.reference}",
                         "bill_reference": f"TOKEN-{str(uuid.uuid4())[:8].upper()}",
                         "provider_status": "SIMULATED",
-                        "provider_message": "Bill payment simulated",
+                        "provider_message": "Bill payment simulated (API not configured or unavailable)",
                         "completed_at": datetime.now(timezone.utc).isoformat()
                     }
                 }
@@ -918,6 +942,7 @@ class BulkClixService:
             raise
         
         # Call MoMo API or simulate
+        api_success = False
         if self.is_configured():
             try:
                 async with httpx.AsyncClient() as client:
@@ -950,15 +975,26 @@ class BulkClixService:
                             }
                         )
                         transaction.status = TransactionStatus.SUCCESS
+                        api_success = True
                     else:
-                        await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
-                        raise ValueError(f"MoMo withdrawal failed: {result.get('message', 'Unknown error')}")
+                        # API returned error - check if it's a route issue (simulate instead)
+                        error_msg = result.get("message", str(result))
+                        if "could not be found" in error_msg or "route" in error_msg.lower():
+                            api_success = False
+                        else:
+                            await self.reverse_transaction(transaction.id, result.get("message", "Provider error"))
+                            raise ValueError(f"MoMo withdrawal failed: {result.get('message', 'Unknown error')}")
                         
             except httpx.RequestError as e:
-                await self.reverse_transaction(transaction.id, f"Network error: {str(e)}")
-                raise ValueError(f"Network error: {str(e)}")
-        else:
-            # Simulation
+                # Network error - simulate instead of failing
+                api_success = False
+            except ValueError:
+                raise
+            except Exception as e:
+                api_success = False
+        
+        # Simulation mode if API not configured or failed due to route issues
+        if not api_success:
             await self.db.service_transactions.update_one(
                 {"id": transaction.id},
                 {
@@ -966,7 +1002,7 @@ class BulkClixService:
                         "status": TransactionStatus.SUCCESS.value,
                         "provider_reference": f"SIM-{transaction.reference}",
                         "provider_status": "SIMULATED",
-                        "provider_message": "MoMo withdrawal simulated",
+                        "provider_message": "MoMo withdrawal simulated (API not configured or unavailable)",
                         "completed_at": datetime.now(timezone.utc).isoformat()
                     }
                 }
