@@ -1171,6 +1171,20 @@ async def get_merchant_report(merchant: dict = Depends(get_current_merchant), da
 
 # ============== SDM ADMIN ROUTES ==============
 
+@sdm_router.get("/admin/config")
+async def admin_get_sdm_config(admin: dict = Depends(get_current_admin)):
+    """Admin: Get SDM platform configuration"""
+    config = await get_sdm_config()
+    return config
+
+@sdm_router.put("/admin/config")
+async def admin_update_sdm_config(request: UpdateSDMConfigRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Update SDM platform configuration"""
+    updates = {k: v for k, v in request.model_dump().items() if v is not None}
+    if updates:
+        await update_sdm_config(updates)
+    return {"message": "Configuration updated", "updates": updates}
+
 @sdm_router.get("/admin/users")
 async def admin_get_users(admin: dict = Depends(get_current_admin), limit: int = 100):
     """Admin: Get all SDM users"""
