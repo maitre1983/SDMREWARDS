@@ -32,14 +32,18 @@ export default function FintechDashboard({ token }) {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [summaryRes, withdrawalsRes, depositsRes, transactionsRes, walletsRes] = await Promise.all([
+      const [summaryRes, investorRes, floatRes, withdrawalsRes, depositsRes, transactionsRes, walletsRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/admin/fintech/summary`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/fintech/investor-dashboard?period_days=30`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/fintech/float/status`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/withdrawals?limit=50`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/deposits?limit=50`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/transactions?limit=50`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/wallets?limit=100`, { headers })
       ]);
       setSummary(summaryRes.data);
+      setInvestorData(investorRes.data);
+      setFloatStatus(floatRes.data);
       setWithdrawals(withdrawalsRes.data);
       setDeposits(depositsRes.data);
       setTransactions(transactionsRes.data);
