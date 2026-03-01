@@ -140,7 +140,55 @@ Métriques clés pour investisseurs :
 
 ---
 
-## PHASE 3: MOBILE MONEY INTEGRATION (À venir)
+## PHASE 3: PUSH NOTIFICATIONS (OneSignal) ✅ COMPLETE
+
+### Implemented Features (March 2026)
+
+#### 1. Backend Push Service
+- **Module**: `/app/backend/push_notifications.py`
+- **Mode**: Simulation (OneSignal pas encore configuré)
+- Enregistrement des devices (player_id, platform)
+- Envoi de notifications segmentées (all, clients, merchants)
+- Statistiques push en temps réel
+
+#### 2. Client/Merchant Device Registration
+- Les utilisateurs peuvent s'abonner aux push notifications
+- Stockage des devices dans MongoDB (`push_devices`)
+- Désabonnement disponible
+
+#### 3. Admin Dashboard Integration
+- **Stats Push** : is_configured, active_devices, clients, merchants
+- **Envoi Push** : Checkbox "Send as Push Notification" dans le formulaire
+- **Mode simulation** : Fonctionne même sans OneSignal configuré
+
+### Configuration OneSignal (À faire)
+```env
+# Dans backend/.env
+ONESIGNAL_APP_ID=votre_app_id
+ONESIGNAL_API_KEY=votre_api_key
+
+# Dans frontend/.env
+REACT_APP_ONESIGNAL_APP_ID=votre_app_id
+```
+
+### New API Endpoints
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | /api/sdm/admin/push/stats | Admin | Statistiques push |
+| POST | /api/sdm/admin/push/test | Admin | Tester le système push |
+| POST | /api/sdm/admin/push/send | Admin | Envoyer push notification |
+| POST | /api/sdm/user/push/register | User | Enregistrer device |
+| POST | /api/sdm/user/push/unregister | User | Désabonner device |
+| GET | /api/sdm/user/push/devices | User | Lister mes devices |
+| POST | /api/sdm/merchant/push/register | Merchant | Enregistrer device |
+
+### Tests: 100% Success
+- Backend: 18/18 tests passés
+- Frontend: All Push UI components verified
+
+---
+
+## PHASE 4: MOBILE MONEY INTEGRATION (À venir)
 
 ### Objectifs
 - Compte Business MTN MoMo
