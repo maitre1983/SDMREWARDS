@@ -1036,3 +1036,182 @@ function StatusBadge({ status }) {
     </span>
   );
 }
+
+function FintechConfigPanel({ config, onSave, isSaving }) {
+  const [formData, setFormData] = useState({
+    sdm_commission_rate: config.sdm_commission_rate || 0.02,
+    cashback_pending_days: config.cashback_pending_days || 7,
+    withdrawal_fee: config.withdrawal_fee || 1.0,
+    float_low_threshold: config.float_low_threshold || 5000,
+    float_critical_threshold: config.float_critical_threshold || 1000,
+  });
+
+  const handleChange = (key, value) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({
+      sdm_commission_rate: parseFloat(formData.sdm_commission_rate),
+      cashback_pending_days: parseInt(formData.cashback_pending_days),
+      withdrawal_fee: parseFloat(formData.withdrawal_fee),
+      float_low_threshold: parseFloat(formData.float_low_threshold),
+      float_critical_threshold: parseFloat(formData.float_critical_threshold),
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-slate-900">Fintech Configuration</h3>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Commission & Fees */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <DollarSign size={18} className="text-emerald-600" />
+            Commission & Fees
+          </h4>
+          <div className="grid grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                SDM Commission Rate (%)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="0.5"
+                value={formData.sdm_commission_rate * 100}
+                onChange={(e) => handleChange('sdm_commission_rate', e.target.value / 100)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Commission SDM prélevée sur le cashback (ex: 2 = 2%)
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Withdrawal Fee (GHS)
+              </label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.withdrawal_fee}
+                onChange={(e) => handleChange('withdrawal_fee', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Frais de retrait Mobile Money
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Cashback Pending Days
+              </label>
+              <Input
+                type="number"
+                min="0"
+                max="30"
+                value={formData.cashback_pending_days}
+                onChange={(e) => handleChange('cashback_pending_days', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Jours avant que le cashback soit disponible
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Float Thresholds */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <AlertTriangle size={18} className="text-amber-600" />
+            Float Alert Thresholds
+          </h4>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Low Balance Threshold (GHS)
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.float_low_threshold}
+                onChange={(e) => handleChange('float_low_threshold', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Alerte jaune si le float passe sous ce seuil
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Critical Threshold (GHS)
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.float_critical_threshold}
+                onChange={(e) => handleChange('float_critical_threshold', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Alerte rouge si le float passe sous ce seuil critique
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Values Display */}
+        <div className="bg-slate-50 rounded-xl border border-slate-200 p-6">
+          <h4 className="font-semibold text-slate-700 mb-4">Current Active Configuration</h4>
+          <div className="grid grid-cols-5 gap-4 text-sm">
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Commission</p>
+              <p className="text-lg font-bold text-emerald-600">{(config.sdm_commission_rate * 100).toFixed(1)}%</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Withdrawal Fee</p>
+              <p className="text-lg font-bold text-blue-600">GHS {config.withdrawal_fee}</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Pending Days</p>
+              <p className="text-lg font-bold text-purple-600">{config.cashback_pending_days} days</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Low Threshold</p>
+              <p className="text-lg font-bold text-amber-600">GHS {config.float_low_threshold}</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Critical</p>
+              <p className="text-lg font-bold text-red-600">GHS {config.float_critical_threshold}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="flex justify-end">
+          <Button 
+            type="submit" 
+            disabled={isSaving}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="animate-spin mr-2" size={16} />
+                Saving...
+              </>
+            ) : (
+              'Save Configuration'
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
