@@ -452,6 +452,9 @@ class UpdateSDMConfigRequest(BaseModel):
     float_alert_emails: Optional[List[str]] = None  # Email addresses for float alerts
     alert_on_low_threshold: Optional[bool] = None  # Send alert on low threshold
     alert_on_critical_threshold: Optional[bool] = None  # Send alert on critical threshold
+    # Service configuration (Airtime, Data, Bills)
+    monthly_service_limit: Optional[float] = None  # Monthly limit for services
+    service_commission_rate: Optional[float] = None  # Commission rate on services
 
 class CreateNotificationRequest(BaseModel):
     recipient_type: str  # "all", "clients", "merchants", "specific"
