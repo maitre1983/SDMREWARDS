@@ -146,6 +146,82 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const handleTopUpFloat = async () => {
+    if (!topUpAmount || parseFloat(topUpAmount) <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/fintech/float/topup`, 
+        { amount: parseFloat(topUpAmount), source: 'BANK_TRANSFER' },
+        { headers }
+      );
+      toast.success(`Float topped up: ${res.data.reference}`);
+      setTopUpAmount('');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to top up float');
+    }
+  };
+
+  const handleExportTransactions = async (format) => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/fintech/export/transactions?format=${format}`, { headers });
+      if (format === 'csv') {
+        const blob = new Blob([res.data.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ledger_transactions_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.success(`Exported ${res.data.count} transactions`);
+      } else {
+        const blob = new Blob([JSON.stringify(res.data.data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ledger_transactions_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.success(`Exported ${res.data.count} transactions`);
+      }
+    } catch (error) {
+      toast.error('Export failed');
+    }
+  };
+
+  const handleExportAuditLogs = async (format) => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/fintech/export/audit-logs?format=${format}`, { headers });
+      if (format === 'csv') {
+        const blob = new Blob([res.data.data], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.success(`Exported ${res.data.count} logs`);
+      }
+    } catch (error) {
+      toast.error('Export failed');
+    }
+  };
+
+  const handlePurgeTestData = async () => {
+    if (!window.confirm('⚠️ WARNING: This will DELETE ALL fintech data. Are you absolutely sure?')) return;
+    if (!window.confirm('This action CANNOT be undone. Type "DELETE" to confirm.')) return;
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/fintech/purge-test-data?confirm=true`, {}, { headers });
+      toast.success('Test data purged successfully');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to purge data');
+    }
+  };
+
   const formatCurrency = (amount) => `GHS ${(amount || 0).toFixed(2)}`;
   const formatDate = (date) => date ? new Date(date).toLocaleString() : '-';
 
