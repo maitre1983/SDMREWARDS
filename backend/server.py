@@ -1544,6 +1544,11 @@ async def admin_get_sdm_stats(admin: dict = Depends(get_current_admin)):
     verified_merchants = await db.sdm_merchants.count_documents({"is_verified": True})
     total_transactions = await db.sdm_transactions.count_documents({})
     
+    # Membership stats
+    total_memberships = await db.membership_cards.count_documents({})
+    active_memberships = await db.membership_cards.count_documents({"status": "active"})
+    total_card_types = await db.merchant_card_types.count_documents({"is_active": True})
+    
     # Total cashback given
     pipeline = [{"$group": {"_id": None, "total": {"$sum": "$net_cashback"}}}]
     cashback_result = await db.sdm_transactions.aggregate(pipeline).to_list(1)
@@ -1554,18 +1559,52 @@ async def admin_get_sdm_stats(admin: dict = Depends(get_current_admin)):
     commission_result = await db.sdm_transactions.aggregate(commission_pipeline).to_list(1)
     total_commission = commission_result[0]["total"] if commission_result else 0
     
+    # Total membership revenue
+    membership_pipeline = [{"$match": {"status": {"$ne": "cancelled"}}}, {"$group": {"_id": None, "total": {"$sum": "$price_paid"}}}]
+    membership_revenue_result = await db.membership_cards.aggregate(membership_pipeline).to_list(1)
+    total_membership_revenue = membership_revenue_result[0]["total"] if membership_revenue_result else 0
+    
+    # Total referral bonuses paid
+    referral_pipeline = [{"$group": {"_id": None, "total": {"$sum": "$amount"}}}]
+    referral_result = await db.referral_bonuses.aggregate(referral_pipeline).to_list(1)
+    total_referral_bonuses = referral_result[0]["total"] if referral_result else 0
+    
     # Pending withdrawals
     pending_withdrawals = await db.sdm_withdrawals.count_documents({"status": "pending"})
+    
+    # Users by referral level
+    level_stats = await db.sdm_users.aggregate([
+        {"$group": {"_id": "$referral_level", "count": {"$sum": 1}}}
+    ]).to_list(10)
     
     return {
         "total_users": total_users,
         "total_merchants": total_merchants,
         "verified_merchants": verified_merchants,
         "total_transactions": total_transactions,
+        "total_memberships": total_memberships,
+        "active_memberships": active_memberships,
+        "total_card_types": total_card_types,
         "total_cashback_given": round(total_cashback, 2),
         "total_commission_earned": round(total_commission, 2),
-        "pending_withdrawals": pending_withdrawals
+        "total_membership_revenue": round(total_membership_revenue, 2),
+        "total_referral_bonuses": round(total_referral_bonuses, 2),
+        "pending_withdrawals": pending_withdrawals,
+        "users_by_level": {l["_id"]: l["count"] for l in level_stats if l["_id"]}
     }
+
+@sdm_router.get("/admin/memberships")
+async def admin_get_memberships(admin: dict = Depends(get_current_admin), status: Optional[str] = None, limit: int = 100):
+    """Admin: Get all membership cards"""
+    query = {} if not status else {"status": status}
+    memberships = await db.membership_cards.find(query, {"_id": 0}).sort("purchased_at", -1).to_list(limit)
+    return memberships
+
+@sdm_router.get("/admin/card-types")
+async def admin_get_all_card_types(admin: dict = Depends(get_current_admin)):
+    """Admin: Get all card types from all merchants"""
+    card_types = await db.merchant_card_types.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return card_types
 
 # ============== EXTERNAL API (For merchant website integration) ==============
 
