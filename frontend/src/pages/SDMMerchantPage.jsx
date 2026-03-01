@@ -952,6 +952,14 @@ export default function SDMMerchantPage() {
           </div>
         )}
       </div>
+
+      {/* QR Scanner Modal */}
+      {showScanner && (
+        <QRScanner
+          onScan={handleQRScanned}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }
