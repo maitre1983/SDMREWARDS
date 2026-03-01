@@ -22,24 +22,27 @@ export default function FintechDashboard({ token }) {
   const [transactions, setTransactions] = useState([]);
   const [wallets, setWallets] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [fintechConfig, setFintechConfig] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('investor');
   const [processingId, setProcessingId] = useState(null);
   const [topUpAmount, setTopUpAmount] = useState('');
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
   
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [summaryRes, investorRes, floatRes, withdrawalsRes, depositsRes, transactionsRes, walletsRes] = await Promise.all([
+      const [summaryRes, investorRes, floatRes, withdrawalsRes, depositsRes, transactionsRes, walletsRes, configRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/admin/fintech/summary`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/investor-dashboard?period_days=30`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/float/status`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/withdrawals?limit=50`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/deposits?limit=50`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/fintech/transactions?limit=50`, { headers }),
-        axios.get(`${API_URL}/api/sdm/admin/fintech/wallets?limit=100`, { headers })
+        axios.get(`${API_URL}/api/sdm/admin/fintech/wallets?limit=100`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/config`, { headers })
       ]);
       setSummary(summaryRes.data);
       setInvestorData(investorRes.data);
@@ -48,6 +51,7 @@ export default function FintechDashboard({ token }) {
       setDeposits(depositsRes.data);
       setTransactions(transactionsRes.data);
       setWallets(walletsRes.data);
+      setFintechConfig(configRes.data);
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error('Failed to load fintech data');
