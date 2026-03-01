@@ -447,6 +447,429 @@ class LedgerService:
         }
     
     # =====================================================
+    # DIRECT PAYMENT TRANSACTION (Client pays, system splits)
+    # =====================================================
+    
+    async def process_direct_payment_transaction(
+        self,
+        merchant_id: str,
+        client_id: str,
+        payment_amount: float,
+        cashback_rate: float,
+        commission_rate: float = 0.02,
+        pending_days: int = 7,
+        payment_method: str = "MOBILE_MONEY",
+        payment_reference: Optional[str] = None,
+        metadata: Dict[str, Any] = None,
+        created_by: str = "SYSTEM"
+    ) -> Dict[str, Any]:
+        """
+        Process a direct payment transaction where client pays directly.
+        The system automatically splits the payment:
+        1. Merchant receives: payment_amount - cashback_amount
+        2. Client receives: cashback_amount - SDM commission (pending)
+        3. SDM receives: commission
+        
+        Flow:
+        1. Client pays payment_amount
+        2. System calculates splits
+        3. Credit merchant wallet (net after cashback)
+        4. Credit client wallet (cashback - commission, pending)
+        5. Credit SDM commission wallet
+        
+        Returns transaction details with all splits.
+        """
+        
+        # Calculate amounts
+        cashback_amount = round(payment_amount * cashback_rate, 2)
+        sdm_commission = round(cashback_amount * commission_rate, 2)
+        net_cashback = round(cashback_amount - sdm_commission, 2)
+        merchant_net = round(payment_amount - cashback_amount, 2)
+        
+        # Get or create wallets
+        merchant_wallet = await self.get_wallet_by_entity(EntityType.MERCHANT, merchant_id)
+        if not merchant_wallet:
+            raise ValueError("Merchant wallet not found")
+        
+        client_wallet = await self.get_wallet_by_entity(EntityType.CLIENT, client_id)
+        if not client_wallet:
+            client_wallet = await self.create_wallet(EntityType.CLIENT, client_id)
+        
+        sdm_commission_wallet = await self.get_sdm_commission_wallet()
+        sdm_float_wallet = await self.get_sdm_float_wallet()
+        
+        # Generate reference
+        reference = self.generate_reference("PAY")
+        available_date = (datetime.now(timezone.utc) + timedelta(days=pending_days)).isoformat()
+        
+        # Get balances before
+        merchant_balance_before = merchant_wallet.available_balance
+        client_balance_before = client_wallet.pending_balance
+        commission_balance_before = sdm_commission_wallet.available_balance
+        float_balance_before = sdm_float_wallet.available_balance
+        
+        # 1. Credit Float (incoming payment)
+        sdm_float_wallet = await self.update_wallet_balance(
+            sdm_float_wallet.id,
+            available_delta=payment_amount
+        )
+        
+        # 2. Credit merchant (net after cashback)
+        merchant_wallet = await self.update_wallet_balance(
+            merchant_wallet.id,
+            available_delta=merchant_net
+        )
+        
+        # 3. Credit client (cashback - commission, pending)
+        client_wallet = await self.update_wallet_balance(
+            client_wallet.id,
+            pending_delta=net_cashback
+        )
+        
+        # 4. Credit SDM commission
+        sdm_commission_wallet = await self.update_wallet_balance(
+            sdm_commission_wallet.id,
+            available_delta=sdm_commission
+        )
+        
+        # Create transaction record
+        transaction = LedgerTransaction(
+            reference_id=reference,
+            transaction_type=TransactionType.CASHBACK_CREDIT,
+            status=TransactionStatus.COMPLETED,
+            source_wallet_id=sdm_float_wallet.id,
+            destination_wallet_id=merchant_wallet.id,
+            external_reference=payment_reference,
+            amount=payment_amount,
+            fee_amount=sdm_commission,
+            net_amount=merchant_net,
+            metadata={
+                **(metadata or {}),
+                "flow_type": "DIRECT_PAYMENT",
+                "merchant_id": merchant_id,
+                "client_id": client_id,
+                "payment_amount": payment_amount,
+                "payment_method": payment_method,
+                "cashback_rate": cashback_rate,
+                "commission_rate": commission_rate,
+                "merchant_net": merchant_net,
+                "cashback_amount": cashback_amount,
+                "net_cashback": net_cashback,
+                "available_date": available_date
+            },
+            created_by=created_by,
+            completed_at=datetime.now(timezone.utc).isoformat()
+        )
+        
+        # Create ledger entries (double-entry)
+        entries = [
+            # Float receives payment
+            LedgerEntry(
+                transaction_id=transaction.id,
+                wallet_id=sdm_float_wallet.id,
+                wallet_entity_type=EntityType.SDM_FLOAT,
+                wallet_entity_id="SDM_FLOAT",
+                entry_type=EntryType.CREDIT,
+                amount=payment_amount,
+                balance_before=float_balance_before,
+                balance_after=sdm_float_wallet.available_balance,
+                description=f"Payment received {reference}"
+            ),
+            # Merchant receives net
+            LedgerEntry(
+                transaction_id=transaction.id,
+                wallet_id=merchant_wallet.id,
+                wallet_entity_type=EntityType.MERCHANT,
+                wallet_entity_id=merchant_id,
+                entry_type=EntryType.CREDIT,
+                amount=merchant_net,
+                balance_before=merchant_balance_before,
+                balance_after=merchant_wallet.available_balance,
+                description=f"Payment credit (net after cashback) {reference}"
+            ),
+            # Client receives cashback (pending)
+            LedgerEntry(
+                transaction_id=transaction.id,
+                wallet_id=client_wallet.id,
+                wallet_entity_type=EntityType.CLIENT,
+                wallet_entity_id=client_id,
+                entry_type=EntryType.CREDIT,
+                amount=net_cashback,
+                balance_before=client_balance_before,
+                balance_after=client_wallet.pending_balance,
+                description=f"Cashback credit (pending) {reference}"
+            ),
+            # SDM receives commission
+            LedgerEntry(
+                transaction_id=transaction.id,
+                wallet_id=sdm_commission_wallet.id,
+                wallet_entity_type=EntityType.SDM_COMMISSION,
+                wallet_entity_id="SDM_COMM",
+                entry_type=EntryType.CREDIT,
+                amount=sdm_commission,
+                balance_before=commission_balance_before,
+                balance_after=sdm_commission_wallet.available_balance,
+                description=f"Commission credit {reference}"
+            )
+        ]
+        
+        # Save to database
+        await self.ledger_transactions.insert_one(transaction.model_dump())
+        await self.ledger_entries.insert_many([e.model_dump() for e in entries])
+        
+        # Audit log
+        await self._audit_log(
+            action="DIRECT_PAYMENT_TRANSACTION",
+            entity_type="ledger_transaction",
+            entity_id=transaction.id,
+            new_values={
+                "payment_amount": payment_amount,
+                "merchant_net": merchant_net,
+                "net_cashback": net_cashback,
+                "sdm_commission": sdm_commission,
+                "merchant_id": merchant_id,
+                "client_id": client_id
+            },
+            performed_by=created_by
+        )
+        
+        return {
+            "transaction_id": transaction.id,
+            "reference": reference,
+            "payment_amount": payment_amount,
+            "splits": {
+                "merchant_receives": merchant_net,
+                "client_cashback": net_cashback,
+                "sdm_commission": sdm_commission,
+                "total_verified": round(merchant_net + net_cashback + sdm_commission, 2)
+            },
+            "cashback_rate": cashback_rate,
+            "commission_rate": commission_rate,
+            "available_date": available_date,
+            "merchant_balance_after": merchant_wallet.available_balance,
+            "client_pending_balance": client_wallet.pending_balance
+        }
+    
+    # =====================================================
+    # WITHDRAWAL WITH FLOAT VERIFICATION
+    # =====================================================
+    
+    async def approve_withdrawal_with_float_check(
+        self,
+        withdrawal_id: str,
+        approved_by: str,
+        admin_notes: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Approve withdrawal with float balance verification.
+        Ensures SDM_FLOAT has sufficient balance before approving.
+        """
+        
+        doc = await self.withdrawal_requests.find_one({"id": withdrawal_id}, {"_id": 0})
+        if not doc:
+            raise ValueError("Withdrawal not found")
+        
+        withdrawal = WithdrawalRequest(**doc)
+        
+        if withdrawal.status != WithdrawalStatus.PENDING:
+            raise ValueError(f"Withdrawal is {withdrawal.status}, cannot approve")
+        
+        # Check float balance
+        float_wallet = await self.get_sdm_float_wallet()
+        if float_wallet.available_balance < withdrawal.net_amount:
+            raise ValueError(
+                f"Insufficient float balance. Float: {float_wallet.available_balance}, "
+                f"Required: {withdrawal.net_amount}. Please top up the float wallet."
+            )
+        
+        # Reserve float for this withdrawal
+        await self.update_wallet_balance(
+            float_wallet.id,
+            available_delta=-withdrawal.net_amount,
+            reserved_delta=withdrawal.net_amount
+        )
+        
+        now = datetime.now(timezone.utc).isoformat()
+        
+        await self.withdrawal_requests.update_one(
+            {"id": withdrawal_id},
+            {
+                "$set": {
+                    "status": WithdrawalStatus.APPROVED.value,
+                    "approved_at": now,
+                    "approved_by": approved_by,
+                    "admin_notes": admin_notes
+                }
+            }
+        )
+        
+        # Audit log
+        await self._audit_log(
+            action="APPROVE_WITHDRAWAL_WITH_FLOAT_CHECK",
+            entity_type="withdrawal_request",
+            entity_id=withdrawal_id,
+            old_values={"status": "PENDING"},
+            new_values={
+                "status": "APPROVED",
+                "float_reserved": withdrawal.net_amount,
+                "float_balance_after": float_wallet.available_balance - withdrawal.net_amount
+            },
+            performed_by=approved_by
+        )
+        
+        return {
+            "withdrawal_id": withdrawal_id,
+            "status": "APPROVED",
+            "amount": withdrawal.amount,
+            "net_amount": withdrawal.net_amount,
+            "float_reserved": withdrawal.net_amount,
+            "float_balance_remaining": float_wallet.available_balance - withdrawal.net_amount
+        }
+    
+    async def complete_withdrawal_with_momo(
+        self,
+        withdrawal_id: str,
+        provider_reference: str,
+        provider_status: str = "SUCCESS"
+    ) -> Dict[str, Any]:
+        """
+        Complete withdrawal after Mobile Money API confirmation.
+        Releases reserved float and finalizes the transaction.
+        """
+        
+        doc = await self.withdrawal_requests.find_one({"id": withdrawal_id}, {"_id": 0})
+        if not doc:
+            raise ValueError("Withdrawal not found")
+        
+        withdrawal = WithdrawalRequest(**doc)
+        
+        if withdrawal.status not in [WithdrawalStatus.APPROVED, WithdrawalStatus.PROCESSING]:
+            raise ValueError(f"Withdrawal is {withdrawal.status}, cannot complete")
+        
+        # Get wallets
+        wallet = await self.get_wallet(withdrawal.wallet_id)
+        float_wallet = await self.get_sdm_float_wallet()
+        
+        # Release reserved balance from user wallet (already reserved at request time)
+        await self.update_wallet_balance(
+            withdrawal.wallet_id,
+            reserved_delta=-withdrawal.amount
+        )
+        
+        # Release reserved float (was reserved at approval)
+        await self.update_wallet_balance(
+            float_wallet.id,
+            reserved_delta=-withdrawal.net_amount
+        )
+        
+        # Create ledger transaction
+        reference = self.generate_reference("WTH")
+        
+        transaction = LedgerTransaction(
+            reference_id=reference,
+            transaction_type=TransactionType.WITHDRAWAL,
+            status=TransactionStatus.COMPLETED,
+            source_wallet_id=wallet.id,
+            destination_wallet_id=float_wallet.id,
+            external_reference=provider_reference,
+            amount=withdrawal.amount,
+            fee_amount=withdrawal.fee,
+            net_amount=withdrawal.net_amount,
+            metadata={
+                "withdrawal_id": withdrawal_id,
+                "provider": withdrawal.provider,
+                "phone": withdrawal.phone_number,
+                "momo_status": provider_status
+            },
+            completed_at=datetime.now(timezone.utc).isoformat()
+        )
+        
+        await self.ledger_transactions.insert_one(transaction.model_dump())
+        
+        now = datetime.now(timezone.utc).isoformat()
+        
+        await self.withdrawal_requests.update_one(
+            {"id": withdrawal_id},
+            {
+                "$set": {
+                    "status": WithdrawalStatus.PAID.value,
+                    "completed_at": now,
+                    "provider_reference": provider_reference,
+                    "provider_status": provider_status,
+                    "transaction_id": transaction.id
+                }
+            }
+        )
+        
+        # Audit log
+        await self._audit_log(
+            action="COMPLETE_WITHDRAWAL_MOMO",
+            entity_type="withdrawal_request",
+            entity_id=withdrawal_id,
+            new_values={
+                "status": "PAID",
+                "provider_reference": provider_reference,
+                "net_amount": withdrawal.net_amount
+            },
+            performed_by="MOMO_API"
+        )
+        
+        return {
+            "withdrawal_id": withdrawal_id,
+            "transaction_id": transaction.id,
+            "reference": reference,
+            "status": "PAID",
+            "amount": withdrawal.amount,
+            "fee": withdrawal.fee,
+            "net_amount": withdrawal.net_amount,
+            "provider": withdrawal.provider,
+            "provider_reference": provider_reference
+        }
+    
+    async def get_float_status(self) -> Dict[str, Any]:
+        """Get float wallet status with alert levels."""
+        
+        float_wallet = await self.get_sdm_float_wallet()
+        
+        # Get pending withdrawals total
+        pending_pipeline = [
+            {"$match": {"status": {"$in": [WithdrawalStatus.PENDING.value, WithdrawalStatus.APPROVED.value]}}},
+            {"$group": {"_id": None, "total": {"$sum": "$net_amount"}, "count": {"$sum": 1}}}
+        ]
+        pending_result = await self.withdrawal_requests.aggregate(pending_pipeline).to_list(1)
+        pending_total = pending_result[0] if pending_result else {"total": 0, "count": 0}
+        
+        # Thresholds
+        LOW_THRESHOLD = 5000  # GHS
+        CRITICAL_THRESHOLD = 1000  # GHS
+        
+        # Calculate coverage ratio
+        coverage = float_wallet.available_balance / pending_total["total"] if pending_total["total"] > 0 else float("inf")
+        
+        # Determine alert level
+        alert_level = "OK"
+        if float_wallet.available_balance < CRITICAL_THRESHOLD:
+            alert_level = "CRITICAL"
+        elif float_wallet.available_balance < LOW_THRESHOLD:
+            alert_level = "LOW"
+        
+        return {
+            "float_balance": float_wallet.available_balance,
+            "reserved_balance": float_wallet.reserved_balance,
+            "pending_withdrawals": {
+                "count": pending_total.get("count", 0),
+                "total_amount": round(pending_total.get("total", 0), 2)
+            },
+            "coverage_ratio": round(coverage, 2) if coverage != float("inf") else "∞",
+            "alert_level": alert_level,
+            "thresholds": {
+                "low": LOW_THRESHOLD,
+                "critical": CRITICAL_THRESHOLD
+            },
+            "can_process_withdrawals": float_wallet.available_balance >= pending_total.get("total", 0)
+        }
+    
+    # =====================================================
     # MERCHANT DEPOSIT (Pre-funding)
     # =====================================================
     
