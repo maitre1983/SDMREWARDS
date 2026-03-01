@@ -333,6 +333,22 @@ class AddStaffRequest(BaseModel):
     phone: str
     role: str = "cashier"
 
+class PurchaseMembershipRequest(BaseModel):
+    payment_method: str = "wallet"  # wallet, mobile_money
+    mobile_money_number: Optional[str] = None
+    mobile_money_provider: Optional[str] = None
+
+class UpdateSDMConfigRequest(BaseModel):
+    membership_card_price: Optional[float] = None
+    referral_bonus_bronze: Optional[float] = None
+    referral_bonus_silver: Optional[float] = None
+    referral_bonus_gold: Optional[float] = None
+    welcome_bonus: Optional[float] = None
+    bronze_min_referrals: Optional[int] = None
+    silver_min_referrals: Optional[int] = None
+    gold_min_referrals: Optional[int] = None
+    membership_validity_days: Optional[int] = None
+
 # ============== HELPER FUNCTIONS ==============
 
 def hash_password(password: str) -> str:
