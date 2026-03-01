@@ -175,6 +175,13 @@ export default function AdminDashboardPage() {
             <BarChart3 size={18} />
             <span>Analytics</span>
           </button>
+          <button
+            onClick={() => setActiveTab('sdm')}
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'sdm' ? 'active' : ''}`}
+          >
+            <CreditCard size={18} />
+            <span>SDM Platform</span>
+          </button>
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
