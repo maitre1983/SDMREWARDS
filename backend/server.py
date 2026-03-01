@@ -2553,8 +2553,450 @@ async def admin_get_float_status(admin: dict = Depends(get_current_admin)):
     }
 
 
-# Import for ledger models
-from ledger import LedgerEntry, LedgerTransaction, TransactionStatus, EntryType
+# ============== NOTIFICATION SYSTEM ==============
+
+async def send_float_alert(alert_type: str, float_balance: float, threshold: float):
+    """Send float alert via webhook and/or email"""
+    config = await get_sdm_config()
+    
+    # Check if alerts are enabled for this type
+    if alert_type == "low" and not config.get("alert_on_low_threshold", True):
+        return None
+    if alert_type == "critical" and not config.get("alert_on_critical_threshold", True):
+        return None
+    
+    # Create alert record
+    alert = FloatAlert(
+        alert_type=alert_type,
+        float_balance=float_balance,
+        threshold=threshold,
+        message=f"Float balance ({float_balance} GHS) has dropped below {alert_type} threshold ({threshold} GHS)"
+    )
+    
+    webhook_url = config.get("float_alert_webhook_url")
+    alert_emails = config.get("float_alert_emails", [])
+    
+    # Send webhook if configured
+    if webhook_url:
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    webhook_url,
+                    json={
+                        "alert_type": alert_type,
+                        "float_balance": float_balance,
+                        "threshold": threshold,
+                        "message": alert.message,
+                        "timestamp": alert.created_at,
+                        "platform": "SDM Fintech"
+                    },
+                    timeout=10.0
+                )
+                alert.webhook_sent = True
+                alert.webhook_response = f"Status: {response.status_code}"
+        except Exception as e:
+            alert.webhook_response = f"Error: {str(e)}"
+    
+    # Send email if configured
+    if alert_emails:
+        try:
+            # Using Resend (if configured)
+            resend_api_key = os.environ.get("RESEND_API_KEY")
+            if resend_api_key:
+                import resend
+                resend.api_key = resend_api_key
+                
+                for email in alert_emails:
+                    try:
+                        resend.Emails.send({
+                            "from": "SDM Fintech <alerts@sdm.com>",
+                            "to": [email],
+                            "subject": f"🚨 Float {alert_type.upper()} Alert - SDM Fintech",
+                            "html": f"""
+                            <h2>Float Balance Alert</h2>
+                            <p><strong>Alert Type:</strong> {alert_type.upper()}</p>
+                            <p><strong>Current Balance:</strong> GHS {float_balance:,.2f}</p>
+                            <p><strong>Threshold:</strong> GHS {threshold:,.2f}</p>
+                            <p><strong>Message:</strong> {alert.message}</p>
+                            <p><strong>Time:</strong> {alert.created_at}</p>
+                            <hr>
+                            <p>Please top up the float wallet to ensure withdrawal processing.</p>
+                            """
+                        })
+                    except:
+                        pass
+                alert.email_sent = True
+                alert.email_recipients = alert_emails
+        except Exception as e:
+            print(f"Email alert error: {e}")
+    
+    # Save alert record
+    await db.float_alerts.insert_one(alert.model_dump())
+    
+    return alert
+
+async def check_float_and_alert():
+    """Check float balance and send alerts if needed"""
+    config = await get_sdm_config()
+    float_status = await ledger_service.get_float_status()
+    
+    float_balance = float_status.get("float_balance", 0)
+    LOW_THRESHOLD = config.get("float_low_threshold", 5000)
+    CRITICAL_THRESHOLD = config.get("float_critical_threshold", 1000)
+    
+    # Check if we already sent an alert recently (within 1 hour)
+    one_hour_ago = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent_alert = await db.float_alerts.find_one({
+        "created_at": {"$gte": one_hour_ago},
+        "is_acknowledged": False
+    }, {"_id": 0})
+    
+    if recent_alert:
+        return None  # Don't spam alerts
+    
+    # Send appropriate alert
+    if float_balance < CRITICAL_THRESHOLD:
+        return await send_float_alert("critical", float_balance, CRITICAL_THRESHOLD)
+    elif float_balance < LOW_THRESHOLD:
+        return await send_float_alert("low", float_balance, LOW_THRESHOLD)
+    
+    return None
+
+# ============== NOTIFICATION ENDPOINTS ==============
+
+@sdm_router.post("/admin/notifications")
+async def create_notification(
+    request: CreateNotificationRequest,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Create and send a notification"""
+    notification = Notification(
+        recipient_type=request.recipient_type,
+        recipient_ids=request.recipient_ids or [],
+        title=request.title,
+        message=request.message,
+        notification_type=request.notification_type,
+        priority=request.priority,
+        action_url=request.action_url,
+        image_url=request.image_url,
+        expires_at=request.expires_at,
+        sent_by=admin["username"]
+    )
+    
+    await db.notifications.insert_one(notification.model_dump())
+    
+    # Count recipients
+    recipient_count = 0
+    if request.recipient_type == "all":
+        users = await db.sdm_users.count_documents({"is_active": True})
+        merchants = await db.sdm_merchants.count_documents({"is_active": True})
+        recipient_count = users + merchants
+    elif request.recipient_type == "clients":
+        recipient_count = await db.sdm_users.count_documents({"is_active": True})
+    elif request.recipient_type == "merchants":
+        recipient_count = await db.sdm_merchants.count_documents({"is_active": True})
+    elif request.recipient_type == "specific":
+        recipient_count = len(request.recipient_ids or [])
+    
+    return {
+        "message": "Notification created and sent",
+        "notification_id": notification.id,
+        "recipient_type": request.recipient_type,
+        "recipient_count": recipient_count
+    }
+
+@sdm_router.get("/admin/notifications")
+async def get_notifications(
+    limit: int = 50,
+    skip: int = 0,
+    notification_type: Optional[str] = None,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Get all notifications"""
+    query = {}
+    if notification_type:
+        query["notification_type"] = notification_type
+    
+    notifications = await db.notifications.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    return notifications
+
+@sdm_router.put("/admin/notifications/{notification_id}")
+async def update_notification(
+    notification_id: str,
+    request: UpdateNotificationRequest,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Update a notification"""
+    update_data = {k: v for k, v in request.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+    
+    result = await db.notifications.update_one(
+        {"id": notification_id},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification updated", "notification_id": notification_id}
+
+@sdm_router.delete("/admin/notifications/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Delete a notification"""
+    result = await db.notifications.delete_one({"id": notification_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification deleted", "notification_id": notification_id}
+
+@sdm_router.get("/admin/notifications/stats")
+async def get_notification_stats(admin: dict = Depends(get_current_admin)):
+    """Admin: Get notification statistics"""
+    total = await db.notifications.count_documents({})
+    by_type = await db.notifications.aggregate([
+        {"$group": {"_id": "$notification_type", "count": {"$sum": 1}}}
+    ]).to_list(100)
+    by_priority = await db.notifications.aggregate([
+        {"$group": {"_id": "$priority", "count": {"$sum": 1}}}
+    ]).to_list(100)
+    
+    return {
+        "total_notifications": total,
+        "by_type": {item["_id"]: item["count"] for item in by_type},
+        "by_priority": {item["_id"]: item["count"] for item in by_priority}
+    }
+
+# ============== FLOAT ALERT ENDPOINTS ==============
+
+@sdm_router.get("/admin/float-alerts")
+async def get_float_alerts(
+    limit: int = 50,
+    acknowledged: Optional[bool] = None,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Get float alert history"""
+    query = {}
+    if acknowledged is not None:
+        query["is_acknowledged"] = acknowledged
+    
+    alerts = await db.float_alerts.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return alerts
+
+@sdm_router.post("/admin/float-alerts/{alert_id}/acknowledge")
+async def acknowledge_float_alert(
+    alert_id: str,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Acknowledge a float alert"""
+    result = await db.float_alerts.update_one(
+        {"id": alert_id},
+        {
+            "$set": {
+                "is_acknowledged": True,
+                "acknowledged_by": admin["username"],
+                "acknowledged_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    
+    return {"message": "Alert acknowledged", "alert_id": alert_id}
+
+@sdm_router.post("/admin/float-alerts/test")
+async def test_float_alert(admin: dict = Depends(get_current_admin)):
+    """Admin: Test float alert system (sends test notification)"""
+    config = await get_sdm_config()
+    
+    webhook_url = config.get("float_alert_webhook_url")
+    alert_emails = config.get("float_alert_emails", [])
+    
+    if not webhook_url and not alert_emails:
+        raise HTTPException(
+            status_code=400, 
+            detail="No webhook URL or email addresses configured. Please configure alert settings first."
+        )
+    
+    # Create test alert
+    test_alert = await send_float_alert("test", 999.99, 1000.0)
+    
+    return {
+        "message": "Test alert sent",
+        "webhook_configured": bool(webhook_url),
+        "webhook_sent": test_alert.webhook_sent if test_alert else False,
+        "emails_configured": len(alert_emails),
+        "email_sent": test_alert.email_sent if test_alert else False
+    }
+
+# ============== CLIENT NOTIFICATION ENDPOINTS ==============
+
+@sdm_router.get("/user/notifications")
+async def get_user_notifications(
+    limit: int = 20,
+    unread_only: bool = False,
+    user: dict = Depends(get_current_user)
+):
+    """User: Get my notifications"""
+    user_id = user["id"]
+    
+    # Query notifications for this user
+    query = {
+        "$or": [
+            {"recipient_type": "all"},
+            {"recipient_type": "clients"},
+            {"recipient_ids": user_id}
+        ],
+        "is_active": True
+    }
+    
+    # Filter expired
+    now = datetime.now(timezone.utc).isoformat()
+    query["$or"].append({"expires_at": None})
+    query["$or"].append({"expires_at": {"$gt": now}})
+    
+    notifications = await db.notifications.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Add read status for this user
+    result = []
+    for notif in notifications:
+        is_read = notif.get("is_read", {}).get(user_id, False)
+        if unread_only and is_read:
+            continue
+        result.append({
+            **notif,
+            "is_read": is_read
+        })
+    
+    return result
+
+@sdm_router.post("/user/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """User: Mark notification as read"""
+    user_id = user["id"]
+    
+    result = await db.notifications.update_one(
+        {"id": notification_id},
+        {"$set": {f"is_read.{user_id}": True}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification marked as read"}
+
+@sdm_router.post("/user/notifications/read-all")
+async def mark_all_notifications_read(user: dict = Depends(get_current_user)):
+    """User: Mark all notifications as read"""
+    user_id = user["id"]
+    
+    # Get all notifications for this user
+    query = {
+        "$or": [
+            {"recipient_type": "all"},
+            {"recipient_type": "clients"},
+            {"recipient_ids": user_id}
+        ],
+        "is_active": True
+    }
+    
+    result = await db.notifications.update_many(
+        query,
+        {"$set": {f"is_read.{user_id}": True}}
+    )
+    
+    return {"message": "All notifications marked as read", "count": result.modified_count}
+
+@sdm_router.get("/user/notifications/unread-count")
+async def get_unread_notification_count(user: dict = Depends(get_current_user)):
+    """User: Get count of unread notifications"""
+    user_id = user["id"]
+    
+    # Query notifications for this user that are NOT read
+    query = {
+        "$or": [
+            {"recipient_type": "all"},
+            {"recipient_type": "clients"},
+            {"recipient_ids": user_id}
+        ],
+        "is_active": True,
+        f"is_read.{user_id}": {"$ne": True}
+    }
+    
+    count = await db.notifications.count_documents(query)
+    
+    return {"unread_count": count}
+
+# ============== MERCHANT NOTIFICATION ENDPOINTS ==============
+
+@sdm_router.get("/merchant/notifications")
+async def get_merchant_notifications(
+    limit: int = 20,
+    unread_only: bool = False,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Merchant: Get my notifications"""
+    merchant_id = merchant["id"]
+    
+    query = {
+        "$or": [
+            {"recipient_type": "all"},
+            {"recipient_type": "merchants"},
+            {"recipient_ids": merchant_id}
+        ],
+        "is_active": True
+    }
+    
+    notifications = await db.notifications.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    result = []
+    for notif in notifications:
+        is_read = notif.get("is_read", {}).get(merchant_id, False)
+        if unread_only and is_read:
+            continue
+        result.append({
+            **notif,
+            "is_read": is_read
+        })
+    
+    return result
+
+@sdm_router.post("/merchant/notifications/{notification_id}/read")
+async def mark_merchant_notification_read(
+    notification_id: str,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Merchant: Mark notification as read"""
+    merchant_id = merchant["id"]
+    
+    result = await db.notifications.update_one(
+        {"id": notification_id},
+        {"$set": {f"is_read.{merchant_id}": True}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    return {"message": "Notification marked as read"}
 
 # Include routers
 app.include_router(api_router)
