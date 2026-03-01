@@ -1107,6 +1107,11 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
     - Client receives: cashback - SDM commission (pending)
     - SDM receives: commission
     """
+    # Get dynamic config
+    config = await get_sdm_config()
+    commission_rate = config.get("sdm_commission_rate", SDM_COMMISSION_RATE)
+    pending_days = config.get("cashback_pending_days", CASHBACK_PENDING_DAYS)
+    
     # Find user by QR code
     user = await db.sdm_users.find_one({"qr_code": request.user_qr_code}, {"_id": 0})
     if not user:
@@ -1130,8 +1135,8 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
             client_id=user["id"],
             payment_amount=request.amount,
             cashback_rate=merchant["cashback_rate"],
-            commission_rate=SDM_COMMISSION_RATE,
-            pending_days=CASHBACK_PENDING_DAYS,
+            commission_rate=commission_rate,
+            pending_days=pending_days,
             payment_method="QR_SCAN",
             metadata={
                 "staff_id": request.staff_id,
