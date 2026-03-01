@@ -697,12 +697,22 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
 
 # ============== SDM USER ROUTES ==============
 
+# Test account credentials (for development/testing only)
+TEST_PHONE = "+233000000000"
+TEST_OTP = "000000"
+
 @sdm_router.post("/auth/send-otp")
 async def send_otp(request: SendOTPRequest):
     """Send OTP to phone number"""
     phone = normalize_phone(request.phone)
-    otp_code = generate_otp()
-    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+    
+    # Test account - fixed OTP that never expires
+    if phone == normalize_phone(TEST_PHONE):
+        otp_code = TEST_OTP
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=365)).isoformat()  # 1 year validity
+    else:
+        otp_code = generate_otp()
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
     
     # Validate referral code if provided
     referral_code = None
@@ -716,9 +726,11 @@ async def send_otp(request: SendOTPRequest):
     await db.otp_records.delete_many({"phone": phone})  # Remove old OTPs
     await db.otp_records.insert_one(otp_record.model_dump())
     
-    # Send SMS
-    message = f"Your SDM verification code is: {otp_code}. Valid for 10 minutes."
-    sms_sent = await send_sms_hubtel(phone, message)
+    # Send SMS (skip for test account)
+    sms_sent = False
+    if phone != normalize_phone(TEST_PHONE):
+        message = f"Your SDM verification code is: {otp_code}. Valid for 10 minutes."
+        sms_sent = await send_sms_hubtel(phone, message)
     
     return {
         "message": "OTP sent" if sms_sent else "OTP generated (SMS not configured)",
@@ -727,7 +739,8 @@ async def send_otp(request: SendOTPRequest):
         "otp_id": otp_record.id,
         "referral_valid": referral_code is not None if request.referral_code else None,
         # For testing only - remove in production
-        "debug_otp": otp_code if not HUBTEL_CLIENT_ID else None
+        "debug_otp": otp_code if not HUBTEL_CLIENT_ID else None,
+        "is_test_account": phone == normalize_phone(TEST_PHONE)
     }
 
 @sdm_router.post("/auth/verify-otp")
