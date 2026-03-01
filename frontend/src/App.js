@@ -6,6 +6,8 @@ import { AuthProvider } from "./context/AuthContext";
 import HomePage from "./pages/HomePage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import SDMClientPage from "./pages/SDMClientPage";
+import SDMMerchantPage from "./pages/SDMMerchantPage";
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/admin" element={<AdminLoginPage />} />
               <Route path="/admin280226" element={<AdminDashboardPage />} />
+              <Route path="/sdm/client" element={<SDMClientPage />} />
+              <Route path="/sdm/merchant" element={<SDMMerchantPage />} />
             </Routes>
           </BrowserRouter>
         </div>
