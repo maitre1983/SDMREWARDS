@@ -38,8 +38,14 @@ class SmartDigitalAPITester:
         if headers:
             test_headers.update(headers)
         
-        if self.token and 'Authorization' not in test_headers:
-            test_headers['Authorization'] = f'Bearer {self.token}'
+        # Use appropriate token based on endpoint
+        if 'Authorization' not in test_headers:
+            if '/api/admin/' in endpoint and self.admin_token:
+                test_headers['Authorization'] = f'Bearer {self.admin_token}'
+            elif '/api/sdm/user/' in endpoint and self.user_token:
+                test_headers['Authorization'] = f'Bearer {self.user_token}'  
+            elif '/api/sdm/merchant/' in endpoint and self.merchant_token:
+                test_headers['Authorization'] = f'Bearer {self.merchant_token}'
 
         self.tests_run += 1
         print(f"\n🔍 Testing {name}...")
