@@ -468,13 +468,24 @@ export default function SDMMerchantPage() {
             <form onSubmit={handleCreateTransaction} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Customer QR Code</label>
-                <Input
-                  value={scanQR}
-                  onChange={(e) => setScanQR(e.target.value.toUpperCase())}
-                  placeholder="Enter QR code (e.g., ABC123DEF456)"
-                  className="h-12 text-lg font-mono uppercase"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    value={scanQR}
+                    onChange={(e) => setScanQR(e.target.value.toUpperCase())}
+                    placeholder="Enter or scan QR code"
+                    className="flex-1 h-12 text-lg font-mono uppercase"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => setShowScanner(true)}
+                    className="h-12 px-4 bg-blue-600 hover:bg-blue-700 text-white"
+                    data-testid="open-scanner-btn"
+                  >
+                    <Camera size={20} className="mr-2" />
+                    Scan
+                  </Button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Transaction Amount (GHS)</label>
@@ -487,6 +498,15 @@ export default function SDMMerchantPage() {
                   step="0.01"
                   className="h-12 text-lg"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Notes (optional)</label>
+                <Input
+                  value={scanNotes}
+                  onChange={(e) => setScanNotes(e.target.value)}
+                  placeholder="e.g., Table 5, Order #123"
+                  className="h-10"
                 />
               </div>
               {scanAmount && (
