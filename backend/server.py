@@ -140,6 +140,10 @@ class SDMUser(BaseModel):
     last_name: Optional[str] = None
     email: Optional[str] = None
     qr_code: str = Field(default_factory=lambda: str(uuid.uuid4())[:12].upper())
+    referral_code: str = Field(default_factory=lambda: f"SDM{secrets.token_hex(3).upper()}")
+    referred_by: Optional[str] = None  # User ID who referred this user
+    referral_bonus_earned: float = 0.0
+    referral_count: int = 0
     wallet_pending: float = 0.0
     wallet_available: float = 0.0
     total_earned: float = 0.0
