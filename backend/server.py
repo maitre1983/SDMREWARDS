@@ -2559,6 +2559,48 @@ async def admin_get_float_status(admin: dict = Depends(get_current_admin)):
     }
 
 
+@sdm_router.post("/admin/fintech/credit-user")
+async def admin_credit_user_wallet(
+    user_id: str,
+    amount: float,
+    reason: str = "Admin credit",
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Credit a user's wallet directly (for testing/adjustments)"""
+    from ledger import EntityType
+    
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user_id)
+    if not wallet:
+        # Create wallet if doesn't exist
+        wallet = await ledger_service.create_wallet(EntityType.CLIENT, user_id)
+    
+    # Credit available balance
+    await ledger_service.update_wallet_balance(
+        wallet.id,
+        available_delta=amount
+    )
+    
+    # Audit log
+    await db.audit_logs.insert_one({
+        "action": "ADMIN_CREDIT_USER",
+        "entity_type": "wallet",
+        "entity_id": wallet.id,
+        "user_id": user_id,
+        "amount": amount,
+        "reason": reason,
+        "performed_by": admin["username"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "message": "User wallet credited",
+        "user_id": user_id,
+        "amount_credited": amount,
+        "new_balance": wallet.available_balance + amount,
+        "reason": reason
+    }
+
+
 # ============== NOTIFICATION SYSTEM ==============
 
 async def send_float_alert(alert_type: str, float_balance: float, threshold: float):
