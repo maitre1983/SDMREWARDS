@@ -3,7 +3,8 @@ import {
   Wallet, TrendingUp, ArrowDownToLine, ArrowUpFromLine, 
   CheckCircle, XCircle, Clock, RefreshCw, Loader2,
   DollarSign, Users, Store, Building2, FileText, Shield,
-  ChevronDown, ChevronUp, Search, Filter, AlertTriangle
+  ChevronDown, ChevronUp, Search, Filter, AlertTriangle,
+  Download, BarChart3, PieChart, Activity, Zap, AlertCircle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
