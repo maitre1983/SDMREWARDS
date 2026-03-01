@@ -47,16 +47,20 @@ export default function SDMClientPage() {
   const fetchUserData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [profileRes, walletRes, txnRes, referralRes] = await Promise.all([
+      const [profileRes, walletRes, txnRes, referralRes, cardsRes, membershipsRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/user/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/wallet`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/transactions`, { headers }),
-        axios.get(`${API_URL}/api/sdm/user/referral`, { headers })
+        axios.get(`${API_URL}/api/sdm/user/referral`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/available-cards`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/memberships`, { headers })
       ]);
       setUser(profileRes.data);
       setWallet(walletRes.data);
       setTransactions(txnRes.data);
       setReferralData(referralRes.data);
+      setAvailableCards(cardsRes.data);
+      setUserMemberships(membershipsRes.data);
     } catch (error) {
       console.error('Fetch error:', error);
       if (error.response?.status === 401) {
