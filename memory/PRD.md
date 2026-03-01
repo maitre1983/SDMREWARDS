@@ -97,10 +97,46 @@ Métriques clés pour investisseurs :
 | PUT | /api/sdm/admin/config | Admin | Update config fintech |
 | POST | /api/sdm/admin/fintech/purge-test-data | Admin | Purger données test |
 | GET | /api/sdm/admin/fintech/ledger/export | Admin | Export ledger CSV/JSON |
+| POST | /api/sdm/admin/notifications | Admin | Créer notification |
+| GET | /api/sdm/admin/notifications | Admin | Liste notifications |
+| DELETE | /api/sdm/admin/notifications/{id} | Admin | Supprimer notification |
+| GET | /api/sdm/admin/float-alerts | Admin | Historique alertes float |
+| POST | /api/sdm/admin/float-alerts/test | Admin | Tester alertes |
+| POST | /api/sdm/admin/float-alerts/{id}/acknowledge | Admin | Acquitter alerte |
+| GET | /api/sdm/user/notifications | User | Mes notifications |
+| POST | /api/sdm/user/notifications/{id}/read | User | Marquer lu |
+| GET | /api/sdm/user/notifications/unread-count | User | Compteur non-lus |
 
 ### Tests: 100% Success
-- Backend: 12/12 tests passés
-- Frontend: All 9 dashboard tabs functional
+- Backend: 32/32 tests passés (Phase 2 complet)
+- Frontend: All 11 dashboard tabs functional
+
+---
+
+## PHASE 2.5: NOTIFICATION SYSTEM ✅ COMPLETE
+
+### Implemented Features (March 2026)
+
+#### 1. Float Alert System (Webhook + Email)
+- **Configuration dynamique** : Webhook URL et emails depuis le dashboard
+- **Types d'alertes** : LOW (seuil bas) et CRITICAL (seuil critique)
+- **Historique** : Suivi des alertes avec status webhook/email
+- **Acknowledge** : Possibilité d'acquitter les alertes
+
+#### 2. Client Notification System
+- **Types** : system, promo, alert, info
+- **Priorités** : low, normal, high, urgent
+- **Recipients** : all (tous), clients (clients seulement), merchants (marchands)
+- **Fonctionnalités client** : Voir notifications, marquer lu, compteur non-lus
+
+#### 3. Dashboard Admin Étendu
+- **11 onglets** : Investor, Overview, Withdrawals, Deposits, Float, Wallets, Notifications, Alerts, Ledger, Config, Audit
+- **Onglet Notifications** : Formulaire création, liste avec suppression
+- **Onglet Alerts** : Configuration webhook/email, historique, test
+
+### Collections MongoDB Ajoutées
+- `notifications`: Notifications envoyées aux utilisateurs
+- `float_alerts`: Historique des alertes float
 
 ---
 
