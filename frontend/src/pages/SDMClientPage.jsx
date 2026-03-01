@@ -66,10 +66,17 @@ export default function SDMClientPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/sdm/auth/send-otp`, { phone });
+      const payload = { phone };
+      if (referralCode) {
+        payload.referral_code = referralCode;
+      }
+      const response = await axios.post(`${API_URL}/api/sdm/auth/send-otp`, payload);
       setOtpId(response.data.otp_id);
       if (response.data.debug_otp) {
         setDebugOtp(response.data.debug_otp);
+      }
+      if (response.data.referral_valid === false) {
+        toast.warning('Referral code not found, continuing without it');
       }
       toast.success('OTP sent to your phone');
       setStep('otp');
@@ -91,7 +98,12 @@ export default function SDMClientPage() {
       localStorage.setItem('sdm_user_token', response.data.access_token);
       setToken(response.data.access_token);
       setUser(response.data.user);
-      toast.success('Login successful!');
+      
+      if (response.data.is_new_user && response.data.welcome_bonus > 0) {
+        toast.success(`Welcome! You received GHS ${response.data.welcome_bonus} bonus!`, { duration: 5000 });
+      } else {
+        toast.success('Login successful!');
+      }
       setStep('dashboard');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Invalid OTP');
