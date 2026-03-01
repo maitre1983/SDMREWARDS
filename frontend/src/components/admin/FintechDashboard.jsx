@@ -1608,14 +1608,15 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
   );
 }
 
-function NotificationForm({ onSubmit, onCancel }) {
+function NotificationForm({ onSubmit, onSubmitPush, onCancel }) {
   const [formData, setFormData] = useState({
     recipient_type: 'all',
     title: '',
     message: '',
     notification_type: 'system',
     priority: 'normal',
-    action_url: ''
+    action_url: '',
+    send_push: false
   });
 
   const handleSubmit = (e) => {
@@ -1624,7 +1625,12 @@ function NotificationForm({ onSubmit, onCancel }) {
       toast.error('Title and message are required');
       return;
     }
-    onSubmit(formData);
+    
+    if (formData.send_push && onSubmitPush) {
+      onSubmitPush(formData);
+    } else {
+      onSubmit(formData);
+    }
   };
 
   return (
@@ -1709,13 +1715,32 @@ function NotificationForm({ onSubmit, onCancel }) {
           />
         </div>
 
+        {/* Push Notification Toggle */}
+        <div className="bg-slate-50 rounded-lg p-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.send_push}
+              onChange={(e) => setFormData({...formData, send_push: e.target.checked})}
+              className="w-5 h-5 text-blue-600 rounded border-slate-300"
+            />
+            <div className="flex items-center gap-2">
+              <Bell size={18} className="text-blue-600" />
+              <div>
+                <span className="font-medium text-slate-900">Send as Push Notification</span>
+                <p className="text-xs text-slate-500">Also send to devices with push enabled</p>
+              </div>
+            </div>
+          </label>
+        </div>
+
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
           <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-            <Send size={14} className="mr-2" />
-            Send Notification
+            {formData.send_push ? <Bell size={14} className="mr-2" /> : <Send size={14} className="mr-2" />}
+            {formData.send_push ? 'Send Push' : 'Send In-App'}
           </Button>
         </div>
       </form>
