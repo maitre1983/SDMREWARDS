@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
-  ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet
+  ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet,
+  CreditCard
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +12,7 @@ import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import axios from 'axios';
+import SDMConfigPanel from '../components/admin/SDMConfigPanel';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/ke4bukaf_WhatsApp%20Image%202026-02-28%20at%2014.47.22.jpeg";
