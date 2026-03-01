@@ -220,13 +220,16 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 - Tailwind CSS + Shadcn UI
 - FintechDashboard: `/app/frontend/src/components/admin/FintechDashboard.jsx`
 
-### New Collections (Phase 1)
+### New Collections (Phase 1-3)
 - `wallets` - Tous les portefeuilles
 - `ledger_entries` - Écritures comptables (DEBIT/CREDIT)
 - `ledger_transactions` - Transactions principales
 - `withdrawal_requests` - Demandes de retrait
 - `merchant_deposits` - Dépôts marchands
 - `audit_logs` - Journal d'audit
+- `notifications` - Notifications in-app
+- `float_alerts` - Historique alertes float
+- `push_devices` - Devices enregistrés pour push
 
 ---
 
