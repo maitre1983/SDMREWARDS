@@ -226,6 +226,21 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const handleSaveConfig = async (updates) => {
+    setIsSavingConfig(true);
+    try {
+      await axios.put(`${API_URL}/api/sdm/admin/config`, updates, { headers });
+      toast.success('Configuration saved successfully');
+      // Refresh config
+      const res = await axios.get(`${API_URL}/api/sdm/admin/config`, { headers });
+      setFintechConfig(res.data);
+    } catch (error) {
+      toast.error('Failed to save configuration');
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
   const formatCurrency = (amount) => `GHS ${(amount || 0).toFixed(2)}`;
   const formatDate = (date) => date ? new Date(date).toLocaleString() : '-';
 
