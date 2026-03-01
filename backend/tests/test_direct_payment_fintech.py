@@ -230,11 +230,12 @@ class TestDirectPaymentFintech:
         """
         
         # Step 1: Register a new test merchant
+        unique_id = uuid.uuid4().hex[:8]
         merchant_data = {
-            "business_name": f"TEST_DirectPay_Merchant_{uuid.uuid4().hex[:8]}",
+            "business_name": f"TEST_DirectPay_Merchant_{unique_id}",
             "business_type": "restaurant",
-            "phone": f"+23324{str(int(time.time()))[-7:]}",
-            "email": f"test_{uuid.uuid4().hex[:6]}@test.com",
+            "phone": f"+233{uuid.uuid4().int % 100000000:08d}",  # Unique phone number
+            "email": f"test_{unique_id}@test.com",
             "city": "Accra",
             "cashback_rate": 0.05  # 5% cashback
         }
