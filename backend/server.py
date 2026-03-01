@@ -218,15 +218,29 @@ class OTPRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     phone: str
     otp_code: str
+    referral_code: Optional[str] = None  # Referral code used during registration
     attempts: int = 0
     is_verified: bool = False
     expires_at: str
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class ReferralBonus(BaseModel):
+    """Referral bonus record"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    referrer_id: str
+    referred_id: str
+    referred_phone: str
+    bonus_type: str  # "referrer_bonus", "welcome_bonus"
+    amount: float
+    status: str = "credited"  # credited, pending
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 # ============== REQUEST/RESPONSE MODELS ==============
 
 class SendOTPRequest(BaseModel):
     phone: str
+    referral_code: Optional[str] = None  # Optional referral code
 
 class VerifyOTPRequest(BaseModel):
     phone: str
