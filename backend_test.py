@@ -268,6 +268,227 @@ class SmartDigitalAPITester:
         # Restore token
         self.admin_token = temp_token
 
+    def test_sdm_auth_flow(self):
+        """Test SDM OTP authentication flow"""
+        print("\n" + "="*50)
+        print("TESTING SDM AUTH FLOW")
+        print("="*50)
+        
+        # Test send OTP
+        otp_request = {"phone": self.test_phone}
+        success, response = self.run_test(
+            "SDM Send OTP",
+            "POST", 
+            "/api/sdm/auth/send-otp",
+            200,
+            data=otp_request
+        )
+        
+        if not success:
+            return False
+            
+        debug_otp = response.get('debug_otp')
+        if not debug_otp:
+            print("❌ No debug OTP found in response")
+            return False
+            
+        print(f"✅ Debug OTP received: {debug_otp}")
+        
+        # Test verify OTP
+        verify_request = {
+            "phone": self.test_phone,
+            "otp_code": debug_otp
+        }
+        success, response = self.run_test(
+            "SDM Verify OTP",
+            "POST",
+            "/api/sdm/auth/verify-otp", 
+            200,
+            data=verify_request
+        )
+        
+        if success and 'access_token' in response:
+            self.user_token = response['access_token']
+            self.sdm_user_id = response.get('user', {}).get('id')
+            print(f"✅ SDM User token acquired: {self.user_token[:20]}...")
+            print(f"✅ SDM User ID: {self.sdm_user_id}")
+            return True
+        else:
+            print("❌ Failed to verify OTP and get user token")
+            return False
+
+    def test_sdm_user_endpoints(self):
+        """Test SDM user endpoints"""
+        if not self.user_token:
+            print("❌ No user token available. Skipping user endpoint tests.")
+            return
+            
+        print("\n" + "="*50)
+        print("TESTING SDM USER ENDPOINTS") 
+        print("="*50)
+        
+        # Test user profile
+        self.run_test("SDM User Profile", "GET", "/api/sdm/user/profile", 200)
+        
+        # Test user wallet
+        self.run_test("SDM User Wallet", "GET", "/api/sdm/user/wallet", 200)
+        
+        # Test user transactions
+        self.run_test("SDM User Transactions", "GET", "/api/sdm/user/transactions", 200)
+
+    def test_sdm_merchant_registration(self):
+        """Test SDM merchant registration"""
+        print("\n" + "="*50)
+        print("TESTING SDM MERCHANT REGISTRATION")
+        print("="*50)
+        
+        merchant_data = {
+            "business_name": "Test Restaurant",
+            "business_type": "restaurant", 
+            "phone": "+233123456789",
+            "email": "test@restaurant.com",
+            "address": "Test Street, Accra",
+            "city": "Accra",
+            "cashback_rate": 0.05
+        }
+        
+        success, response = self.run_test(
+            "SDM Merchant Registration",
+            "POST",
+            "/api/sdm/merchant/register",
+            200,
+            data=merchant_data
+        )
+        
+        if success and 'access_token' in response:
+            self.merchant_token = response['access_token']
+            self.sdm_merchant_id = response.get('merchant_id')
+            print(f"✅ Merchant token acquired: {self.merchant_token[:20]}...")
+            print(f"✅ Merchant ID: {self.sdm_merchant_id}")
+            return True
+        else:
+            print("❌ Failed to register merchant")
+            return False
+
+    def test_sdm_merchant_endpoints(self):
+        """Test SDM merchant endpoints"""
+        if not self.merchant_token:
+            print("❌ No merchant token available. Skipping merchant endpoint tests.")
+            return
+            
+        print("\n" + "="*50)
+        print("TESTING SDM MERCHANT ENDPOINTS")
+        print("="*50)
+        
+        # Test merchant profile
+        self.run_test("SDM Merchant Profile", "GET", "/api/sdm/merchant/profile", 200)
+        
+        # Test merchant transactions
+        self.run_test("SDM Merchant Transactions", "GET", "/api/sdm/merchant/transactions", 200)
+        
+        # Test merchant report
+        self.run_test("SDM Merchant Report", "GET", "/api/sdm/merchant/report?days=30", 200)
+
+    def test_sdm_transaction_creation(self):
+        """Test SDM transaction creation"""
+        if not self.merchant_token or not self.sdm_user_id:
+            print("❌ Missing merchant token or user ID. Skipping transaction tests.")
+            return
+            
+        print("\n" + "="*50)
+        print("TESTING SDM TRANSACTION CREATION")
+        print("="*50)
+        
+        transaction_data = {
+            "user_qr_code": self.test_qr_code,
+            "amount": 50.00,
+            "notes": "Test transaction from automated testing"
+        }
+        
+        success, response = self.run_test(
+            "SDM Create Transaction",
+            "POST",
+            "/api/sdm/merchant/transaction",
+            200,
+            data=transaction_data
+        )
+        
+        if success:
+            print(f"✅ Transaction created: {response.get('transaction_id')}")
+            print(f"✅ Cashback amount: GHS {response.get('cashback_amount')}")
+        
+        return success
+
+    def test_sdm_external_api(self):
+        """Test SDM external API with test merchant credentials"""
+        print("\n" + "="*50)
+        print("TESTING SDM EXTERNAL API")
+        print("="*50)
+        
+        # Test external user lookup
+        headers = {
+            "X-API-Key": self.test_merchant_api_key
+        }
+        
+        success, response = self.run_test(
+            "SDM External User Lookup",
+            "GET",
+            f"/api/sdm/external/user/{self.test_phone}",
+            200,
+            headers=headers
+        )
+        
+        if success:
+            print(f"✅ User exists: {response.get('exists')}")
+        
+        # Test external transaction creation
+        if success and response.get('exists'):
+            external_headers = {
+                "X-API-Key": self.test_merchant_api_key,
+                "X-API-Secret": "test_secret_key"  # This might fail but we'll test the endpoint
+            }
+            
+            transaction_data = {
+                "user_phone": self.test_phone,
+                "amount": 25.00,
+                "reference": "External API test transaction"
+            }
+            
+            # This might fail due to invalid secret but tests the endpoint
+            self.run_test(
+                "SDM External Transaction",
+                "POST", 
+                "/api/sdm/external/transaction",
+                401,  # Expect 401 due to invalid secret
+                data=transaction_data,
+                headers=external_headers
+            )
+
+    def test_admin_sdm_endpoints(self):
+        """Test admin SDM management endpoints"""
+        if not self.admin_token:
+            print("❌ No admin token available. Skipping admin SDM tests.")
+            return
+            
+        print("\n" + "="*50)
+        print("TESTING ADMIN SDM ENDPOINTS")
+        print("="*50)
+        
+        # Test admin get SDM users
+        self.run_test("Admin Get SDM Users", "GET", "/api/sdm/admin/users", 200)
+        
+        # Test admin get SDM merchants  
+        self.run_test("Admin Get SDM Merchants", "GET", "/api/sdm/admin/merchants", 200)
+        
+        # Test admin get SDM transactions
+        self.run_test("Admin Get SDM Transactions", "GET", "/api/sdm/admin/transactions", 200)
+        
+        # Test admin get SDM stats
+        self.run_test("Admin Get SDM Stats", "GET", "/api/sdm/admin/sdm-stats", 200)
+        
+        # Test admin get withdrawals
+        self.run_test("Admin Get Withdrawals", "GET", "/api/sdm/admin/withdrawals", 200)
+
     def print_summary(self):
         """Print test summary"""
         print("\n" + "="*60)
