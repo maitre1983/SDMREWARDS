@@ -48,6 +48,8 @@ HUBTEL_SENDER_ID = os.environ.get('HUBTEL_SENDER_ID', 'SDM')
 SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
 CASHBACK_PENDING_DAYS = int(os.environ.get('CASHBACK_PENDING_DAYS', '7'))
 WITHDRAWAL_FEE = float(os.environ.get('WITHDRAWAL_FEE', '1.0'))  # GHS
+REFERRAL_BONUS = float(os.environ.get('REFERRAL_BONUS', '5.0'))  # GHS bonus for referrer
+REFERRAL_WELCOME_BONUS = float(os.environ.get('REFERRAL_WELCOME_BONUS', '2.0'))  # GHS for new user
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
