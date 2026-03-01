@@ -80,7 +80,7 @@ export default function SDMMerchantPage() {
       const headers = { Authorization: `Bearer ${token}` };
       const [profileRes, txnRes, reportRes, cardTypesRes, membershipsRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/merchant/profile`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/transactions`, { headers }),
+        axios.get(`${API_URL}/api/sdm/merchant/transactions?limit=${txnLimit}`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/card-types`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/memberships`, { headers })
@@ -95,6 +95,12 @@ export default function SDMMerchantPage() {
         handleLogout();
       }
     }
+  };
+
+  const handleQRScanned = (qrCode) => {
+    setScanQR(qrCode);
+    setShowScanner(false);
+    toast.success(`QR Code scanned: ${qrCode}`);
   };
 
   const handleRegister = async (e) => {
