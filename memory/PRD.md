@@ -41,43 +41,72 @@ PENDING → APPROVED → PROCESSING → PAID/FAILED
 - Actions: Approve/Reject withdrawal, Confirm deposit
 - Audit trail visible
 
-### API Endpoints Fintech
+---
+
+## PHASE 2: MOTEUR DE TRANSACTION & CONFIG DYNAMIQUE ✅ COMPLETE
+
+### Implemented Features (March 2026)
+
+#### 1. Direct Payment Transaction Flow
+Le client paie directement et le système répartit automatiquement :
+- **Marchand reçoit**: Paiement - Cashback
+- **Client reçoit**: Cashback - Commission SDM (en pending)
+- **SDM reçoit**: Commission sur le cashback
+
+**Exemple** (100 GHS, 5% cashback, 2.5% commission):
+- Marchand: 95 GHS
+- Client: 4.88 GHS (pending)
+- SDM Commission: 0.12 GHS
+
+#### 2. Configuration Dynamique Fintech
+Paramètres configurables via Admin Dashboard :
+| Paramètre | Description | Défaut |
+|-----------|-------------|--------|
+| `sdm_commission_rate` | Commission SDM sur cashback | 2% |
+| `withdrawal_fee` | Frais de retrait Mobile Money | 1.0 GHS |
+| `cashback_pending_days` | Jours avant disponibilité cashback | 7 jours |
+| `float_low_threshold` | Seuil d'alerte jaune | 5000 GHS |
+| `float_critical_threshold` | Seuil d'alerte rouge | 1000 GHS |
+
+#### 3. Float Management & Alertes
+- Endpoint `/api/sdm/admin/fintech/float/status` retourne :
+  - Solde float disponible
+  - Niveau d'alerte (OK, LOW, CRITICAL)
+  - Ratio de couverture des retraits pending
+  - Recommandations automatiques
+
+#### 4. Investor Dashboard
+Métriques clés pour investisseurs :
+- GMV (Gross Merchandise Value)
+- Commissions totales
+- Nombre de transactions
+- Croissance par période
+- Breakdown quotidien
+
+#### 5. Dashboard Admin Étendu
+- **9 onglets**: Investor, Overview, Withdrawals, Deposits, Float, Wallets, Ledger, Config, Audit
+- Export CSV/JSON des transactions
+- Purge des données de test
+
+### New API Endpoints
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | /api/sdm/admin/fintech/summary | Admin | Résumé financier plateforme |
-| GET | /api/sdm/admin/fintech/wallets | Admin | Liste tous les wallets |
-| GET | /api/sdm/admin/fintech/transactions | Admin | Transactions ledger |
-| GET | /api/sdm/admin/fintech/withdrawals | Admin | Demandes de retrait |
-| POST | /api/sdm/admin/fintech/withdrawals/{id}/approve | Admin | Approuver retrait |
-| POST | /api/sdm/admin/fintech/withdrawals/{id}/reject | Admin | Rejeter retrait |
-| POST | /api/sdm/admin/fintech/withdrawals/{id}/complete | Admin | Marquer payé |
-| GET | /api/sdm/admin/fintech/deposits | Admin | Dépôts marchands |
-| POST | /api/sdm/admin/fintech/deposits/{id}/confirm | Admin | Confirmer dépôt |
-| GET | /api/sdm/admin/fintech/audit-logs | Admin | Journal d'audit |
-| POST | /api/sdm/admin/fintech/process-pending | Admin | Convertir pending→available |
-| GET | /api/sdm/merchant/fintech/wallet | Merchant | Mon wallet |
-| POST | /api/sdm/merchant/fintech/deposit | Merchant | Demander dépôt |
-| POST | /api/sdm/merchant/fintech/withdraw | Merchant | Demander retrait |
-| GET | /api/sdm/user/fintech/wallet | User | Mon wallet |
-| POST | /api/sdm/user/fintech/withdraw | User | Demander retrait |
+| GET | /api/sdm/admin/fintech/investor-dashboard | Admin | Métriques investisseur |
+| GET | /api/sdm/admin/fintech/float/status | Admin | Status float avec alertes |
+| PUT | /api/sdm/admin/config | Admin | Update config fintech |
+| POST | /api/sdm/admin/fintech/purge-test-data | Admin | Purger données test |
+| GET | /api/sdm/admin/fintech/ledger/export | Admin | Export ledger CSV/JSON |
 
 ### Tests: 100% Success
-- Backend: 15/15 tests passés
-- Frontend: All 6 dashboard tabs functional
+- Backend: 12/12 tests passés
+- Frontend: All 9 dashboard tabs functional
 
 ---
 
-## PHASE 2: MOBILE MONEY & PRÉ-FINANCEMENT (À venir - Mois 3-4)
+## PHASE 3: MOBILE MONEY INTEGRATION (À venir)
 
 ### Objectifs
-- [ ] Intégration MTN MoMo API (Sandbox puis Production)
-- [ ] Intégration Vodafone Cash API
-- [ ] Collection API pour dépôts automatiques
-- [ ] Disbursement API pour payouts automatiques
-- [ ] Préfinancement marchand obligatoire
-
-### Prérequis
 - Compte Business MTN MoMo
 - Compte Business Vodafone Cash
 - Certificats SSL production
