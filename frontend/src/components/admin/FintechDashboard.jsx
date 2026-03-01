@@ -26,6 +26,7 @@ export default function FintechDashboard({ token }) {
   const [fintechConfig, setFintechConfig] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [floatAlerts, setFloatAlerts] = useState([]);
+  const [pushStats, setPushStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('investor');
   const [processingId, setProcessingId] = useState(null);
