@@ -378,6 +378,103 @@ export default function SDMClientPage() {
           </div>
         )}
 
+        {activeTab === 'referral' && referralData && (
+          <div className="space-y-4">
+            {/* Referral Card */}
+            <div className="bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl p-6 text-white">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Gift size={24} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Invite Friends</h3>
+                  <p className="text-sm opacity-80">Earn GHS {referralData.bonus_per_referral} per friend</p>
+                </div>
+              </div>
+              
+              <div className="bg-white/10 rounded-xl p-4 mb-4">
+                <p className="text-xs opacity-70 mb-1">Your Referral Code</p>
+                <p className="text-2xl font-mono font-bold">{referralData.referral_code}</p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={copyReferralLink}
+                  className="flex-1 bg-white/20 hover:bg-white/30 text-white"
+                >
+                  <Copy size={16} className="mr-2" />
+                  Copy Link
+                </Button>
+                <Button
+                  onClick={shareReferral}
+                  className="flex-1 bg-white text-blue-600 hover:bg-white/90"
+                >
+                  <Share2 size={16} className="mr-2" />
+                  Share
+                </Button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl p-4 text-center">
+                <Users size={24} className="mx-auto mb-2 text-blue-600" />
+                <p className="text-2xl font-bold text-slate-900">{referralData.total_referrals}</p>
+                <p className="text-xs text-slate-500">Friends Invited</p>
+              </div>
+              <div className="bg-white rounded-xl p-4 text-center">
+                <DollarSign size={24} className="mx-auto mb-2 text-emerald-600" />
+                <p className="text-2xl font-bold text-slate-900">GHS {referralData.total_bonus_earned?.toFixed(2)}</p>
+                <p className="text-xs text-slate-500">Bonus Earned</p>
+              </div>
+            </div>
+
+            {/* How it works */}
+            <div className="bg-white rounded-2xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">How it works</h3>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">1</div>
+                  <p className="text-sm text-slate-600">Share your referral code with friends</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">2</div>
+                  <p className="text-sm text-slate-600">They sign up using your code</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">3</div>
+                  <p className="text-sm text-slate-600">You get GHS {referralData.bonus_per_referral}, they get GHS {referralData.welcome_bonus_amount}!</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Referral History */}
+            {referralData.referrals?.length > 0 && (
+              <div className="bg-white rounded-2xl p-6">
+                <h3 className="font-semibold text-slate-900 mb-4">Your Referrals</h3>
+                <div className="space-y-2">
+                  {referralData.referrals.map((ref, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Users size={14} className="text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            {ref.first_name || ref.last_name ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() : 'SDM User'}
+                          </p>
+                          <p className="text-xs text-slate-500">{new Date(ref.created_at).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-semibold text-emerald-600">+GHS {referralData.bonus_per_referral}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'withdraw' && (
           <div className="bg-white rounded-2xl p-6">
             <h3 className="font-semibold text-slate-900 mb-4">Withdraw to Mobile Money</h3>
