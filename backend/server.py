@@ -44,15 +44,53 @@ HUBTEL_CLIENT_ID = os.environ.get('HUBTEL_CLIENT_ID', '')
 HUBTEL_CLIENT_SECRET = os.environ.get('HUBTEL_CLIENT_SECRET', '')
 HUBTEL_SENDER_ID = os.environ.get('HUBTEL_SENDER_ID', 'SDM')
 
-# SDM Business Settings
+# SDM Business Settings (defaults - can be overridden by DB config)
 SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
 CASHBACK_PENDING_DAYS = int(os.environ.get('CASHBACK_PENDING_DAYS', '7'))
 WITHDRAWAL_FEE = float(os.environ.get('WITHDRAWAL_FEE', '1.0'))  # GHS
-REFERRAL_BONUS = float(os.environ.get('REFERRAL_BONUS', '5.0'))  # GHS bonus for referrer
-REFERRAL_WELCOME_BONUS = float(os.environ.get('REFERRAL_WELCOME_BONUS', '2.0'))  # GHS for new user
+
+# Default config (will be loaded from DB)
+DEFAULT_SDM_CONFIG = {
+    "membership_card_price": 50.0,  # GHS
+    "referral_bonus_bronze": 5.0,   # GHS per referral at Bronze level
+    "referral_bonus_silver": 7.0,   # GHS per referral at Silver level  
+    "referral_bonus_gold": 10.0,    # GHS per referral at Gold level
+    "welcome_bonus": 2.0,           # GHS for new member
+    "bronze_min_referrals": 0,
+    "silver_min_referrals": 5,
+    "gold_min_referrals": 15,
+    "membership_validity_days": 365,
+}
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
+
+# Global config cache
+sdm_config_cache = None
+
+async def get_sdm_config():
+    """Get SDM config from database or return defaults"""
+    global sdm_config_cache
+    if sdm_config_cache:
+        return sdm_config_cache
+    
+    config = await db.sdm_config.find_one({"type": "main"}, {"_id": 0})
+    if config:
+        sdm_config_cache = {**DEFAULT_SDM_CONFIG, **config}
+    else:
+        sdm_config_cache = DEFAULT_SDM_CONFIG.copy()
+        await db.sdm_config.insert_one({"type": "main", **sdm_config_cache})
+    return sdm_config_cache
+
+async def update_sdm_config(updates: dict):
+    """Update SDM config and clear cache"""
+    global sdm_config_cache
+    await db.sdm_config.update_one(
+        {"type": "main"},
+        {"$set": updates},
+        upsert=True
+    )
+    sdm_config_cache = None  # Clear cache
 
 # Create the main app
 app = FastAPI(title="Smart Digital Solutions & SDM API")
