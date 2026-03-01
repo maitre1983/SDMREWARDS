@@ -319,6 +319,26 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const handleSendPushNotification = async (notificationData) => {
+    try {
+      const res = await axios.post(
+        `${API_URL}/api/sdm/admin/push/send?recipient_type=${notificationData.recipient_type}`,
+        {
+          title: notificationData.title,
+          message: notificationData.message,
+          url: notificationData.action_url
+        },
+        { headers }
+      );
+      toast.success(`Push notification sent! ${res.data.push_result?.simulated ? '(Simulated - OneSignal not configured)' : ''}`);
+      setShowNewNotificationForm(false);
+      fetchNotifications();
+      fetchPushStats();
+    } catch (error) {
+      toast.error('Failed to send push notification');
+    }
+  };
+
   const formatCurrency = (amount) => `GHS ${(amount || 0).toFixed(2)}`;
   const formatDate = (date) => date ? new Date(date).toLocaleString() : '-';
 
