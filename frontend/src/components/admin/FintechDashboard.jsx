@@ -919,6 +919,27 @@ export default function FintechDashboard({ token }) {
   );
 }
 
+function MetricCard({ title, value, change, icon: Icon }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+          <Icon size={20} />
+        </div>
+        {change !== undefined && (
+          <span className={`text-sm font-medium px-2 py-1 rounded ${
+            change >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+          }`}>
+            {change >= 0 ? '+' : ''}{change}%
+          </span>
+        )}
+      </div>
+      <p className="text-2xl font-bold text-slate-900">{value}</p>
+      <p className="text-xs text-slate-500 mt-1">{title}</p>
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, label, value, subValue, color }) {
   const colors = {
     blue: 'bg-blue-100 text-blue-600',
