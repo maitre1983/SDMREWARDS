@@ -1169,6 +1169,289 @@ async def get_merchant_report(merchant: dict = Depends(get_current_merchant), da
         "daily_breakdown": [{"date": k, **v} for k, v in sorted(daily_stats.items())]
     }
 
+# ============== MERCHANT MEMBERSHIP CARD TYPES ==============
+
+@sdm_router.post("/merchant/card-types")
+async def create_card_type(request: CreateCardTypeRequest, merchant: dict = Depends(get_current_merchant)):
+    """Create a membership card type for this merchant"""
+    card_type = MerchantMembershipCardType(
+        merchant_id=merchant["id"],
+        merchant_name=merchant["business_name"],
+        name=request.name,
+        description=request.description,
+        price=request.price,
+        validity_days=request.validity_days,
+        cashback_bonus=request.cashback_bonus,
+        referral_bonus=request.referral_bonus,
+        welcome_bonus=request.welcome_bonus
+    )
+    await db.merchant_card_types.insert_one(card_type.model_dump())
+    return {"message": "Card type created", "card_type": card_type.model_dump()}
+
+@sdm_router.get("/merchant/card-types")
+async def get_merchant_card_types(merchant: dict = Depends(get_current_merchant)):
+    """Get all card types for this merchant"""
+    card_types = await db.merchant_card_types.find(
+        {"merchant_id": merchant["id"], "is_active": True},
+        {"_id": 0}
+    ).to_list(100)
+    return card_types
+
+@sdm_router.put("/merchant/card-types/{card_type_id}")
+async def update_card_type(
+    card_type_id: str,
+    request: CreateCardTypeRequest,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Update a card type"""
+    updates = {k: v for k, v in request.model_dump().items() if v is not None}
+    result = await db.merchant_card_types.update_one(
+        {"id": card_type_id, "merchant_id": merchant["id"]},
+        {"$set": updates}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Card type not found")
+    return {"message": "Card type updated"}
+
+@sdm_router.delete("/merchant/card-types/{card_type_id}")
+async def delete_card_type(card_type_id: str, merchant: dict = Depends(get_current_merchant)):
+    """Deactivate a card type (soft delete)"""
+    result = await db.merchant_card_types.update_one(
+        {"id": card_type_id, "merchant_id": merchant["id"]},
+        {"$set": {"is_active": False}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Card type not found")
+    return {"message": "Card type deactivated"}
+
+@sdm_router.get("/merchant/memberships")
+async def get_merchant_memberships(merchant: dict = Depends(get_current_merchant)):
+    """Get all active memberships for this merchant"""
+    memberships = await db.membership_cards.find(
+        {"merchant_id": merchant["id"], "status": "active"},
+        {"_id": 0}
+    ).sort("purchased_at", -1).to_list(500)
+    return memberships
+
+# ============== USER MEMBERSHIP ENDPOINTS ==============
+
+@sdm_router.get("/user/available-cards")
+async def get_available_cards(user: dict = Depends(get_current_user)):
+    """Get all available membership cards from all merchants"""
+    # Get all active card types from verified merchants
+    pipeline = [
+        {"$match": {"is_active": True}},
+        {"$lookup": {
+            "from": "sdm_merchants",
+            "localField": "merchant_id",
+            "foreignField": "id",
+            "as": "merchant"
+        }},
+        {"$unwind": "$merchant"},
+        {"$match": {"merchant.is_verified": True, "merchant.is_active": True}},
+        {"$project": {
+            "_id": 0,
+            "id": 1,
+            "merchant_id": 1,
+            "merchant_name": 1,
+            "name": 1,
+            "description": 1,
+            "price": 1,
+            "validity_days": 1,
+            "cashback_bonus": 1,
+            "referral_bonus": 1,
+            "welcome_bonus": 1,
+            "merchant_type": "$merchant.business_type",
+            "merchant_city": "$merchant.city"
+        }}
+    ]
+    card_types = await db.merchant_card_types.aggregate(pipeline).to_list(100)
+    return card_types
+
+@sdm_router.get("/user/memberships")
+async def get_user_memberships(user: dict = Depends(get_current_user)):
+    """Get all user's membership cards"""
+    memberships = await db.membership_cards.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("purchased_at", -1).to_list(100)
+    
+    # Check and update expired cards
+    now = datetime.now(timezone.utc)
+    active_memberships = []
+    for card in memberships:
+        if card["status"] == "active" and card.get("expires_at"):
+            expires = datetime.fromisoformat(card["expires_at"].replace("Z", "+00:00"))
+            if expires < now:
+                await db.membership_cards.update_one(
+                    {"id": card["id"]},
+                    {"$set": {"status": "expired"}}
+                )
+                card["status"] = "expired"
+        active_memberships.append(card)
+    
+    return active_memberships
+
+@sdm_router.post("/user/purchase-membership")
+async def purchase_membership(request: PurchaseMembershipRequest, user: dict = Depends(get_current_user)):
+    """Purchase a membership card from a merchant"""
+    config = await get_sdm_config()
+    
+    # Get the card type
+    card_type = await db.merchant_card_types.find_one(
+        {"id": request.card_type_id, "is_active": True},
+        {"_id": 0}
+    )
+    if not card_type:
+        raise HTTPException(status_code=404, detail="Card type not found")
+    
+    # Check if user already has active membership for this merchant
+    existing = await db.membership_cards.find_one({
+        "user_id": user["id"],
+        "merchant_id": card_type["merchant_id"],
+        "status": "active"
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="You already have an active membership with this merchant")
+    
+    # Process payment
+    if request.payment_method == "wallet":
+        if user["wallet_available"] < card_type["price"]:
+            raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+        
+        # Deduct from wallet
+        await db.sdm_users.update_one(
+            {"id": user["id"]},
+            {"$inc": {"wallet_available": -card_type["price"]}}
+        )
+    elif request.payment_method == "mobile_money":
+        # For now, simulate mobile money payment (to be integrated with Hubtel later)
+        pass
+    
+    # Create membership card
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=card_type["validity_days"])).isoformat()
+    
+    membership = MembershipCard(
+        user_id=user["id"],
+        user_phone=user["phone"],
+        merchant_id=card_type["merchant_id"],
+        merchant_name=card_type["merchant_name"],
+        card_type_id=card_type["id"],
+        card_type_name=card_type["name"],
+        price_paid=card_type["price"],
+        payment_method=request.payment_method,
+        expires_at=expires_at
+    )
+    await db.membership_cards.insert_one(membership.model_dump())
+    
+    # Update user membership status
+    await db.sdm_users.update_one(
+        {"id": user["id"]},
+        {
+            "$set": {
+                "has_membership": True,
+                "membership_card_id": membership.id,
+                "membership_expires": expires_at
+            }
+        }
+    )
+    
+    # Give welcome bonus to new member
+    if card_type.get("welcome_bonus", 0) > 0:
+        await db.sdm_users.update_one(
+            {"id": user["id"]},
+            {
+                "$inc": {
+                    "wallet_available": card_type["welcome_bonus"],
+                    "total_earned": card_type["welcome_bonus"]
+                }
+            }
+        )
+        
+        # Record welcome bonus
+        welcome_bonus_record = ReferralBonus(
+            referrer_id=card_type["merchant_id"],
+            referred_id=user["id"],
+            referred_phone=user["phone"],
+            bonus_type="membership_welcome_bonus",
+            amount=card_type["welcome_bonus"]
+        )
+        await db.referral_bonuses.insert_one(welcome_bonus_record.model_dump())
+    
+    # Process referrer bonus if applicable
+    if user.get("referred_by") and not membership.referrer_bonus_paid:
+        referrer = await db.sdm_users.find_one({"id": user["referred_by"]}, {"_id": 0})
+        if referrer:
+            # Check if referrer needs membership (based on config)
+            can_receive_bonus = True
+            if config.get("require_membership_for_referral", False):
+                can_receive_bonus = referrer.get("has_membership", False)
+            
+            if can_receive_bonus:
+                # Get referrer's level bonus
+                level = referrer.get("referral_level", "bronze")
+                bonus_key = f"referral_bonus_{level}"
+                referral_bonus = card_type.get("referral_bonus", config.get(bonus_key, 5.0))
+                
+                # Credit referrer
+                await db.sdm_users.update_one(
+                    {"id": referrer["id"]},
+                    {
+                        "$inc": {
+                            "wallet_available": referral_bonus,
+                            "total_earned": referral_bonus,
+                            "referral_bonus_earned": referral_bonus,
+                            "referral_count": 1
+                        }
+                    }
+                )
+                
+                # Record referrer bonus
+                referrer_bonus_record = ReferralBonus(
+                    referrer_id=referrer["id"],
+                    referred_id=user["id"],
+                    referred_phone=user["phone"],
+                    bonus_type="membership_referral_bonus",
+                    amount=referral_bonus
+                )
+                await db.referral_bonuses.insert_one(referrer_bonus_record.model_dump())
+                
+                # Mark bonus as paid
+                await db.membership_cards.update_one(
+                    {"id": membership.id},
+                    {"$set": {"referrer_bonus_paid": True}}
+                )
+                
+                # Update referrer level if needed
+                await update_referral_level(referrer["id"])
+    
+    return {
+        "message": "Membership purchased successfully",
+        "membership": membership.model_dump(),
+        "welcome_bonus": card_type.get("welcome_bonus", 0)
+    }
+
+async def update_referral_level(user_id: str):
+    """Update user's referral level based on referral count"""
+    config = await get_sdm_config()
+    user = await db.sdm_users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        return
+    
+    referral_count = user.get("referral_count", 0)
+    new_level = "bronze"
+    
+    if referral_count >= config.get("gold_min_referrals", 15):
+        new_level = "gold"
+    elif referral_count >= config.get("silver_min_referrals", 5):
+        new_level = "silver"
+    
+    if user.get("referral_level") != new_level:
+        await db.sdm_users.update_one(
+            {"id": user_id},
+            {"$set": {"referral_level": new_level}}
+        )
+
 # ============== SDM ADMIN ROUTES ==============
 
 @sdm_router.get("/admin/config")
