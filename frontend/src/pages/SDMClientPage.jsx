@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Wallet, QrCode, ArrowLeft, Phone, Loader2, 
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
-  Copy, RefreshCw, Gift, Users, Share2
+  Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
