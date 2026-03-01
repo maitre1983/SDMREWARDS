@@ -906,6 +906,244 @@ export default function FintechDashboard({ token }) {
         </div>
       )}
 
+      {/* Notifications Management */}
+      {activeSubTab === 'notifications' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Client Notifications</h3>
+            <Button 
+              onClick={() => setShowNewNotificationForm(!showNewNotificationForm)}
+              className="gap-2 bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus size={16} />
+              New Notification
+            </Button>
+          </div>
+
+          {showNewNotificationForm && (
+            <NotificationForm 
+              onSubmit={handleCreateNotification} 
+              onCancel={() => setShowNewNotificationForm(false)} 
+            />
+          )}
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Type</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Title</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Recipients</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Priority</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Sent</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {notifications.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                      No notifications sent yet
+                    </td>
+                  </tr>
+                ) : (
+                  notifications.map((notif) => (
+                    <tr key={notif.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 text-xs rounded ${
+                          notif.notification_type === 'promo' ? 'bg-purple-100 text-purple-700' :
+                          notif.notification_type === 'alert' ? 'bg-red-100 text-red-700' :
+                          notif.notification_type === 'transaction' ? 'bg-green-100 text-green-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {notif.notification_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-900">{notif.title}</p>
+                        <p className="text-xs text-slate-500 truncate max-w-xs">{notif.message}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="capitalize">{notif.recipient_type}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 text-xs rounded ${
+                          notif.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                          notif.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                          notif.priority === 'normal' ? 'bg-blue-100 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {notif.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">
+                        {new Date(notif.sent_at).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteNotification(notif.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Float Alerts */}
+      {activeSubTab === 'alerts' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Float Alerts</h3>
+            <Button 
+              onClick={handleTestFloatAlert}
+              variant="outline"
+              className="gap-2"
+            >
+              <Send size={16} />
+              Test Alert
+            </Button>
+          </div>
+
+          {/* Alert Configuration */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-amber-600" />
+              Alert Configuration
+            </h4>
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Webhook URL
+                </label>
+                <Input
+                  type="url"
+                  placeholder="https://your-webhook.com/alert"
+                  value={fintechConfig?.float_alert_webhook_url || ''}
+                  onChange={(e) => setFintechConfig({...fintechConfig, float_alert_webhook_url: e.target.value})}
+                />
+                <p className="text-xs text-slate-500 mt-1">URL to receive POST alerts</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Alert Emails (comma separated)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="admin@sdm.com, finance@sdm.com"
+                  value={(fintechConfig?.float_alert_emails || []).join(', ')}
+                  onChange={(e) => setFintechConfig({
+                    ...fintechConfig, 
+                    float_alert_emails: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  })}
+                />
+                <p className="text-xs text-slate-500 mt-1">Email addresses for alerts</p>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button 
+                onClick={() => handleSaveConfig({
+                  float_alert_webhook_url: fintechConfig?.float_alert_webhook_url,
+                  float_alert_emails: fintechConfig?.float_alert_emails
+                })}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Save Alert Settings
+              </Button>
+            </div>
+          </div>
+
+          {/* Alert History */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 border-b border-slate-100">
+              <h4 className="font-semibold text-slate-900">Alert History</h4>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Type</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Balance</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Threshold</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Webhook</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Email</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Status</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Date</th>
+                  <th className="px-4 py-3 text-left text-slate-600 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {floatAlerts.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                      No alerts triggered yet
+                    </td>
+                  </tr>
+                ) : (
+                  floatAlerts.map((alert) => (
+                    <tr key={alert.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 text-xs rounded ${
+                          alert.alert_type === 'critical' ? 'bg-red-100 text-red-700' :
+                          alert.alert_type === 'low' ? 'bg-amber-100 text-amber-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {alert.alert_type.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium">GHS {alert.float_balance.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-slate-500">GHS {alert.threshold.toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        {alert.webhook_sent ? (
+                          <CheckCircle size={16} className="text-green-600" />
+                        ) : (
+                          <XCircle size={16} className="text-slate-400" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {alert.email_sent ? (
+                          <CheckCircle size={16} className="text-green-600" />
+                        ) : (
+                          <XCircle size={16} className="text-slate-400" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {alert.is_acknowledged ? (
+                          <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">Acknowledged</span>
+                        ) : (
+                          <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">
+                        {new Date(alert.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        {!alert.is_acknowledged && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleAcknowledgeAlert(alert.id)}
+                          >
+                            Acknowledge
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Ledger Transactions */}
       {activeSubTab === 'ledger' && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
