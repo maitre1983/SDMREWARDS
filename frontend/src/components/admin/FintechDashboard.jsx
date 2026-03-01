@@ -98,6 +98,10 @@ export default function FintechDashboard({ token }) {
   useEffect(() => {
     if (activeSubTab === 'audit') {
       fetchAuditLogs();
+    } else if (activeSubTab === 'notifications') {
+      fetchNotifications();
+    } else if (activeSubTab === 'alerts') {
+      fetchFloatAlerts();
     }
   }, [activeSubTab]);
 
