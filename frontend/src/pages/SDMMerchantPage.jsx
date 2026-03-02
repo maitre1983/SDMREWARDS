@@ -404,22 +404,23 @@ export default function SDMMerchantPage() {
 
   // Dashboard
   return (
-    <div className="min-h-screen bg-slate-100" data-testid="sdm-merchant-dashboard">
+    <div className={`min-h-screen bg-slate-100 ${isRTL ? 'rtl' : 'ltr'}`} data-testid="sdm-merchant-dashboard">
       {/* Header */}
       <header className="bg-slate-900 text-white px-4 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-cyan-500 flex items-center justify-center">
-              <Store size={20} className="text-slate-900" />
-            </div>
+            <img src={LOGO_URL} alt="SDM" className="w-10 h-10 rounded-lg object-cover" />
             <div>
               <p className="font-semibold">{merchant?.business_name}</p>
               <p className="text-xs text-slate-400">{merchant?.business_type}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="p-2 hover:bg-slate-800 rounded-lg">
-            <LogOut size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <LanguageSelector variant="buttons" className="opacity-90" />
+            <button onClick={handleLogout} className="p-2 hover:bg-slate-800 rounded-lg">
+              <LogOut size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
