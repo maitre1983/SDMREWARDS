@@ -330,7 +330,51 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 
 ---
 
-## PHASE 5: MOBILE MONEY INTEGRATION (À venir)
+## PHASE 5: VIP CARDS & PARTNERS ✅ COMPLETE
+
+### Implemented Features (March 2026)
+
+#### 1. Système de Cartes VIP (Admin-Managed)
+- **3 tiers**: Silver (25 GHS), Gold (50 GHS), Platinum (100 GHS)
+- Prix, cashback boost, limite retrait configurables par Admin
+- Achat/Upgrade depuis l'app client avec cashback
+- Bonus parrainage (+3 GHS parrain, +1 GHS filleul) à l'achat de carte
+
+#### 2. Gestion des Partenaires
+- CRUD complet depuis dashboard Admin
+- Catégories: Restaurant, Shop, Hotel, School, Pharmacy, etc.
+- Option "Exclusif Gold+" pour partenaires premium
+- Liste publique accessible dans l'app client
+
+#### 3. Renommages UI
+- "SDM Wallet" → "SDM Rewards"
+- "Available Balance" → "My Cash Back Balance"
+- Ajout disclaimer: "SDM n'est pas une banque..."
+
+### New API Endpoints (VIP Cards & Partners)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | /api/sdm/admin/vip-cards | Admin | Liste des types de cartes VIP |
+| POST | /api/sdm/admin/vip-cards | Admin | Créer un type de carte |
+| PUT | /api/sdm/admin/vip-cards/{id} | Admin | Modifier une carte |
+| GET | /api/sdm/admin/partners | Admin | Liste des partenaires |
+| POST | /api/sdm/admin/partners | Admin | Ajouter un partenaire |
+| PUT | /api/sdm/admin/partners/{id} | Admin | Modifier un partenaire |
+| DELETE | /api/sdm/admin/partners/{id} | Admin | Supprimer un partenaire |
+| GET | /api/sdm/partners | Public | Liste publique des partenaires |
+| GET | /api/sdm/user/vip-cards | Public | Cartes VIP disponibles |
+| GET | /api/sdm/user/my-vip-membership | User | Ma carte VIP actuelle |
+| POST | /api/sdm/user/vip-cards/purchase | User | Acheter/Upgrader carte VIP |
+
+### Collections MongoDB Ajoutées
+- `vip_card_types`: Types de cartes VIP (Silver, Gold, Platinum)
+- `vip_memberships`: Adhésions VIP des utilisateurs
+- `sdm_partners`: Liste des partenaires SDM
+
+---
+
+## PHASE 6: MOBILE MONEY INTEGRATION (À venir)
 
 ### Objectifs
 - Compte Business MTN MoMo
