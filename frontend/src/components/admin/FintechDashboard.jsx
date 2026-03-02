@@ -441,6 +441,7 @@ export default function FintechDashboard({ token }) {
       fetchPartners();
     } else if (activeSubTab === 'lottery') {
       fetchLotteries();
+      fetchSchedulerData();
     }
   }, [activeSubTab]);
 
