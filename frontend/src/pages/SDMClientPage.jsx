@@ -720,9 +720,9 @@ export default function SDMClientPage() {
                     <Crown className="text-white" size={24} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold">Carte VIP SDM</p>
+                    <p className="font-semibold">SDM VIP Card</p>
                     <p className="text-sm opacity-80">
-                      {myVipMembership ? `Upgrade vers ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold ou Platinum'}
+                      {myVipMembership ? `Upgrade to ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold or Platinum'}
                     </p>
                   </div>
                   <ChevronRight className="text-white/80" size={20} />
@@ -739,7 +739,7 @@ export default function SDMClientPage() {
                   </div>
                   <div className="flex-1 text-left">
                     <p className="font-semibold text-slate-900">Our Partners</p>
-                    <p className="text-sm text-slate-500">{partners.length} commerces acceptent SDM</p>
+                    <p className="text-sm text-slate-500">{partners.length} merchants accept SDM</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
                 </button>
