@@ -1105,6 +1105,282 @@ export default function FintechDashboard({ token }) {
         </div>
       )}
 
+      {/* VIP Cards Management */}
+      {activeSubTab === 'vip-cards' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Gestion des Cartes VIP</h3>
+            <Button variant="outline" size="sm" onClick={fetchVipCards} className="gap-2">
+              <RefreshCw size={16} />
+              Actualiser
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-6">
+            {vipCards.map((card) => (
+              <div 
+                key={card.id}
+                className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+              >
+                <div 
+                  className="p-4 text-white"
+                  style={{ backgroundColor: card.badge_color === '#C0C0C0' ? '#6B7280' : card.badge_color }}
+                >
+                  <div className="flex items-center justify-between">
+                    <Crown size={32} />
+                    <span className="text-2xl font-bold">GHS {card.price}</span>
+                  </div>
+                  <h4 className="text-xl font-bold mt-2">{card.name}</h4>
+                  <p className="text-sm opacity-80">{card.tier}</p>
+                </div>
+                <div className="p-4 space-y-3">
+                  <p className="text-sm text-slate-600">{card.description}</p>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 bg-slate-50 rounded">
+                      <p className="text-slate-500">Cashback Boost</p>
+                      <p className="font-bold">+{card.cashback_boost}%</p>
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded">
+                      <p className="text-slate-500">Limite Retrait</p>
+                      <p className="font-bold">GHS {card.monthly_withdrawal_limit}</p>
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded">
+                      <p className="text-slate-500">Lottery</p>
+                      <p className="font-bold">x{card.lottery_multiplier}</p>
+                    </div>
+                    <div className="p-2 bg-slate-50 rounded">
+                      <p className="text-slate-500">Validité</p>
+                      <p className="font-bold">{card.validity_days} jours</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {card.benefits_list?.slice(0, 5).map((benefit, i) => (
+                      <p key={i} className="text-xs text-slate-600 flex items-start gap-1">
+                        <CheckCircle className="text-emerald-500 shrink-0 mt-0.5" size={10} />
+                        {benefit}
+                      </p>
+                    ))}
+                  </div>
+
+                  {editingVipCard === card.id ? (
+                    <div className="space-y-2 pt-2 border-t">
+                      <Input
+                        type="number"
+                        placeholder="Prix"
+                        defaultValue={card.price}
+                        onChange={(e) => card._newPrice = parseFloat(e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Cashback Boost %"
+                        defaultValue={card.cashback_boost}
+                        step="0.1"
+                        onChange={(e) => card._newBoost = parseFloat(e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Limite retrait"
+                        defaultValue={card.monthly_withdrawal_limit}
+                        onChange={(e) => card._newLimit = parseFloat(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleUpdateVipCard(card.id, {
+                            ...card,
+                            price: card._newPrice || card.price,
+                            cashback_boost: card._newBoost || card.cashback_boost,
+                            monthly_withdrawal_limit: card._newLimit || card.monthly_withdrawal_limit
+                          })}
+                        >
+                          Sauvegarder
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingVipCard(null)}>
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full gap-2"
+                      onClick={() => setEditingVipCard(card.id)}
+                    >
+                      <Edit size={14} />
+                      Modifier
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Partners Management */}
+      {activeSubTab === 'partners' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Gestion des Partenaires SDM</h3>
+            <Button onClick={() => setShowPartnerForm(!showPartnerForm)} className="gap-2">
+              <Plus size={16} />
+              Ajouter Partenaire
+            </Button>
+          </div>
+
+          {/* New Partner Form */}
+          {showPartnerForm && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h4 className="font-semibold text-slate-900 mb-4">Nouveau Partenaire</h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+                  <Input
+                    value={newPartner.name}
+                    onChange={(e) => setNewPartner({...newPartner, name: e.target.value})}
+                    placeholder="Restaurant Chez Akwaba"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Catégorie</label>
+                  <select
+                    value={newPartner.category}
+                    onChange={(e) => setNewPartner({...newPartner, category: e.target.value})}
+                    className="w-full h-10 px-3 border border-slate-200 rounded-lg"
+                  >
+                    <option value="RESTAURANT">Restaurant</option>
+                    <option value="SHOP">Boutique</option>
+                    <option value="HOTEL">Hôtel</option>
+                    <option value="SCHOOL">École</option>
+                    <option value="SALON">Salon</option>
+                    <option value="PHARMACY">Pharmacie</option>
+                    <option value="SUPERMARKET">Supermarché</option>
+                    <option value="GAS_STATION">Station Essence</option>
+                    <option value="OTHER">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Ville</label>
+                  <Input
+                    value={newPartner.city}
+                    onChange={(e) => setNewPartner({...newPartner, city: e.target.value})}
+                    placeholder="Accra"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Adresse</label>
+                  <Input
+                    value={newPartner.address}
+                    onChange={(e) => setNewPartner({...newPartner, address: e.target.value})}
+                    placeholder="123 Oxford Street, Osu"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone</label>
+                  <Input
+                    value={newPartner.phone}
+                    onChange={(e) => setNewPartner({...newPartner, phone: e.target.value})}
+                    placeholder="024 XXX XXXX"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Taux Cashback (%)</label>
+                  <Input
+                    type="number"
+                    value={newPartner.cashback_rate}
+                    onChange={(e) => setNewPartner({...newPartner, cashback_rate: parseFloat(e.target.value)})}
+                    min="1"
+                    max="20"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    type="checkbox"
+                    checked={newPartner.is_gold_exclusive}
+                    onChange={(e) => setNewPartner({...newPartner, is_gold_exclusive: e.target.checked})}
+                    className="w-4 h-4"
+                  />
+                  <label className="text-sm text-slate-700">Exclusif Gold/Platinum</label>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button onClick={handleCreatePartner} className="bg-emerald-600 hover:bg-emerald-700">
+                  Ajouter
+                </Button>
+                <Button variant="outline" onClick={() => setShowPartnerForm(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Partners List */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Partenaire</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Catégorie</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Ville</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Cashback</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Exclusif</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partners.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
+                      Aucun partenaire. Ajoutez-en un!
+                    </td>
+                  </tr>
+                ) : (
+                  partners.map((partner) => (
+                    <tr key={partner.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-900">{partner.name}</p>
+                        <p className="text-xs text-slate-500">{partner.address}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                          {partner.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{partner.city}</td>
+                      <td className="px-4 py-3">
+                        <span className="font-bold text-emerald-600">{partner.cashback_rate}%</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {partner.is_gold_exclusive && (
+                          <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs">
+                            Gold+
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => handleDeletePartner(partner.id)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Float Management */}
       {activeSubTab === 'float' && floatStatus && (
         <div className="space-y-6">
