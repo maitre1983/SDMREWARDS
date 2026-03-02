@@ -7,99 +7,97 @@
 
 ---
 
-## MULTILINGUAL SUPPORT ✅
-| Language | Code | Direction | Status |
-|----------|------|-----------|--------|
-| English | EN | LTR | ✅ Default |
-| French | FR | LTR | ✅ Active |
-| Arabic | AR | RTL | ✅ Active |
-| Chinese | ZH | LTR | ✅ Active |
+## BACKEND ARCHITECTURE (Refactored)
+
+### Directory Structure
+```
+/app/backend/
+├── server.py          # Main entry point (5200+ lines - to be split)
+├── models/            # ✅ NEW - Extracted Pydantic models
+│   ├── base.py        # Core models (Contact, Admin, Visit)
+│   ├── users.py       # SDMUser model
+│   ├── merchants.py   # Merchant models
+│   ├── vip.py         # VIP membership models
+│   ├── partners.py    # Partner models
+│   ├── lottery.py     # Lottery models
+│   └── services.py    # Service transaction models
+├── routers/           # ✅ NEW - Future route separation
+│   └── lottery.py     # Lottery routes (template)
+├── ledger/            # Double-entry accounting
+├── services/          # External services
+│   └── bulkclix_service.py
+├── tests/             # Test files
+├── ARCHITECTURE.md    # ✅ NEW - Architecture documentation
+└── CHANGELOG.md       # ✅ NEW - Version changelog
+```
+
+### Refactoring Status
+| Component | Status | Lines |
+|-----------|--------|-------|
+| Models | ✅ Extracted | ~300 |
+| Auth Routes | 🔄 In server.py | ~75 |
+| User Routes | 🔄 In server.py | ~287 |
+| Merchant Routes | 🔄 In server.py | ~245 |
+| Service Routes | 🔄 In server.py | ~350 |
+| VIP Routes | 🔄 In server.py | ~200 |
+| Lottery Routes | 🔄 In server.py | ~400 |
+| Fintech Routes | 🔄 In server.py | ~350 |
 
 ---
 
-## AUTO LOTTERY SCHEDULER ✅ (March 2026)
+## MULTILINGUAL SUPPORT ✅
+| Language | Code | Direction |
+|----------|------|-----------|
+| English | EN | LTR ✅ Default |
+| French | FR | LTR ✅ |
+| Arabic | AR | RTL ✅ |
+| Chinese | ZH | LTR ✅ |
 
-### Configuration
-- **Schedule**: 1st of each month at 00:05 UTC
+---
+
+## AUTO LOTTERY SCHEDULER ✅
+- **Schedule**: 1st of each month @ 00:05 UTC
 - **Default Prize**: 500 GHS (configurable)
-- **Auto-Activate**: Enrolls all active VIP members automatically
-
-### Features
-- Automatic lottery creation on the 1st of each month
-- Configurable default prize amount via admin dashboard
-- Toggle auto-activation (enroll VIP members automatically)
-- Manual trigger button for testing
-- Scheduler logs and status monitoring
-- No duplicate lotteries (checks for existing month)
-
-### Admin UI
-- Status indicator (green = active)
-- Next run date display
-- Configuration form (Status, Prize, Auto-Activate)
-- "Trigger Now" button for manual execution
-- Recent scheduler logs
+- **Auto-Activate**: Enrolls VIP members automatically
 
 ---
 
 ## VIP MEMBERSHIP CARDS
-
-| Tier | Price | Cashback Boost | Withdrawal Limit | Lottery |
-|------|-------|----------------|------------------|---------|
-| **SILVER** | 25 GHS | +0% | 2,500 GHS/month | x1 |
-| **GOLD** | 50 GHS | +0.2% | 2,500 GHS/month | x2 |
-| **PLATINUM** | 100 GHS | +0.5% | 5,000 GHS/month | x3 |
+| Tier | Price | Boost | Limit | Lottery |
+|------|-------|-------|-------|---------|
+| SILVER | 25 | +0% | 2,500 | x1 |
+| GOLD | 50 | +0.2% | 2,500 | x2 |
+| PLATINUM | 100 | +0.5% | 5,000 | x3 |
 
 ---
 
 ## IMPLEMENTED FEATURES
-
-### Core Platform (Phase 1-5)
-- Central Ledger with Double-Entry Accounting
-- Transaction Engine with Idempotency
-- Super App Services (SIMULATED)
-- VIP Card System (3 tiers)
-- Partner Directory & Promotions
-
-### VIP Lottery (Phase 6)
-- 5 winners: 40%, 25%, 15%, 12%, 8%
-- VIP tier multipliers
-
-### Multilingual & Branding (Phase 7)
-- 4 Languages (EN, FR, AR, ZH)
-- RTL Support for Arabic
-- New SDM Rewards Logo
-
-### Auto Lottery Scheduler (Phase 8) ✅
-- APScheduler integration
-- Monthly auto-creation
-- Admin configuration UI
-
----
-
-## KEY API ENDPOINTS
-
-### Scheduler
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/sdm/admin/scheduler/status | Get scheduler status & next run |
-| GET | /api/sdm/admin/scheduler/logs | Get execution logs |
-| GET | /api/sdm/admin/lottery-config | Get auto config |
-| PUT | /api/sdm/admin/lottery-config | Update config |
-| POST | /api/sdm/admin/lottery/trigger-monthly | Manual trigger |
+- ✅ Central Ledger (Double-Entry)
+- ✅ Super App Services (SIMULATED)
+- ✅ VIP Card System (3 tiers)
+- ✅ Partner Directory
+- ✅ Promotions Engine
+- ✅ Leaderboards
+- ✅ VIP Lottery (5 winners)
+- ✅ Multilingual (4 languages)
+- ✅ Auto Lottery Scheduler
+- ✅ Models Package Extraction
 
 ---
 
 ## UPCOMING TASKS (P1)
 
+### Complete Backend Refactoring
+- Extract routes from server.py to routers/
+- Import models from models package
+- Test all endpoints after each extraction
+
 ### SEO & Public Pages
 - Public partner directory
-- Landing page optimization
+- Landing optimization
 
 ### Birthday Bonus
 - Auto bonus for VIP members
-
-### Backend Refactoring (CRITICAL)
-- Split `server.py` (5200+ lines)
 
 ---
 
@@ -110,11 +108,11 @@
 ---
 
 ## MOCKED INTEGRATIONS
-- BulkClix API
-- Hubtel SMS
+- BulkClix API (services)
+- Hubtel SMS (OTP)
 - OneSignal (PENDING)
 
 ---
 
 *Last Updated: March 2026*
-*Phase 8 Complete - Auto Lottery Scheduler*
+*Backend Refactoring Phase 1 Complete*
