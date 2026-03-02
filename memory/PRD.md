@@ -13,6 +13,10 @@
 ```
 /app/backend/
 ├── server.py          # Main entry point (5200+ lines - to be split)
+├── core/              # ✅ NEW - Shared utilities
+│   ├── config.py      # Database, JWT, API keys
+│   ├── dependencies.py # Auth dependencies
+│   └── utils.py       # Helper functions
 ├── models/            # ✅ NEW - Extracted Pydantic models
 │   ├── base.py        # Core models (Contact, Admin, Visit)
 │   ├── users.py       # SDMUser model
@@ -21,7 +25,8 @@
 │   ├── partners.py    # Partner models
 │   ├── lottery.py     # Lottery models
 │   └── services.py    # Service transaction models
-├── routers/           # ✅ NEW - Future route separation
+├── routers/           # ✅ NEW - Route separation
+│   ├── auth.py        # Auth routes (template ready)
 │   └── lottery.py     # Lottery routes (template)
 ├── ledger/            # Double-entry accounting
 ├── services/          # External services
@@ -82,6 +87,9 @@
 - ✅ Multilingual (4 languages)
 - ✅ Auto Lottery Scheduler
 - ✅ Models Package Extraction
+- ✅ SDM Rewards Landing Page
+- ✅ Core Package (config, utils, dependencies)
+- ✅ Merchant Card Management Removed
 
 ---
 
@@ -114,5 +122,6 @@
 
 ---
 
-*Last Updated: March 2026*
-*Backend Refactoring Phase 1 Complete*
+*Last Updated: March 2, 2026*
+*Backend Refactoring Phase 1 Complete - Core Package Created*
+*SDM Rewards Page Added to Landing*
