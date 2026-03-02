@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, Search, Filter, AlertTriangle,
   Download, BarChart3, PieChart, Activity, Zap, AlertCircle,
   Bell, Send, Trash2, Eye, Plus, Smartphone, Trophy, Gift, Megaphone,
-  Percent, Calendar, Crown, MapPin, Edit
+  Percent, Calendar, Crown, MapPin, Edit, Ticket, Play, Award
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
