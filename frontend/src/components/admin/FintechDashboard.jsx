@@ -1312,6 +1312,256 @@ export default function FintechDashboard({ token }) {
         </div>
       )}
 
+      {/* Lottery Management */}
+      {activeSubTab === 'lottery' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Tirages VIP Mensuels</h3>
+            <Button onClick={() => setShowLotteryForm(!showLotteryForm)} className="gap-2 bg-purple-600 hover:bg-purple-700">
+              <Plus size={16} />
+              Nouveau Tirage
+            </Button>
+          </div>
+
+          {/* New Lottery Form */}
+          {showLotteryForm && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h4 className="font-semibold text-slate-900 mb-4">Créer un Tirage</h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nom du tirage</label>
+                  <Input
+                    value={newLottery.name}
+                    onChange={(e) => setNewLottery({...newLottery, name: e.target.value})}
+                    placeholder="Tirage Mars 2026"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Mois</label>
+                  <Input
+                    type="month"
+                    value={newLottery.month}
+                    onChange={(e) => setNewLottery({...newLottery, month: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Source Cagnotte</label>
+                  <select
+                    value={newLottery.funding_source}
+                    onChange={(e) => setNewLottery({...newLottery, funding_source: e.target.value})}
+                    className="w-full h-10 px-3 border border-slate-200 rounded-lg"
+                  >
+                    <option value="FIXED">Montant fixe</option>
+                    <option value="COMMISSION">% Commissions SDM</option>
+                    <option value="MIXED">Mixte (fixe + commissions)</option>
+                  </select>
+                </div>
+                {newLottery.funding_source !== 'COMMISSION' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant fixe (GHS)</label>
+                    <Input
+                      type="number"
+                      value={newLottery.fixed_amount}
+                      onChange={(e) => setNewLottery({...newLottery, fixed_amount: parseFloat(e.target.value)})}
+                      min="100"
+                    />
+                  </div>
+                )}
+                {newLottery.funding_source !== 'FIXED' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">% des commissions</label>
+                    <Input
+                      type="number"
+                      value={newLottery.commission_percentage}
+                      onChange={(e) => setNewLottery({...newLottery, commission_percentage: parseFloat(e.target.value)})}
+                      min="1"
+                      max="50"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date début</label>
+                  <Input
+                    type="date"
+                    value={newLottery.start_date}
+                    onChange={(e) => setNewLottery({...newLottery, start_date: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date fin</label>
+                  <Input
+                    type="date"
+                    value={newLottery.end_date}
+                    onChange={(e) => setNewLottery({...newLottery, end_date: e.target.value})}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                  <Input
+                    value={newLottery.description}
+                    onChange={(e) => setNewLottery({...newLottery, description: e.target.value})}
+                    placeholder="Description du tirage..."
+                  />
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                <p className="text-sm font-medium text-purple-900">Distribution des prix (5 gagnants):</p>
+                <p className="text-xs text-purple-700">1er: 40% | 2ème: 25% | 3ème: 15% | 4ème: 12% | 5ème: 8%</p>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button onClick={handleCreateLottery} className="bg-purple-600 hover:bg-purple-700">
+                  Créer le Tirage
+                </Button>
+                <Button variant="outline" onClick={() => setShowLotteryForm(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Lotteries List */}
+          <div className="space-y-4">
+            {lotteries.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+                <Ticket size={48} className="mx-auto mb-3 text-slate-300" />
+                <p className="text-slate-500">Aucun tirage. Créez-en un!</p>
+              </div>
+            ) : (
+              lotteries.map((lottery) => (
+                <div key={lottery.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                  <div className={`p-4 ${
+                    lottery.status === 'COMPLETED' ? 'bg-emerald-50' :
+                    lottery.status === 'ACTIVE' ? 'bg-purple-50' :
+                    'bg-slate-50'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          lottery.status === 'COMPLETED' ? 'bg-emerald-200' :
+                          lottery.status === 'ACTIVE' ? 'bg-purple-200' :
+                          'bg-slate-200'
+                        }`}>
+                          <Ticket className={
+                            lottery.status === 'COMPLETED' ? 'text-emerald-700' :
+                            lottery.status === 'ACTIVE' ? 'text-purple-700' :
+                            'text-slate-600'
+                          } size={24} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900">{lottery.name}</h4>
+                          <p className="text-sm text-slate-600">{lottery.month}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-slate-900">GHS {lottery.total_prize_pool?.toFixed(2)}</p>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          lottery.status === 'COMPLETED' ? 'bg-emerald-200 text-emerald-800' :
+                          lottery.status === 'ACTIVE' ? 'bg-purple-200 text-purple-800' :
+                          lottery.status === 'DRAFT' ? 'bg-slate-200 text-slate-800' :
+                          'bg-amber-200 text-amber-800'
+                        }`}>
+                          {lottery.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <div className="grid grid-cols-4 gap-4 mb-4">
+                      <div className="text-center p-2 bg-slate-50 rounded">
+                        <p className="text-xs text-slate-500">Participants</p>
+                        <p className="font-bold text-slate-900">{lottery.total_participants || 0}</p>
+                      </div>
+                      <div className="text-center p-2 bg-slate-50 rounded">
+                        <p className="text-xs text-slate-500">Entrées totales</p>
+                        <p className="font-bold text-slate-900">{lottery.total_entries || 0}</p>
+                      </div>
+                      <div className="text-center p-2 bg-slate-50 rounded">
+                        <p className="text-xs text-slate-500">Début</p>
+                        <p className="font-bold text-slate-900">{lottery.start_date?.slice(0, 10) || '-'}</p>
+                      </div>
+                      <div className="text-center p-2 bg-slate-50 rounded">
+                        <p className="text-xs text-slate-500">Fin</p>
+                        <p className="font-bold text-slate-900">{lottery.end_date?.slice(0, 10) || '-'}</p>
+                      </div>
+                    </div>
+
+                    {/* Winners display */}
+                    {lottery.status === 'COMPLETED' && lottery.winners?.length > 0 && (
+                      <div className="mb-4 p-3 bg-amber-50 rounded-lg">
+                        <p className="text-sm font-medium text-amber-900 mb-2">🏆 Gagnants:</p>
+                        <div className="space-y-1">
+                          {lottery.winners.map((w, i) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-2">
+                                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`}
+                                <span className="font-medium">{w.name}</span>
+                                <span className="text-xs text-slate-500">({w.tier})</span>
+                              </span>
+                              <span className="font-bold text-emerald-600">GHS {w.prize_amount?.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex gap-2">
+                      {lottery.status === 'DRAFT' && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleActivateLottery(lottery.id)}
+                            className="gap-2 bg-purple-600 hover:bg-purple-700"
+                          >
+                            <Play size={14} />
+                            Activer & Inscrire VIP
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => handleDeleteLottery(lottery.id)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </>
+                      )}
+                      {lottery.status === 'ACTIVE' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleDrawLottery(lottery.id)}
+                          className="gap-2 bg-amber-600 hover:bg-amber-700"
+                        >
+                          <Award size={14} />
+                          Effectuer le Tirage
+                        </Button>
+                      )}
+                      {lottery.status === 'COMPLETED' && !lottery.is_announced && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleAnnounceLottery(lottery.id)}
+                          className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <Megaphone size={14} />
+                          Annoncer les Résultats
+                        </Button>
+                      )}
+                      {lottery.is_announced && (
+                        <span className="text-sm text-emerald-600 flex items-center gap-1">
+                          <CheckCircle size={14} />
+                          Résultats annoncés
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Partners Management */}
       {activeSubTab === 'partners' && (
         <div className="space-y-6">
