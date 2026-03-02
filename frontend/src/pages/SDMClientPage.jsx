@@ -1229,7 +1229,7 @@ export default function SDMClientPage() {
                           {/* Action Button */}
                           {isCurrentTier ? (
                             <div className="text-center py-2 bg-amber-200 rounded-lg text-amber-800 font-medium text-sm">
-                              Votre carte actuelle
+                              Your current card
                             </div>
                           ) : canPurchase ? (
                             <Button
@@ -1239,12 +1239,12 @@ export default function SDMClientPage() {
                               style={{ backgroundColor: card.badge_color === '#C0C0C0' ? '#6B7280' : card.badge_color }}
                             >
                               {isServiceLoading ? <Loader2 className="animate-spin" /> : (
-                                myVipMembership ? `Upgrade pour GHS ${priceToShow}` : `Acheter pour GHS ${card.price}`
+                                myVipMembership ? `Upgrade for GHS ${priceToShow}` : `Buy for GHS ${card.price}`
                               )}
                             </Button>
                           ) : (
                             <div className="text-center py-2 bg-slate-200 rounded-lg text-slate-500 font-medium text-sm">
-                              Non disponible
+                              Not available
                             </div>
                           )}
                         </div>
@@ -1254,7 +1254,7 @@ export default function SDMClientPage() {
                 </div>
 
                 <p className="text-xs text-center text-slate-500 mt-4">
-                  Le paiement sera débité de votre solde cashback
+                  Payment will be deducted from your cashback balance
                 </p>
               </div>
             )}
@@ -1274,15 +1274,15 @@ export default function SDMClientPage() {
                     <MapPin className="text-purple-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Nos Partenaires</h3>
-                    <p className="text-sm text-slate-500">{partners.length} commerces acceptent SDM</p>
+                    <h3 className="font-bold text-slate-900">Our Partners</h3>
+                    <p className="text-sm text-slate-500">{partners.length} merchants accept SDM</p>
                   </div>
                 </div>
 
                 {partners.length === 0 ? (
                   <div className="text-center py-8 text-slate-500">
                     <Store size={48} className="mx-auto mb-3 opacity-40" />
-                    <p>Liste des partenaires bientôt disponible</p>
+                    <p>Partner list coming soon</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
