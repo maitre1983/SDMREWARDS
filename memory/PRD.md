@@ -84,7 +84,7 @@
 - ✅ Promotions Engine
 - ✅ Leaderboards
 - ✅ VIP Lottery (5 winners)
-- ✅ Multilingual (4 languages)
+- ✅ Multilingual (4 languages - EN default)
 - ✅ Auto Lottery Scheduler
 - ✅ Models Package Extraction
 - ✅ SDM Rewards Landing Page
@@ -95,6 +95,8 @@
 - ✅ Merchant: Phone + Password + GPS Address Registration
 - ✅ Favicon & Title (www.sdmrewards.com)
 - ✅ "Made with Emergent" Badge Removed
+- ✅ English Priority Language (all pages translated)
+- ✅ Password Reset via OTP
 
 ---
 
@@ -128,5 +130,5 @@
 ---
 
 *Last Updated: March 2, 2026*
-*BulkClix OTP Integration Complete*
-*New Authentication Flow with Password*
+*English Priority Language Complete*
+*Auth with OTP + Password Tested and Working*
