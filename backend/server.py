@@ -3591,16 +3591,21 @@ class CreditUserRequest(BaseModel):
 @sdm_router.post("/admin/fintech/users/credit")
 async def credit_user_wallet(request: CreditUserRequest, admin: dict = Depends(get_current_admin)):
     """Admin: Credit a user's available cashback balance (for testing)"""
+    from ledger import EntityType
+    
     phone = normalize_phone(request.phone)
     user = await db.sdm_users.find_one({"phone": phone})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Update wallet
-    await db.wallets.update_one(
-        {"owner_id": user["id"], "type": "CLIENT_AVAILABLE"},
-        {"$inc": {"balance": request.amount}}
-    )
+    # Get or create the ledger wallet
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user["id"])
+    if wallet:
+        # Update the ledger wallet
+        await db.wallets.update_one(
+            {"id": wallet.id},
+            {"$inc": {"available_balance": request.amount, "balance": request.amount}}
+        )
     
     return {"message": f"Credited GHS {request.amount} to {phone}", "user_id": user["id"]}
 
