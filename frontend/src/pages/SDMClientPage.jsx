@@ -901,8 +901,8 @@ export default function SDMClientPage() {
                     <Wifi className="text-blue-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Forfait Internet</h3>
-                    <p className="text-sm text-slate-500">Choisissez votre bundle data</p>
+                    <h3 className="font-bold text-slate-900">Data Bundle</h3>
+                    <p className="text-sm text-slate-500">Choose your data bundle</p>
                   </div>
                 </div>
                 
@@ -921,7 +921,7 @@ export default function SDMClientPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Sélectionnez un forfait</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Select a bundle</label>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {dataBundles.map((bundle) => (
                         <label
@@ -958,7 +958,7 @@ export default function SDMClientPage() {
                     className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"
                     data-testid="data-submit"
                   >
-                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Acheter le Forfait'}
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Buy Data Bundle'}
                   </Button>
                 </form>
               </div>
