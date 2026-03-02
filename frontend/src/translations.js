@@ -652,6 +652,22 @@ export const translations = {
   }
 };
 
+import { sdmTranslations } from './sdmTranslations';
+
+// Merge SDM translations into main translations
+Object.keys(sdmTranslations).forEach(lang => {
+  if (translations[lang]) {
+    translations[lang] = { ...translations[lang], ...sdmTranslations[lang] };
+  }
+});
+
 export const getDirection = (lang) => {
   return lang === 'ar' ? 'rtl' : 'ltr';
+};
+
+export const languageInfo = {
+  en: { name: 'English', nativeName: 'English', flag: '🇬🇧' },
+  fr: { name: 'French', nativeName: 'Français', flag: '🇫🇷' },
+  ar: { name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
+  zh: { name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
 };
