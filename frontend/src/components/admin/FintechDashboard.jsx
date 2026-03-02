@@ -83,6 +83,15 @@ export default function FintechDashboard({ token }) {
     end_date: ''
   });
   
+  // Auto Lottery Scheduler state
+  const [schedulerStatus, setSchedulerStatus] = useState(null);
+  const [schedulerLogs, setSchedulerLogs] = useState([]);
+  const [lotteryConfig, setLotteryConfig] = useState({
+    enabled: true,
+    default_prize_amount: 500,
+    auto_activate: true
+  });
+  
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
