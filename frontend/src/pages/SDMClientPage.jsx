@@ -219,6 +219,29 @@ export default function SDMClientPage() {
     }
   };
 
+  // Purchase VIP Card
+  const handlePurchaseVIP = async (cardTypeId) => {
+    setIsServiceLoading(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API_URL}/api/sdm/user/vip-cards/purchase`, {
+        card_type_id: cardTypeId
+      }, { headers });
+      
+      toast.success(response.data.message);
+      if (response.data.referral_bonus_received > 0) {
+        toast.success(`Bonus de bienvenue: +GHS ${response.data.referral_bonus_received}`);
+      }
+      setActiveService(null);
+      fetchUserData();
+      fetchServiceData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+    } finally {
+      setIsServiceLoading(false);
+    }
+  };
+
   const handleSendOTP = async (e) => {
     e.preventDefault();
     setIsLoading(true);
