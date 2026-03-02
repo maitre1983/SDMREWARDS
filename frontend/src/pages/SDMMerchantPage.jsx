@@ -450,7 +450,6 @@ export default function SDMMerchantPage() {
         <div className="max-w-4xl mx-auto flex">
           {[
             { id: 'scan', icon: QrCode, label: 'Scan QR' },
-            { id: 'cards', icon: CreditCard, label: 'Cards' },
             { id: 'transactions', icon: BarChart3, label: 'Transactions' },
             { id: 'staff', icon: Users, label: 'Staff' },
             { id: 'settings', icon: Settings, label: 'Settings' },
