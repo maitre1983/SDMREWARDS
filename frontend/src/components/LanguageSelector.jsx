@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLanguage } from '../i18n';
+import { useLanguage } from '../context/LanguageContext';
 import { Globe, ChevronDown, Check } from 'lucide-react';
 
 const LanguageSelector = ({ variant = 'dropdown', className = '' }) => {
