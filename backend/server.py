@@ -3213,6 +3213,51 @@ class MoMoWithdrawalRequest(BaseModel):
     amount: float
     network: Optional[str] = None
 
+# ==================== PROMOTIONS MODELS ====================
+
+class PromotionTargetService(str, Enum):
+    ALL = "ALL"
+    AIRTIME = "AIRTIME"
+    DATA = "DATA"
+    BILL_PAYMENT = "BILL_PAYMENT"
+    MOMO_WITHDRAWAL = "MOMO_WITHDRAWAL"
+
+class PromotionDayOfWeek(str, Enum):
+    MONDAY = "MONDAY"
+    TUESDAY = "TUESDAY"
+    WEDNESDAY = "WEDNESDAY"
+    THURSDAY = "THURSDAY"
+    FRIDAY = "FRIDAY"
+    SATURDAY = "SATURDAY"
+    SUNDAY = "SUNDAY"
+
+class CreatePromotionRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    target_service: PromotionTargetService = PromotionTargetService.ALL
+    discount_percent: float  # e.g., 10 for 10%
+    min_amount: float = 0  # Minimum transaction amount to apply
+    days_of_week: List[str] = []  # Empty = all days, or ["SATURDAY", "SUNDAY"]
+    start_date: Optional[str] = None  # ISO date string
+    end_date: Optional[str] = None  # ISO date string
+    is_active: bool = True
+
+class ServicePromotion(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    target_service: str  # ALL, AIRTIME, DATA, BILL_PAYMENT, MOMO_WITHDRAWAL
+    discount_percent: float
+    min_amount: float = 0
+    days_of_week: List[str] = []
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_active: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    usage_count: int = 0
+    total_discount_given: float = 0.0
+
 # ==================== USER SERVICE ENDPOINTS ====================
 
 @sdm_router.get("/user/services/balance")
