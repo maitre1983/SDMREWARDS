@@ -1093,6 +1093,213 @@ export default function SDMClientPage() {
                 </form>
               </div>
             )}
+
+            {/* VIP CARDS VIEW */}
+            {activeService === 'vip' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="vip-form">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                    <Crown className="text-amber-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Cartes VIP SDM</h3>
+                    <p className="text-sm text-slate-500">
+                      {myVipMembership ? `Vous êtes ${myVipMembership.tier}` : 'Rejoignez la communauté VIP'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Current Membership Status */}
+                {myVipMembership && (
+                  <div className="mb-6 p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl border border-amber-200">
+                    <div className="flex items-center gap-3">
+                      <Crown className="text-amber-600" size={32} />
+                      <div>
+                        <p className="font-bold text-amber-900">{myVipMembership.card_name}</p>
+                        <p className="text-sm text-amber-700">N° {myVipMembership.card_number}</p>
+                        <p className="text-xs text-amber-600">
+                          Expire le {new Date(myVipMembership.expires_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* VIP Cards List */}
+                <div className="space-y-4">
+                  {vipCards.map((card) => {
+                    const tierOrder = { SILVER: 1, GOLD: 2, PLATINUM: 3 };
+                    const currentTier = tierOrder[myVipMembership?.tier] || 0;
+                    const cardTier = tierOrder[card.tier] || 0;
+                    const canPurchase = cardTier > currentTier;
+                    const isCurrentTier = myVipMembership?.tier === card.tier;
+                    const priceToShow = canPurchase && myVipMembership 
+                      ? card.price - vipCards.find(c => c.tier === myVipMembership.tier)?.price 
+                      : card.price;
+
+                    return (
+                      <div 
+                        key={card.id}
+                        className={`rounded-xl border-2 overflow-hidden ${
+                          isCurrentTier 
+                            ? 'border-amber-400 bg-amber-50' 
+                            : canPurchase 
+                              ? 'border-slate-200 hover:border-blue-300' 
+                              : 'border-slate-100 bg-slate-50 opacity-60'
+                        }`}
+                      >
+                        <div 
+                          className="p-4"
+                          style={{ 
+                            background: isCurrentTier 
+                              ? `linear-gradient(135deg, ${card.badge_color}33, ${card.badge_color}11)` 
+                              : undefined 
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-full flex items-center justify-center"
+                                style={{ backgroundColor: card.badge_color }}
+                              >
+                                <Crown className="text-white" size={20} />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900">{card.name}</p>
+                                <p className="text-xs text-slate-500">{card.description}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              {canPurchase && myVipMembership ? (
+                                <>
+                                  <p className="text-lg font-bold text-emerald-600">+GHS {priceToShow}</p>
+                                  <p className="text-xs text-slate-500">Upgrade</p>
+                                </>
+                              ) : (
+                                <p className="text-lg font-bold text-slate-900">GHS {card.price}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Benefits */}
+                          <div className="space-y-1 mb-4">
+                            {card.benefits_list?.slice(0, 4).map((benefit, i) => (
+                              <p key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                                <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={12} />
+                                {benefit}
+                              </p>
+                            ))}
+                            {card.benefits_list?.length > 4 && (
+                              <p className="text-xs text-blue-600">+{card.benefits_list.length - 4} autres avantages</p>
+                            )}
+                          </div>
+
+                          {/* Action Button */}
+                          {isCurrentTier ? (
+                            <div className="text-center py-2 bg-amber-200 rounded-lg text-amber-800 font-medium text-sm">
+                              Votre carte actuelle
+                            </div>
+                          ) : canPurchase ? (
+                            <Button
+                              onClick={() => handlePurchaseVIP(card.id)}
+                              disabled={isServiceLoading || (serviceBalance?.cashback_balance || 0) < priceToShow}
+                              className="w-full"
+                              style={{ backgroundColor: card.badge_color === '#C0C0C0' ? '#6B7280' : card.badge_color }}
+                            >
+                              {isServiceLoading ? <Loader2 className="animate-spin" /> : (
+                                myVipMembership ? `Upgrade pour GHS ${priceToShow}` : `Acheter pour GHS ${card.price}`
+                              )}
+                            </Button>
+                          ) : (
+                            <div className="text-center py-2 bg-slate-200 rounded-lg text-slate-500 font-medium text-sm">
+                              Non disponible
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <p className="text-xs text-center text-slate-500 mt-4">
+                  Le paiement sera débité de votre solde cashback
+                </p>
+              </div>
+            )}
+
+            {/* PARTNERS LIST VIEW */}
+            {activeService === 'partners' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="partners-view">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <MapPin className="text-purple-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Nos Partenaires</h3>
+                    <p className="text-sm text-slate-500">{partners.length} commerces acceptent SDM</p>
+                  </div>
+                </div>
+
+                {partners.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500">
+                    <Store size={48} className="mx-auto mb-3 opacity-40" />
+                    <p>Liste des partenaires bientôt disponible</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {partners.map((partner) => (
+                      <div 
+                        key={partner.id}
+                        className={`p-4 rounded-xl border ${
+                          partner.is_gold_exclusive 
+                            ? 'border-amber-200 bg-amber-50' 
+                            : 'border-slate-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                            <Store className="text-slate-600" size={20} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-slate-900">{partner.name}</p>
+                              {partner.is_gold_exclusive && (
+                                <span className="text-xs px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full">
+                                  Gold+
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500">{partner.category}</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              <MapPin size={12} className="inline mr-1" />
+                              {partner.address}, {partner.city}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-emerald-600 font-bold">{partner.cashback_rate}%</p>
+                            <p className="text-xs text-slate-500">cashback</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
