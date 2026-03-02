@@ -540,6 +540,172 @@ export default function SDMMerchantPage() {
           </div>
         )}
 
+        {activeTab === 'cards' && (
+          <div className="space-y-4">
+            {/* Create Card Type */}
+            <div className="bg-white rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-900">Membership Card Types</h3>
+                <Button
+                  onClick={() => setShowCardForm(!showCardForm)}
+                  className="bg-cyan-500 hover:bg-cyan-600 text-slate-900 gap-2"
+                  size="sm"
+                >
+                  <Plus size={16} />
+                  New Card Type
+                </Button>
+              </div>
+
+              {showCardForm && (
+                <form onSubmit={handleCreateCardType} className="border-t pt-4 mt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Card Name *</label>
+                      <Input
+                        value={cardForm.name}
+                        onChange={(e) => setCardForm({...cardForm, name: e.target.value})}
+                        placeholder="VIP Card, Gold Member, etc."
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Price (GHS) *</label>
+                      <Input
+                        type="number"
+                        value={cardForm.price}
+                        onChange={(e) => setCardForm({...cardForm, price: parseFloat(e.target.value)})}
+                        min="1"
+                        step="0.01"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Description</label>
+                    <Input
+                      value={cardForm.description}
+                      onChange={(e) => setCardForm({...cardForm, description: e.target.value})}
+                      placeholder="Benefits of this card..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Validity (days)</label>
+                      <Input
+                        type="number"
+                        value={cardForm.validity_days}
+                        onChange={(e) => setCardForm({...cardForm, validity_days: parseInt(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Extra Cashback %</label>
+                      <Input
+                        type="number"
+                        value={cardForm.cashback_bonus * 100}
+                        onChange={(e) => setCardForm({...cardForm, cashback_bonus: parseFloat(e.target.value) / 100})}
+                        min="0"
+                        max="20"
+                        step="0.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Referral Bonus</label>
+                      <Input
+                        type="number"
+                        value={cardForm.referral_bonus}
+                        onChange={(e) => setCardForm({...cardForm, referral_bonus: parseFloat(e.target.value)})}
+                        min="0"
+                        step="0.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Welcome Bonus</label>
+                      <Input
+                        type="number"
+                        value={cardForm.welcome_bonus}
+                        onChange={(e) => setCardForm({...cardForm, welcome_bonus: parseFloat(e.target.value)})}
+                        min="0"
+                        step="0.5"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className="bg-cyan-500 hover:bg-cyan-600 text-slate-900"
+                    >
+                      {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Create Card Type'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowCardForm(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* Card Types List */}
+              {cardTypes.length === 0 && !showCardForm ? (
+                <div className="text-center py-8 text-slate-500">
+                  <CreditCard size={40} className="mx-auto mb-3 opacity-30" />
+                  <p>No card types yet</p>
+                  <p className="text-xs mt-1">Create your first membership card type!</p>
+                </div>
+              ) : (
+                <div className="space-y-3 mt-4">
+                  {cardTypes.map((ct) => (
+                    <div key={ct.id} className="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-900">{ct.name}</p>
+                        <p className="text-sm text-slate-500">{ct.description || 'No description'}</p>
+                        <div className="flex gap-4 mt-2 text-xs text-slate-600">
+                          <span>Price: GHS {ct.price}</span>
+                          <span>Valid: {ct.validity_days} days</span>
+                          <span>Welcome: GHS {ct.welcome_bonus}</span>
+                          <span>Referral: GHS {ct.referral_bonus}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteCardType(ct.id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Active Memberships */}
+            <div className="bg-white rounded-2xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">Active Members ({memberships.length})</h3>
+              {memberships.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">No members yet</p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {memberships.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-slate-900">{m.user_phone}</p>
+                        <p className="text-xs text-slate-500">{m.card_type_name} - {m.card_number}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-emerald-600">GHS {m.price_paid}</p>
+                        <p className="text-xs text-slate-400">Exp: {new Date(m.expires_at).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {activeTab === 'transactions' && (
           <div className="space-y-4">
