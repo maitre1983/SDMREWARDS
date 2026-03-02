@@ -330,7 +330,7 @@ export default function FintechDashboard({ token }) {
   };
 
   const handleDrawLottery = async (lotteryId) => {
-    if (!window.confirm('Effectuer le tirage maintenant? Cette action est irréversible.')) return;
+    if (!window.confirm('Perform the draw now? This action is irreversible.')) return;
     try {
       const res = await axios.post(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}/draw`, {}, { headers });
       toast.success(res.data.message);
@@ -351,7 +351,7 @@ export default function FintechDashboard({ token }) {
   };
 
   const handleDeleteLottery = async (lotteryId) => {
-    if (!window.confirm('Supprimer ce tirage?')) return;
+    if (!window.confirm('Delete this draw?')) return;
     try {
       await axios.delete(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}`, { headers });
       toast.success('Draw deleted');
@@ -920,7 +920,7 @@ export default function FintechDashboard({ token }) {
               </select>
               <Button onClick={handleAnnounceTopClients} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                 <Megaphone size={16} />
-                Annoncer les Gagnants
+                Announce Winners
               </Button>
             </div>
           </div>
@@ -1025,7 +1025,7 @@ export default function FintechDashboard({ token }) {
           {/* New Promo Form */}
           {showNewPromoForm && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h4 className="font-semibold text-slate-900 mb-4">Créer une Promotion</h4>
+              <h4 className="font-semibold text-slate-900 mb-4">Create Promotion</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nom</label>
@@ -1103,7 +1103,7 @@ export default function FintechDashboard({ token }) {
               </div>
               <div className="flex gap-2 mt-4">
                 <Button onClick={handleCreatePromo} className="bg-emerald-600 hover:bg-emerald-700">
-                  Créer la Promotion
+                  Create Promotion
                 </Button>
                 <Button variant="outline" onClick={() => setShowNewPromoForm(false)}>
                   Annuler
