@@ -4,7 +4,7 @@ import {
   Wallet, QrCode, ArrowLeft, Phone, Loader2, 
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
-  Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin
+  Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
