@@ -99,14 +99,15 @@ export default function SDMClientPage() {
   const fetchServiceData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [balanceRes, bundlesRes, historyRes, promosRes, vipCardsRes, vipMembershipRes, partnersRes] = await Promise.all([
+      const [balanceRes, bundlesRes, historyRes, promosRes, vipCardsRes, vipMembershipRes, partnersRes, lotteriesRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/user/services/balance`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/services/data-bundles`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/services/history`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/services/promotions`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/vip-cards`),
         axios.get(`${API_URL}/api/sdm/user/my-vip-membership`, { headers }),
-        axios.get(`${API_URL}/api/sdm/partners`)
+        axios.get(`${API_URL}/api/sdm/partners`),
+        axios.get(`${API_URL}/api/sdm/user/lotteries`, { headers })
       ]);
       setServiceBalance(balanceRes.data);
       setDataBundles(bundlesRes.data.bundles || []);
@@ -115,6 +116,7 @@ export default function SDMClientPage() {
       setVipCards(vipCardsRes.data.cards || []);
       setMyVipMembership(vipMembershipRes.data.membership);
       setPartners(partnersRes.data.partners || []);
+      setLotteries(lotteriesRes.data);
     } catch (error) {
       console.error('Service data fetch error:', error);
     }
