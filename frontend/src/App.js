@@ -8,6 +8,7 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import SDMClientPage from "./pages/SDMClientPage";
 import SDMMerchantPage from "./pages/SDMMerchantPage";
+import SDMRewardsPage from "./pages/SDMRewardsPage";
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
               <Route path="/admin280226" element={<AdminDashboardPage />} />
               <Route path="/sdm/client" element={<SDMClientPage />} />
               <Route path="/sdm/merchant" element={<SDMMerchantPage />} />
+              <Route path="/sdm/rewards" element={<SDMRewardsPage />} />
             </Routes>
           </BrowserRouter>
         </div>

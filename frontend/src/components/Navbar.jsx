@@ -24,6 +24,7 @@ export const Navbar = () => {
   const navLinks = [
     { href: '/#services', label: t('nav_services') },
     { href: '/#pricing', label: t('nav_pricing') },
+    { href: '/sdm/rewards', label: 'SDM Rewards', isPage: true },
     { href: '/#portfolio', label: t('nav_portfolio') },
     { href: '/#contact', label: t('nav_contact') },
   ];
@@ -67,15 +68,26 @@ export const Navbar = () => {
           {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-8">
             {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => scrollToSection(e, link.href)}
-                className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
-                data-testid={`nav-link-${link.href.replace('/#', '')}`}
-              >
-                {link.label}
-              </a>
+              link.isPage ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+                  data-testid={`nav-link-${link.href.replace('/', '')}`}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => scrollToSection(e, link.href)}
+                  className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
+                  data-testid={`nav-link-${link.href.replace('/#', '')}`}
+                >
+                  {link.label}
+                </a>
+              )
             ))}
           </div>
 
@@ -111,14 +123,25 @@ export const Navbar = () => {
         {isMobileMenuOpen && (
           <div className="lg:hidden bg-white border-t border-slate-100 py-4 px-2">
             {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={(e) => scrollToSection(e, link.href)}
-                className="block px-4 py-3 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                {link.label}
-              </a>
+              link.isPage ? (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => scrollToSection(e, link.href)}
+                  className="block px-4 py-3 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+                >
+                  {link.label}
+                </a>
+              )
             ))}
             <div className="mt-4 px-4">
               <a href="/#contact" onClick={(e) => scrollToSection(e, '/#contact')}>
