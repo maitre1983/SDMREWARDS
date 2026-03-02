@@ -139,13 +139,13 @@ export default function SDMClientPage() {
         network: airtimeForm.network || null
       }, { headers });
       
-      toast.success(`Airtime acheté! Référence: ${response.data.reference}`);
+      toast.success(`Airtime purchased! Reference: ${response.data.reference}`);
       setAirtimeForm({ phone: '', amount: '', network: '' });
       setActiveService(null);
       fetchUserData();
       fetchServiceData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+      toast.error(error.response?.data?.detail || 'Purchase failed');
     } finally {
       setIsServiceLoading(false);
     }
@@ -162,13 +162,13 @@ export default function SDMClientPage() {
         bundle_id: dataForm.bundleId
       }, { headers });
       
-      toast.success(`Forfait data acheté! Référence: ${response.data.reference}`);
+      toast.success(`Data bundle purchased! Reference: ${response.data.reference}`);
       setDataForm({ phone: '', bundleId: '' });
       setActiveService(null);
       fetchUserData();
       fetchServiceData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+      toast.error(error.response?.data?.detail || 'Purchase failed');
     } finally {
       setIsServiceLoading(false);
     }
@@ -186,13 +186,13 @@ export default function SDMClientPage() {
         amount: parseFloat(billForm.amount)
       }, { headers });
       
-      toast.success(`Facture payée! Token: ${response.data.bill_reference || response.data.reference}`);
+      toast.success(`Bill paid! Token: ${response.data.bill_reference || response.data.reference}`);
       setBillForm({ provider: 'ECG', accountNumber: '', amount: '' });
       setActiveService(null);
       fetchUserData();
       fetchServiceData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec du paiement');
+      toast.error(error.response?.data?.detail || 'Payment failed');
     } finally {
       setIsServiceLoading(false);
     }
@@ -210,13 +210,13 @@ export default function SDMClientPage() {
         network: momoForm.network || null
       }, { headers });
       
-      toast.success(`Retrait initié! Montant net: GHS ${response.data.net_amount}`);
+      toast.success(`Withdrawal initiated! Net amount: GHS ${response.data.net_amount}`);
       setMomoForm({ phone: '', amount: '', network: '' });
       setActiveService(null);
       fetchUserData();
       fetchServiceData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec du retrait');
+      toast.error(error.response?.data?.detail || 'Withdrawal failed');
     } finally {
       setIsServiceLoading(false);
     }
@@ -239,7 +239,7 @@ export default function SDMClientPage() {
       fetchUserData();
       fetchServiceData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+      toast.error(error.response?.data?.detail || 'Purchase failed');
     } finally {
       setIsServiceLoading(false);
     }
