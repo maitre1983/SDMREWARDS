@@ -233,7 +233,7 @@ export default function SDMClientPage() {
       
       toast.success(response.data.message);
       if (response.data.referral_bonus_received > 0) {
-        toast.success(`Bonus de bienvenue: +GHS ${response.data.referral_bonus_received}`);
+        toast.success(`Welcome bonus: +GHS ${response.data.referral_bonus_received}`);
       }
       setActiveService(null);
       fetchUserData();
@@ -1150,7 +1150,7 @@ export default function SDMClientPage() {
                         <p className="font-bold text-amber-900">{myVipMembership.card_name}</p>
                         <p className="text-sm text-amber-700">N° {myVipMembership.card_number}</p>
                         <p className="text-xs text-amber-600">
-                          Expire le {new Date(myVipMembership.expires_at).toLocaleDateString()}
+                          Expires: {new Date(myVipMembership.expires_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -1222,7 +1222,7 @@ export default function SDMClientPage() {
                               </p>
                             ))}
                             {card.benefits_list?.length > 4 && (
-                              <p className="text-xs text-blue-600">+{card.benefits_list.length - 4} autres avantages</p>
+                              <p className="text-xs text-blue-600">+{card.benefits_list.length - 4} more benefits</p>
                             )}
                           </div>
 
