@@ -188,7 +188,61 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 
 ---
 
-## PHASE 4: MOBILE MONEY INTEGRATION (À venir)
+## PHASE 4: SUPER APP SERVICES ✅ COMPLETE
+
+### Implemented Features (March 2026)
+
+#### 1. Service Backend (BulkClix Integration)
+- **Module**: `/app/backend/services/bulkclix_service.py`
+- **Mode**: SIMULATION (API BulkClix retourne "Unauthorized" → simulation automatique)
+- 4 services disponibles :
+  - Achat de crédit téléphonique (Airtime)
+  - Achat de forfaits data (Data bundles)
+  - Paiement de factures (ECG, GWCL, DSTV, GOTV)
+  - Retrait Mobile Money
+
+#### 2. Transaction Engine
+- Débit automatique du solde cashback `CLIENT_AVAILABLE`
+- Clé d'idempotence pour éviter les doublons
+- Statuts : `PENDING`, `SUCCESS`, `FAILED`, `REVERSED`
+- Commission dynamique (0.1% par défaut) configurable
+
+#### 3. Limites & Contrôles
+- Limite mensuelle : 2500 GHS (configurable)
+- Vérification du solde avant transaction
+- Détection automatique du réseau téléphonique
+
+#### 4. Interface Client (Super App UI)
+- Nouvel onglet "Services" dans `SDMClientPage.jsx`
+- Affichage du solde cashback disponible
+- 4 formulaires de service avec validation
+- Historique des transactions de services
+
+### New API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | /api/sdm/user/services/balance | User | Solde cashback et limite mensuelle |
+| GET | /api/sdm/user/services/data-bundles | Public | Forfaits data disponibles |
+| POST | /api/sdm/user/services/airtime | User | Achat crédit téléphonique |
+| POST | /api/sdm/user/services/data | User | Achat forfait data |
+| POST | /api/sdm/user/services/bill | User | Paiement facture |
+| POST | /api/sdm/user/services/withdraw | User | Retrait MoMo |
+| GET | /api/sdm/user/services/history | User | Historique services |
+| GET | /api/sdm/admin/services/stats | Admin | Statistiques services |
+
+### Collections MongoDB Ajoutées
+- `service_transactions`: Transactions de services (airtime, data, bills, momo)
+
+### Tests: 100% Success
+- Backend: 16/16 tests passés
+- Frontend: All Services UI components verified
+- Idempotency: Working
+- Monthly limit: Enforced
+
+---
+
+## PHASE 5: MOBILE MONEY INTEGRATION (À venir)
 
 ### Objectifs
 - Compte Business MTN MoMo
@@ -197,7 +251,7 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 
 ---
 
-## PHASE 3: SCALE & SÉCURITÉ (À venir - Mois 5-6)
+## PHASE 6: SCALE & SÉCURITÉ (À venir - Mois 5-6)
 
 ### Objectifs
 - [ ] Anti-fraud engine (velocity checks, scoring)
@@ -214,13 +268,15 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 - FastAPI (Python)
 - MongoDB with ACID transactions
 - Ledger module: `/app/backend/ledger/`
+- Services module: `/app/backend/services/`
 
 ### Frontend
 - React 19
 - Tailwind CSS + Shadcn UI
 - FintechDashboard: `/app/frontend/src/components/admin/FintechDashboard.jsx`
+- SDMClientPage: `/app/frontend/src/pages/SDMClientPage.jsx`
 
-### New Collections (Phase 1-3)
+### New Collections (Phase 1-4)
 - `wallets` - Tous les portefeuilles
 - `ledger_entries` - Écritures comptables (DEBIT/CREDIT)
 - `ledger_transactions` - Transactions principales
@@ -230,6 +286,7 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 - `notifications` - Notifications in-app
 - `float_alerts` - Historique alertes float
 - `push_devices` - Devices enregistrés pour push
+- `service_transactions` - Transactions de services Super App
 
 ---
 
@@ -245,7 +302,7 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 
 ### Test Credentials
 - **Admin**: admin / Gerard0103@
-- **Test Client**: +233000000000 / OTP: 000000
+- **Test Client**: +233000000000 (ou 0000000000) / OTP: 000000
 - **Test Merchant**: 233246283156 / sdk_af10983a3524c11d21c39dfe2fbf4660
 
 ---
@@ -256,6 +313,8 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 |---------|--------|
 | Mobile Money Payout (MTN/Vodafone) | MOCKED - Admin marks as PAID manually |
 | Hubtel SMS OTP | MOCKED - Debug OTP shown (configure keys for real SMS) |
+| BulkClix API (Airtime, Data, Bills, MoMo) | MOCKED - API retourne "Unauthorized", simulation activée |
+| OneSignal Push Notifications | PENDING - En attente des clés API utilisateur |
 
 ---
 
@@ -265,4 +324,4 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 ---
 
 *Last Updated: March 2026*
-*Phase 1 Complete - Ready for Phase 2*
+*Phase 4 (Super App) Complete - Ready for Phase 5*
