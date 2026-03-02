@@ -3367,13 +3367,33 @@ async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_curre
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid network: {request.network}")
     
+    # Check for promotions
+    promo_info = await apply_promotion("AIRTIME", request.amount)
+    effective_amount = promo_info["final_amount"]
+    
     try:
         result = await bulkclix_service.buy_airtime(
             user_id=user["id"],
             phone_number=request.phone_number,
-            amount=request.amount,
+            amount=effective_amount,
             network=network
         )
+        # Add promo info to result
+        result["original_amount"] = request.amount
+        result["promotion"] = promo_info
+        
+        # Update promo usage stats
+        if promo_info["has_discount"]:
+            await db.service_promotions.update_one(
+                {"id": promo_info["promo_id"]},
+                {
+                    "$inc": {
+                        "usage_count": 1,
+                        "total_discount_given": promo_info["discount_amount"]
+                    }
+                }
+            )
+        
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -3382,11 +3402,35 @@ async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_curre
 async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_user)):
     """User: Buy data bundle using cashback balance"""
     try:
+        # Get bundle price for promo calculation
+        bundles = bulkclix_service.get_data_bundles()
+        bundle = next((b for b in bundles if b["id"] == request.bundle_id), None)
+        if not bundle:
+            raise HTTPException(status_code=400, detail=f"Invalid bundle: {request.bundle_id}")
+        
+        # Check for promotions
+        promo_info = await apply_promotion("DATA", bundle["price"])
+        
         result = await bulkclix_service.buy_data(
             user_id=user["id"],
             phone_number=request.phone_number,
-            bundle_id=request.bundle_id
+            bundle_id=request.bundle_id,
+            discount_amount=promo_info["discount_amount"] if promo_info["has_discount"] else 0
         )
+        result["promotion"] = promo_info
+        
+        # Update promo usage stats
+        if promo_info["has_discount"]:
+            await db.service_promotions.update_one(
+                {"id": promo_info["promo_id"]},
+                {
+                    "$inc": {
+                        "usage_count": 1,
+                        "total_discount_given": promo_info["discount_amount"]
+                    }
+                }
+            )
+        
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -3399,14 +3443,33 @@ async def pay_bill(request: PayBillRequest, user: dict = Depends(get_current_use
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid provider: {request.provider}")
     
+    # Check for promotions
+    promo_info = await apply_promotion("BILL_PAYMENT", request.amount)
+    effective_amount = promo_info["final_amount"]
+    
     try:
         result = await bulkclix_service.pay_bill(
             user_id=user["id"],
             provider=provider,
             account_number=request.account_number,
-            amount=request.amount,
+            amount=effective_amount,
             customer_name=request.customer_name
         )
+        result["original_amount"] = request.amount
+        result["promotion"] = promo_info
+        
+        # Update promo usage stats
+        if promo_info["has_discount"]:
+            await db.service_promotions.update_one(
+                {"id": promo_info["promo_id"]},
+                {
+                    "$inc": {
+                        "usage_count": 1,
+                        "total_discount_given": promo_info["discount_amount"]
+                    }
+                }
+            )
+        
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
