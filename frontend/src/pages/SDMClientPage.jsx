@@ -825,7 +825,7 @@ export default function SDMClientPage() {
                 
                 <form onSubmit={handleBuyAirtime} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro de téléphone</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
                     <Input
                       type="tel"
                       value={airtimeForm.phone}
@@ -838,7 +838,7 @@ export default function SDMClientPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant (GHS)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Amount (GHS)</label>
                     <Input
                       type="number"
                       value={airtimeForm.amount}
@@ -853,14 +853,14 @@ export default function SDMClientPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Réseau (optionnel)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Network (optional)</label>
                     <select
                       value={airtimeForm.network}
                       onChange={(e) => setAirtimeForm({...airtimeForm, network: e.target.value})}
                       className="w-full h-12 rounded-lg border border-slate-200 px-4"
                       data-testid="airtime-network"
                     >
-                      <option value="">Auto-détecter</option>
+                      <option value="">Auto-detect</option>
                       <option value="MTN">MTN</option>
                       <option value="VODAFONE">Vodafone</option>
                       <option value="AIRTELTIGO">AirtelTigo</option>
@@ -870,7 +870,7 @@ export default function SDMClientPage() {
                   {serviceBalance && parseFloat(airtimeForm.amount) > serviceBalance.cashback_balance && (
                     <div className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 p-3 rounded-lg">
                       <AlertCircle size={16} />
-                      Solde insuffisant
+                      Insufficient balance
                     </div>
                   )}
 
@@ -880,7 +880,7 @@ export default function SDMClientPage() {
                     className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white"
                     data-testid="airtime-submit"
                   >
-                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Acheter le Crédit'}
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Buy Airtime'}
                   </Button>
                 </form>
               </div>
@@ -908,7 +908,7 @@ export default function SDMClientPage() {
                 
                 <form onSubmit={handleBuyData} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro de téléphone</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
                     <Input
                       type="tel"
                       value={dataForm.phone}
@@ -1014,7 +1014,7 @@ export default function SDMClientPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant (GHS)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Amount (GHS)</label>
                     <Input
                       type="number"
                       value={billForm.amount}
@@ -1075,7 +1075,7 @@ export default function SDMClientPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant (GHS)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Amount (GHS)</label>
                     <Input
                       type="number"
                       value={momoForm.amount}
@@ -1093,14 +1093,14 @@ export default function SDMClientPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Réseau (optionnel)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Network (optional)</label>
                     <select
                       value={momoForm.network}
                       onChange={(e) => setMomoForm({...momoForm, network: e.target.value})}
                       className="w-full h-12 rounded-lg border border-slate-200 px-4"
                       data-testid="momo-network"
                     >
-                      <option value="">Auto-détecter</option>
+                      <option value="">Auto-detect</option>
                       <option value="MTN">MTN MoMo</option>
                       <option value="VODAFONE">Vodafone Cash</option>
                       <option value="AIRTELTIGO">AirtelTigo Money</option>
