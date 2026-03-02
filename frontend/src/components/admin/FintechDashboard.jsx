@@ -1473,15 +1473,15 @@ export default function FintechDashboard({ token }) {
                         <p className="font-bold text-slate-900">{lottery.total_participants || 0}</p>
                       </div>
                       <div className="text-center p-2 bg-slate-50 rounded">
-                        <p className="text-xs text-slate-500">Entrées totales</p>
+                        <p className="text-xs text-slate-500">Total Entries</p>
                         <p className="font-bold text-slate-900">{lottery.total_entries || 0}</p>
                       </div>
                       <div className="text-center p-2 bg-slate-50 rounded">
-                        <p className="text-xs text-slate-500">Début</p>
+                        <p className="text-xs text-slate-500">Start</p>
                         <p className="font-bold text-slate-900">{lottery.start_date?.slice(0, 10) || '-'}</p>
                       </div>
                       <div className="text-center p-2 bg-slate-50 rounded">
-                        <p className="text-xs text-slate-500">Fin</p>
+                        <p className="text-xs text-slate-500">End</p>
                         <p className="font-bold text-slate-900">{lottery.end_date?.slice(0, 10) || '-'}</p>
                       </div>
                     </div>
@@ -1489,7 +1489,7 @@ export default function FintechDashboard({ token }) {
                     {/* Winners display */}
                     {lottery.status === 'COMPLETED' && lottery.winners?.length > 0 && (
                       <div className="mb-4 p-3 bg-amber-50 rounded-lg">
-                        <p className="text-sm font-medium text-amber-900 mb-2">🏆 Gagnants:</p>
+                        <p className="text-sm font-medium text-amber-900 mb-2">🏆 Winners:</p>
                         <div className="space-y-1">
                           {lottery.winners.map((w, i) => (
                             <div key={i} className="flex items-center justify-between text-sm">
@@ -1515,7 +1515,7 @@ export default function FintechDashboard({ token }) {
                             className="gap-2 bg-purple-600 hover:bg-purple-700"
                           >
                             <Play size={14} />
-                            Activer & Inscrire VIP
+                            Activate & Enroll VIP
                           </Button>
                           <Button
                             size="sm"
@@ -1534,7 +1534,7 @@ export default function FintechDashboard({ token }) {
                           className="gap-2 bg-amber-600 hover:bg-amber-700"
                         >
                           <Award size={14} />
-                          Effectuer le Tirage
+                          Perform Draw
                         </Button>
                       )}
                       {lottery.status === 'COMPLETED' && !lottery.is_announced && (
@@ -1544,13 +1544,13 @@ export default function FintechDashboard({ token }) {
                           className="gap-2 bg-emerald-600 hover:bg-emerald-700"
                         >
                           <Megaphone size={14} />
-                          Annoncer les Résultats
+                          Announce Results
                         </Button>
                       )}
                       {lottery.is_announced && (
                         <span className="text-sm text-emerald-600 flex items-center gap-1">
                           <CheckCircle size={14} />
-                          Résultats annoncés
+                          Results announced
                         </span>
                       )}
                     </div>
