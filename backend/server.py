@@ -3922,14 +3922,14 @@ DEFAULT_VIP_CARDS = [
         "badge_color": "#C0C0C0",
         "description": "Entry Card - Community & Savings",
         "benefits_list": [
-            "Accès aux offres exclusives marchands partenaires",
-            "Accès à l'app SDM (wallet + historique + tracking rewards)",
-            "Accès aux tirages mensuels (lottery partenaires)",
-            "Accès prioritaire aux promos flash",
-            "Tableau de bord personnel avec score fidélité",
-            "Notifications personnalisées selon zone géographique",
-            "Birthday Bonus (bonus spécial le mois d'anniversaire)",
-            "Achat data bundles, électricité, airtime avec cashback"
+            "Access to exclusive partner merchant offers",
+            "Access to SDM app (wallet + history + reward tracking)",
+            "Access to monthly draws (partner lottery)",
+            "Priority access to flash promos",
+            "Personal dashboard with loyalty score",
+            "Personalized notifications by geographic area",
+            "Birthday Bonus (special bonus on your birthday month)",
+            "Buy data bundles, electricity, airtime with cashback"
         ]
     },
     {
@@ -3948,14 +3948,14 @@ DEFAULT_VIP_CARDS = [
         "badge_color": "#FFD700",
         "description": "Premium Card - Benefits + Power",
         "benefits_list": [
-            "Tout ce que Silver a +",
-            "Cashback boosté (+0.2% sur partenaires)",
-            "Double chance aux tirages mensuels",
-            "Traitement prioritaire des retraits MoMo",
-            "Accès aux Marchands Gold exclusifs",
-            "Accès aux événements SDM (networking, fintech, business)",
-            "Réduction directe chez partenaires Gold",
-            "Badge digital Gold (statut visible dans l'app)"
+            "Everything Silver has +",
+            "Boosted cashback (+0.2% on partners)",
+            "Double chance in monthly draws",
+            "Priority processing for MoMo withdrawals",
+            "Access to exclusive Gold Merchants",
+            "Access to SDM events (networking, fintech, business)",
+            "Direct discount at Gold partners",
+            "Digital Gold badge (visible status in app)"
         ]
     },
     {
@@ -3974,16 +3974,16 @@ DEFAULT_VIP_CARDS = [
         "badge_color": "#E5E4E2",
         "description": "Elite Card - Business & Social Status",
         "benefits_list": [
-            "Tout Silver + Gold +",
-            "Cashback Premium Boost (+0.5%)",
-            "Accès aux offres privées partenaires",
-            "Accès aux opportunités business partenaires SDM",
-            "Accès aux investissements partenaires (crypto, RWA)",
-            "Limite de retrait élevée (5000 GHS/mois)",
-            "Triple chance aux tirages majeurs",
-            "Invitation aux conférences & événements fermés",
-            "Programme Ambassadeur (earn commission via referrals)",
-            "Rapport annuel de gains personnalisé"
+            "Everything Silver + Gold +",
+            "Premium Cashback Boost (+0.5%)",
+            "Access to private partner offers",
+            "Access to SDM business partner opportunities",
+            "Access to partner investments (crypto, RWA)",
+            "High withdrawal limit (5000 GHS/month)",
+            "Triple chance in major draws",
+            "Invitation to closed conferences & events",
+            "Ambassador Program (earn commission via referrals)",
+            "Personalized annual earnings report"
         ]
     }
 ]
