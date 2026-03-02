@@ -370,6 +370,55 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  // Auto Lottery Scheduler functions
+  const fetchSchedulerData = async () => {
+    try {
+      const [statusRes, logsRes, configRes] = await Promise.all([
+        axios.get(`${API_URL}/api/sdm/admin/scheduler/status`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/scheduler/logs`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/lottery-config`, { headers })
+      ]);
+      setSchedulerStatus(statusRes.data);
+      setSchedulerLogs(logsRes.data.logs || []);
+      setLotteryConfig(configRes.data.config || {});
+    } catch (error) {
+      console.error('Scheduler data error:', error);
+    }
+  };
+
+  const handleUpdateLotteryConfig = async () => {
+    try {
+      await axios.put(`${API_URL}/api/sdm/admin/lottery-config`, {
+        enabled: lotteryConfig.enabled,
+        default_prize_amount: parseFloat(lotteryConfig.default_prize_amount) || 500,
+        auto_activate: lotteryConfig.auto_activate
+      }, { headers });
+      toast.success('Auto lottery config updated');
+      fetchSchedulerData();
+    } catch (error) {
+      toast.error('Error updating config');
+    }
+  };
+
+  const handleTriggerMonthlyLottery = async () => {
+    if (!window.confirm('Create and activate this month\'s lottery now?')) return;
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/lottery/trigger-monthly`, {}, { headers });
+      if (res.data.created) {
+        toast.success(`Lottery created: ${res.data.lottery?.name}`);
+        if (res.data.auto_activated) {
+          toast.success(`Auto-activated with ${res.data.participants_enrolled} participants`);
+        }
+      } else {
+        toast.info(res.data.message);
+      }
+      fetchLotteries();
+      fetchSchedulerData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error');
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
