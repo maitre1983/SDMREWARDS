@@ -202,6 +202,10 @@ export default function FintechDashboard({ token }) {
       fetchPushStats();
     } else if (activeSubTab === 'alerts') {
       fetchFloatAlerts();
+    } else if (activeSubTab === 'promotions') {
+      fetchPromotions();
+    } else if (activeSubTab === 'leaderboard') {
+      fetchLeaderboard();
     }
   }, [activeSubTab]);
 
