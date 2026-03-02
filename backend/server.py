@@ -4667,6 +4667,27 @@ async def trigger_monthly_lottery(admin: dict = Depends(get_current_admin)):
     
     return result
 
+@sdm_router.get("/admin/scheduler/logs")
+async def get_scheduler_logs(admin: dict = Depends(get_current_admin)):
+    """Admin: Get scheduler execution logs"""
+    logs = await db.scheduler_logs.find({}, {"_id": 0}).sort("executed_at", -1).to_list(50)
+    return {"logs": logs}
+
+@sdm_router.get("/admin/scheduler/status")
+async def get_scheduler_status(admin: dict = Depends(get_current_admin)):
+    """Admin: Get scheduler status and next run time"""
+    job = scheduler.get_job("monthly_lottery")
+    
+    config = await db.lottery_config.find_one({"id": "auto_lottery"}, {"_id": 0})
+    
+    return {
+        "scheduler_running": scheduler.running,
+        "job_exists": job is not None,
+        "next_run": str(job.next_run_time) if job else None,
+        "config": config,
+        "info": "Lottery auto-created on the 1st of each month at 00:05 UTC"
+    }
+
 
 # ==================== USER VIP CARD ENDPOINTS ====================
 
