@@ -118,6 +118,78 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  const fetchPromotions = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/promotions`, { headers });
+      setPromotions(res.data.promotions || []);
+    } catch (error) {
+      console.error('Promotions error:', error);
+    }
+  };
+
+  const fetchLeaderboard = async (period = leaderboardPeriod) => {
+    try {
+      const [cashbackRes, servicesRes] = await Promise.all([
+        axios.get(`${API_URL}/api/sdm/admin/leaderboard/cashback?period=${period}`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/leaderboard/services?period=${period}`, { headers })
+      ]);
+      setLeaderboardCashback(cashbackRes.data);
+      setLeaderboardServices(servicesRes.data);
+    } catch (error) {
+      console.error('Leaderboard error:', error);
+    }
+  };
+
+  const handleCreatePromo = async () => {
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/promotions`, newPromo, { headers });
+      toast.success('Promotion créée!');
+      setShowNewPromoForm(false);
+      setNewPromo({
+        name: '',
+        description: '',
+        target_service: 'ALL',
+        discount_percent: 10,
+        min_amount: 0,
+        days_of_week: [],
+        is_active: true
+      });
+      fetchPromotions();
+    } catch (error) {
+      toast.error('Erreur lors de la création');
+    }
+  };
+
+  const handleTogglePromo = async (promoId) => {
+    try {
+      await axios.patch(`${API_URL}/api/sdm/admin/promotions/${promoId}/toggle`, {}, { headers });
+      toast.success('Statut modifié');
+      fetchPromotions();
+    } catch (error) {
+      toast.error('Erreur');
+    }
+  };
+
+  const handleDeletePromo = async (promoId) => {
+    if (!window.confirm('Supprimer cette promotion?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/sdm/admin/promotions/${promoId}`, { headers });
+      toast.success('Promotion supprimée');
+      fetchPromotions();
+    } catch (error) {
+      toast.error('Erreur');
+    }
+  };
+
+  const handleAnnounceTopClients = async () => {
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/leaderboard/announce?period=${leaderboardPeriod}`, {}, { headers });
+      toast.success('Annonce envoyée à tous les clients!');
+    } catch (error) {
+      toast.error('Erreur lors de l\'annonce');
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
