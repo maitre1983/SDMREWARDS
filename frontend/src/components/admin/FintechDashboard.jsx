@@ -287,6 +287,80 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  // Lottery functions
+  const fetchLotteries = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/lotteries`, { headers });
+      setLotteries(res.data.lotteries || []);
+    } catch (error) {
+      console.error('Lotteries error:', error);
+    }
+  };
+
+  const handleCreateLottery = async () => {
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/lotteries`, newLottery, { headers });
+      toast.success('Tirage créé');
+      setShowLotteryForm(false);
+      setNewLottery({
+        name: '',
+        description: '',
+        month: new Date().toISOString().slice(0, 7),
+        funding_source: 'FIXED',
+        fixed_amount: 500,
+        commission_percentage: 10,
+        prize_distribution: [40, 25, 15, 12, 8],
+        start_date: '',
+        end_date: ''
+      });
+      fetchLotteries();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur');
+    }
+  };
+
+  const handleActivateLottery = async (lotteryId) => {
+    try {
+      const res = await axios.patch(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}/activate`, {}, { headers });
+      toast.success(res.data.message);
+      fetchLotteries();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur');
+    }
+  };
+
+  const handleDrawLottery = async (lotteryId) => {
+    if (!window.confirm('Effectuer le tirage maintenant? Cette action est irréversible.')) return;
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}/draw`, {}, { headers });
+      toast.success(res.data.message);
+      fetchLotteries();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur');
+    }
+  };
+
+  const handleAnnounceLottery = async (lotteryId) => {
+    try {
+      const res = await axios.post(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}/announce`, {}, { headers });
+      toast.success('Résultats annoncés!');
+      fetchLotteries();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur');
+    }
+  };
+
+  const handleDeleteLottery = async (lotteryId) => {
+    if (!window.confirm('Supprimer ce tirage?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}`, { headers });
+      toast.success('Tirage supprimé');
+      fetchLotteries();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur');
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
