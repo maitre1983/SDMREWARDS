@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Wallet, QrCode, ArrowLeft, Phone, Loader2, 
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import OTPInput from '../components/OTPInput';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useLanguage } from '../context/LanguageContext';
@@ -292,6 +293,61 @@ export default function SDMClientPage() {
       setIsLoading(false);
     }
   };
+
+  // Auto-submit OTP when received via Web OTP API
+  const handleOTPAutoFill = useCallback(async (autoFilledOtp) => {
+    if (autoFilledOtp && autoFilledOtp.length === 4) {
+      setOtp(autoFilledOtp);
+      toast.info('OTP auto-filled from SMS');
+      
+      // Small delay to allow state update, then auto-submit
+      setTimeout(async () => {
+        setIsLoading(true);
+        try {
+          const response = await axios.post(`${API_URL}/api/sdm/auth/register`, {
+            phone,
+            full_name: fullName,
+            password,
+            referral_code: referralCode || null,
+            otp_code: autoFilledOtp,
+            request_id: otpId
+          });
+          
+          localStorage.setItem('sdm_user_token', response.data.access_token);
+          setToken(response.data.access_token);
+          setUser(response.data.user);
+          
+          if (response.data.welcome_bonus > 0) {
+            toast.success(t('sdm_welcome_bonus_received').replace('{amount}', response.data.welcome_bonus), { duration: 5000 });
+          } else {
+            toast.success(t('sdm_register_success'));
+          }
+          setStep('dashboard');
+        } catch (error) {
+          if (error.response?.data?.detail?.includes('already registered')) {
+            try {
+              const loginResponse = await axios.post(`${API_URL}/api/sdm/auth/verify-otp`, { 
+                phone, 
+                otp_code: autoFilledOtp,
+                request_id: otpId
+              });
+              localStorage.setItem('sdm_user_token', loginResponse.data.access_token);
+              setToken(loginResponse.data.access_token);
+              setUser(loginResponse.data.user);
+              toast.success(t('sdm_login_success'));
+              setStep('dashboard');
+            } catch (verifyError) {
+              toast.error(verifyError.response?.data?.detail || t('sdm_invalid_otp'));
+            }
+          } else {
+            toast.error(error.response?.data?.detail || t('sdm_invalid_otp'));
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      }, 300);
+    }
+  }, [phone, fullName, password, referralCode, otpId, t]);
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
@@ -695,28 +751,27 @@ export default function SDMClientPage() {
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     {t('sdm_otp_code')}
                   </label>
-                  <Input
-                    type="text"
+                  <OTPInput
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
+                    onAutoFill={handleOTPAutoFill}
+                    length={4}
                     placeholder={t('sdm_enter_4_digit')}
-                    maxLength={4}
-                    className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl text-center text-2xl tracking-widest"
-                    required
-                    data-testid="sdm-otp-input"
+                    disabled={isLoading}
+                    testId="sdm-otp-input"
                   />
                 </div>
                 
                 {debugOtp && (
-                  <p className="text-xs text-amber-400 text-center">
+                  <p className="text-xs text-amber-400 text-center mt-6">
                     {t('sdm_test_code')}: <strong>{debugOtp}</strong>
                   </p>
                 )}
                 
                 {ussdCode && !debugOtp && (
-                  <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                  <div className="bg-slate-800/50 rounded-xl p-4 text-center mt-6">
                     <p className="text-xs text-slate-400 mb-1">
-                      Didn't receive the SMS? Dial this code:
+                      {t('sdm_didnt_receive_sms') || "Didn't receive the SMS? Dial this code:"}
                     </p>
                     <p className="text-lg font-bold text-cyan-400">
                       {ussdCode}

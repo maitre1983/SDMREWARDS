@@ -99,6 +99,7 @@
 - ✅ Password Reset via OTP
 - ✅ Dynamic Admin URL (/admin<DDMMYY>) - Security enhancement
 - ✅ Session Persistence (localStorage tokens for admin, client, merchant)
+- ✅ Web OTP API Integration (auto-fill OTP from SMS on Chrome Android)
 
 ---
 
@@ -116,9 +117,12 @@
 ### Birthday Bonus
 - Auto bonus for VIP members
 
-### Auto-read OTP (Web OTP API)
-- Investigate Web OTP API for supported browsers
-- Requires HTTPS and user permission
+### Auto-read OTP (Web OTP API) ✅ IMPLEMENTED
+- OTPInput component with Web OTP API support
+- Auto-fills OTP code when SMS arrives (Chrome Android)
+- Shows "Waiting for SMS..." indicator when listening
+- Fallback to manual input on unsupported browsers
+- Auto-submits form when OTP is received
 
 ### Contact Sync
 - Requires native mobile capabilities (not possible in web app)

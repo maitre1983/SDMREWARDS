@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Store, ArrowLeft, Loader2, QrCode, Users, BarChart3,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import OTPInput from '../components/OTPInput';
 import { toast } from 'sonner';
 import axios from 'axios';
 import QRScanner from '../components/QRScanner';
@@ -122,6 +123,40 @@ export default function SDMMerchantPage() {
       setIsLoading(false);
     }
   };
+
+  // Auto-submit OTP when received via Web OTP API
+  const handleOTPAutoFill = useCallback(async (autoFilledOtp) => {
+    if (autoFilledOtp && autoFilledOtp.length === 4) {
+      setOtp(autoFilledOtp);
+      toast.info('OTP auto-filled from SMS');
+      
+      // Small delay then auto-submit
+      setTimeout(async () => {
+        if (!registerForm.password || registerForm.password.length < 6) {
+          toast.error('Please enter a password (min 6 characters)');
+          return;
+        }
+        
+        setIsLoading(true);
+        try {
+          const response = await axios.post(`${API_URL}/api/sdm/merchant/register`, {
+            ...registerForm,
+            otp_code: autoFilledOtp,
+            request_id: otpRequestId
+          });
+          localStorage.setItem('sdm_merchant_token', response.data.access_token);
+          setToken(response.data.access_token);
+          setMerchant(response.data.merchant);
+          toast.success(t('sdm_register_success'));
+          setStep('dashboard');
+        } catch (error) {
+          toast.error(error.response?.data?.detail || t('sdm_register_failed'));
+        } finally {
+          setIsLoading(false);
+        }
+      }, 300);
+    }
+  }, [registerForm, otpRequestId, t]);
 
   const handleVerifyOTPAndRegister = async (e) => {
     e.preventDefault();
@@ -442,27 +477,27 @@ export default function SDMMerchantPage() {
                 
                 <div>
                   <label className="block text-sm text-slate-300 mb-1">{t('sdm_otp_code')} *</label>
-                  <Input
-                    type="text"
+                  <OTPInput
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
+                    onAutoFill={handleOTPAutoFill}
+                    length={4}
                     placeholder={t('sdm_enter_4_digit')}
-                    maxLength={4}
-                    className="bg-slate-800/50 border-slate-700 text-white text-center text-xl tracking-widest"
-                    required
+                    disabled={isLoading}
+                    testId="sdm-merchant-otp-input"
                   />
                 </div>
                 
                 {debugOtp && (
-                  <p className="text-xs text-amber-400 text-center">
+                  <p className="text-xs text-amber-400 text-center mt-6">
                     {t('sdm_test_code')}: <strong>{debugOtp}</strong>
                   </p>
                 )}
                 
                 {ussdCode && !debugOtp && (
-                  <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                  <div className="bg-slate-800/50 rounded-xl p-4 text-center mt-6">
                     <p className="text-xs text-slate-400 mb-1">
-                      Didn't receive the SMS? Dial this code:
+                      {t('sdm_didnt_receive_sms') || "Didn't receive the SMS? Dial this code:"}
                     </p>
                     <p className="text-lg font-bold text-cyan-400">
                       {ussdCode}
