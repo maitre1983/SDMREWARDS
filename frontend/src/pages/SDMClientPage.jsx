@@ -607,11 +607,11 @@ export default function SDMClientPage() {
             {/* Service Balance Info */}
             {serviceBalance && (
               <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-4 text-white">
-                <p className="text-sm opacity-80">Solde Cashback Disponible</p>
+                <p className="text-sm opacity-80">Available Cashback Balance</p>
                 <p className="text-2xl font-bold">GHS {serviceBalance.cashback_balance?.toFixed(2) || '0.00'}</p>
                 <div className="flex gap-4 mt-2 text-xs">
-                  <span>Limite mensuelle: GHS {serviceBalance.monthly_limit}</span>
-                  <span>Utilisé: GHS {serviceBalance.monthly_used?.toFixed(2)}</span>
+                  <span>Monthly Limit: GHS {serviceBalance.monthly_limit}</span>
+                  <span>Used: GHS {serviceBalance.monthly_used?.toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -619,7 +619,7 @@ export default function SDMClientPage() {
             {/* Service Selection Menu */}
             {!activeService && (
               <div className="space-y-3">
-                <h3 className="font-semibold text-slate-900">Utiliser mon Cashback</h3>
+                <h3 className="font-semibold text-slate-900">Use My Cashback</h3>
                 
                 {/* Airtime */}
                 <button
