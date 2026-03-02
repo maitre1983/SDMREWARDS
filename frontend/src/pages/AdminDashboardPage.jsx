@@ -211,17 +211,20 @@ export default function AdminDashboardPage() {
         <header className="sticky top-0 z-20 bg-white border-b border-slate-200 px-8 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-slate-900">{t('admin_dashboard')}</h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchData}
-              disabled={isLoading}
-              className="gap-2"
-              data-testid="refresh-button"
-            >
-              <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-4">
+              <LanguageSelector />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchData}
+                disabled={isLoading}
+                className="gap-2"
+                data-testid="refresh-button"
+              >
+                <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
+                Refresh
+              </Button>
+            </div>
           </div>
         </header>
 
