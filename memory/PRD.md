@@ -97,6 +97,8 @@
 - ✅ "Made with Emergent" Badge Removed
 - ✅ English Priority Language (all pages translated)
 - ✅ Password Reset via OTP
+- ✅ Dynamic Admin URL (/admin<DDMMYY>) - Security enhancement
+- ✅ Session Persistence (localStorage tokens for admin, client, merchant)
 
 ---
 
@@ -114,21 +116,39 @@
 ### Birthday Bonus
 - Auto bonus for VIP members
 
+### Auto-read OTP (Web OTP API)
+- Investigate Web OTP API for supported browsers
+- Requires HTTPS and user permission
+
+### Contact Sync
+- Requires native mobile capabilities (not possible in web app)
+- Consider PWA or native app implementation
+
 ---
 
 ## TEST CREDENTIALS
-- **Admin**: admin / Gerard0103@
-- **Client**: 0000000000 / OTP: 000000
+- **Admin**: `/admin` -> redirects to `/admin<DDMMYY>` (e.g., `/admin020326`)
+  - Username: `admin`
+  - Password: `Gerard0103@`
+- **Client**: `/sdm/client`
+  - Phone: `0000000000`
+  - Password: `TestPass123`
+  - OTP (for registration): `0000`
+- **Merchant**: `/sdm/merchant`
+  - Phone: `0000000000`
+  - OTP (for registration): `0000`
 
 ---
 
 ## MOCKED INTEGRATIONS
-- BulkClix API (services)
-- Hubtel SMS (OTP)
+- BulkClix API (services - airtime, data, bills)
 - OneSignal (PENDING)
+
+## ACTIVE INTEGRATIONS
+- BulkClix API (OTP SMS - Real)
 
 ---
 
 *Last Updated: March 2, 2026*
-*English Priority Language Complete*
-*Auth with OTP + Password Tested and Working*
+*Dynamic Admin URL Tested and Working*
+*Session Persistence Verified*
