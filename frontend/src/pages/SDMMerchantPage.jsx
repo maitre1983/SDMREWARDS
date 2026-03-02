@@ -18,6 +18,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
 
 export default function SDMMerchantPage() {
+  const { t, isRTL } = useLanguage();
   const [step, setStep] = useState('register'); // register, login, dashboard
   const [isLoading, setIsLoading] = useState(false);
   const [token, setToken] = useState(localStorage.getItem('sdm_merchant_token'));
