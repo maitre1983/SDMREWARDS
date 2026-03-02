@@ -17,6 +17,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
 
 export default function SDMClientPage() {
+  const { t, isRTL } = useLanguage();
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState('phone'); // phone, otp, dashboard
   const [phone, setPhone] = useState('');
