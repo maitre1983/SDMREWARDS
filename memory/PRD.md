@@ -1,7 +1,44 @@
 # SDM FINTECH PLATFORM - PRD
 
 ## Project Overview
-**SDM (Smart Development Membership)** - Infrastructure Fintech de fidélité et cashback scalable Ghana → Afrique
+**SDM (Smart Development Membership)** - Réseau de consommateurs fidèles et loyaux du Ghana
+
+> **IMPORTANT**: SDM n'est pas une banque ni un service financier. C'est un réseau d'amis et de consommateurs fidèles et loyaux.
+
+---
+
+## REFERRAL PROGRAM
+- **Parrain**: +3 GHS lors de l'achat de carte par le filleul
+- **Filleul**: +1 GHS bonus à l'achat de sa carte
+
+---
+
+## VIP MEMBERSHIP CARDS
+
+| Tier | Prix | Cashback Boost | Limite Retrait | Lottery |
+|------|------|----------------|----------------|---------|
+| **SILVER** | 25 GHS | +0% | 2,500 GHS/mois | x1 |
+| **GOLD** | 50 GHS | +0.2% | 2,500 GHS/mois | x2 |
+| **PLATINUM** | 100 GHS | +0.5% | 5,000 GHS/mois | x3 |
+
+### Silver Benefits
+- Accès aux offres exclusives marchands partenaires
+- Accès à l'app SDM (wallet + historique + tracking rewards)
+- Accès aux tirages mensuels
+- Birthday Bonus
+
+### Gold Benefits (Silver +)
+- Cashback boosté (+0.2% sur partenaires)
+- Double chance aux tirages mensuels
+- Traitement prioritaire des retraits MoMo
+- Accès aux Marchands Gold exclusifs
+
+### Platinum Benefits (Silver + Gold +)
+- Cashback Premium Boost (+0.5%)
+- Triple chance aux tirages majeurs
+- Limite de retrait élevée (5000 GHS/mois)
+- Programme Ambassadeur
+- Accès aux opportunités business & investissements
 
 ---
 
