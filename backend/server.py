@@ -5079,6 +5079,145 @@ async def announce_top_clients(
 # Import for ledger models
 from ledger import LedgerEntry, LedgerTransaction, TransactionStatus, EntryType
 
+# ==================== AUTO LOTTERY SCHEDULER ====================
+
+scheduler = AsyncIOScheduler()
+
+async def auto_create_monthly_lottery():
+    """Automatically create and activate monthly lottery on the 1st of each month"""
+    try:
+        logging.info("🎰 Auto Lottery Scheduler: Starting monthly lottery creation...")
+        
+        # Get config
+        config = await db.lottery_config.find_one({"id": "auto_lottery"}, {"_id": 0})
+        if not config or not config.get("enabled", True):
+            logging.info("Auto lottery is disabled. Skipping.")
+            return
+        
+        # Get current month
+        now = datetime.now(timezone.utc)
+        current_month = f"{now.year}-{now.month:02d}"
+        
+        # Check if lottery for this month already exists
+        existing = await db.lotteries.find_one({"month": current_month}, {"_id": 0})
+        if existing:
+            logging.info(f"Lottery for {current_month} already exists. Skipping.")
+            return
+        
+        # Create lottery
+        month_names = ["", "January", "February", "March", "April", "May", "June", 
+                       "July", "August", "September", "October", "November", "December"]
+        
+        # Calculate dates
+        start_date = f"{now.year}-{now.month:02d}-01"
+        if now.month == 12:
+            last_day = 31
+        else:
+            next_month = datetime(now.year, now.month + 1, 1) if now.month < 12 else datetime(now.year + 1, 1, 1)
+            last_day = (next_month - timedelta(days=1)).day
+        end_date = f"{now.year}-{now.month:02d}-{last_day}"
+        
+        prize_amount = config.get("default_prize_amount", 500.0)
+        
+        lottery = SDMLottery(
+            name=f"{month_names[now.month]} {now.year} VIP Draw",
+            description=f"Automatic monthly VIP lottery for {month_names[now.month]} {now.year}",
+            month=current_month,
+            funding_source="FIXED",
+            fixed_amount=prize_amount,
+            commission_percentage=0,
+            total_prize_pool=prize_amount,
+            prize_distribution=[40, 25, 15, 12, 8],
+            start_date=start_date,
+            end_date=end_date,
+            created_by="auto_scheduler"
+        )
+        
+        await db.lotteries.insert_one(lottery.model_dump())
+        logging.info(f"✅ Created lottery: {lottery.name} with prize pool GHS {prize_amount}")
+        
+        # Update config
+        await db.lottery_config.update_one(
+            {"id": "auto_lottery"},
+            {
+                "$set": {
+                    "last_auto_created": datetime.now(timezone.utc).isoformat(),
+                    "next_draw_month": f"{now.year}-{now.month + 1:02d}" if now.month < 12 else f"{now.year + 1}-01"
+                }
+            }
+        )
+        
+        # Auto-activate if configured
+        if config.get("auto_activate", True):
+            vip_members = await db.vip_memberships.find({"status": "active"}, {"_id": 0}).to_list(10000)
+            tier_multipliers = {"SILVER": 1, "GOLD": 2, "PLATINUM": 3}
+            
+            total_entries = 0
+            enrolled = 0
+            
+            for member in vip_members:
+                user = await db.sdm_users.find_one({"id": member["user_id"]}, {"_id": 0})
+                if not user:
+                    continue
+                
+                entries = tier_multipliers.get(member["tier"], 1)
+                
+                participant = LotteryParticipant(
+                    lottery_id=lottery.id,
+                    user_id=member["user_id"],
+                    user_phone=member["user_phone"],
+                    user_name=f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM Member",
+                    vip_tier=member["tier"],
+                    entries=entries
+                )
+                
+                await db.lottery_participants.insert_one(participant.model_dump())
+                total_entries += entries
+                enrolled += 1
+            
+            # Update lottery status
+            await db.lotteries.update_one(
+                {"id": lottery.id},
+                {"$set": {
+                    "status": "ACTIVE",
+                    "total_participants": enrolled,
+                    "total_entries": total_entries,
+                    "activated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            logging.info(f"✅ Auto-activated lottery with {enrolled} participants and {total_entries} entries")
+        
+        # Log to scheduler history
+        await db.scheduler_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "job_type": "auto_lottery",
+            "status": "SUCCESS",
+            "lottery_id": lottery.id,
+            "lottery_name": lottery.name,
+            "participants": enrolled if config.get("auto_activate", True) else 0,
+            "executed_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"❌ Auto Lottery Scheduler Error: {str(e)}")
+        await db.scheduler_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "job_type": "auto_lottery",
+            "status": "ERROR",
+            "error": str(e),
+            "executed_at": datetime.now(timezone.utc).isoformat()
+        })
+
+# Schedule: Run at 00:05 UTC on the 1st of every month
+scheduler.add_job(
+    auto_create_monthly_lottery,
+    CronTrigger(day=1, hour=0, minute=5),
+    id="monthly_lottery",
+    name="Auto Monthly Lottery Creator",
+    replace_existing=True
+)
+
 # Include routers
 app.include_router(api_router)
 app.include_router(sdm_router)
@@ -5092,6 +5231,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_scheduler():
+    """Start the scheduler on app startup"""
+    scheduler.start()
+    logging.info("🚀 Auto Lottery Scheduler started - Will run on 1st of each month at 00:05 UTC")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    scheduler.shutdown()
     client.close()
+    logging.info("Scheduler and DB connection closed")
