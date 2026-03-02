@@ -3714,7 +3714,7 @@ async def get_top_cashback_clients(
                 "rank": i,
                 "user_id": entry["_id"],
                 "phone": user.get("phone", "N/A"),
-                "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Client SDM",
+                "name": f"{user.get('first_name') or ''} {user.get('last_name') or ''}".strip() or "Client SDM",
                 "total_cashback": round(entry["total_cashback"], 2),
                 "transaction_count": entry["transaction_count"]
             })
