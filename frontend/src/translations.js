@@ -7,6 +7,7 @@ export const translations = {
     nav_portfolio: "Portfolio",
     nav_contact: "Contact",
     nav_admin: "Admin",
+    nav_login: "Login",
     
     // Hero
     hero_subtitle: "SMART DIGITAL SOLUTIONS",
@@ -170,6 +171,7 @@ export const translations = {
     nav_portfolio: "Portfolio",
     nav_contact: "Contact",
     nav_admin: "Admin",
+    nav_login: "Connexion",
     
     // Hero
     hero_subtitle: "SMART DIGITAL SOLUTIONS",

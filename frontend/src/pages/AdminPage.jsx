@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import { Loader2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -12,22 +11,6 @@ import AdminDashboardPage from './AdminDashboardPage';
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
 
-// Generate dynamic admin URL based on current date (DDMMYY format)
-const getAdminPath = () => {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = String(now.getFullYear()).slice(-2);
-  return `/admin${day}${month}${year}`;
-};
-
-// Validate if current path matches today's admin path
-const isValidAdminPath = () => {
-  const currentPath = window.location.pathname;
-  const validPath = getAdminPath();
-  return currentPath === validPath;
-};
-
 export default function AdminPage() {
   const { t } = useLanguage();
   const { token, isAuthenticated, login } = useAuth();
@@ -36,11 +19,6 @@ export default function AdminPage() {
     username: '',
     password: '',
   });
-
-  // Check if URL is valid (matches today's date)
-  if (!isValidAdminPath()) {
-    return <Navigate to="/" replace />;
-  }
 
   // If authenticated, show dashboard
   if (isAuthenticated && token) {
@@ -56,6 +34,8 @@ export default function AdminPage() {
       const response = await axios.post(`${API_URL}/api/admin/login`, credentials);
       login(response.data.access_token);
       toast.success('Login successful');
+      // Force reload to show dashboard
+      window.location.reload();
     } catch (error) {
       console.error('Login error:', error);
       toast.error('Invalid credentials');

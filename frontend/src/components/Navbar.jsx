@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogIn } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Button } from './ui/button';
@@ -92,8 +92,18 @@ export const Navbar = () => {
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <LanguageSwitcher />
+            
+            {/* Client Login Button */}
+            <Link
+              to="/sdm/client"
+              className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-full transition-all hover:bg-blue-50"
+              data-testid="nav-client-login"
+            >
+              <LogIn size={16} />
+              {t('nav_login') || 'Login'}
+            </Link>
             
             <a
               href="/#contact"
@@ -143,6 +153,15 @@ export const Navbar = () => {
                 </a>
               )
             ))}
+            {/* Mobile Client Login */}
+            <Link
+              to="/sdm/client"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-2 px-4 py-3 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors mt-2"
+            >
+              <LogIn size={18} />
+              {t('nav_login') || 'Login'}
+            </Link>
             <div className="mt-4 px-4">
               <a href="/#contact" onClick={(e) => scrollToSection(e, '/#contact')}>
                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full">
