@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { translations, getDirection } from '../translations';
+import { translations, getDirection, languageInfo } from '../translations';
 
 const LanguageContext = createContext();
 
@@ -33,7 +33,15 @@ export const LanguageProvider = ({ children }) => {
   }, [language]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage: changeLanguage, t, direction: getDirection(language) }}>
+    <LanguageContext.Provider value={{ 
+      language, 
+      setLanguage: changeLanguage, 
+      t, 
+      direction: getDirection(language),
+      isRTL: getDirection(language) === 'rtl',
+      languageInfo,
+      languages: ['en', 'fr', 'ar', 'zh']
+    }}>
       {children}
     </LanguageContext.Provider>
   );
