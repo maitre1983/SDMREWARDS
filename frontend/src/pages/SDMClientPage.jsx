@@ -44,6 +44,7 @@ export default function SDMClientPage() {
   const [dataBundles, setDataBundles] = useState([]);
   const [serviceHistory, setServiceHistory] = useState([]);
   const [isServiceLoading, setIsServiceLoading] = useState(false);
+  const [activePromos, setActivePromos] = useState([]);
   
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
