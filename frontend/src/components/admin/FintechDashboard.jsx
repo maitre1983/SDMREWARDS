@@ -35,6 +35,22 @@ export default function FintechDashboard({ token }) {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [showNewNotificationForm, setShowNewNotificationForm] = useState(false);
   
+  // Promotions & Leaderboard state
+  const [promotions, setPromotions] = useState([]);
+  const [leaderboardCashback, setLeaderboardCashback] = useState(null);
+  const [leaderboardServices, setLeaderboardServices] = useState(null);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState('month');
+  const [showNewPromoForm, setShowNewPromoForm] = useState(false);
+  const [newPromo, setNewPromo] = useState({
+    name: '',
+    description: '',
+    target_service: 'ALL',
+    discount_percent: 10,
+    min_amount: 0,
+    days_of_week: [],
+    is_active: true
+  });
+  
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
