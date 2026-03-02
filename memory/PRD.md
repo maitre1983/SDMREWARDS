@@ -242,6 +242,57 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 
 ---
 
+## PHASE 4B: PROMOTIONS & LEADERBOARD ✅ COMPLETE
+
+### Implemented Features (March 2026)
+
+#### 1. Système de Promotions
+- Réductions en pourcentage sur les services
+- Conditions par jour de la semaine (ex: -10% weekend)
+- Montant minimum pour activer la promo
+- Dates de validité (début/fin)
+- Activation/Désactivation par service
+
+#### 2. Leaderboard Top Clients
+- **Meilleurs Cashback**: Classement par cashback gagné (semaine/mois/an)
+- **Champions Services**: Classement par utilisation des services
+- Annonce automatique par notification à tous les clients
+
+#### 3. Interface Admin Enrichie
+- **Onglet "Top Clients"**: Visualisation du leaderboard avec bouton "Annoncer les Gagnants"
+- **Onglet "Promos"**: Création, modification, activation/désactivation des promotions
+
+#### 4. Interface Client
+- Badges de réduction visibles sur les services avec promo active
+- Affichage du nom de la promo et économies réalisées après achat
+
+### New API Endpoints (Promotions & Leaderboard)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | /api/sdm/user/services/promotions | User | Promos actives pour le client |
+| POST | /api/sdm/admin/promotions | Admin | Créer une promotion |
+| GET | /api/sdm/admin/promotions | Admin | Liste des promotions |
+| PUT | /api/sdm/admin/promotions/{id} | Admin | Modifier une promo |
+| DELETE | /api/sdm/admin/promotions/{id} | Admin | Supprimer une promo |
+| PATCH | /api/sdm/admin/promotions/{id}/toggle | Admin | Activer/Désactiver |
+| GET | /api/sdm/admin/leaderboard/cashback | Admin | Top clients cashback |
+| GET | /api/sdm/admin/leaderboard/services | Admin | Top utilisateurs services |
+| POST | /api/sdm/admin/leaderboard/announce | Admin | Annoncer les gagnants |
+| POST | /api/sdm/admin/fintech/users/credit | Admin | Créditer un utilisateur (test) |
+
+### Collections MongoDB Ajoutées
+- `service_promotions`: Promotions sur les services
+
+### Tests Validés
+- Création/modification/suppression de promotions
+- Application automatique de la meilleure promo lors d'un achat
+- Leaderboard par période (semaine/mois/an)
+- Annonce des gagnants via notifications
+- Affichage des badges promo côté client
+
+---
+
 ## PHASE 5: MOBILE MONEY INTEGRATION (À venir)
 
 ### Objectifs
