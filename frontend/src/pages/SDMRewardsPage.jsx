@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
 
 const LOGO_URL = "/sdm-logo.png";
 
