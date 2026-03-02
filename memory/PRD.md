@@ -7,7 +7,7 @@
 
 ---
 
-## MULTILINGUAL SUPPORT ✅ (March 2026)
+## MULTILINGUAL SUPPORT ✅
 | Language | Code | Direction | Status |
 |----------|------|-----------|--------|
 | English | EN | LTR | ✅ Default |
@@ -15,17 +15,29 @@
 | Arabic | AR | RTL | ✅ Active |
 | Chinese | ZH | LTR | ✅ Active |
 
-Language selector available on:
-- SDM Client (buttons variant)
-- SDM Merchant (buttons variant)
-- Admin Dashboard (dropdown variant)
-- Landing Page (navbar dropdown)
-
 ---
 
-## REFERRAL PROGRAM
-- **Referrer**: +3 GHS when referral buys a card
-- **Referee**: +1 GHS bonus on first card purchase
+## AUTO LOTTERY SCHEDULER ✅ (March 2026)
+
+### Configuration
+- **Schedule**: 1st of each month at 00:05 UTC
+- **Default Prize**: 500 GHS (configurable)
+- **Auto-Activate**: Enrolls all active VIP members automatically
+
+### Features
+- Automatic lottery creation on the 1st of each month
+- Configurable default prize amount via admin dashboard
+- Toggle auto-activation (enroll VIP members automatically)
+- Manual trigger button for testing
+- Scheduler logs and status monitoring
+- No duplicate lotteries (checks for existing month)
+
+### Admin UI
+- Status indicator (green = active)
+- Next run date display
+- Configuration form (Status, Prize, Auto-Activate)
+- "Trigger Now" button for manual execution
+- Recent scheduler logs
 
 ---
 
@@ -41,120 +53,68 @@ Language selector available on:
 
 ## IMPLEMENTED FEATURES
 
-### Phase 1-5: Core Platform
+### Core Platform (Phase 1-5)
 - Central Ledger with Double-Entry Accounting
-- Merchant & Client Wallets
 - Transaction Engine with Idempotency
 - Super App Services (SIMULATED)
 - VIP Card System (3 tiers)
-- Partner Directory
-- Promotions Engine
-- Leaderboards
+- Partner Directory & Promotions
 
-### Phase 6: VIP Lottery ✅
-- Monthly VIP Lottery Draws
-- 5 winners per draw: 40%, 25%, 15%, 12%, 8%
-- VIP tier multipliers (Silver x1, Gold x2, Platinum x3)
-- Public result announcements
+### VIP Lottery (Phase 6)
+- 5 winners: 40%, 25%, 15%, 12%, 8%
+- VIP tier multipliers
 
-### Phase 7: Multilingual & Branding ✅ (March 2026)
-- **New SDM Rewards Logo** - Integrated on all pages
-- **4 Languages**: English, French, Arabic, Chinese
-- **RTL Support** for Arabic
-- **Auto Monthly Lottery**: 
-  - Default prize: 500 GHS
-  - Auto-activate and enroll VIP members
-  - Configurable via admin
+### Multilingual & Branding (Phase 7)
+- 4 Languages (EN, FR, AR, ZH)
+- RTL Support for Arabic
+- New SDM Rewards Logo
+
+### Auto Lottery Scheduler (Phase 8) ✅
+- APScheduler integration
+- Monthly auto-creation
+- Admin configuration UI
+
+---
+
+## KEY API ENDPOINTS
+
+### Scheduler
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/sdm/admin/scheduler/status | Get scheduler status & next run |
+| GET | /api/sdm/admin/scheduler/logs | Get execution logs |
+| GET | /api/sdm/admin/lottery-config | Get auto config |
+| PUT | /api/sdm/admin/lottery-config | Update config |
+| POST | /api/sdm/admin/lottery/trigger-monthly | Manual trigger |
 
 ---
 
 ## UPCOMING TASKS (P1)
 
 ### SEO & Public Pages
-- Public partner directory (no login)
+- Public partner directory
 - Landing page optimization
-- Meta tags
 
 ### Birthday Bonus
-- Auto bonus for VIP members during birthday month
+- Auto bonus for VIP members
 
 ### Backend Refactoring (CRITICAL)
-Split `server.py` (5000+ lines) into:
-- `routers/auth.py`
-- `routers/services.py`
-- `routers/vip.py`
-- `routers/partners.py`
-- `routers/lottery.py`
-- `routers/admin.py`
+- Split `server.py` (5200+ lines)
 
 ---
 
-## FUTURE TASKS (P2/P3)
-
-### P2
-- Real BulkClix API Integration
-- OneSignal Push Notifications
-- KYC Implementation
-
-### P3
-- Physical Cards
-- Anti-fraud Engine
-- Multi-currency Support
-
----
-
-## KEY API ENDPOINTS
-
-### Auto Lottery
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | /api/sdm/admin/lottery-config | Admin | Get auto lottery config |
-| PUT | /api/sdm/admin/lottery-config | Admin | Update config (amount, enabled) |
-| POST | /api/sdm/admin/lottery/trigger-monthly | Admin | Manually trigger monthly lottery |
-
-### VIP Lottery
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | /api/sdm/admin/lotteries | Admin | List all |
-| POST | /api/sdm/admin/lotteries | Admin | Create |
-| PATCH | /api/sdm/admin/lotteries/{id}/activate | Admin | Activate |
-| POST | /api/sdm/admin/lotteries/{id}/draw | Admin | Draw |
-| POST | /api/sdm/admin/lotteries/{id}/announce | Admin | Announce |
-
----
-
-## ACCESS URLS
-
-| Page | URL |
-|------|-----|
-| Landing | / |
-| Admin Login | /admin |
-| Admin Dashboard | /admin280226 |
-| SDM Client | /sdm/client |
-| SDM Merchant | /sdm/merchant |
-
-### Test Credentials
+## TEST CREDENTIALS
 - **Admin**: admin / Gerard0103@
-- **Test Client**: 0000000000 / OTP: 000000
+- **Client**: 0000000000 / OTP: 000000
 
 ---
 
 ## MOCKED INTEGRATIONS
-
-| Service | Status |
-|---------|--------|
-| BulkClix API | MOCKED |
-| Hubtel SMS | MOCKED |
-| OneSignal | PENDING |
-
----
-
-## TEST REPORTS
-- `/app/test_reports/iteration_12.json` - Latest (Multilingual + Logo)
-- `/app/backend/tests/test_multilingual_lottery.py`
-- `/app/backend/tests/test_lottery_system.py`
+- BulkClix API
+- Hubtel SMS
+- OneSignal (PENDING)
 
 ---
 
 *Last Updated: March 2026*
-*Phase 7 Complete - Multilingual & Auto Lottery*
+*Phase 8 Complete - Auto Lottery Scheduler*
