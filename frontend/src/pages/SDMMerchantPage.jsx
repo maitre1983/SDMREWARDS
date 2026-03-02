@@ -250,17 +250,20 @@ export default function SDMMerchantPage() {
   // Register/Login Screen
   if (step !== 'dashboard') {
     return (
-      <div className="min-h-screen bg-slate-950 px-4 py-8" data-testid="sdm-merchant-auth">
+      <div className={`min-h-screen bg-slate-950 px-4 py-8 ${isRTL ? 'rtl' : 'ltr'}`} data-testid="sdm-merchant-auth">
+        {/* Language Selector */}
+        <div className="absolute top-4 right-4 z-10">
+          <LanguageSelector variant="buttons" />
+        </div>
+        
         <div className="max-w-md mx-auto">
           <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
             <ArrowLeft size={18} />
-            Back to website
+            {t('sdm_back')}
           </Link>
 
           <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-              <Store size={32} className="text-white" />
-            </div>
+            <img src={LOGO_URL} alt="SDM Merchant" className="w-20 h-20 mx-auto mb-4 rounded-2xl object-cover" />
             <h1 className="text-2xl font-bold text-white">SDM Merchant</h1>
             <p className="text-slate-400">Partner Dashboard</p>
           </div>
