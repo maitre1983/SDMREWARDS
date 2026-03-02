@@ -1325,6 +1325,108 @@ export default function SDMClientPage() {
                 )}
               </div>
             )}
+
+            {/* LOTTERY VIEW */}
+            {activeService === 'lottery' && (
+              <div className="bg-white rounded-2xl p-6" data-testid="lottery-view">
+                <button
+                  onClick={() => setActiveService(null)}
+                  className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
+                >
+                  <ArrowLeft size={18} />
+                  Retour
+                </button>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <Ticket className="text-purple-600" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Tirages VIP</h3>
+                    <p className="text-sm text-slate-500">
+                      Vos chances: x{myVipMembership?.tier === 'PLATINUM' ? 3 : myVipMembership?.tier === 'GOLD' ? 2 : 1}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Active Lotteries */}
+                {lotteries?.active_lotteries?.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Tirages en cours</h4>
+                    <div className="space-y-3">
+                      {lotteries.active_lotteries.map((lottery) => {
+                        const myEntry = lotteries.my_participations?.[lottery.id];
+                        return (
+                          <div key={lottery.id} className="p-4 rounded-xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-bold text-purple-900">{lottery.name}</h5>
+                              <span className="text-lg font-bold text-purple-600">GHS {lottery.total_prize_pool?.toFixed(0)}</span>
+                            </div>
+                            <p className="text-xs text-purple-700 mb-2">{lottery.description}</p>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-purple-600">
+                                Fin: {new Date(lottery.end_date).toLocaleDateString()}
+                              </span>
+                              {myEntry ? (
+                                <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded-full">
+                                  Inscrit ({myEntry.entries} entrées)
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 bg-amber-200 text-amber-800 rounded-full">
+                                  Non inscrit
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Past Results */}
+                {lotteries?.completed_lotteries?.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Résultats passés</h4>
+                    <div className="space-y-3">
+                      {lotteries.completed_lotteries.map((lottery) => {
+                        const myEntry = lotteries.my_participations?.[lottery.id];
+                        return (
+                          <div key={lottery.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-semibold text-slate-900">{lottery.name}</h5>
+                              <span className="text-emerald-600 font-bold">GHS {lottery.total_prize_pool?.toFixed(0)}</span>
+                            </div>
+                            {lottery.winners?.length > 0 && (
+                              <div className="space-y-1">
+                                {lottery.winners.slice(0, 3).map((w, i) => (
+                                  <div key={i} className="flex items-center justify-between text-sm">
+                                    <span className="flex items-center gap-1">
+                                      {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                                      <span className={myEntry?.user_id === w.user_id ? 'font-bold text-emerald-600' : 'text-slate-600'}>
+                                        {myEntry?.user_id === w.user_id ? 'Vous!' : w.name}
+                                      </span>
+                                    </span>
+                                    <span className="font-medium">GHS {w.prize_amount?.toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {(!lotteries?.active_lotteries?.length && !lotteries?.completed_lotteries?.length) && (
+                  <div className="text-center py-8 text-slate-500">
+                    <Ticket size={48} className="mx-auto mb-3 opacity-40" />
+                    <p>Aucun tirage pour le moment</p>
+                    <p className="text-xs mt-1">Revenez bientôt!</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
