@@ -780,7 +780,7 @@ async def send_otp_bulkclix(phone: str) -> dict:
                 headers={
                     "x-api-key": BULKCLIX_API_KEY,
                     "Content-Type": "application/json",
-                    "Accept": "application/json"
+                    "Accept": "application/json",
                 },
                 timeout=30.0
             )
@@ -795,10 +795,10 @@ async def send_otp_bulkclix(phone: str) -> dict:
                     "phone": phone_clean
                 }
             else:
-                logger.error(f"BulkClix OTP error: {response.text} {json}")
+                logger.error(f"BulkClix OTP error: {response.text}")
                 return {"success": False, "error": response.text}
     except Exception as e:
-        logger.error(f"BulkClix OTP error: {str(e)} {json}")
+        logger.error(f"BulkClix OTP error: {str(e)}")
         return {"success": False, "error": str(e)}
 
 async def verify_otp_bulkclix(phone: str, code: str, request_id: str) -> dict:
