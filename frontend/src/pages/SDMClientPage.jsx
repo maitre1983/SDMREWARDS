@@ -755,11 +755,11 @@ export default function SDMClientPage() {
                       <Ticket className="text-white" size={24} />
                     </div>
                     <div className="flex-1 text-left">
-                      <p className="font-semibold">Tirages VIP</p>
+                      <p className="font-semibold">VIP Lottery</p>
                       <p className="text-sm opacity-80">
                         {lotteries?.active_lotteries?.length > 0 
-                          ? `${lotteries.active_lotteries.length} tirage(s) en cours`
-                          : 'Voir les résultats'}
+                          ? `${lotteries.active_lotteries.length} active draw(s)`
+                          : 'View results'}
                       </p>
                     </div>
                     <ChevronRight className="text-white/80" size={20} />
@@ -769,17 +769,17 @@ export default function SDMClientPage() {
                 {/* Service History Summary */}
                 {serviceHistory.length > 0 && (
                   <div className="mt-6">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Transactions Récentes</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Recent Transactions</h4>
                     <div className="space-y-2">
                       {serviceHistory.slice(0, 3).map((tx) => (
                         <div key={tx.id} className="bg-white rounded-lg p-3 border border-slate-100">
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="text-sm font-medium text-slate-900">
-                                {tx.service_type === 'AIRTIME' && 'Crédit téléphonique'}
-                                {tx.service_type === 'DATA' && 'Forfait Internet'}
-                                {tx.service_type === 'BILL_PAYMENT' && 'Paiement facture'}
-                                {tx.service_type === 'MOMO_WITHDRAWAL' && 'Retrait MoMo'}
+                                {tx.service_type === 'AIRTIME' && 'Phone Credit'}
+                                {tx.service_type === 'DATA' && 'Data Bundle'}
+                                {tx.service_type === 'BILL_PAYMENT' && 'Bill Payment'}
+                                {tx.service_type === 'MOMO_WITHDRAWAL' && 'MoMo Withdrawal'}
                               </p>
                               <p className="text-xs text-slate-500">{tx.phone_number || tx.bill_account_number}</p>
                             </div>
