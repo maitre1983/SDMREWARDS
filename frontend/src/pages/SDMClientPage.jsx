@@ -48,6 +48,7 @@ export default function SDMClientPage() {
   const [vipCards, setVipCards] = useState([]);
   const [myVipMembership, setMyVipMembership] = useState(null);
   const [partners, setPartners] = useState([]);
+  const [lotteries, setLotteries] = useState(null);
   
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
