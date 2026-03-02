@@ -5,7 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Button } from './ui/button';
 
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/ke4bukaf_WhatsApp%20Image%202026-02-28%20at%2014.47.22.jpeg";
+const LOGO_URL = "/sdm-logo.png";
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
