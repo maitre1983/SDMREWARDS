@@ -658,7 +658,7 @@ export default function SDMClientPage() {
                   </div>
                   <div className="flex-1 text-left">
                     <p className="font-semibold text-slate-900">Data Bundle</p>
-                    <p className="text-sm text-slate-500">Data bundles pour tous réseaux</p>
+                    <p className="text-sm text-slate-500">Data bundles for all networks</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
                 </button>
@@ -700,7 +700,7 @@ export default function SDMClientPage() {
                   </div>
                   <div className="flex-1 text-left">
                     <p className="font-semibold text-slate-900">Mobile Money Withdrawal</p>
-                    <p className="text-sm text-slate-500">Retirer vers MTN, Vodafone, AirtelTigo</p>
+                    <p className="text-sm text-slate-500">Withdraw to MTN, Vodafone, AirtelTigo</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
                 </button>
