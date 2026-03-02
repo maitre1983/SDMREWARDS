@@ -95,17 +95,24 @@ export default function SDMClientPage() {
   const fetchServiceData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [balanceRes, bundlesRes, historyRes] = await Promise.all([
+      const [balanceRes, bundlesRes, historyRes, promosRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/user/services/balance`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/services/data-bundles`, { headers }),
-        axios.get(`${API_URL}/api/sdm/user/services/history`, { headers })
+        axios.get(`${API_URL}/api/sdm/user/services/history`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/services/promotions`, { headers })
       ]);
       setServiceBalance(balanceRes.data);
       setDataBundles(bundlesRes.data.bundles || []);
       setServiceHistory(historyRes.data.transactions || []);
+      setActivePromos(promosRes.data.promotions || []);
     } catch (error) {
       console.error('Service data fetch error:', error);
     }
+  };
+
+  // Helper to check if a service has active promo
+  const getServicePromo = (serviceType) => {
+    return activePromos.find(p => p.target_service === serviceType || p.target_service === 'ALL');
   };
 
   // Buy Airtime
