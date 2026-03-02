@@ -744,6 +744,28 @@ export default function SDMClientPage() {
                   <ChevronRight className="text-slate-400" size={20} />
                 </button>
 
+                {/* Lottery VIP */}
+                {myVipMembership && (
+                  <button
+                    onClick={() => setActiveService('lottery')}
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-4 flex items-center gap-4 text-white"
+                    data-testid="service-lottery"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                      <Ticket className="text-white" size={24} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold">Tirages VIP</p>
+                      <p className="text-sm opacity-80">
+                        {lotteries?.active_lotteries?.length > 0 
+                          ? `${lotteries.active_lotteries.length} tirage(s) en cours`
+                          : 'Voir les résultats'}
+                      </p>
+                    </div>
+                    <ChevronRight className="text-white/80" size={20} />
+                  </button>
+                )}
+
                 {/* Service History Summary */}
                 {serviceHistory.length > 0 && (
                   <div className="mt-6">
