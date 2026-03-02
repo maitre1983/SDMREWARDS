@@ -502,29 +502,30 @@ export default function SDMClientPage() {
 
   // Dashboard
   return (
-    <div className="min-h-screen bg-slate-100" data-testid="sdm-client-dashboard">
+    <div className={`min-h-screen bg-slate-100 ${isRTL ? 'rtl' : 'ltr'}`} data-testid="sdm-client-dashboard">
       {/* Header */}
       <header className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white px-4 py-6">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <Wallet size={20} />
-              </div>
+              <img src={LOGO_URL} alt="SDM Rewards" className="w-10 h-10 rounded-full object-cover" />
               <div>
                 <p className="text-sm opacity-80">SDM Rewards</p>
-                <p className="font-semibold">{user?.first_name || 'Member'}</p>
+                <p className="font-semibold">{user?.first_name || t('sdm_member') || 'Member'}</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="text-sm opacity-80 hover:opacity-100">
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <LanguageSelector variant="buttons" className="opacity-90" />
+              <button onClick={handleLogout} className="text-sm opacity-80 hover:opacity-100 ml-2">
+                {t('admin_logout') || 'Logout'}
+              </button>
+            </div>
           </div>
 
           {/* Balance Card */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm opacity-80">My Cash Back Balance</p>
+              <p className="text-sm opacity-80">{t('sdm_my_cashback')}</p>
               {user?.referral_level && (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full border capitalize ${getReferralLevelColor(user.referral_level)}`}>
                   <Award size={12} className="inline mr-1" />
@@ -549,7 +550,7 @@ export default function SDMClientPage() {
           
           {/* Disclaimer */}
           <p className="text-xs text-center opacity-60 mt-2">
-            SDM is not a bank or financial service. It is a network of friends and loyal consumers.
+            {t('sdm_disclaimer')}
           </p>
         </div>
       </header>
