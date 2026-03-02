@@ -381,6 +381,8 @@ export default function FintechDashboard({ token }) {
       fetchVipCards();
     } else if (activeSubTab === 'partners') {
       fetchPartners();
+    } else if (activeSubTab === 'lottery') {
+      fetchLotteries();
     }
   }, [activeSubTab]);
 
