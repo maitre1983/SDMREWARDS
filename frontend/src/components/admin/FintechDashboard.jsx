@@ -1316,28 +1316,28 @@ export default function FintechDashboard({ token }) {
       {activeSubTab === 'lottery' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Tirages VIP Mensuels</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Monthly VIP Draws</h3>
             <Button onClick={() => setShowLotteryForm(!showLotteryForm)} className="gap-2 bg-purple-600 hover:bg-purple-700">
               <Plus size={16} />
-              Nouveau Tirage
+              New Draw
             </Button>
           </div>
 
           {/* New Lottery Form */}
           {showLotteryForm && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h4 className="font-semibold text-slate-900 mb-4">Créer un Tirage</h4>
+              <h4 className="font-semibold text-slate-900 mb-4">Create a Draw</h4>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nom du tirage</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Draw Name</label>
                   <Input
                     value={newLottery.name}
                     onChange={(e) => setNewLottery({...newLottery, name: e.target.value})}
-                    placeholder="Tirage Mars 2026"
+                    placeholder="March 2026 Draw"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mois</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Month</label>
                   <Input
                     type="month"
                     value={newLottery.month}
@@ -1345,20 +1345,20 @@ export default function FintechDashboard({ token }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Source Cagnotte</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Prize Pool Source</label>
                   <select
                     value={newLottery.funding_source}
                     onChange={(e) => setNewLottery({...newLottery, funding_source: e.target.value})}
                     className="w-full h-10 px-3 border border-slate-200 rounded-lg"
                   >
-                    <option value="FIXED">Montant fixe</option>
-                    <option value="COMMISSION">% Commissions SDM</option>
-                    <option value="MIXED">Mixte (fixe + commissions)</option>
+                    <option value="FIXED">Fixed Amount</option>
+                    <option value="COMMISSION">% of SDM Commissions</option>
+                    <option value="MIXED">Mixed (fixed + commissions)</option>
                   </select>
                 </div>
                 {newLottery.funding_source !== 'COMMISSION' && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Montant fixe (GHS)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Fixed Amount (GHS)</label>
                     <Input
                       type="number"
                       value={newLottery.fixed_amount}
@@ -1369,7 +1369,7 @@ export default function FintechDashboard({ token }) {
                 )}
                 {newLottery.funding_source !== 'FIXED' && (
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">% des commissions</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">% of commissions</label>
                     <Input
                       type="number"
                       value={newLottery.commission_percentage}
@@ -1380,7 +1380,7 @@ export default function FintechDashboard({ token }) {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Date début</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
                   <Input
                     type="date"
                     value={newLottery.start_date}
@@ -1388,7 +1388,7 @@ export default function FintechDashboard({ token }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Date fin</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
                   <Input
                     type="date"
                     value={newLottery.end_date}
@@ -1400,20 +1400,20 @@ export default function FintechDashboard({ token }) {
                   <Input
                     value={newLottery.description}
                     onChange={(e) => setNewLottery({...newLottery, description: e.target.value})}
-                    placeholder="Description du tirage..."
+                    placeholder="Draw description..."
                   />
                 </div>
               </div>
               <div className="mt-4 p-3 bg-purple-50 rounded-lg">
-                <p className="text-sm font-medium text-purple-900">Distribution des prix (5 gagnants):</p>
-                <p className="text-xs text-purple-700">1er: 40% | 2ème: 25% | 3ème: 15% | 4ème: 12% | 5ème: 8%</p>
+                <p className="text-sm font-medium text-purple-900">Prize Distribution (5 winners):</p>
+                <p className="text-xs text-purple-700">1st: 40% | 2nd: 25% | 3rd: 15% | 4th: 12% | 5th: 8%</p>
               </div>
               <div className="flex gap-2 mt-4">
                 <Button onClick={handleCreateLottery} className="bg-purple-600 hover:bg-purple-700">
-                  Créer le Tirage
+                  Create Draw
                 </Button>
                 <Button variant="outline" onClick={() => setShowLotteryForm(false)}>
-                  Annuler
+                  Cancel
                 </Button>
               </div>
             </div>
