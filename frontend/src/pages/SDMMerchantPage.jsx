@@ -188,47 +188,6 @@ export default function SDMMerchantPage() {
     setStep('register');
   };
 
-  const handleCreateCardType = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      await axios.post(
-        `${API_URL}/api/sdm/merchant/card-types`,
-        cardForm,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success('Card type created!');
-      setShowCardForm(false);
-      setCardForm({
-        name: '',
-        description: '',
-        price: 50,
-        validity_days: 365,
-        cashback_bonus: 0,
-        referral_bonus: 5,
-        welcome_bonus: 2
-      });
-      fetchMerchantData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create card type');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteCardType = async (cardTypeId) => {
-    if (!window.confirm('Deactivate this card type?')) return;
-    try {
-      await axios.delete(`${API_URL}/api/sdm/merchant/card-types/${cardTypeId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      toast.success('Card type deactivated');
-      fetchMerchantData();
-    } catch (error) {
-      toast.error('Failed to deactivate card type');
-    }
-  };
-
   // Register/Login Screen
   if (step !== 'dashboard') {
     return (
