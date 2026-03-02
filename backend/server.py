@@ -4518,6 +4518,154 @@ async def get_public_lottery_results():
     
     return {"results": results}
 
+# ==================== AUTO LOTTERY CONFIGURATION ====================
+
+class AutoLotteryConfigRequest(BaseModel):
+    enabled: bool = True
+    default_prize_amount: float = 500.0
+    auto_activate: bool = True
+
+@sdm_router.get("/admin/lottery-config")
+async def get_auto_lottery_config(admin: dict = Depends(get_current_admin)):
+    """Admin: Get auto lottery configuration"""
+    config = await db.lottery_config.find_one({"id": "auto_lottery"}, {"_id": 0})
+    if not config:
+        # Default config
+        config = {
+            "id": "auto_lottery",
+            "enabled": True,
+            "default_prize_amount": 500.0,
+            "auto_activate": True,
+            "last_auto_created": None,
+            "next_draw_month": None
+        }
+        await db.lottery_config.insert_one(config)
+    return {"config": config}
+
+@sdm_router.put("/admin/lottery-config")
+async def update_auto_lottery_config(request: AutoLotteryConfigRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Update auto lottery configuration"""
+    await db.lottery_config.update_one(
+        {"id": "auto_lottery"},
+        {
+            "$set": {
+                "enabled": request.enabled,
+                "default_prize_amount": request.default_prize_amount,
+                "auto_activate": request.auto_activate,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_by": admin.get("username")
+            }
+        },
+        upsert=True
+    )
+    return {"message": "Auto lottery config updated"}
+
+@sdm_router.post("/admin/lottery/trigger-monthly")
+async def trigger_monthly_lottery(admin: dict = Depends(get_current_admin)):
+    """Admin: Manually trigger monthly lottery creation (for testing or if scheduler missed)"""
+    config = await db.lottery_config.find_one({"id": "auto_lottery"}, {"_id": 0})
+    if not config:
+        config = {"enabled": True, "default_prize_amount": 500.0, "auto_activate": True}
+    
+    # Get current month
+    now = datetime.now(timezone.utc)
+    current_month = f"{now.year}-{now.month:02d}"
+    
+    # Check if lottery for this month already exists
+    existing = await db.lotteries.find_one({"month": current_month}, {"_id": 0})
+    if existing:
+        return {"message": f"Lottery for {current_month} already exists", "lottery_id": existing["id"], "created": False}
+    
+    # Create lottery for current month
+    month_names = ["", "January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
+    
+    # Calculate start and end dates
+    start_date = f"{now.year}-{now.month:02d}-01"
+    if now.month == 12:
+        last_day = 31
+    else:
+        # Get last day of current month
+        next_month = datetime(now.year, now.month + 1, 1) if now.month < 12 else datetime(now.year + 1, 1, 1)
+        last_day = (next_month - timedelta(days=1)).day
+    end_date = f"{now.year}-{now.month:02d}-{last_day}"
+    
+    lottery = SDMLottery(
+        name=f"{month_names[now.month]} {now.year} VIP Draw",
+        description=f"Monthly VIP lottery for {month_names[now.month]} {now.year}",
+        month=current_month,
+        funding_source="FIXED",
+        fixed_amount=config.get("default_prize_amount", 500.0),
+        commission_percentage=0,
+        total_prize_pool=config.get("default_prize_amount", 500.0),
+        prize_distribution=[40, 25, 15, 12, 8],
+        start_date=start_date,
+        end_date=end_date,
+        created_by="auto_system"
+    )
+    
+    await db.lotteries.insert_one(lottery.model_dump())
+    
+    # Update config with last created date
+    await db.lottery_config.update_one(
+        {"id": "auto_lottery"},
+        {
+            "$set": {
+                "last_auto_created": datetime.now(timezone.utc).isoformat(),
+                "next_draw_month": f"{now.year}-{now.month + 1:02d}" if now.month < 12 else f"{now.year + 1}-01"
+            }
+        }
+    )
+    
+    result = {"message": f"Lottery for {current_month} created", "lottery": lottery.model_dump(), "created": True}
+    
+    # Auto-activate if configured
+    if config.get("auto_activate", True):
+        # Get all active VIP members
+        vip_members = await db.vip_memberships.find({"status": "active"}, {"_id": 0}).to_list(10000)
+        tier_multipliers = {"SILVER": 1, "GOLD": 2, "PLATINUM": 3}
+        
+        total_entries = 0
+        enrolled = 0
+        
+        for member in vip_members:
+            user = await db.sdm_users.find_one({"id": member["user_id"]}, {"_id": 0})
+            if not user:
+                continue
+            
+            entries = tier_multipliers.get(member["tier"], 1)
+            
+            participant = LotteryParticipant(
+                lottery_id=lottery.id,
+                user_id=member["user_id"],
+                user_phone=member["user_phone"],
+                user_name=f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM Member",
+                vip_tier=member["tier"],
+                entries=entries
+            )
+            
+            await db.lottery_participants.insert_one(participant.model_dump())
+            total_entries += entries
+            enrolled += 1
+        
+        # Update lottery status and counts
+        await db.lotteries.update_one(
+            {"id": lottery.id},
+            {"$set": {
+                "status": "ACTIVE",
+                "total_participants": enrolled,
+                "total_entries": total_entries,
+                "activated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        result["auto_activated"] = True
+        result["participants_enrolled"] = enrolled
+        result["total_entries"] = total_entries
+    
+    return result
+
+
 # ==================== USER VIP CARD ENDPOINTS ====================
 
 @sdm_router.get("/user/vip-cards")
