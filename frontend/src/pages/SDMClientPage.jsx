@@ -508,6 +508,11 @@ export default function SDMClientPage() {
               </div>
             </div>
           </div>
+          
+          {/* Disclaimer */}
+          <p className="text-xs text-center opacity-60 mt-2">
+            SDM n'est pas une banque ni un service financier. C'est un réseau d'amis et de consommateurs fidèles et loyaux.
+          </p>
         </div>
       </header>
 
