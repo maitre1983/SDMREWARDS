@@ -337,6 +337,69 @@ class SDMPartner(BaseModel):
     is_active: bool = True
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+# ==================== LOTTERY SYSTEM ====================
+
+class LotteryStatus(str, Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    DRAWING = "DRAWING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+class LotteryFundingSource(str, Enum):
+    FIXED = "FIXED"  # Admin sets fixed amount
+    COMMISSION = "COMMISSION"  # % of SDM commissions
+    MIXED = "MIXED"  # Both
+
+class SDMLottery(BaseModel):
+    """Monthly VIP Lottery Draw"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # e.g., "Tirage Mars 2026"
+    description: Optional[str] = None
+    month: str  # e.g., "2026-03"
+    status: str = "DRAFT"  # DRAFT, ACTIVE, DRAWING, COMPLETED, CANCELLED
+    
+    # Prize Pool
+    funding_source: str = "FIXED"  # FIXED, COMMISSION, MIXED
+    fixed_amount: float = 0.0  # Fixed prize pool
+    commission_percentage: float = 0.0  # % of SDM commissions to add
+    total_prize_pool: float = 0.0  # Calculated total
+    
+    # Prize Distribution (5 winners)
+    prize_distribution: List[float] = Field(default_factory=lambda: [40, 25, 15, 12, 8])  # Percentages
+    
+    # Participants
+    total_participants: int = 0
+    total_entries: int = 0  # With multipliers
+    
+    # Dates
+    start_date: str = ""
+    end_date: str = ""
+    draw_date: Optional[str] = None
+    
+    # Results
+    winners: List[Dict] = Field(default_factory=list)  # [{user_id, name, phone, tier, prize_amount, rank}]
+    is_announced: bool = False
+    
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_by: Optional[str] = None
+
+class LotteryParticipant(BaseModel):
+    """Lottery participant entry"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    lottery_id: str
+    user_id: str
+    user_phone: str
+    user_name: str
+    vip_tier: str  # SILVER, GOLD, PLATINUM
+    entries: int  # 1 for Silver, 2 for Gold, 3 for Platinum
+    is_winner: bool = False
+    prize_rank: Optional[int] = None  # 1-5 if winner
+    prize_amount: float = 0.0
+    registered_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
 class SDMMerchant(BaseModel):
     """SDM Merchant/Business"""
     model_config = ConfigDict(extra="ignore")
