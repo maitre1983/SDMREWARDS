@@ -384,21 +384,24 @@ export default function SDMClientPage() {
   // Login/OTP Screen
   if (step !== 'dashboard') {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4" data-testid="sdm-client-login">
+      <div className={`min-h-screen bg-slate-950 flex items-center justify-center px-4 ${isRTL ? 'rtl' : 'ltr'}`} data-testid="sdm-client-login">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[120px]" />
+        </div>
+        
+        {/* Language Selector - Top Right */}
+        <div className="absolute top-4 right-4 z-10">
+          <LanguageSelector variant="buttons" />
         </div>
 
         <div className="relative w-full max-w-md">
           <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
             <ArrowLeft size={18} />
-            Back to website
+            {t('sdm_back')}
           </Link>
 
           <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
-              <Wallet size={32} className="text-white" />
-            </div>
+            <img src={LOGO_URL} alt="SDM Rewards" className="w-20 h-20 mx-auto mb-4 rounded-2xl object-cover" />
             <h1 className="text-2xl font-bold text-white">SDM Rewards</h1>
             <p className="text-slate-400">Smart Development Membership</p>
           </div>
@@ -407,7 +410,7 @@ export default function SDMClientPage() {
             {step === 'phone' ? (
               <form onSubmit={handleSendOTP}>
                 <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Phone Number
+                  {t('sdm_phone_number')}
                 </label>
                 <div className="flex gap-2 mb-4">
                   <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
@@ -426,7 +429,7 @@ export default function SDMClientPage() {
                 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Referral Code <span className="text-slate-500">(optional)</span>
+                    {t('sdm_referral_optional')}
                   </label>
                   <Input
                     type="text"
