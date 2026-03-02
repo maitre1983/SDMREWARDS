@@ -51,6 +51,23 @@ export default function FintechDashboard({ token }) {
     is_active: true
   });
   
+  // VIP Cards & Partners state
+  const [vipCards, setVipCards] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [showVipCardForm, setShowVipCardForm] = useState(false);
+  const [showPartnerForm, setShowPartnerForm] = useState(false);
+  const [editingVipCard, setEditingVipCard] = useState(null);
+  const [editingPartner, setEditingPartner] = useState(null);
+  const [newPartner, setNewPartner] = useState({
+    name: '',
+    category: 'SHOP',
+    address: '',
+    city: 'Accra',
+    phone: '',
+    cashback_rate: 5,
+    is_gold_exclusive: false
+  });
+  
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
