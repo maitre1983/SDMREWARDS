@@ -702,6 +702,45 @@ export default function SDMClientPage() {
                   <ChevronRight className="text-slate-400" size={20} />
                 </button>
 
+                {/* VIP Membership */}
+                <button
+                  onClick={() => setActiveService('vip')}
+                  className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-xl p-4 flex items-center gap-4 text-white relative"
+                  data-testid="service-vip"
+                >
+                  {myVipMembership && (
+                    <div className="absolute -top-2 -right-2 bg-white text-amber-600 text-xs px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                      {myVipMembership.tier}
+                    </div>
+                  )}
+                  <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Crown className="text-white" size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold">Carte VIP SDM</p>
+                    <p className="text-sm opacity-80">
+                      {myVipMembership ? `Upgrade vers ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold ou Platinum'}
+                    </p>
+                  </div>
+                  <ChevronRight className="text-white/80" size={20} />
+                </button>
+
+                {/* Partenaires SDM */}
+                <button
+                  onClick={() => setActiveService('partners')}
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  data-testid="service-partners"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <MapPin className="text-purple-600" size={24} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-slate-900">Nos Partenaires</p>
+                    <p className="text-sm text-slate-500">{partners.length} commerces acceptent SDM</p>
+                  </div>
+                  <ChevronRight className="text-slate-400" size={20} />
+                </button>
+
                 {/* Service History Summary */}
                 {serviceHistory.length > 0 && (
                   <div className="mt-6">
