@@ -68,6 +68,21 @@ export default function FintechDashboard({ token }) {
     is_gold_exclusive: false
   });
   
+  // Lottery state
+  const [lotteries, setLotteries] = useState([]);
+  const [showLotteryForm, setShowLotteryForm] = useState(false);
+  const [newLottery, setNewLottery] = useState({
+    name: '',
+    description: '',
+    month: new Date().toISOString().slice(0, 7),
+    funding_source: 'FIXED',
+    fixed_amount: 500,
+    commission_percentage: 10,
+    prize_distribution: [40, 25, 15, 12, 8],
+    start_date: '',
+    end_date: ''
+  });
+  
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
