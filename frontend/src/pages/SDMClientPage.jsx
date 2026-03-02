@@ -529,7 +529,17 @@ export default function SDMClientPage() {
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm opacity-80">{t('sdm_my_cashback')}</p>
-              {user?.referral_level && (
+              {/* Show VIP tier if member, otherwise show referral level */}
+              {myVipMembership?.tier ? (
+                <span className={`px-2 py-1 text-xs font-medium rounded-full border ${
+                  myVipMembership.tier === 'PLATINUM' ? 'bg-gradient-to-r from-slate-700 to-slate-500 text-white border-slate-400' :
+                  myVipMembership.tier === 'GOLD' ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-amber-900 border-amber-300' :
+                  'bg-gradient-to-r from-slate-300 to-slate-200 text-slate-700 border-slate-400'
+                }`}>
+                  <Crown size={12} className="inline mr-1" />
+                  VIP {myVipMembership.tier}
+                </span>
+              ) : user?.referral_level && (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full border capitalize ${getReferralLevelColor(user.referral_level)}`}>
                   <Award size={12} className="inline mr-1" />
                   {user.referral_level}
