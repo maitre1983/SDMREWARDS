@@ -1341,9 +1341,9 @@ export default function SDMClientPage() {
                     <Ticket className="text-purple-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Tirages VIP</h3>
+                    <h3 className="font-bold text-slate-900">VIP Lottery</h3>
                     <p className="text-sm text-slate-500">
-                      Vos chances: x{myVipMembership?.tier === 'PLATINUM' ? 3 : myVipMembership?.tier === 'GOLD' ? 2 : 1}
+                      Your chances: x{myVipMembership?.tier === 'PLATINUM' ? 3 : myVipMembership?.tier === 'GOLD' ? 2 : 1}
                     </p>
                   </div>
                 </div>
@@ -1351,7 +1351,7 @@ export default function SDMClientPage() {
                 {/* Active Lotteries */}
                 {lotteries?.active_lotteries?.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Tirages en cours</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Active Draws</h4>
                     <div className="space-y-3">
                       {lotteries.active_lotteries.map((lottery) => {
                         const myEntry = lotteries.my_participations?.[lottery.id];
@@ -1364,15 +1364,15 @@ export default function SDMClientPage() {
                             <p className="text-xs text-purple-700 mb-2">{lottery.description}</p>
                             <div className="flex items-center justify-between text-xs">
                               <span className="text-purple-600">
-                                Fin: {new Date(lottery.end_date).toLocaleDateString()}
+                                Ends: {new Date(lottery.end_date).toLocaleDateString()}
                               </span>
                               {myEntry ? (
                                 <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded-full">
-                                  Inscrit ({myEntry.entries} entrées)
+                                  Enrolled ({myEntry.entries} entries)
                                 </span>
                               ) : (
                                 <span className="px-2 py-1 bg-amber-200 text-amber-800 rounded-full">
-                                  Non inscrit
+                                  Not enrolled
                                 </span>
                               )}
                             </div>
@@ -1386,7 +1386,7 @@ export default function SDMClientPage() {
                 {/* Past Results */}
                 {lotteries?.completed_lotteries?.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Résultats passés</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Past Results</h4>
                     <div className="space-y-3">
                       {lotteries.completed_lotteries.map((lottery) => {
                         const myEntry = lotteries.my_participations?.[lottery.id];
@@ -1403,7 +1403,7 @@ export default function SDMClientPage() {
                                     <span className="flex items-center gap-1">
                                       {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
                                       <span className={myEntry?.user_id === w.user_id ? 'font-bold text-emerald-600' : 'text-slate-600'}>
-                                        {myEntry?.user_id === w.user_id ? 'Vous!' : w.name}
+                                        {myEntry?.user_id === w.user_id ? 'You!' : w.name}
                                       </span>
                                     </span>
                                     <span className="font-medium">GHS {w.prize_amount?.toFixed(2)}</span>
