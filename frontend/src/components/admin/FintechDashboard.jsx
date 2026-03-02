@@ -5,7 +5,8 @@ import {
   DollarSign, Users, Store, Building2, FileText, Shield,
   ChevronDown, ChevronUp, Search, Filter, AlertTriangle,
   Download, BarChart3, PieChart, Activity, Zap, AlertCircle,
-  Bell, Send, Trash2, Eye, Plus, Smartphone
+  Bell, Send, Trash2, Eye, Plus, Smartphone, Trophy, Gift, Megaphone,
+  Percent, Calendar
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
