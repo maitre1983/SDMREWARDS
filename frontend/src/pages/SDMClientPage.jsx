@@ -546,7 +546,7 @@ export default function SDMClientPage() {
           
           {/* Disclaimer */}
           <p className="text-xs text-center opacity-60 mt-2">
-            SDM n'est pas une banque ni un service financier. C'est un réseau d'amis et de consommateurs fidèles et loyaux.
+            SDM is not a bank or financial service. It is a network of friends and loyal consumers.
           </p>
         </div>
       </header>
