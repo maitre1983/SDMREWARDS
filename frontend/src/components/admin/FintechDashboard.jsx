@@ -188,7 +188,7 @@ export default function FintechDashboard({ token }) {
       });
       fetchPromotions();
     } catch (error) {
-      toast.error('Erreur lors de la création');
+      toast.error('Error creating promotion');
     }
   };
 
@@ -198,7 +198,7 @@ export default function FintechDashboard({ token }) {
       toast.success('Status changed');
       fetchPromotions();
     } catch (error) {
-      toast.error('Erreur');
+      toast.error('Error');
     }
   };
 
@@ -206,10 +206,10 @@ export default function FintechDashboard({ token }) {
     if (!window.confirm('Delete this promotion?')) return;
     try {
       await axios.delete(`${API_URL}/api/sdm/admin/promotions/${promoId}`, { headers });
-      toast.success('Promotion supprimée');
+      toast.success('Promotion deleted');
       fetchPromotions();
     } catch (error) {
-      toast.error('Erreur');
+      toast.error('Error');
     }
   };
 
@@ -218,7 +218,7 @@ export default function FintechDashboard({ token }) {
       const res = await axios.post(`${API_URL}/api/sdm/admin/leaderboard/announce?period=${leaderboardPeriod}`, {}, { headers });
       toast.success('Annonce envoyée à tous les clients!');
     } catch (error) {
-      toast.error('Erreur lors de l\'annonce');
+      toast.error('Error sending announcement');
     }
   };
 
@@ -235,11 +235,11 @@ export default function FintechDashboard({ token }) {
   const handleUpdateVipCard = async (cardId, data) => {
     try {
       await axios.put(`${API_URL}/api/sdm/admin/vip-cards/${cardId}`, data, { headers });
-      toast.success('Carte VIP mise à jour');
+      toast.success('VIP Card updated');
       fetchVipCards();
       setEditingVipCard(null);
     } catch (error) {
-      toast.error('Erreur');
+      toast.error('Error');
     }
   };
 
@@ -261,7 +261,7 @@ export default function FintechDashboard({ token }) {
       setNewPartner({ name: '', category: 'SHOP', address: '', city: 'Accra', phone: '', cashback_rate: 5, is_gold_exclusive: false });
       fetchPartners();
     } catch (error) {
-      toast.error('Erreur');
+      toast.error('Error');
     }
   };
 
@@ -272,7 +272,7 @@ export default function FintechDashboard({ token }) {
       fetchPartners();
       setEditingPartner(null);
     } catch (error) {
-      toast.error('Erreur');
+      toast.error('Error');
     }
   };
 
@@ -283,7 +283,7 @@ export default function FintechDashboard({ token }) {
       toast.success('Partner deleted');
       fetchPartners();
     } catch (error) {
-      toast.error('Erreur');
+      toast.error('Error');
     }
   };
 
@@ -914,9 +914,9 @@ export default function FintechDashboard({ token }) {
                 onChange={(e) => { setLeaderboardPeriod(e.target.value); fetchLeaderboard(e.target.value); }}
                 className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
               >
-                <option value="week">Cette semaine</option>
-                <option value="month">Ce mois</option>
-                <option value="year">Cette année</option>
+                <option value="week">This week</option>
+                <option value="month">This month</option>
+                <option value="year">This year</option>
               </select>
               <Button onClick={handleAnnounceTopClients} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                 <Megaphone size={16} />
@@ -1077,7 +1077,7 @@ export default function FintechDashboard({ token }) {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Jours actifs (vide = tous les jours)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Active days (empty = all days)</label>
                   <div className="flex flex-wrap gap-2">
                     {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map((day) => (
                       <button
@@ -1204,7 +1204,7 @@ export default function FintechDashboard({ token }) {
             <h3 className="text-lg font-semibold text-slate-900">Gestion des Cartes VIP</h3>
             <Button variant="outline" size="sm" onClick={fetchVipCards} className="gap-2">
               <RefreshCw size={16} />
-              Actualiser
+              Refresh
             </Button>
           </div>
 
@@ -1242,8 +1242,8 @@ export default function FintechDashboard({ token }) {
                       <p className="font-bold">x{card.lottery_multiplier}</p>
                     </div>
                     <div className="p-2 bg-slate-50 rounded">
-                      <p className="text-slate-500">Validité</p>
-                      <p className="font-bold">{card.validity_days} jours</p>
+                      <p className="text-slate-500">Validity</p>
+                      <p className="font-bold">{card.validity_days} days</p>
                     </div>
                   </div>
 
@@ -1273,7 +1273,7 @@ export default function FintechDashboard({ token }) {
                       />
                       <Input
                         type="number"
-                        placeholder="Limite retrait"
+                        placeholder="Withdrawal limit"
                         defaultValue={card.monthly_withdrawal_limit}
                         onChange={(e) => card._newLimit = parseFloat(e.target.value)}
                       />
@@ -2592,7 +2592,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Frais de retrait Mobile Money
+                Mobile Money withdrawal fee
               </p>
             </div>
             <div>
@@ -2608,7 +2608,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Jours avant que le cashback soit disponible
+                Days before cashback becomes available
               </p>
             </div>
           </div>
