@@ -636,7 +636,7 @@ export default function SDMClientPage() {
                     <Phone className="text-orange-600" size={24} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Acheter du Crédit</p>
+                    <p className="font-semibold text-slate-900">Buy Airtime</p>
                     <p className="text-sm text-slate-500">Airtime MTN, Vodafone, AirtelTigo</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
@@ -657,7 +657,7 @@ export default function SDMClientPage() {
                     <Wifi className="text-blue-600" size={24} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Forfait Internet</p>
+                    <p className="font-semibold text-slate-900">Data Bundle</p>
                     <p className="text-sm text-slate-500">Data bundles pour tous réseaux</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
@@ -678,7 +678,7 @@ export default function SDMClientPage() {
                     <Zap className="text-yellow-600" size={24} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Payer une Facture</p>
+                    <p className="font-semibold text-slate-900">Pay a Bill</p>
                     <p className="text-sm text-slate-500">ECG, GWCL, DSTV, GOTV</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
@@ -699,7 +699,7 @@ export default function SDMClientPage() {
                     <Banknote className="text-green-600" size={24} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Retrait Mobile Money</p>
+                    <p className="font-semibold text-slate-900">Mobile Money Withdrawal</p>
                     <p className="text-sm text-slate-500">Retirer vers MTN, Vodafone, AirtelTigo</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
@@ -738,7 +738,7 @@ export default function SDMClientPage() {
                     <MapPin className="text-purple-600" size={24} />
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Nos Partenaires</p>
+                    <p className="font-semibold text-slate-900">Our Partners</p>
                     <p className="text-sm text-slate-500">{partners.length} commerces acceptent SDM</p>
                   </div>
                   <ChevronRight className="text-slate-400" size={20} />
@@ -818,8 +818,8 @@ export default function SDMClientPage() {
                     <Phone className="text-orange-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Acheter du Crédit</h3>
-                    <p className="text-sm text-slate-500">Airtime pour tous les réseaux</p>
+                    <h3 className="font-bold text-slate-900">Buy Airtime</h3>
+                    <p className="text-sm text-slate-500">Airtime for all networks</p>
                   </div>
                 </div>
                 
