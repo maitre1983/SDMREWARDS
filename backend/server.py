@@ -3920,7 +3920,7 @@ DEFAULT_VIP_CARDS = [
         "has_business_opportunities": False,
         "has_investment_access": False,
         "badge_color": "#C0C0C0",
-        "description": "Carte d'entrée - Communauté & Économies",
+        "description": "Entry Card - Community & Savings",
         "benefits_list": [
             "Accès aux offres exclusives marchands partenaires",
             "Accès à l'app SDM (wallet + historique + tracking rewards)",
@@ -3946,7 +3946,7 @@ DEFAULT_VIP_CARDS = [
         "has_business_opportunities": False,
         "has_investment_access": False,
         "badge_color": "#FFD700",
-        "description": "Carte Premium - Avantages + Pouvoir",
+        "description": "Premium Card - Benefits + Power",
         "benefits_list": [
             "Tout ce que Silver a +",
             "Cashback boosté (+0.2% sur partenaires)",
@@ -3972,7 +3972,7 @@ DEFAULT_VIP_CARDS = [
         "has_business_opportunities": True,
         "has_investment_access": True,
         "badge_color": "#E5E4E2",
-        "description": "Carte Élite - Business & Statut Social",
+        "description": "Elite Card - Business & Social Status",
         "benefits_list": [
             "Tout Silver + Gold +",
             "Cashback Premium Boost (+0.5%)",
