@@ -827,17 +827,26 @@ async def verify_otp_bulkclix(phone: str, code: str, request_id: str) -> dict:
                 timeout=30.0
             )
             
-            if response.status_code in [200, 201]:
+            logger.info(f"BulkClix verify response: {response.status_code} - {response.text}")
+            
+            try:
                 data = response.json()
+            except:
+                data = {}
+            
+            if response.status_code in [200, 201]:
                 if "successful" in data.get("message", "").lower():
                     logger.info(f"BulkClix OTP verified for {phone_clean}")
                     return {"success": True, "phone": phone_clean}
                 else:
                     return {"success": False, "error": data.get("message", "Verification failed")}
+            elif response.status_code == 401:
+                return {"success": False, "error": "OTP expired or invalid request. Please request a new code."}
+            elif response.status_code == 422:
+                return {"success": False, "error": data.get("message", "Invalid OTP code")}
             else:
-                error_data = response.json() if response.text else {}
                 logger.error(f"BulkClix OTP verify error: {response.text}")
-                return {"success": False, "error": error_data.get("message", "Verification failed")}
+                return {"success": False, "error": data.get("message", "Verification failed")}
     except Exception as e:
         logger.error(f"BulkClix OTP verify error: {str(e)}")
         return {"success": False, "error": str(e)}

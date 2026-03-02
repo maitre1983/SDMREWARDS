@@ -110,10 +110,10 @@ export default function SDMMerchantPage() {
       if (response.data.is_test_account) {
         setDebugOtp('0000');
       }
-      toast.success('Code OTP envoyé sur votre téléphone');
+      toast.success(t('sdm_otp_sent'));
       setStep('otp');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'envoi de l\'OTP');
+      toast.error(error.response?.data?.detail || t('sdm_otp_failed') || 'Failed to send OTP');
     } finally {
       setIsLoading(false);
     }
@@ -137,10 +137,10 @@ export default function SDMMerchantPage() {
       localStorage.setItem('sdm_merchant_token', response.data.access_token);
       setToken(response.data.access_token);
       setMerchant(response.data.merchant);
-      toast.success('Inscription réussie!');
+      toast.success(t('sdm_register_success'));
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'inscription');
+      toast.error(error.response?.data?.detail || t('sdm_register_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -157,10 +157,10 @@ export default function SDMMerchantPage() {
       localStorage.setItem('sdm_merchant_token', response.data.access_token);
       setToken(response.data.access_token);
       setMerchant(response.data.merchant);
-      toast.success('Connexion réussie!');
+      toast.success(t('sdm_login_success'));
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Identifiants invalides');
+      toast.error(error.response?.data?.detail || t('sdm_invalid_credentials'));
     } finally {
       setIsLoading(false);
     }
@@ -178,12 +178,12 @@ export default function SDMMerchantPage() {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(`Cashback GHS ${response.data.cashback_amount} crédité à ${response.data.user_name}!`);
+      toast.success(t('sdm_cashback_credited') + ` ${response.data.user_name}!`);
       setScanQR('');
       setScanAmount('');
       fetchMerchantData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de la transaction');
+      toast.error(error.response?.data?.detail || t('sdm_transaction_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -240,13 +240,13 @@ export default function SDMMerchantPage() {
         <div className="max-w-md mx-auto">
           <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
             <ArrowLeft size={18} />
-            Retour
+            {t('sdm_back')}
           </Link>
 
           <div className="text-center mb-8">
             <img src={LOGO_URL} alt="SDM Merchant" className="w-20 h-20 mx-auto mb-4 rounded-2xl object-cover" />
             <h1 className="text-2xl font-bold text-white">SDM Merchant</h1>
-            <p className="text-slate-400">Tableau de bord partenaire</p>
+            <p className="text-slate-400">{t('sdm_merchant_portal')}</p>
           </div>
 
           <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
@@ -254,14 +254,14 @@ export default function SDMMerchantPage() {
             {/* Welcome Screen */}
             {step === 'welcome' && (
               <div className="space-y-4">
-                <p className="text-center text-slate-300 mb-6">Bienvenue sur le portail marchand</p>
+                <p className="text-center text-slate-300 mb-6">{t('sdm_welcome_merchant')}</p>
                 <Button
                   onClick={() => setStep('register')}
                   className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
                   data-testid="merchant-register-btn"
                 >
                   <Store size={18} className="mr-2" />
-                  Inscrire mon commerce
+                  {t('sdm_register_business')}
                 </Button>
                 <Button
                   onClick={() => setStep('login')}
@@ -270,7 +270,7 @@ export default function SDMMerchantPage() {
                   data-testid="merchant-login-btn"
                 >
                   <Lock size={18} className="mr-2" />
-                  Se connecter
+                  {t('sdm_login')}
                 </Button>
               </div>
             )}
@@ -278,37 +278,37 @@ export default function SDMMerchantPage() {
             {/* Register Step 1: Business Info + Phone */}
             {step === 'register' && (
               <form onSubmit={handleSendOTP} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Inscription</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_registration')}</h3>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Nom du commerce *</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_business_name')} *</label>
                   <Input
                     value={registerForm.business_name}
                     onChange={(e) => setRegisterForm({...registerForm, business_name: e.target.value})}
-                    placeholder="Mon Restaurant"
+                    placeholder="My Restaurant"
                     className="bg-slate-800/50 border-slate-700 text-white"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Type d'activité *</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_business_type')} *</label>
                   <select
                     value={registerForm.business_type}
                     onChange={(e) => setRegisterForm({...registerForm, business_type: e.target.value})}
                     className="w-full h-10 rounded-lg bg-slate-800/50 border border-slate-700 text-white px-3"
                   >
-                    <option value="restaurant">Restaurant</option>
-                    <option value="salon">Salon / Barbershop</option>
-                    <option value="spa">Spa / Massage</option>
-                    <option value="hotel">Hôtel</option>
-                    <option value="retail">Commerce de détail</option>
-                    <option value="other">Autre</option>
+                    <option value="restaurant">{t('sdm_restaurant')}</option>
+                    <option value="salon">{t('sdm_salon')}</option>
+                    <option value="spa">{t('sdm_spa')}</option>
+                    <option value="hotel">{t('sdm_hotel')}</option>
+                    <option value="retail">{t('sdm_retail')}</option>
+                    <option value="other">{t('sdm_other')}</option>
                   </select>
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Téléphone *</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_phone_number')} *</label>
                   <div className="flex gap-2">
                     <div className="flex items-center px-4 bg-slate-800 rounded-lg text-slate-400">
                       +233
@@ -324,22 +324,22 @@ export default function SDMMerchantPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Email</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_email')}</label>
                   <Input
                     type="email"
                     value={registerForm.email}
                     onChange={(e) => setRegisterForm({...registerForm, email: e.target.value})}
-                    placeholder="email@exemple.com"
+                    placeholder="email@example.com"
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Adresse</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_address')}</label>
                   <Input
                     value={registerForm.address}
                     onChange={(e) => setRegisterForm({...registerForm, address: e.target.value})}
-                    placeholder="Rue et quartier"
+                    placeholder={t('sdm_street_area')}
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
                 </div>
@@ -347,19 +347,19 @@ export default function SDMMerchantPage() {
                 <div>
                   <label className="block text-sm text-slate-300 mb-1">
                     <MapPin size={14} className="inline mr-1" />
-                    Adresse GPS (Code Plus ou coordonnées)
+                    {t('sdm_gps_address')}
                   </label>
                   <Input
                     value={registerForm.gps_address}
                     onChange={(e) => setRegisterForm({...registerForm, gps_address: e.target.value})}
-                    placeholder="Ex: 9G8V+QH Accra ou 5.6037,-0.1870"
+                    placeholder="E.g. 9G8V+QH Accra or 5.6037,-0.1870"
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Utilisez Google Maps pour obtenir votre code Plus</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('sdm_gps_hint')}</p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Ville</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_city')}</label>
                   <Input
                     value={registerForm.city}
                     onChange={(e) => setRegisterForm({...registerForm, city: e.target.value})}
@@ -369,7 +369,7 @@ export default function SDMMerchantPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Taux de cashback (%)</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_cashback_rate')}</label>
                   <Input
                     type="number"
                     value={registerForm.cashback_rate * 100}
@@ -378,7 +378,7 @@ export default function SDMMerchantPage() {
                     max="20"
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Entre 1% et 20%</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('sdm_between_1_20')}</p>
                 </div>
                 
                 <Button
@@ -389,7 +389,7 @@ export default function SDMMerchantPage() {
                   {isLoading ? <Loader2 className="animate-spin" /> : (
                     <>
                       <Send size={18} className="mr-2" />
-                      Envoyer le code OTP
+                      {t('sdm_send_otp_code')}
                     </>
                   )}
                 </Button>
@@ -399,7 +399,7 @@ export default function SDMMerchantPage() {
                   onClick={() => setStep('welcome')}
                   className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Retour
+                  {t('sdm_back')}
                 </button>
               </form>
             )}
@@ -407,18 +407,18 @@ export default function SDMMerchantPage() {
             {/* Register Step 2: OTP + Password */}
             {step === 'otp' && (
               <form onSubmit={handleVerifyOTPAndRegister} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Vérification & Mot de passe</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_verification_password')}</h3>
                 <p className="text-slate-400 text-sm text-center mb-4">
-                  Code envoyé au {registerForm.phone}
+                  {t('sdm_code_sent_to_phone')} {registerForm.phone}
                 </p>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Code OTP *</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_otp_code')} *</label>
                   <Input
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Entrez le code à 4 chiffres"
+                    placeholder={t('sdm_enter_4_digit')}
                     maxLength={4}
                     className="bg-slate-800/50 border-slate-700 text-white text-center text-xl tracking-widest"
                     required
@@ -427,19 +427,19 @@ export default function SDMMerchantPage() {
                 
                 {debugOtp && (
                   <p className="text-xs text-amber-400 text-center">
-                    Code test: <strong>{debugOtp}</strong>
+                    {t('sdm_test_code')}: <strong>{debugOtp}</strong>
                   </p>
                 )}
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Mot de passe *</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_password')} *</label>
                   <div className="relative">
                     <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <Input
                       type={showPassword ? "text" : "password"}
                       value={registerForm.password}
                       onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})}
-                      placeholder="Min. 6 caractères"
+                      placeholder={t('sdm_min_6_chars')}
                       className="bg-slate-800/50 border-slate-700 text-white pl-10 pr-12"
                       required
                       minLength={6}
@@ -452,7 +452,7 @@ export default function SDMMerchantPage() {
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Ce mot de passe servira pour vos connexions futures</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('sdm_password_for_future')}</p>
                 </div>
                 
                 <Button
@@ -460,7 +460,7 @@ export default function SDMMerchantPage() {
                   disabled={isLoading || otp.length !== 4 || registerForm.password.length < 6}
                   className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Finaliser l\'inscription'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_finalize_registration')}
                 </Button>
                 
                 <button
@@ -468,7 +468,7 @@ export default function SDMMerchantPage() {
                   onClick={() => setStep('register')}
                   className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Modifier les informations
+                  {t('sdm_modify_info')}
                 </button>
               </form>
             )}
@@ -476,10 +476,10 @@ export default function SDMMerchantPage() {
             {/* Login */}
             {step === 'login' && (
               <form onSubmit={handleLogin} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Connexion</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_connection')}</h3>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Numéro de téléphone</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_phone_number')}</label>
                   <div className="flex gap-2">
                     <div className="flex items-center px-4 bg-slate-800 rounded-lg text-slate-400">
                       +233
@@ -495,14 +495,14 @@ export default function SDMMerchantPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Mot de passe</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_password')}</label>
                   <div className="relative">
                     <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <Input
                       type={showLoginPassword ? "text" : "password"}
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Votre mot de passe"
+                      placeholder={t('sdm_your_password')}
                       className="bg-slate-800/50 border-slate-700 text-white pl-10 pr-12"
                       required
                     />
@@ -521,7 +521,7 @@ export default function SDMMerchantPage() {
                   disabled={isLoading || !loginPhone || !loginPassword}
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Se connecter'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_login')}
                 </Button>
                 
                 <button
@@ -529,7 +529,7 @@ export default function SDMMerchantPage() {
                   onClick={() => setStep('welcome')}
                   className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Retour
+                  {t('sdm_back')}
                 </button>
               </form>
             )}

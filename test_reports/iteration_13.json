@@ -1,0 +1,55 @@
+{
+  "summary": "Comprehensive testing of SDM auth flows (client + merchant) and language features. All backend APIs pass (11/11). English is default language, language selector works correctly. Fixed French toast messages to use translation system.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_sdm_auth.py",
+    "/app/test_reports/pytest/sdm_auth_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/frontend/src/pages/SDMClientPage.jsx - Fixed French toast messages to use t() translation function",
+    "/app/frontend/src/pages/SDMMerchantPage.jsx - Fixed French toast messages to use t() translation function",
+    "/app/frontend/src/sdmTranslations.js - Added missing sdm_otp_failed translation key",
+    "/app/backend/tests/test_sdm_auth.py - Created comprehensive auth flow tests"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 auth tests passed)",
+    "frontend": "100% (all UI tests passed)"
+  },
+  "seed_data_creation": "None - used test account (phone: 0000000000, OTP: 0000)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All SDM auth flows working: Client registration (send OTP -> verify -> register with name+password), Client login (phone+password), Merchant registration (send OTP -> verify OTP+password -> complete), Merchant login (phone+password). Test account works with phone 0000000000 and OTP 0000. Language is English by default on all pages. Language selector (EN/FR/AR/ZH) works correctly. Fixed toast messages to use translation system instead of hardcoded French.",
+  "tested_features": [
+    "Client send OTP (test account) - PASS: Returns request_id=test_request_id, is_test_account=true",
+    "Client verify OTP (test account) - PASS: Returns success for existing user or is_new_user=true",
+    "Client verify OTP (invalid code) - PASS: Returns 400 error",
+    "Client registration - PASS: Creates user with name, password, handles referral",
+    "Client login (phone+password) - PASS: Returns access_token and user data",
+    "Merchant send OTP (test account) - PASS: Returns request_id=test_request_id",
+    "Merchant registration (GPS address) - PASS: Creates merchant with all fields including gps_address",
+    "Merchant login (phone+password) - PASS: Returns access_token and merchant data",
+    "Forgot password endpoint - PASS: Sends OTP for password reset",
+    "Client page English by default - PASS: Shows 'Create an account', 'Login' buttons",
+    "Merchant page English by default - PASS: Shows 'Register my business', 'Login' buttons",
+    "Language selector works - PASS: EN/FR/AR/ZH all switch correctly, AR applies RTL",
+    "Toast messages in English - PASS: 'OTP sent to your phone', 'Login successful!' (after fix)"
+  ],
+  "bugs_fixed": [
+    "Toast messages in SDMClientPage.jsx were hardcoded in French - Fixed to use t() translation function",
+    "Toast messages in SDMMerchantPage.jsx were hardcoded in French - Fixed to use t() translation function"
+  ],
+  "mocked_apis": {
+    "has_mocked_apis": true,
+    "mocked_apis_list": ["BulkClix airtime/data/bills (NOT OTP - OTP is real via BulkClix)"]
+  }
+}

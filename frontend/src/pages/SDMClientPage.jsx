@@ -269,10 +269,10 @@ export default function SDMClientPage() {
       if (response.data.is_test_account) {
         setDebugOtp('0000');
       }
-      toast.success('OTP envoyé sur votre téléphone');
+      toast.success(t('sdm_otp_sent'));
       setStep('otp');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'envoi de l\'OTP');
+      toast.error(error.response?.data?.detail || t('sdm_otp_failed') || 'Failed to send OTP');
     } finally {
       setIsLoading(false);
     }
@@ -291,17 +291,17 @@ export default function SDMClientPage() {
       if (response.data.is_new_user) {
         // New user - go to registration form
         setStep('register_form');
-        toast.success('OTP vérifié! Complétez votre inscription');
+        toast.success(t('sdm_otp_verified'));
       } else {
         // Existing user - login successful
         localStorage.setItem('sdm_user_token', response.data.access_token);
         setToken(response.data.access_token);
         setUser(response.data.user);
-        toast.success('Connexion réussie!');
+        toast.success(t('sdm_login_success'));
         setStep('dashboard');
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'OTP invalide');
+      toast.error(error.response?.data?.detail || t('sdm_invalid_otp'));
     } finally {
       setIsLoading(false);
     }
@@ -334,13 +334,13 @@ export default function SDMClientPage() {
       setUser(response.data.user);
       
       if (response.data.welcome_bonus > 0) {
-        toast.success(`Bienvenue! Vous avez reçu GHS ${response.data.welcome_bonus} de bonus!`, { duration: 5000 });
+        toast.success(t('sdm_welcome_bonus_received').replace('{amount}', response.data.welcome_bonus), { duration: 5000 });
       } else {
-        toast.success('Inscription réussie!');
+        toast.success(t('sdm_register_success'));
       }
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'inscription');
+      toast.error(error.response?.data?.detail || t('sdm_register_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -358,10 +358,10 @@ export default function SDMClientPage() {
       localStorage.setItem('sdm_user_token', response.data.access_token);
       setToken(response.data.access_token);
       setUser(response.data.user);
-      toast.success('Connexion réussie!');
+      toast.success(t('sdm_login_success'));
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Identifiants invalides');
+      toast.error(error.response?.data?.detail || t('sdm_invalid_credentials'));
     } finally {
       setIsLoading(false);
     }
@@ -380,12 +380,12 @@ export default function SDMClientPage() {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(`Demande de retrait soumise! Montant net: GHS ${response.data.net_amount}`);
+      toast.success(`${t('sdm_withdrawal_submitted')} ${response.data.net_amount}`);
       setWithdrawAmount('');
       setWithdrawPhone('');
       fetchUserData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec du retrait');
+      toast.error(error.response?.data?.detail || t('sdm_withdrawal_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -466,7 +466,7 @@ export default function SDMClientPage() {
         <div className="relative w-full max-w-md">
           <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
             <ArrowLeft size={18} />
-            Retour
+            {t('sdm_back')}
           </Link>
 
           <div className="text-center mb-8">
@@ -480,14 +480,14 @@ export default function SDMClientPage() {
             {/* Welcome Screen - Choose Register or Login */}
             {step === 'welcome' && (
               <div className="space-y-4">
-                <p className="text-center text-slate-300 mb-6">Bienvenue sur SDM Rewards</p>
+                <p className="text-center text-slate-300 mb-6">{t('sdm_welcome')}</p>
                 <Button
                   onClick={() => setStep('register')}
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   data-testid="sdm-register-btn"
                 >
                   <User size={18} className="mr-2" />
-                  Créer un compte
+                  {t('sdm_create_account')}
                 </Button>
                 <Button
                   onClick={() => setStep('login')}
@@ -496,7 +496,7 @@ export default function SDMClientPage() {
                   data-testid="sdm-login-btn"
                 >
                   <Lock size={18} className="mr-2" />
-                  Se connecter
+                  {t('sdm_login')}
                 </Button>
               </div>
             )}
@@ -504,11 +504,11 @@ export default function SDMClientPage() {
             {/* Login with phone + password */}
             {step === 'login' && (
               <form onSubmit={handleLogin} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Connexion</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_connection')}</h3>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Numéro de téléphone
+                    {t('sdm_phone_number')}
                   </label>
                   <div className="flex gap-2">
                     <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
@@ -528,14 +528,14 @@ export default function SDMClientPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Mot de passe
+                    {t('sdm_password')}
                   </label>
                   <div className="relative">
                     <Input
                       type={showLoginPassword ? "text" : "password"}
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Votre mot de passe"
+                      placeholder={t('sdm_your_password')}
                       className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pr-12"
                       required
                       data-testid="sdm-login-password-input"
@@ -556,7 +556,7 @@ export default function SDMClientPage() {
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   data-testid="sdm-login-submit-btn"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Se connecter'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_login')}
                 </Button>
 
                 <button
@@ -564,7 +564,7 @@ export default function SDMClientPage() {
                   onClick={() => setStep('welcome')}
                   className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Retour
+                  {t('sdm_back')}
                 </button>
               </form>
             )}
@@ -572,11 +572,11 @@ export default function SDMClientPage() {
             {/* Register - Step 1: Phone + OTP */}
             {step === 'register' && (
               <form onSubmit={handleSendOTP} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Inscription</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_registration')}</h3>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Numéro de téléphone *
+                    {t('sdm_phone_number')} *
                   </label>
                   <div className="flex gap-2">
                     <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
@@ -596,19 +596,19 @@ export default function SDMClientPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Code de parrainage (optionnel)
+                    {t('sdm_referral_optional')}
                   </label>
                   <Input
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    placeholder="ex: SDM1A2B3C"
+                    placeholder="e.g. SDM1A2B3C"
                     className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl uppercase"
                     data-testid="sdm-referral-input"
                   />
                   {referralCode && (
                     <p className="text-xs text-emerald-400 mt-1">
-                      Recevez GHS 2 de bonus de bienvenue!
+                      {t('sdm_get_welcome_bonus')}
                     </p>
                   )}
                 </div>
@@ -622,7 +622,7 @@ export default function SDMClientPage() {
                   {isLoading ? <Loader2 className="animate-spin" /> : (
                     <>
                       <Send size={18} className="mr-2" />
-                      Envoyer le code OTP
+                      {t('sdm_send_otp_code')}
                     </>
                   )}
                 </Button>
@@ -632,7 +632,7 @@ export default function SDMClientPage() {
                   onClick={() => setStep('welcome')}
                   className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Retour
+                  {t('sdm_back')}
                 </button>
               </form>
             )}
@@ -640,20 +640,20 @@ export default function SDMClientPage() {
             {/* Register - Step 2: OTP Verification */}
             {step === 'otp' && (
               <form onSubmit={handleVerifyOTP} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Vérification OTP</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_otp_verification')}</h3>
                 <p className="text-slate-400 text-sm text-center mb-4">
-                  Un code a été envoyé au {phone}
+                  {t('sdm_code_sent_to')} {phone}
                 </p>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Code OTP
+                    {t('sdm_otp_code')}
                   </label>
                   <Input
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value)}
-                    placeholder="Entrez le code à 4 chiffres"
+                    placeholder={t('sdm_enter_4_digit')}
                     maxLength={4}
                     className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl text-center text-2xl tracking-widest"
                     required
@@ -663,7 +663,7 @@ export default function SDMClientPage() {
                 
                 {debugOtp && (
                   <p className="text-xs text-amber-400 text-center">
-                    Code test: <strong>{debugOtp}</strong>
+                    {t('sdm_test_code')}: <strong>{debugOtp}</strong>
                   </p>
                 )}
                 
@@ -673,7 +673,7 @@ export default function SDMClientPage() {
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   data-testid="sdm-verify-otp-btn"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Vérifier le code'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_verify_code')}
                 </Button>
                 
                 <button
@@ -681,7 +681,7 @@ export default function SDMClientPage() {
                   onClick={() => setStep('register')}
                   className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Changer de numéro
+                  {t('sdm_change_number')}
                 </button>
               </form>
             )}
@@ -689,11 +689,11 @@ export default function SDMClientPage() {
             {/* Register - Step 3: Complete Registration */}
             {step === 'register_form' && (
               <form onSubmit={handleRegister} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">Complétez votre profil</h3>
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_complete_profile')}</h3>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Nom complet *
+                    {t('sdm_full_name')} *
                   </label>
                   <div className="relative">
                     <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -701,7 +701,7 @@ export default function SDMClientPage() {
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Votre nom complet"
+                      placeholder={t('sdm_your_full_name')}
                       className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10"
                       required
                       data-testid="sdm-fullname-input"
@@ -711,7 +711,7 @@ export default function SDMClientPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Mot de passe *
+                    {t('sdm_password')} *
                   </label>
                   <div className="relative">
                     <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -719,7 +719,7 @@ export default function SDMClientPage() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Min. 6 caractères"
+                      placeholder={t('sdm_min_6_chars')}
                       className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10 pr-12"
                       required
                       minLength={6}
@@ -733,7 +733,7 @@ export default function SDMClientPage() {
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Minimum 6 caractères</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('sdm_min_6_chars')}</p>
                 </div>
 
                 <Button
@@ -742,7 +742,7 @@ export default function SDMClientPage() {
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   data-testid="sdm-register-submit-btn"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Créer mon compte'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_create_my_account')}
                 </Button>
               </form>
             )}
@@ -763,13 +763,13 @@ export default function SDMClientPage() {
               <img src={LOGO_URL} alt="SDM Rewards" className="w-10 h-10 rounded-full object-cover" />
               <div>
                 <p className="text-sm opacity-80">SDM Rewards</p>
-                <p className="font-semibold">{user?.full_name || user?.first_name || 'Membre'}</p>
+                <p className="font-semibold">{user?.full_name || user?.first_name || t('sdm_member')}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <LanguageSelector variant="buttons" className="opacity-90" />
               <button onClick={handleLogout} className="text-sm opacity-80 hover:opacity-100 ml-2">
-                {t('admin_logout') || 'Logout'}
+                {t('sdm_logout')}
               </button>
             </div>
           </div>
