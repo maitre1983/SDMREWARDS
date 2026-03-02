@@ -979,29 +979,29 @@ export default function SDMClientPage() {
                     <Zap className="text-yellow-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Payer une Facture</h3>
-                    <p className="text-sm text-slate-500">Électricité, eau, TV</p>
+                    <h3 className="font-bold text-slate-900">Pay a Bill</h3>
+                    <p className="text-sm text-slate-500">Electricity, water, TV</p>
                   </div>
                 </div>
                 
                 <form onSubmit={handlePayBill} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Fournisseur</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Provider</label>
                     <select
                       value={billForm.provider}
                       onChange={(e) => setBillForm({...billForm, provider: e.target.value})}
                       className="w-full h-12 rounded-lg border border-slate-200 px-4"
                       data-testid="bill-provider"
                     >
-                      <option value="ECG">ECG - Électricité</option>
-                      <option value="GWCL">GWCL - Eau</option>
+                      <option value="ECG">ECG - Electricity</option>
+                      <option value="GWCL">GWCL - Water</option>
                       <option value="DSTV">DSTV</option>
                       <option value="GOTV">GOTV</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro de compte / Meter</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Account Number / Meter</label>
                     <Input
                       type="text"
                       value={billForm.accountNumber}
@@ -1034,7 +1034,7 @@ export default function SDMClientPage() {
                     className="w-full h-12 bg-yellow-500 hover:bg-yellow-600 text-white"
                     data-testid="bill-submit"
                   >
-                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Payer la Facture'}
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Pay Bill'}
                   </Button>
                 </form>
               </div>
