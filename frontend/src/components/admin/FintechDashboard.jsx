@@ -630,6 +630,7 @@ export default function FintechDashboard({ token }) {
           { id: 'leaderboard', label: 'Top Clients', icon: Trophy },
           { id: 'promotions', label: 'Promos', icon: Gift },
           { id: 'vip-cards', label: 'VIP Cards', icon: Crown },
+          { id: 'lottery', label: 'Lottery', icon: Ticket },
           { id: 'partners', label: 'Partenaires', icon: MapPin },
           { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
           { id: 'deposits', label: 'Deposits', icon: ArrowDownToLine },
