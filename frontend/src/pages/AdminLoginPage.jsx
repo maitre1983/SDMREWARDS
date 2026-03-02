@@ -11,7 +11,16 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
 
-export default function AdminLoginPage() {
+// Generate dynamic admin URL based on current date (DDMMYY format)
+const getAdminPath = () => {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  return `/admin${day}${month}${year}`;
+};
+
+export default function AdminLoginPage({ adminPath }) {
   const { t } = useLanguage();
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -21,6 +30,8 @@ export default function AdminLoginPage() {
     password: '',
   });
 
+  const dynamicAdminPath = adminPath || getAdminPath();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -29,7 +40,7 @@ export default function AdminLoginPage() {
       const response = await axios.post(`${API_URL}/api/admin/login`, credentials);
       login(response.data.access_token);
       toast.success('Login successful');
-      navigate('/admin280226');
+      navigate(dynamicAdminPath);
     } catch (error) {
       console.error('Login error:', error);
       toast.error('Invalid credentials');
