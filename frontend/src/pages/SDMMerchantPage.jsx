@@ -11,8 +11,11 @@ import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import axios from 'axios';
 import QRScanner from '../components/QRScanner';
+import { useLanguage } from '../context/LanguageContext';
+import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const LOGO_URL = "/sdm-logo.png";
 
 export default function SDMMerchantPage() {
   const [step, setStep] = useState('register'); // register, login, dashboard
