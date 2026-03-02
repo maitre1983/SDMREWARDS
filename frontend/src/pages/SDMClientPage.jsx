@@ -559,11 +559,11 @@ export default function SDMClientPage() {
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-lg mx-auto flex overflow-x-auto">
           {[
-            { id: 'wallet', icon: QrCode, label: 'My QR' },
-            { id: 'services', icon: Smartphone, label: 'Services' },
-            { id: 'membership', icon: CreditCard, label: 'Cards' },
-            { id: 'referral', icon: Gift, label: 'Invite' },
-            { id: 'history', icon: History, label: 'History' },
+            { id: 'wallet', icon: QrCode, label: t('sdm_my_qr') },
+            { id: 'services', icon: Smartphone, label: t('sdm_services') },
+            { id: 'membership', icon: CreditCard, label: t('sdm_cards') },
+            { id: 'referral', icon: Gift, label: t('sdm_invite') },
+            { id: 'history', icon: History, label: t('sdm_history') },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -584,7 +584,7 @@ export default function SDMClientPage() {
       <div className="max-w-lg mx-auto p-4">
         {activeTab === 'wallet' && user && (
           <div className="bg-white rounded-2xl p-6 text-center">
-            <h3 className="font-semibold text-slate-900 mb-4">Your QR Code</h3>
+            <h3 className="font-semibold text-slate-900 mb-4">{t('sdm_your_qr')}</h3>
             {user.qr_code_image && (
               <img 
                 src={user.qr_code_image} 
@@ -593,7 +593,7 @@ export default function SDMClientPage() {
               />
             )}
             <p className="text-2xl font-mono font-bold text-blue-600 mb-2">{user.qr_code}</p>
-            <p className="text-sm text-slate-500 mb-4">Show this to the merchant to earn cashback</p>
+            <p className="text-sm text-slate-500 mb-4">{t('sdm_show_merchant')}</p>
             <Button
               onClick={copyQRCode}
               variant="outline"
