@@ -968,27 +968,43 @@ async def track_visit(visit_data: VisitCreate, request: Request):
 
 @api_router.post("/admin/login", response_model=TokenResponse)
 async def admin_login(credentials: AdminLogin):
-    admin = await db.admins.find_one({"username": credentials.username}, {"_id": 0})
+    # Allow login with email or username
+    admin = await db.admins.find_one(
+        {"$or": [{"username": credentials.username}, {"email": credentials.username}]}, 
+        {"_id": 0}
+    )
     if not admin or not verify_password(credentials.password, admin["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_token({"sub": admin["username"], "type": "admin"})
+    token = create_token({"sub": admin.get("email", admin["username"]), "type": "admin"})
     return TokenResponse(access_token=token)
 
 @api_router.post("/admin/setup")
 async def setup_admin():
-    existing = await db.admins.find_one({"username": "admin"}, {"_id": 0})
+    # Check by email (primary identifier)
+    existing = await db.admins.find_one({"email": "emileparfait2003@gmail.com"}, {"_id": 0})
     if existing:
         new_hash = hash_password("Gerard0103@")
         await db.admins.update_one(
-            {"username": "admin"},
-            {"$set": {"password_hash": new_hash, "email": "emileparfait2003@gmail.com"}}
+            {"email": "emileparfait2003@gmail.com"},
+            {"$set": {"password_hash": new_hash, "username": "emileparfait2003@gmail.com"}}
         )
         return {"message": "Admin password updated"}
-    admin = AdminUser(username="admin", password_hash=hash_password("Gerard0103@"))
+    
+    # Also check old admin account and update it
+    old_admin = await db.admins.find_one({"username": "admin"}, {"_id": 0})
+    if old_admin:
+        new_hash = hash_password("Gerard0103@")
+        await db.admins.update_one(
+            {"username": "admin"},
+            {"$set": {"password_hash": new_hash, "email": "emileparfait2003@gmail.com", "username": "emileparfait2003@gmail.com"}}
+        )
+        return {"message": "Admin updated to use email"}
+    
+    admin = AdminUser(username="emileparfait2003@gmail.com", password_hash=hash_password("Gerard0103@"))
     doc = admin.model_dump()
     doc["email"] = "emileparfait2003@gmail.com"
     await db.admins.insert_one(doc)
-    return {"message": "Admin created", "username": "admin"}
+    return {"message": "Admin created", "email": "emileparfait2003@gmail.com"}
 
 @api_router.get("/admin/messages", response_model=List[ContactMessage])
 async def get_all_messages(admin: dict = Depends(get_current_admin)):
