@@ -288,6 +288,10 @@ export default function FintechDashboard({ token }) {
       fetchPromotions();
     } else if (activeSubTab === 'leaderboard') {
       fetchLeaderboard();
+    } else if (activeSubTab === 'vip-cards') {
+      fetchVipCards();
+    } else if (activeSubTab === 'partners') {
+      fetchPartners();
     }
   }, [activeSubTab]);
 
