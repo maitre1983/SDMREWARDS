@@ -1374,6 +1374,101 @@ export default function FintechDashboard({ token }) {
       {/* Lottery Management */}
       {activeSubTab === 'lottery' && (
         <div className="space-y-6">
+          {/* Auto Scheduler Config */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center">
+                  <Calendar className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Auto Monthly Lottery</h3>
+                  <p className="text-sm text-slate-500">
+                    {schedulerStatus?.scheduler_running ? (
+                      <span className="text-emerald-600 flex items-center gap-1">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        Scheduler Active - Next run: {schedulerStatus?.next_run ? new Date(schedulerStatus.next_run).toLocaleDateString() : 'N/A'}
+                      </span>
+                    ) : (
+                      <span className="text-amber-600">Scheduler not running</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleTriggerMonthlyLottery}
+                variant="outline"
+                className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-100"
+              >
+                <Zap size={16} />
+                Trigger Now
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                <select
+                  value={lotteryConfig.enabled ? 'enabled' : 'disabled'}
+                  onChange={(e) => setLotteryConfig({...lotteryConfig, enabled: e.target.value === 'enabled'})}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg bg-white"
+                >
+                  <option value="enabled">Enabled</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Default Prize (GHS)</label>
+                <Input
+                  type="number"
+                  value={lotteryConfig.default_prize_amount || 500}
+                  onChange={(e) => setLotteryConfig({...lotteryConfig, default_prize_amount: parseFloat(e.target.value)})}
+                  min="100"
+                  className="bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Auto-Activate</label>
+                <select
+                  value={lotteryConfig.auto_activate ? 'yes' : 'no'}
+                  onChange={(e) => setLotteryConfig({...lotteryConfig, auto_activate: e.target.value === 'yes'})}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-lg bg-white"
+                >
+                  <option value="yes">Yes - Enroll VIP members</option>
+                  <option value="no">No - Manual activation</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                Lottery auto-created on the 1st of each month at 00:05 UTC
+              </p>
+              <Button onClick={handleUpdateLotteryConfig} size="sm" className="bg-purple-600 hover:bg-purple-700">
+                Save Config
+              </Button>
+            </div>
+            
+            {/* Scheduler Logs */}
+            {schedulerLogs.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-purple-200">
+                <p className="text-sm font-medium text-slate-700 mb-2">Recent Scheduler Logs</p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {schedulerLogs.slice(0, 5).map((log, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs bg-white/50 px-3 py-2 rounded">
+                      <span className={log.status === 'SUCCESS' ? 'text-emerald-600' : 'text-red-600'}>
+                        {log.status === 'SUCCESS' ? '✓' : '✗'} {log.lottery_name || log.error || 'Unknown'}
+                      </span>
+                      <span className="text-slate-400">
+                        {new Date(log.executed_at).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-slate-900">Monthly VIP Draws</h3>
             <Button onClick={() => setShowLotteryForm(!showLotteryForm)} className="gap-2 bg-purple-600 hover:bg-purple-700">
