@@ -3689,6 +3689,434 @@ async def credit_user_wallet(request: CreditUserRequest, admin: dict = Depends(g
     
     return {"message": f"Credited GHS {request.amount} to {phone}", "user_id": user["id"]}
 
+# ==================== VIP CARDS ADMIN ENDPOINTS ====================
+
+# Default VIP card types to seed
+DEFAULT_VIP_CARDS = [
+    {
+        "tier": "SILVER",
+        "name": "VIP Silver Member",
+        "price": 25.0,
+        "validity_days": 365,
+        "cashback_boost": 0.0,
+        "monthly_withdrawal_limit": 2500.0,
+        "lottery_multiplier": 1,
+        "has_priority_withdrawal": False,
+        "has_gold_merchants_access": False,
+        "has_ambassador_program": False,
+        "has_business_opportunities": False,
+        "has_investment_access": False,
+        "badge_color": "#C0C0C0",
+        "description": "Carte d'entrée - Communauté & Économies",
+        "benefits_list": [
+            "Accès aux offres exclusives marchands partenaires",
+            "Accès à l'app SDM (wallet + historique + tracking rewards)",
+            "Accès aux tirages mensuels (lottery partenaires)",
+            "Accès prioritaire aux promos flash",
+            "Tableau de bord personnel avec score fidélité",
+            "Notifications personnalisées selon zone géographique",
+            "Birthday Bonus (bonus spécial le mois d'anniversaire)",
+            "Achat data bundles, électricité, airtime avec cashback"
+        ]
+    },
+    {
+        "tier": "GOLD",
+        "name": "VIP Gold Member",
+        "price": 50.0,
+        "validity_days": 365,
+        "cashback_boost": 0.2,
+        "monthly_withdrawal_limit": 2500.0,
+        "lottery_multiplier": 2,
+        "has_priority_withdrawal": True,
+        "has_gold_merchants_access": True,
+        "has_ambassador_program": False,
+        "has_business_opportunities": False,
+        "has_investment_access": False,
+        "badge_color": "#FFD700",
+        "description": "Carte Premium - Avantages + Pouvoir",
+        "benefits_list": [
+            "Tout ce que Silver a +",
+            "Cashback boosté (+0.2% sur partenaires)",
+            "Double chance aux tirages mensuels",
+            "Traitement prioritaire des retraits MoMo",
+            "Accès aux Marchands Gold exclusifs",
+            "Accès aux événements SDM (networking, fintech, business)",
+            "Réduction directe chez partenaires Gold",
+            "Badge digital Gold (statut visible dans l'app)"
+        ]
+    },
+    {
+        "tier": "PLATINUM",
+        "name": "VIP Platinum Member",
+        "price": 100.0,
+        "validity_days": 365,
+        "cashback_boost": 0.5,
+        "monthly_withdrawal_limit": 5000.0,
+        "lottery_multiplier": 3,
+        "has_priority_withdrawal": True,
+        "has_gold_merchants_access": True,
+        "has_ambassador_program": True,
+        "has_business_opportunities": True,
+        "has_investment_access": True,
+        "badge_color": "#E5E4E2",
+        "description": "Carte Élite - Business & Statut Social",
+        "benefits_list": [
+            "Tout Silver + Gold +",
+            "Cashback Premium Boost (+0.5%)",
+            "Accès aux offres privées partenaires",
+            "Accès aux opportunités business partenaires SDM",
+            "Accès aux investissements partenaires (crypto, RWA)",
+            "Limite de retrait élevée (5000 GHS/mois)",
+            "Triple chance aux tirages majeurs",
+            "Invitation aux conférences & événements fermés",
+            "Programme Ambassadeur (earn commission via referrals)",
+            "Rapport annuel de gains personnalisé"
+        ]
+    }
+]
+
+class CreateVIPCardRequest(BaseModel):
+    tier: str
+    name: str
+    price: float
+    validity_days: int = 365
+    cashback_boost: float = 0.0
+    monthly_withdrawal_limit: float = 2500.0
+    lottery_multiplier: int = 1
+    has_priority_withdrawal: bool = False
+    has_gold_merchants_access: bool = False
+    has_ambassador_program: bool = False
+    has_business_opportunities: bool = False
+    has_investment_access: bool = False
+    badge_color: str = "#C0C0C0"
+    description: str = ""
+    benefits_list: List[str] = []
+    is_active: bool = True
+
+@sdm_router.get("/admin/vip-cards")
+async def get_vip_cards(admin: dict = Depends(get_current_admin)):
+    """Admin: Get all VIP card types"""
+    cards = await db.vip_card_types.find({}, {"_id": 0}).sort("price", 1).to_list(100)
+    
+    # Seed default cards if none exist
+    if not cards:
+        for card_data in DEFAULT_VIP_CARDS:
+            card = VIPCardType(**card_data)
+            await db.vip_card_types.insert_one(card.model_dump())
+        cards = await db.vip_card_types.find({}, {"_id": 0}).sort("price", 1).to_list(100)
+    
+    return {"cards": cards}
+
+@sdm_router.post("/admin/vip-cards")
+async def create_vip_card(request: CreateVIPCardRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Create a new VIP card type"""
+    card = VIPCardType(
+        tier=request.tier,
+        name=request.name,
+        price=request.price,
+        validity_days=request.validity_days,
+        cashback_boost=request.cashback_boost,
+        monthly_withdrawal_limit=request.monthly_withdrawal_limit,
+        lottery_multiplier=request.lottery_multiplier,
+        has_priority_withdrawal=request.has_priority_withdrawal,
+        has_gold_merchants_access=request.has_gold_merchants_access,
+        has_ambassador_program=request.has_ambassador_program,
+        has_business_opportunities=request.has_business_opportunities,
+        has_investment_access=request.has_investment_access,
+        badge_color=request.badge_color,
+        description=request.description,
+        benefits_list=request.benefits_list
+    )
+    
+    await db.vip_card_types.insert_one(card.model_dump())
+    return {"message": "VIP card created", "card": card.model_dump()}
+
+@sdm_router.put("/admin/vip-cards/{card_id}")
+async def update_vip_card(card_id: str, request: CreateVIPCardRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Update a VIP card type"""
+    result = await db.vip_card_types.update_one(
+        {"id": card_id},
+        {
+            "$set": {
+                "tier": request.tier,
+                "name": request.name,
+                "price": request.price,
+                "validity_days": request.validity_days,
+                "cashback_boost": request.cashback_boost,
+                "monthly_withdrawal_limit": request.monthly_withdrawal_limit,
+                "lottery_multiplier": request.lottery_multiplier,
+                "has_priority_withdrawal": request.has_priority_withdrawal,
+                "has_gold_merchants_access": request.has_gold_merchants_access,
+                "has_ambassador_program": request.has_ambassador_program,
+                "has_business_opportunities": request.has_business_opportunities,
+                "has_investment_access": request.has_investment_access,
+                "badge_color": request.badge_color,
+                "description": request.description,
+                "benefits_list": request.benefits_list,
+                "is_active": request.is_active,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="VIP card not found")
+    return {"message": "VIP card updated"}
+
+@sdm_router.delete("/admin/vip-cards/{card_id}")
+async def delete_vip_card(card_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Delete a VIP card type"""
+    result = await db.vip_card_types.delete_one({"id": card_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="VIP card not found")
+    return {"message": "VIP card deleted"}
+
+# ==================== PARTNERS ADMIN ENDPOINTS ====================
+
+class CreatePartnerRequest(BaseModel):
+    name: str
+    category: str
+    description: Optional[str] = None
+    address: str
+    city: str = "Accra"
+    region: str = "Greater Accra"
+    phone: Optional[str] = None
+    cashback_rate: float = 5.0
+    logo_url: Optional[str] = None
+    is_gold_exclusive: bool = False
+    is_active: bool = True
+
+@sdm_router.get("/admin/partners")
+async def get_partners(admin: dict = Depends(get_current_admin)):
+    """Admin: Get all partners"""
+    partners = await db.sdm_partners.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    return {"partners": partners}
+
+@sdm_router.post("/admin/partners")
+async def create_partner(request: CreatePartnerRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Create a new partner"""
+    partner = SDMPartner(
+        name=request.name,
+        category=request.category,
+        description=request.description,
+        address=request.address,
+        city=request.city,
+        region=request.region,
+        phone=request.phone,
+        cashback_rate=request.cashback_rate,
+        logo_url=request.logo_url,
+        is_gold_exclusive=request.is_gold_exclusive,
+        is_active=request.is_active
+    )
+    
+    await db.sdm_partners.insert_one(partner.model_dump())
+    return {"message": "Partner created", "partner": partner.model_dump()}
+
+@sdm_router.put("/admin/partners/{partner_id}")
+async def update_partner(partner_id: str, request: CreatePartnerRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Update a partner"""
+    result = await db.sdm_partners.update_one(
+        {"id": partner_id},
+        {
+            "$set": {
+                "name": request.name,
+                "category": request.category,
+                "description": request.description,
+                "address": request.address,
+                "city": request.city,
+                "region": request.region,
+                "phone": request.phone,
+                "cashback_rate": request.cashback_rate,
+                "logo_url": request.logo_url,
+                "is_gold_exclusive": request.is_gold_exclusive,
+                "is_active": request.is_active
+            }
+        }
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Partner not found")
+    return {"message": "Partner updated"}
+
+@sdm_router.delete("/admin/partners/{partner_id}")
+async def delete_partner(partner_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Delete a partner"""
+    result = await db.sdm_partners.delete_one({"id": partner_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Partner not found")
+    return {"message": "Partner deleted"}
+
+# Public endpoint for partners list
+@sdm_router.get("/partners")
+async def get_public_partners(category: Optional[str] = None, city: Optional[str] = None):
+    """Public: Get partners list for display"""
+    query = {"is_active": True}
+    if category:
+        query["category"] = category
+    if city:
+        query["city"] = city
+    
+    partners = await db.sdm_partners.find(query, {"_id": 0}).sort("name", 1).to_list(500)
+    
+    # Get unique categories for filter
+    categories = await db.sdm_partners.distinct("category", {"is_active": True})
+    cities = await db.sdm_partners.distinct("city", {"is_active": True})
+    
+    return {
+        "partners": partners,
+        "categories": categories,
+        "cities": cities
+    }
+
+# ==================== USER VIP CARD ENDPOINTS ====================
+
+@sdm_router.get("/user/vip-cards")
+async def get_available_vip_cards():
+    """Public: Get available VIP card types for purchase"""
+    cards = await db.vip_card_types.find({"is_active": True}, {"_id": 0}).sort("price", 1).to_list(10)
+    
+    # Seed if empty
+    if not cards:
+        for card_data in DEFAULT_VIP_CARDS:
+            card = VIPCardType(**card_data)
+            await db.vip_card_types.insert_one(card.model_dump())
+        cards = await db.vip_card_types.find({"is_active": True}, {"_id": 0}).sort("price", 1).to_list(10)
+    
+    return {"cards": cards}
+
+@sdm_router.get("/user/my-vip-membership")
+async def get_my_vip_membership(user: dict = Depends(get_current_user)):
+    """User: Get current VIP membership"""
+    membership = await db.vip_memberships.find_one(
+        {"user_id": user["id"], "status": "active"},
+        {"_id": 0}
+    )
+    return {"membership": membership}
+
+class PurchaseVIPCardRequest(BaseModel):
+    card_type_id: str
+
+@sdm_router.post("/user/vip-cards/purchase")
+async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depends(get_current_user)):
+    """User: Purchase or upgrade VIP card using cashback balance"""
+    from ledger import EntityType
+    
+    # Get card type
+    card_type = await db.vip_card_types.find_one({"id": request.card_type_id, "is_active": True}, {"_id": 0})
+    if not card_type:
+        raise HTTPException(status_code=404, detail="VIP card type not found")
+    
+    # Check current membership
+    current_membership = await db.vip_memberships.find_one(
+        {"user_id": user["id"], "status": "active"},
+        {"_id": 0}
+    )
+    
+    price_to_pay = card_type["price"]
+    is_upgrade = False
+    
+    # If upgrading, calculate price difference
+    if current_membership:
+        tier_order = {"SILVER": 1, "GOLD": 2, "PLATINUM": 3}
+        current_tier = tier_order.get(current_membership["tier"], 0)
+        new_tier = tier_order.get(card_type["tier"], 0)
+        
+        if new_tier <= current_tier:
+            raise HTTPException(status_code=400, detail="Cannot downgrade or purchase same tier")
+        
+        # Calculate upgrade price (difference)
+        current_card = await db.vip_card_types.find_one({"tier": current_membership["tier"]}, {"_id": 0})
+        if current_card:
+            price_to_pay = card_type["price"] - current_card["price"]
+        is_upgrade = True
+    
+    # Check cashback balance
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user["id"])
+    if not wallet or wallet.available_balance < price_to_pay:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient cashback balance. Need: GHS {price_to_pay}, Available: GHS {wallet.available_balance if wallet else 0}"
+        )
+    
+    # Debit cashback
+    await db.wallets.update_one(
+        {"id": wallet.id},
+        {"$inc": {"available_balance": -price_to_pay, "balance": -price_to_pay}}
+    )
+    
+    # Mark old membership as upgraded
+    if current_membership:
+        await db.vip_memberships.update_one(
+            {"id": current_membership["id"]},
+            {"$set": {"status": "upgraded"}}
+        )
+    
+    # Create new membership
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=card_type["validity_days"])).isoformat()
+    
+    membership = VIPMembership(
+        user_id=user["id"],
+        user_phone=user["phone"],
+        card_type_id=card_type["id"],
+        tier=card_type["tier"],
+        card_name=card_type["name"],
+        price_paid=price_to_pay,
+        payment_method="cashback",
+        expires_at=expires_at,
+        upgraded_from=current_membership["tier"] if current_membership else None
+    )
+    
+    await db.vip_memberships.insert_one(membership.model_dump())
+    
+    # Update user record with VIP tier
+    await db.sdm_users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "vip_tier": card_type["tier"],
+            "vip_membership_id": membership.id,
+            "monthly_withdrawal_limit": card_type["monthly_withdrawal_limit"]
+        }}
+    )
+    
+    # Award referral bonuses if this is first purchase and user was referred
+    if not is_upgrade and user.get("referred_by"):
+        # Award welcome bonus to user (1 GHS)
+        await db.wallets.update_one(
+            {"id": wallet.id},
+            {"$inc": {"available_balance": REFERRAL_WELCOME_BONUS, "balance": REFERRAL_WELCOME_BONUS}}
+        )
+        
+        # Award referrer bonus (3 GHS)
+        referrer = await db.sdm_users.find_one({"id": user["referred_by"]})
+        if referrer:
+            referrer_wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, referrer["id"])
+            if referrer_wallet:
+                await db.wallets.update_one(
+                    {"id": referrer_wallet.id},
+                    {"$inc": {"available_balance": REFERRAL_BONUS, "balance": REFERRAL_BONUS}}
+                )
+                
+                # Record referral bonus
+                bonus_record = ReferralBonus(
+                    referrer_id=referrer["id"],
+                    referred_id=user["id"],
+                    bonus_type="referrer_bonus",
+                    amount=REFERRAL_BONUS
+                )
+                await db.referral_bonuses.insert_one(bonus_record.model_dump())
+        
+        # Mark as processed
+        await db.vip_memberships.update_one(
+            {"id": membership.id},
+            {"$set": {"referrer_bonus_paid": True}}
+        )
+    
+    return {
+        "message": f"{'Upgraded to' if is_upgrade else 'Purchased'} {card_type['name']}!",
+        "membership": membership.model_dump(),
+        "price_paid": price_to_pay,
+        "is_upgrade": is_upgrade,
+        "referral_bonus_received": REFERRAL_WELCOME_BONUS if not is_upgrade and user.get("referred_by") else 0
+    }
+
 # ==================== ADMIN PROMOTIONS ENDPOINTS ====================
 
 @sdm_router.post("/admin/promotions")
