@@ -195,7 +195,7 @@ export default function FintechDashboard({ token }) {
   const handleTogglePromo = async (promoId) => {
     try {
       await axios.patch(`${API_URL}/api/sdm/admin/promotions/${promoId}/toggle`, {}, { headers });
-      toast.success('Statut modifié');
+      toast.success('Status changed');
       fetchPromotions();
     } catch (error) {
       toast.error('Erreur');
@@ -203,7 +203,7 @@ export default function FintechDashboard({ token }) {
   };
 
   const handleDeletePromo = async (promoId) => {
-    if (!window.confirm('Supprimer cette promotion?')) return;
+    if (!window.confirm('Delete this promotion?')) return;
     try {
       await axios.delete(`${API_URL}/api/sdm/admin/promotions/${promoId}`, { headers });
       toast.success('Promotion supprimée');
@@ -256,7 +256,7 @@ export default function FintechDashboard({ token }) {
   const handleCreatePartner = async () => {
     try {
       await axios.post(`${API_URL}/api/sdm/admin/partners`, newPartner, { headers });
-      toast.success('Partenaire ajouté');
+      toast.success('Partner added');
       setShowPartnerForm(false);
       setNewPartner({ name: '', category: 'SHOP', address: '', city: 'Accra', phone: '', cashback_rate: 5, is_gold_exclusive: false });
       fetchPartners();
@@ -268,7 +268,7 @@ export default function FintechDashboard({ token }) {
   const handleUpdatePartner = async (partnerId, data) => {
     try {
       await axios.put(`${API_URL}/api/sdm/admin/partners/${partnerId}`, data, { headers });
-      toast.success('Partenaire mis à jour');
+      toast.success('Partner updated');
       fetchPartners();
       setEditingPartner(null);
     } catch (error) {
@@ -277,10 +277,10 @@ export default function FintechDashboard({ token }) {
   };
 
   const handleDeletePartner = async (partnerId) => {
-    if (!window.confirm('Supprimer ce partenaire?')) return;
+    if (!window.confirm('Delete this partner?')) return;
     try {
       await axios.delete(`${API_URL}/api/sdm/admin/partners/${partnerId}`, { headers });
-      toast.success('Partenaire supprimé');
+      toast.success('Partner deleted');
       fetchPartners();
     } catch (error) {
       toast.error('Erreur');
@@ -631,7 +631,7 @@ export default function FintechDashboard({ token }) {
           { id: 'promotions', label: 'Promos', icon: Gift },
           { id: 'vip-cards', label: 'VIP Cards', icon: Crown },
           { id: 'lottery', label: 'Lottery', icon: Ticket },
-          { id: 'partners', label: 'Partenaires', icon: MapPin },
+          { id: 'partners', label: 'Partners', icon: MapPin },
           { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
           { id: 'deposits', label: 'Deposits', icon: ArrowDownToLine },
           { id: 'float', label: 'Float', icon: Zap },
@@ -963,7 +963,7 @@ export default function FintechDashboard({ token }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-500 text-center py-4">Aucune donnée</p>
+                <p className="text-slate-500 text-center py-4">No data</p>
               )}
             </div>
 
@@ -1004,7 +1004,7 @@ export default function FintechDashboard({ token }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-slate-500 text-center py-4">Aucune donnée</p>
+                <p className="text-slate-500 text-center py-4">No data</p>
               )}
             </div>
           </div>
@@ -1106,7 +1106,7 @@ export default function FintechDashboard({ token }) {
                   Create Promotion
                 </Button>
                 <Button variant="outline" onClick={() => setShowNewPromoForm(false)}>
-                  Annuler
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -1121,8 +1121,8 @@ export default function FintechDashboard({ token }) {
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Service</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Réduction</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Jours</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Utilisations</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Statut</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Usage</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Actions</th>
                 </tr>
               </thead>
@@ -1130,7 +1130,7 @@ export default function FintechDashboard({ token }) {
                 {promotions.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
-                      Aucune promotion. Créez-en une!
+                      No promotions. Create one!
                     </td>
                   </tr>
                 ) : (
@@ -1158,7 +1158,7 @@ export default function FintechDashboard({ token }) {
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium">{promo.usage_count || 0}</p>
-                        <p className="text-xs text-slate-500">GHS {(promo.total_discount_given || 0).toFixed(2)} économisés</p>
+                        <p className="text-xs text-slate-500">GHS {(promo.total_discount_given || 0).toFixed(2)} saved</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -1176,7 +1176,7 @@ export default function FintechDashboard({ token }) {
                             variant="outline"
                             onClick={() => handleTogglePromo(promo.id)}
                           >
-                            {promo.is_active ? 'Désactiver' : 'Activer'}
+                            {promo.is_active ? 'Disable' : 'Enable'}
                           </Button>
                           <Button
                             size="sm"
@@ -1287,10 +1287,10 @@ export default function FintechDashboard({ token }) {
                             monthly_withdrawal_limit: card._newLimit || card.monthly_withdrawal_limit
                           })}
                         >
-                          Sauvegarder
+                          Save
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => setEditingVipCard(null)}>
-                          Annuler
+                          Cancel
                         </Button>
                       </div>
                     </div>
@@ -1302,7 +1302,7 @@ export default function FintechDashboard({ token }) {
                       onClick={() => setEditingVipCard(card.id)}
                     >
                       <Edit size={14} />
-                      Modifier
+                      Edit
                     </Button>
                   )}
                 </div>
@@ -1566,17 +1566,17 @@ export default function FintechDashboard({ token }) {
       {activeSubTab === 'partners' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Gestion des Partenaires SDM</h3>
+            <h3 className="text-lg font-semibold text-slate-900">SDM Partners Management</h3>
             <Button onClick={() => setShowPartnerForm(!showPartnerForm)} className="gap-2">
               <Plus size={16} />
-              Ajouter Partenaire
+              Add Partner
             </Button>
           </div>
 
           {/* New Partner Form */}
           {showPartnerForm && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h4 className="font-semibold text-slate-900 mb-4">Nouveau Partenaire</h4>
+              <h4 className="font-semibold text-slate-900 mb-4">New Partner</h4>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Nom</label>
@@ -1653,7 +1653,7 @@ export default function FintechDashboard({ token }) {
                   Ajouter
                 </Button>
                 <Button variant="outline" onClick={() => setShowPartnerForm(false)}>
-                  Annuler
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -1664,7 +1664,7 @@ export default function FintechDashboard({ token }) {
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Partenaire</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Partner</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Catégorie</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Ville</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Cashback</th>
