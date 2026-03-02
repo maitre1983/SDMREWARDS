@@ -1055,14 +1055,14 @@ export default function SDMClientPage() {
                     <Banknote className="text-green-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Retrait Mobile Money</h3>
-                    <p className="text-sm text-slate-500">Retirer vers votre MoMo</p>
+                    <h3 className="font-bold text-slate-900">Mobile Money Withdrawal</h3>
+                    <p className="text-sm text-slate-500">Withdraw to your MoMo</p>
                   </div>
                 </div>
                 
                 <form onSubmit={handleServiceWithdraw} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro Mobile Money</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Mobile Money Number</label>
                     <Input
                       type="tel"
                       value={momoForm.phone}
@@ -1088,7 +1088,7 @@ export default function SDMClientPage() {
                       data-testid="momo-amount"
                     />
                     <p className="text-xs text-slate-500 mt-1">
-                      Frais: GHS 1.00 | Vous recevrez: GHS {Math.max(0, (parseFloat(momoForm.amount) || 0) - 1).toFixed(2)}
+                      Fee: GHS 1.00 | You will receive: GHS {Math.max(0, (parseFloat(momoForm.amount) || 0) - 1).toFixed(2)}
                     </p>
                   </div>
 
@@ -1113,7 +1113,7 @@ export default function SDMClientPage() {
                     className="w-full h-12 bg-green-600 hover:bg-green-700 text-white"
                     data-testid="momo-submit"
                   >
-                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Effectuer le Retrait'}
+                    {isServiceLoading ? <Loader2 className="animate-spin" /> : 'Withdraw'}
                   </Button>
                 </form>
               </div>
@@ -1134,9 +1134,9 @@ export default function SDMClientPage() {
                     <Crown className="text-amber-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Cartes VIP SDM</h3>
+                    <h3 className="font-bold text-slate-900">SDM VIP Cards</h3>
                     <p className="text-sm text-slate-500">
-                      {myVipMembership ? `Vous êtes ${myVipMembership.tier}` : 'Rejoignez la communauté VIP'}
+                      {myVipMembership ? `You are ${myVipMembership.tier}` : 'Join the VIP community'}
                     </p>
                   </div>
                 </div>
