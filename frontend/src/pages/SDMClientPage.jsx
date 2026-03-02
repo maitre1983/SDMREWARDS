@@ -361,7 +361,7 @@ export default function SDMClientPage() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
               <Wallet size={32} className="text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">SDM Wallet</h1>
+            <h1 className="text-2xl font-bold text-white">SDM Rewards</h1>
             <p className="text-slate-400">Smart Development Membership</p>
           </div>
 
@@ -474,7 +474,7 @@ export default function SDMClientPage() {
                 <Wallet size={20} />
               </div>
               <div>
-                <p className="text-sm opacity-80">SDM Wallet</p>
+                <p className="text-sm opacity-80">SDM Rewards</p>
                 <p className="font-semibold">{user?.first_name || 'Member'}</p>
               </div>
             </div>
@@ -486,7 +486,7 @@ export default function SDMClientPage() {
           {/* Balance Card */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm opacity-80">Available Balance</p>
+              <p className="text-sm opacity-80">My Cash Back Balance</p>
               {user?.referral_level && (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full border capitalize ${getReferralLevelColor(user.referral_level)}`}>
                   <Award size={12} className="inline mr-1" />
@@ -1191,7 +1191,7 @@ export default function SDMClientPage() {
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">3</div>
-                  <p className="text-sm text-slate-600">You get GHS {referralData.bonus_per_referral}, they get GHS {referralData.welcome_bonus_amount}!</p>
+                  <p className="text-sm text-slate-600">You get GHS 3, they get GHS 1 when they buy a membership card!</p>
                 </div>
               </div>
             </div>
