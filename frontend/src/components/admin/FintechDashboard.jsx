@@ -723,6 +723,300 @@ export default function FintechDashboard({ token }) {
         </div>
       )}
 
+      {/* Leaderboard - Top Clients */}
+      {activeSubTab === 'leaderboard' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Top Clients Leaderboard</h3>
+            <div className="flex gap-2">
+              <select
+                value={leaderboardPeriod}
+                onChange={(e) => { setLeaderboardPeriod(e.target.value); fetchLeaderboard(e.target.value); }}
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              >
+                <option value="week">Cette semaine</option>
+                <option value="month">Ce mois</option>
+                <option value="year">Cette année</option>
+              </select>
+              <Button onClick={handleAnnounceTopClients} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                <Megaphone size={16} />
+                Annoncer les Gagnants
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            {/* Top Cashback Earners */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Trophy className="text-amber-600" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900">Meilleurs Cashback</h4>
+                  <p className="text-sm text-slate-500">{leaderboardCashback?.period_label}</p>
+                </div>
+              </div>
+              
+              {leaderboardCashback?.top_clients?.length > 0 ? (
+                <div className="space-y-3">
+                  {leaderboardCashback.top_clients.map((client, i) => (
+                    <div key={client.user_id} className={`flex items-center justify-between p-3 rounded-lg ${
+                      i === 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          i === 0 ? 'bg-amber-500 text-white' : i === 1 ? 'bg-slate-400 text-white' : i === 2 ? 'bg-orange-400 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {client.rank}
+                        </span>
+                        <div>
+                          <p className="font-medium text-slate-900">{client.name}</p>
+                          <p className="text-xs text-slate-500">{client.phone}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-emerald-600">GHS {client.total_cashback.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500">{client.transaction_count} txns</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 text-center py-4">Aucune donnée</p>
+              )}
+            </div>
+
+            {/* Top Service Users */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Activity className="text-blue-600" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900">Champions Services</h4>
+                  <p className="text-sm text-slate-500">{leaderboardServices?.period_label}</p>
+                </div>
+              </div>
+              
+              {leaderboardServices?.top_clients?.length > 0 ? (
+                <div className="space-y-3">
+                  {leaderboardServices.top_clients.map((client, i) => (
+                    <div key={client.user_id} className={`flex items-center justify-between p-3 rounded-lg ${
+                      i === 0 ? 'bg-blue-50 border border-blue-200' : 'bg-slate-50'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                          i === 0 ? 'bg-blue-500 text-white' : i === 1 ? 'bg-slate-400 text-white' : i === 2 ? 'bg-orange-400 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {client.rank}
+                        </span>
+                        <div>
+                          <p className="font-medium text-slate-900">{client.name}</p>
+                          <p className="text-xs text-slate-500">{client.services_used?.join(', ')}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-blue-600">GHS {client.total_spent.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500">{client.transaction_count} txns</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 text-center py-4">Aucune donnée</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Promotions Management */}
+      {activeSubTab === 'promotions' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Gestion des Promotions</h3>
+            <Button onClick={() => setShowNewPromoForm(!showNewPromoForm)} className="gap-2">
+              <Plus size={16} />
+              Nouvelle Promo
+            </Button>
+          </div>
+
+          {/* New Promo Form */}
+          {showNewPromoForm && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h4 className="font-semibold text-slate-900 mb-4">Créer une Promotion</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+                  <Input
+                    value={newPromo.name}
+                    onChange={(e) => setNewPromo({...newPromo, name: e.target.value})}
+                    placeholder="-10% Data Weekend"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Service ciblé</label>
+                  <select
+                    value={newPromo.target_service}
+                    onChange={(e) => setNewPromo({...newPromo, target_service: e.target.value})}
+                    className="w-full h-10 px-3 border border-slate-200 rounded-lg"
+                  >
+                    <option value="ALL">Tous les services</option>
+                    <option value="AIRTIME">Airtime uniquement</option>
+                    <option value="DATA">Data uniquement</option>
+                    <option value="BILL_PAYMENT">Factures uniquement</option>
+                    <option value="MOMO_WITHDRAWAL">Retrait MoMo</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Réduction (%)</label>
+                  <Input
+                    type="number"
+                    value={newPromo.discount_percent}
+                    onChange={(e) => setNewPromo({...newPromo, discount_percent: parseFloat(e.target.value)})}
+                    min="1"
+                    max="50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Montant minimum (GHS)</label>
+                  <Input
+                    type="number"
+                    value={newPromo.min_amount}
+                    onChange={(e) => setNewPromo({...newPromo, min_amount: parseFloat(e.target.value)})}
+                    min="0"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                  <Input
+                    value={newPromo.description}
+                    onChange={(e) => setNewPromo({...newPromo, description: e.target.value})}
+                    placeholder="Description de la promotion"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Jours actifs (vide = tous les jours)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map((day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const days = newPromo.days_of_week.includes(day)
+                            ? newPromo.days_of_week.filter(d => d !== day)
+                            : [...newPromo.days_of_week, day];
+                          setNewPromo({...newPromo, days_of_week: days});
+                        }}
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          newPromo.days_of_week.includes(day)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button onClick={handleCreatePromo} className="bg-emerald-600 hover:bg-emerald-700">
+                  Créer la Promotion
+                </Button>
+                <Button variant="outline" onClick={() => setShowNewPromoForm(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Promotions List */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Promotion</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Service</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Réduction</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Jours</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Utilisations</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Statut</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {promotions.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
+                      Aucune promotion. Créez-en une!
+                    </td>
+                  </tr>
+                ) : (
+                  promotions.map((promo) => (
+                    <tr key={promo.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-900">{promo.name}</p>
+                        <p className="text-xs text-slate-500">{promo.description}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                          {promo.target_service}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-bold text-emerald-600">{promo.discount_percent}%</span>
+                        {promo.min_amount > 0 && (
+                          <p className="text-xs text-slate-500">Min: GHS {promo.min_amount}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {promo.days_of_week?.length > 0 
+                          ? promo.days_of_week.map(d => d.slice(0, 3)).join(', ')
+                          : 'Tous'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium">{promo.usage_count || 0}</p>
+                        <p className="text-xs text-slate-500">GHS {(promo.total_discount_given || 0).toFixed(2)} économisés</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          promo.is_active 
+                            ? 'bg-emerald-100 text-emerald-700' 
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {promo.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleTogglePromo(promo.id)}
+                          >
+                            {promo.is_active ? 'Désactiver' : 'Activer'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                            onClick={() => handleDeletePromo(promo.id)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Float Management */}
       {activeSubTab === 'float' && floatStatus && (
         <div className="space-y-6">
