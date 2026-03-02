@@ -207,6 +207,71 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  // VIP Cards functions
+  const fetchVipCards = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/vip-cards`, { headers });
+      setVipCards(res.data.cards || []);
+    } catch (error) {
+      console.error('VIP cards error:', error);
+    }
+  };
+
+  const handleUpdateVipCard = async (cardId, data) => {
+    try {
+      await axios.put(`${API_URL}/api/sdm/admin/vip-cards/${cardId}`, data, { headers });
+      toast.success('Carte VIP mise à jour');
+      fetchVipCards();
+      setEditingVipCard(null);
+    } catch (error) {
+      toast.error('Erreur');
+    }
+  };
+
+  // Partners functions
+  const fetchPartners = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/partners`, { headers });
+      setPartners(res.data.partners || []);
+    } catch (error) {
+      console.error('Partners error:', error);
+    }
+  };
+
+  const handleCreatePartner = async () => {
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/partners`, newPartner, { headers });
+      toast.success('Partenaire ajouté');
+      setShowPartnerForm(false);
+      setNewPartner({ name: '', category: 'SHOP', address: '', city: 'Accra', phone: '', cashback_rate: 5, is_gold_exclusive: false });
+      fetchPartners();
+    } catch (error) {
+      toast.error('Erreur');
+    }
+  };
+
+  const handleUpdatePartner = async (partnerId, data) => {
+    try {
+      await axios.put(`${API_URL}/api/sdm/admin/partners/${partnerId}`, data, { headers });
+      toast.success('Partenaire mis à jour');
+      fetchPartners();
+      setEditingPartner(null);
+    } catch (error) {
+      toast.error('Erreur');
+    }
+  };
+
+  const handleDeletePartner = async (partnerId) => {
+    if (!window.confirm('Supprimer ce partenaire?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/sdm/admin/partners/${partnerId}`, { headers });
+      toast.success('Partenaire supprimé');
+      fetchPartners();
+    } catch (error) {
+      toast.error('Erreur');
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
