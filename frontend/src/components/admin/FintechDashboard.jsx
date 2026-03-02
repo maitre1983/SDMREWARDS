@@ -1201,7 +1201,7 @@ export default function FintechDashboard({ token }) {
       {activeSubTab === 'vip-cards' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">Gestion des Cartes VIP</h3>
+            <h3 className="text-lg font-semibold text-slate-900">VIP Cards Management</h3>
             <Button variant="outline" size="sm" onClick={fetchVipCards} className="gap-2">
               <RefreshCw size={16} />
               Refresh
@@ -1587,7 +1587,7 @@ export default function FintechDashboard({ token }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Catégorie</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
                   <select
                     value={newPartner.category}
                     onChange={(e) => setNewPartner({...newPartner, category: e.target.value})}
@@ -1605,7 +1605,7 @@ export default function FintechDashboard({ token }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Ville</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">City</label>
                   <Input
                     value={newPartner.city}
                     onChange={(e) => setNewPartner({...newPartner, city: e.target.value})}
@@ -1645,7 +1645,7 @@ export default function FintechDashboard({ token }) {
                     onChange={(e) => setNewPartner({...newPartner, is_gold_exclusive: e.target.checked})}
                     className="w-4 h-4"
                   />
-                  <label className="text-sm text-slate-700">Exclusif Gold/Platinum</label>
+                  <label className="text-sm text-slate-700">Gold/Platinum Exclusive</label>
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
@@ -1665,10 +1665,10 @@ export default function FintechDashboard({ token }) {
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Partner</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Catégorie</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Ville</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Category</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">City</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Cashback</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Exclusif</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Exclusive</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Actions</th>
                 </tr>
               </thead>
