@@ -450,6 +450,8 @@ export default function FintechDashboard({ token }) {
         {[
           { id: 'investor', label: 'Investor', icon: BarChart3 },
           { id: 'overview', label: 'Overview', icon: TrendingUp },
+          { id: 'leaderboard', label: 'Top Clients', icon: Trophy },
+          { id: 'promotions', label: 'Promos', icon: Gift },
           { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
           { id: 'deposits', label: 'Deposits', icon: ArrowDownToLine },
           { id: 'float', label: 'Float', icon: Zap },
