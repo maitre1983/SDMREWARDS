@@ -257,6 +257,86 @@ class MembershipCard(BaseModel):
     expires_at: str = ""
     referrer_bonus_paid: bool = False  # Track if referrer got bonus
 
+# ==================== VIP MEMBERSHIP CARDS (Admin-Managed) ====================
+
+class VIPCardTier(str, Enum):
+    SILVER = "SILVER"
+    GOLD = "GOLD"
+    PLATINUM = "PLATINUM"
+
+class VIPCardType(BaseModel):
+    """VIP Membership Card Type - Admin managed"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tier: str  # SILVER, GOLD, PLATINUM
+    name: str  # "VIP Silver Member", etc.
+    price: float
+    validity_days: int = 365
+    # Benefits
+    cashback_boost: float = 0.0  # Extra % on cashback (0.2 for Gold, 0.5 for Platinum)
+    monthly_withdrawal_limit: float = 2500.0  # 5000 for Platinum
+    lottery_multiplier: int = 1  # 1 for Silver, 2 for Gold, 3 for Platinum
+    has_priority_withdrawal: bool = False
+    has_gold_merchants_access: bool = False
+    has_ambassador_program: bool = False
+    has_business_opportunities: bool = False
+    has_investment_access: bool = False
+    # Display
+    badge_color: str = "#C0C0C0"  # Silver by default
+    description: str = ""
+    benefits_list: List[str] = Field(default_factory=list)
+    is_active: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class VIPMembership(BaseModel):
+    """User's VIP Membership"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_phone: str
+    card_type_id: str
+    tier: str  # SILVER, GOLD, PLATINUM
+    card_name: str
+    card_number: str = Field(default_factory=lambda: f"VIP{datetime.now().strftime('%Y%m%d')}{secrets.token_hex(4).upper()}")
+    price_paid: float
+    payment_method: str = "cashback"  # "cashback", "mobile_money"
+    status: str = "active"  # active, expired, upgraded
+    purchased_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    expires_at: str = ""
+    upgraded_from: Optional[str] = None  # Previous tier if upgraded
+    referrer_bonus_paid: bool = False
+
+# ==================== PARTNERS (Admin-Managed) ====================
+
+class PartnerCategory(str, Enum):
+    RESTAURANT = "RESTAURANT"
+    SHOP = "SHOP"
+    HOTEL = "HOTEL"
+    SCHOOL = "SCHOOL"
+    SALON = "SALON"
+    PHARMACY = "PHARMACY"
+    SUPERMARKET = "SUPERMARKET"
+    GAS_STATION = "GAS_STATION"
+    OTHER = "OTHER"
+
+class SDMPartner(BaseModel):
+    """SDM Partner Business - for display purposes"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    category: str  # RESTAURANT, SHOP, HOTEL, SCHOOL, etc.
+    description: Optional[str] = None
+    address: str
+    city: str = "Accra"
+    region: str = "Greater Accra"
+    phone: Optional[str] = None
+    cashback_rate: float = 5.0  # Display rate
+    logo_url: Optional[str] = None
+    is_gold_exclusive: bool = False  # Only for Gold/Platinum members
+    is_active: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
 class SDMMerchant(BaseModel):
     """SDM Merchant/Business"""
     model_config = ConfigDict(extra="ignore")
