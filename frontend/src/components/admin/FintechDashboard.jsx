@@ -300,7 +300,7 @@ export default function FintechDashboard({ token }) {
   const handleCreateLottery = async () => {
     try {
       await axios.post(`${API_URL}/api/sdm/admin/lotteries`, newLottery, { headers });
-      toast.success('Tirage créé');
+      toast.success('Draw created');
       setShowLotteryForm(false);
       setNewLottery({
         name: '',
@@ -343,7 +343,7 @@ export default function FintechDashboard({ token }) {
   const handleAnnounceLottery = async (lotteryId) => {
     try {
       const res = await axios.post(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}/announce`, {}, { headers });
-      toast.success('Résultats annoncés!');
+      toast.success('Results announced!');
       fetchLotteries();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erreur');
@@ -354,7 +354,7 @@ export default function FintechDashboard({ token }) {
     if (!window.confirm('Supprimer ce tirage?')) return;
     try {
       await axios.delete(`${API_URL}/api/sdm/admin/lotteries/${lotteryId}`, { headers });
-      toast.success('Tirage supprimé');
+      toast.success('Draw deleted');
       fetchLotteries();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erreur');
