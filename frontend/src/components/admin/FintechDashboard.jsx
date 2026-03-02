@@ -1424,7 +1424,7 @@ export default function FintechDashboard({ token }) {
             {lotteries.length === 0 ? (
               <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
                 <Ticket size={48} className="mx-auto mb-3 text-slate-300" />
-                <p className="text-slate-500">Aucun tirage. Créez-en un!</p>
+                <p className="text-slate-500">No draws. Create one!</p>
               </div>
             ) : (
               lotteries.map((lottery) => (
