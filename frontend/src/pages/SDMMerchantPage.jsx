@@ -58,20 +58,6 @@ export default function SDMMerchantPage() {
   const [txnLimit, setTxnLimit] = useState(50);
   const [showTxnDetails, setShowTxnDetails] = useState(null);
 
-  // Card types
-  const [cardTypes, setCardTypes] = useState([]);
-  const [memberships, setMemberships] = useState([]);
-  const [showCardForm, setShowCardForm] = useState(false);
-  const [cardForm, setCardForm] = useState({
-    name: '',
-    description: '',
-    price: 50,
-    validity_days: 365,
-    cashback_bonus: 0,
-    referral_bonus: 5,
-    welcome_bonus: 2
-  });
-
   useEffect(() => {
     if (token) {
       setStep('dashboard');
@@ -82,18 +68,14 @@ export default function SDMMerchantPage() {
   const fetchMerchantData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [profileRes, txnRes, reportRes, cardTypesRes, membershipsRes] = await Promise.all([
+      const [profileRes, txnRes, reportRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/merchant/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/transactions?limit=${txnLimit}`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/card-types`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/memberships`, { headers })
+        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers })
       ]);
       setMerchant(profileRes.data);
       setTransactions(txnRes.data);
       setReport(reportRes.data);
-      setCardTypes(cardTypesRes.data);
-      setMemberships(membershipsRes.data);
     } catch (error) {
       if (error.response?.status === 401) {
         handleLogout();
