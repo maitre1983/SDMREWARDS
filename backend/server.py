@@ -3584,6 +3584,26 @@ async def get_service_config(admin: dict = Depends(get_current_admin)):
         "api_configured": bulkclix_service.is_configured()
     }
 
+class CreditUserRequest(BaseModel):
+    phone: str
+    amount: float
+
+@sdm_router.post("/admin/fintech/users/credit")
+async def credit_user_wallet(request: CreditUserRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Credit a user's available cashback balance (for testing)"""
+    phone = normalize_phone(request.phone)
+    user = await db.sdm_users.find_one({"phone": phone})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update wallet
+    await db.wallets.update_one(
+        {"owner_id": user["id"], "type": "CLIENT_AVAILABLE"},
+        {"$inc": {"balance": request.amount}}
+    )
+    
+    return {"message": f"Credited GHS {request.amount} to {phone}", "user_id": user["id"]}
+
 # ==================== ADMIN PROMOTIONS ENDPOINTS ====================
 
 @sdm_router.post("/admin/promotions")
