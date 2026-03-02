@@ -811,7 +811,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
@@ -894,7 +894,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
@@ -972,7 +972,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
@@ -1048,7 +1048,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
@@ -1127,7 +1127,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
@@ -1267,7 +1267,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
@@ -1334,7 +1334,7 @@ export default function SDMClientPage() {
                   className="flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4"
                 >
                   <ArrowLeft size={18} />
-                  Retour
+                  Back
                 </button>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
