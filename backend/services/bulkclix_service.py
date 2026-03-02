@@ -551,7 +551,8 @@ class BulkClixService:
         self,
         user_id: str,
         phone_number: str,
-        bundle_id: str
+        bundle_id: str,
+        discount_amount: float = 0
     ) -> Dict[str, Any]:
         """Purchase data bundle for a phone number"""
         
@@ -568,7 +569,8 @@ class BulkClixService:
         if not bundle:
             raise ValueError(f"Data bundle not found: {bundle_id}")
         
-        amount = bundle.price
+        amount = bundle.price - discount_amount  # Apply discount
+        original_amount = bundle.price
         commission = round(amount * self.commission_rate, 2)
         net_amount = amount - commission
         
