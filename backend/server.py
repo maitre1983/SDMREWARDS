@@ -3260,6 +3260,77 @@ class ServicePromotion(BaseModel):
 
 # ==================== USER SERVICE ENDPOINTS ====================
 
+# Helper function to get active promotions
+async def get_active_promotions(service_type: str = None):
+    """Get active promotions for a service type"""
+    now = datetime.now(timezone.utc)
+    current_day = now.strftime("%A").upper()  # MONDAY, TUESDAY, etc.
+    
+    query = {"is_active": True}
+    
+    promotions = await db.service_promotions.find(query, {"_id": 0}).to_list(100)
+    
+    active_promos = []
+    for promo in promotions:
+        # Check date range
+        if promo.get("start_date") and promo["start_date"] > now.isoformat():
+            continue
+        if promo.get("end_date") and promo["end_date"] < now.isoformat():
+            continue
+        
+        # Check day of week
+        if promo.get("days_of_week") and len(promo["days_of_week"]) > 0:
+            if current_day not in promo["days_of_week"]:
+                continue
+        
+        # Check service type
+        if service_type and promo["target_service"] != "ALL":
+            if promo["target_service"] != service_type:
+                continue
+        
+        active_promos.append(promo)
+    
+    return active_promos
+
+async def apply_promotion(service_type: str, amount: float):
+    """Apply best promotion for a service and return discount info"""
+    promos = await get_active_promotions(service_type)
+    
+    best_discount = 0
+    best_promo = None
+    
+    for promo in promos:
+        # Check minimum amount
+        if amount < promo.get("min_amount", 0):
+            continue
+        
+        discount = amount * (promo["discount_percent"] / 100)
+        if discount > best_discount:
+            best_discount = discount
+            best_promo = promo
+    
+    if best_promo:
+        return {
+            "has_discount": True,
+            "promo_id": best_promo["id"],
+            "promo_name": best_promo["name"],
+            "discount_percent": best_promo["discount_percent"],
+            "discount_amount": round(best_discount, 2),
+            "final_amount": round(amount - best_discount, 2)
+        }
+    
+    return {
+        "has_discount": False,
+        "discount_amount": 0,
+        "final_amount": amount
+    }
+
+@sdm_router.get("/user/services/promotions")
+async def get_user_promotions():
+    """Get active promotions for user"""
+    promos = await get_active_promotions()
+    return {"promotions": promos}
+
 @sdm_router.get("/user/services/balance")
 async def get_user_service_balance(user: dict = Depends(get_current_user)):
     """User: Get available cashback balance for services"""
