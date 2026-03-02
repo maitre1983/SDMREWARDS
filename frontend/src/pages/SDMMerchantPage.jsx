@@ -381,56 +381,6 @@ export default function SDMMerchantPage() {
                   <p className="text-xs text-slate-500 mt-1">{t('sdm_between_1_20')}</p>
                 </div>
                 
-                <Button
-                  type="submit"
-                  disabled={isLoading || !registerForm.business_name || !registerForm.phone}
-                  className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
-                >
-                  {isLoading ? <Loader2 className="animate-spin" /> : (
-                    <>
-                      <Send size={18} className="mr-2" />
-                      {t('sdm_send_otp_code')}
-                    </>
-                  )}
-                </Button>
-                
-                <button
-                  type="button"
-                  onClick={() => setStep('welcome')}
-                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
-                >
-                  {t('sdm_back')}
-                </button>
-              </form>
-            )}
-
-            {/* Register Step 2: OTP + Password */}
-            {step === 'otp' && (
-              <form onSubmit={handleVerifyOTPAndRegister} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_verification_password')}</h3>
-                <p className="text-slate-400 text-sm text-center mb-4">
-                  {t('sdm_code_sent_to_phone')} {registerForm.phone}
-                </p>
-                
-                <div>
-                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_otp_code')} *</label>
-                  <Input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder={t('sdm_enter_4_digit')}
-                    maxLength={4}
-                    className="bg-slate-800/50 border-slate-700 text-white text-center text-xl tracking-widest"
-                    required
-                  />
-                </div>
-                
-                {debugOtp && (
-                  <p className="text-xs text-amber-400 text-center">
-                    {t('sdm_test_code')}: <strong>{debugOtp}</strong>
-                  </p>
-                )}
-                
                 <div>
                   <label className="block text-sm text-slate-300 mb-1">{t('sdm_password')} *</label>
                   <div className="relative">
@@ -457,7 +407,57 @@ export default function SDMMerchantPage() {
                 
                 <Button
                   type="submit"
-                  disabled={isLoading || otp.length !== 4 || registerForm.password.length < 6}
+                  disabled={isLoading || !registerForm.business_name || !registerForm.phone || registerForm.password.length < 6}
+                  className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" /> : (
+                    <>
+                      <Send size={18} className="mr-2" />
+                      {t('sdm_send_otp_code')}
+                    </>
+                  )}
+                </Button>
+                
+                <button
+                  type="button"
+                  onClick={() => setStep('welcome')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
+                >
+                  {t('sdm_back')}
+                </button>
+              </form>
+            )}
+
+            {/* Register Step 2: OTP Verification Only */}
+            {step === 'otp' && (
+              <form onSubmit={handleVerifyOTPAndRegister} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_otp_verification')}</h3>
+                <p className="text-slate-400 text-sm text-center mb-4">
+                  {t('sdm_code_sent_to_phone')} {registerForm.phone}
+                </p>
+                
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">{t('sdm_otp_code')} *</label>
+                  <Input
+                    type="text"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder={t('sdm_enter_4_digit')}
+                    maxLength={4}
+                    className="bg-slate-800/50 border-slate-700 text-white text-center text-xl tracking-widest"
+                    required
+                  />
+                </div>
+                
+                {debugOtp && (
+                  <p className="text-xs text-amber-400 text-center">
+                    {t('sdm_test_code')}: <strong>{debugOtp}</strong>
+                  </p>
+                )}
+                
+                <Button
+                  type="submit"
+                  disabled={isLoading || otp.length !== 4}
                   className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
                 >
                   {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_finalize_registration')}

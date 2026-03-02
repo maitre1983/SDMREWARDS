@@ -258,6 +258,17 @@ export default function SDMClientPage() {
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
+    
+    // Validate form before sending OTP
+    if (!fullName.trim()) {
+      toast.error(t('sdm_name_required') || 'Please enter your full name');
+      return;
+    }
+    if (password.length < 6) {
+      toast.error(t('sdm_password_min_6') || 'Password must be at least 6 characters');
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const payload = { phone };
@@ -282,44 +293,7 @@ export default function SDMClientPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/sdm/auth/verify-otp`, { 
-        phone, 
-        otp_code: otp,
-        request_id: otpId
-      });
-      
-      if (response.data.is_new_user) {
-        // New user - go to registration form
-        setStep('register_form');
-        toast.success(t('sdm_otp_verified'));
-      } else {
-        // Existing user - login successful
-        localStorage.setItem('sdm_user_token', response.data.access_token);
-        setToken(response.data.access_token);
-        setUser(response.data.user);
-        toast.success(t('sdm_login_success'));
-        setStep('dashboard');
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.detail || t('sdm_invalid_otp'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    if (!fullName.trim()) {
-      toast.error('Veuillez entrer votre nom complet');
-      return;
-    }
-    if (password.length < 6) {
-      toast.error('Le mot de passe doit contenir au moins 6 caractères');
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
+      // For registration, call the register endpoint directly with OTP
       const response = await axios.post(`${API_URL}/api/sdm/auth/register`, {
         phone,
         full_name: fullName,
@@ -340,10 +314,33 @@ export default function SDMClientPage() {
       }
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || t('sdm_register_failed'));
+      // If user already exists, try to verify OTP for login
+      if (error.response?.data?.detail?.includes('already registered')) {
+        try {
+          const loginResponse = await axios.post(`${API_URL}/api/sdm/auth/verify-otp`, { 
+            phone, 
+            otp_code: otp,
+            request_id: otpId
+          });
+          localStorage.setItem('sdm_user_token', loginResponse.data.access_token);
+          setToken(loginResponse.data.access_token);
+          setUser(loginResponse.data.user);
+          toast.success(t('sdm_login_success'));
+          setStep('dashboard');
+        } catch (verifyError) {
+          toast.error(verifyError.response?.data?.detail || t('sdm_invalid_otp'));
+        }
+      } else {
+        toast.error(error.response?.data?.detail || t('sdm_invalid_otp'));
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRegister = async (e) => {
+    // This function is now deprecated - registration happens in handleVerifyOTP
+    e.preventDefault();
   };
 
   const handleLogin = async (e) => {
@@ -569,10 +566,28 @@ export default function SDMClientPage() {
               </form>
             )}
 
-            {/* Register - Step 1: Phone + OTP */}
+            {/* Register - Step 1: Phone + Name + Password → Send OTP */}
             {step === 'register' && (
               <form onSubmit={handleSendOTP} className="space-y-4">
                 <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_registration')}</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    {t('sdm_full_name')} *
+                  </label>
+                  <div className="relative">
+                    <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder={t('sdm_your_full_name')}
+                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10"
+                      required
+                      data-testid="sdm-fullname-input"
+                    />
+                  </div>
+                </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -596,6 +611,33 @@ export default function SDMClientPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
+                    {t('sdm_password')} *
+                  </label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={t('sdm_min_6_chars')}
+                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10 pr-12"
+                      required
+                      minLength={6}
+                      data-testid="sdm-password-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{t('sdm_min_6_chars')}</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
                     {t('sdm_referral_optional')}
                   </label>
                   <Input
@@ -615,7 +657,7 @@ export default function SDMClientPage() {
 
                 <Button
                   type="submit"
-                  disabled={isLoading || !phone}
+                  disabled={isLoading || !phone || !fullName || password.length < 6}
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   data-testid="sdm-send-otp-btn"
                 >
@@ -637,7 +679,7 @@ export default function SDMClientPage() {
               </form>
             )}
 
-            {/* Register - Step 2: OTP Verification */}
+            {/* Register - Step 2: OTP Verification → Complete Registration */}
             {step === 'otp' && (
               <form onSubmit={handleVerifyOTP} className="space-y-4">
                 <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_otp_verification')}</h3>
@@ -683,67 +725,6 @@ export default function SDMClientPage() {
                 >
                   {t('sdm_change_number')}
                 </button>
-              </form>
-            )}
-
-            {/* Register - Step 3: Complete Registration */}
-            {step === 'register_form' && (
-              <form onSubmit={handleRegister} className="space-y-4">
-                <h3 className="text-lg font-semibold text-white text-center mb-4">{t('sdm_complete_profile')}</h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    {t('sdm_full_name')} *
-                  </label>
-                  <div className="relative">
-                    <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder={t('sdm_your_full_name')}
-                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10"
-                      required
-                      data-testid="sdm-fullname-input"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    {t('sdm_password')} *
-                  </label>
-                  <div className="relative">
-                    <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder={t('sdm_min_6_chars')}
-                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10 pr-12"
-                      required
-                      minLength={6}
-                      data-testid="sdm-password-input"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                    >
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">{t('sdm_min_6_chars')}</p>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={isLoading || !fullName || password.length < 6}
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
-                  data-testid="sdm-register-submit-btn"
-                >
-                  {isLoading ? <Loader2 className="animate-spin" /> : t('sdm_create_my_account')}
-                </Button>
               </form>
             )}
           </div>
