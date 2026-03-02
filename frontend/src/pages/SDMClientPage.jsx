@@ -4,7 +4,8 @@ import {
   Wallet, QrCode, ArrowLeft, Phone, Loader2, 
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
-  Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket
+  Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket,
+  Eye, EyeOff, User, Lock
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -19,7 +20,7 @@ const LOGO_URL = "/sdm-logo.png";
 export default function SDMClientPage() {
   const { t, isRTL } = useLanguage();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState('phone'); // phone, otp, dashboard
+  const [step, setStep] = useState('welcome'); // welcome, register, login, otp, register_form, dashboard
   const [phone, setPhone] = useState('');
   const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
   const [otp, setOtp] = useState('');
@@ -35,6 +36,13 @@ export default function SDMClientPage() {
   const [availableCards, setAvailableCards] = useState([]);
   const [userMemberships, setUserMemberships] = useState([]);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  
+  // Auth form states
+  const [fullName, setFullName] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   // Withdrawal form
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -257,17 +265,14 @@ export default function SDMClientPage() {
         payload.referral_code = referralCode;
       }
       const response = await axios.post(`${API_URL}/api/sdm/auth/send-otp`, payload);
-      setOtpId(response.data.otp_id);
-      if (response.data.debug_otp) {
-        setDebugOtp(response.data.debug_otp);
+      setOtpId(response.data.request_id);
+      if (response.data.is_test_account) {
+        setDebugOtp('0000');
       }
-      if (response.data.referral_valid === false) {
-        toast.warning('Referral code not found, continuing without it');
-      }
-      toast.success('OTP sent to your phone');
+      toast.success('OTP envoyé sur votre téléphone');
       setStep('otp');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to send OTP');
+      toast.error(error.response?.data?.detail || 'Échec de l\'envoi de l\'OTP');
     } finally {
       setIsLoading(false);
     }
@@ -279,20 +284,84 @@ export default function SDMClientPage() {
     try {
       const response = await axios.post(`${API_URL}/api/sdm/auth/verify-otp`, { 
         phone, 
-        otp_code: otp 
+        otp_code: otp,
+        request_id: otpId
       });
+      
+      if (response.data.is_new_user) {
+        // New user - go to registration form
+        setStep('register_form');
+        toast.success('OTP vérifié! Complétez votre inscription');
+      } else {
+        // Existing user - login successful
+        localStorage.setItem('sdm_user_token', response.data.access_token);
+        setToken(response.data.access_token);
+        setUser(response.data.user);
+        toast.success('Connexion réussie!');
+        setStep('dashboard');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'OTP invalide');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (!fullName.trim()) {
+      toast.error('Veuillez entrer votre nom complet');
+      return;
+    }
+    if (password.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/sdm/auth/register`, {
+        phone,
+        full_name: fullName,
+        password,
+        referral_code: referralCode || null,
+        otp_code: otp,
+        request_id: otpId
+      });
+      
       localStorage.setItem('sdm_user_token', response.data.access_token);
       setToken(response.data.access_token);
       setUser(response.data.user);
       
-      if (response.data.is_new_user && response.data.welcome_bonus > 0) {
-        toast.success(`Welcome! You received GHS ${response.data.welcome_bonus} bonus!`, { duration: 5000 });
+      if (response.data.welcome_bonus > 0) {
+        toast.success(`Bienvenue! Vous avez reçu GHS ${response.data.welcome_bonus} de bonus!`, { duration: 5000 });
       } else {
-        toast.success('Login successful!');
+        toast.success('Inscription réussie!');
       }
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid OTP');
+      toast.error(error.response?.data?.detail || 'Échec de l\'inscription');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/sdm/auth/login`, {
+        phone,
+        password: loginPassword
+      });
+      
+      localStorage.setItem('sdm_user_token', response.data.access_token);
+      setToken(response.data.access_token);
+      setUser(response.data.user);
+      toast.success('Connexion réussie!');
+      setStep('dashboard');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Identifiants invalides');
     } finally {
       setIsLoading(false);
     }
@@ -311,12 +380,12 @@ export default function SDMClientPage() {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(`Withdrawal request submitted! Net amount: GHS ${response.data.net_amount}`);
+      toast.success(`Demande de retrait soumise! Montant net: GHS ${response.data.net_amount}`);
       setWithdrawAmount('');
       setWithdrawPhone('');
       fetchUserData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Withdrawal failed');
+      toast.error(error.response?.data?.detail || 'Échec du retrait');
     } finally {
       setIsLoading(false);
     }
@@ -326,7 +395,7 @@ export default function SDMClientPage() {
     localStorage.removeItem('sdm_user_token');
     setToken(null);
     setUser(null);
-    setStep('phone');
+    setStep('welcome');
   };
 
   const copyQRCode = () => {
@@ -397,7 +466,7 @@ export default function SDMClientPage() {
         <div className="relative w-full max-w-md">
           <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
             <ArrowLeft size={18} />
-            {t('sdm_back')}
+            Retour
           </Link>
 
           <div className="text-center mb-8">
@@ -407,41 +476,139 @@ export default function SDMClientPage() {
           </div>
 
           <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl p-8 border border-slate-800">
-            {step === 'phone' ? (
-              <form onSubmit={handleSendOTP}>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  {t('sdm_phone_number')}
-                </label>
-                <div className="flex gap-2 mb-4">
-                  <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
-                    +233
+            
+            {/* Welcome Screen - Choose Register or Login */}
+            {step === 'welcome' && (
+              <div className="space-y-4">
+                <p className="text-center text-slate-300 mb-6">Bienvenue sur SDM Rewards</p>
+                <Button
+                  onClick={() => setStep('register')}
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                  data-testid="sdm-register-btn"
+                >
+                  <User size={18} className="mr-2" />
+                  Créer un compte
+                </Button>
+                <Button
+                  onClick={() => setStep('login')}
+                  variant="outline"
+                  className="w-full h-12 border-slate-600 text-slate-300 hover:bg-slate-800 rounded-xl"
+                  data-testid="sdm-login-btn"
+                >
+                  <Lock size={18} className="mr-2" />
+                  Se connecter
+                </Button>
+              </div>
+            )}
+
+            {/* Login with phone + password */}
+            {step === 'login' && (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Connexion</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Numéro de téléphone
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
+                      +233
+                    </div>
+                    <Input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="XX XXX XXXX"
+                      className="flex-1 h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl"
+                      required
+                      data-testid="sdm-login-phone-input"
+                    />
                   </div>
-                  <Input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="XX XXX XXXX"
-                    className="flex-1 h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl"
-                    required
-                    data-testid="sdm-phone-input"
-                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Mot de passe
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showLoginPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Votre mot de passe"
+                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pr-12"
+                      required
+                      data-testid="sdm-login-password-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showLoginPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !phone || !loginPassword}
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                  data-testid="sdm-login-submit-btn"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Se connecter'}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep('welcome')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
+                >
+                  Retour
+                </button>
+              </form>
+            )}
+
+            {/* Register - Step 1: Phone + OTP */}
+            {step === 'register' && (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Inscription</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Numéro de téléphone *
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="flex items-center px-4 bg-slate-800 rounded-xl text-slate-400">
+                      +233
+                    </div>
+                    <Input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="XX XXX XXXX"
+                      className="flex-1 h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl"
+                      required
+                      data-testid="sdm-phone-input"
+                    />
+                  </div>
                 </div>
                 
-                <div className="mb-6">
+                <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    {t('sdm_referral_optional')}
+                    Code de parrainage (optionnel)
                   </label>
                   <Input
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    placeholder="e.g., SDM1A2B3C"
+                    placeholder="ex: SDM1A2B3C"
                     className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl uppercase"
                     data-testid="sdm-referral-input"
                   />
                   {referralCode && (
                     <p className="text-xs text-emerald-400 mt-1">
-                      Get GHS 2 welcome bonus!
+                      Recevez GHS 2 de bonus de bienvenue!
                     </p>
                   )}
                 </div>
@@ -455,46 +622,128 @@ export default function SDMClientPage() {
                   {isLoading ? <Loader2 className="animate-spin" /> : (
                     <>
                       <Send size={18} className="mr-2" />
-                      Send OTP
+                      Envoyer le code OTP
                     </>
                   )}
                 </Button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep('welcome')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
+                >
+                  Retour
+                </button>
               </form>
-            ) : (
-              <form onSubmit={handleVerifyOTP}>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Enter OTP Code
-                </label>
-                <Input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl text-center text-2xl tracking-widest mb-4"
-                  required
-                  data-testid="sdm-otp-input"
-                />
+            )}
+
+            {/* Register - Step 2: OTP Verification */}
+            {step === 'otp' && (
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Vérification OTP</h3>
+                <p className="text-slate-400 text-sm text-center mb-4">
+                  Un code a été envoyé au {phone}
+                </p>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Code OTP
+                  </label>
+                  <Input
+                    type="text"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="Entrez le code à 4 chiffres"
+                    maxLength={4}
+                    className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl text-center text-2xl tracking-widest"
+                    required
+                    data-testid="sdm-otp-input"
+                  />
+                </div>
+                
                 {debugOtp && (
-                  <p className="text-xs text-amber-400 mb-4 text-center">
-                    Debug OTP (SMS not configured): <strong>{debugOtp}</strong>
+                  <p className="text-xs text-amber-400 text-center">
+                    Code test: <strong>{debugOtp}</strong>
                   </p>
                 )}
+                
                 <Button
                   type="submit"
-                  disabled={isLoading || otp.length !== 6}
+                  disabled={isLoading || otp.length !== 4}
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
                   data-testid="sdm-verify-otp-btn"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Verify & Login'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Vérifier le code'}
                 </Button>
+                
                 <button
                   type="button"
-                  onClick={() => setStep('phone')}
-                  className="w-full mt-4 text-sm text-slate-400 hover:text-white"
+                  onClick={() => setStep('register')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
                 >
-                  Change phone number
+                  Changer de numéro
                 </button>
+              </form>
+            )}
+
+            {/* Register - Step 3: Complete Registration */}
+            {step === 'register_form' && (
+              <form onSubmit={handleRegister} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Complétez votre profil</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Nom complet *
+                  </label>
+                  <div className="relative">
+                    <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Votre nom complet"
+                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10"
+                      required
+                      data-testid="sdm-fullname-input"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Mot de passe *
+                  </label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Min. 6 caractères"
+                      className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl pl-10 pr-12"
+                      required
+                      minLength={6}
+                      data-testid="sdm-password-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Minimum 6 caractères</p>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !fullName || password.length < 6}
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                  data-testid="sdm-register-submit-btn"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Créer mon compte'}
+                </Button>
               </form>
             )}
           </div>
@@ -514,7 +763,7 @@ export default function SDMClientPage() {
               <img src={LOGO_URL} alt="SDM Rewards" className="w-10 h-10 rounded-full object-cover" />
               <div>
                 <p className="text-sm opacity-80">SDM Rewards</p>
-                <p className="font-semibold">{user?.first_name || t('sdm_member') || 'Member'}</p>
+                <p className="font-semibold">{user?.full_name || user?.first_name || 'Membre'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">

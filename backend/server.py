@@ -53,6 +53,11 @@ HUBTEL_CLIENT_ID = os.environ.get('HUBTEL_CLIENT_ID', '')
 HUBTEL_CLIENT_SECRET = os.environ.get('HUBTEL_CLIENT_SECRET', '')
 HUBTEL_SENDER_ID = os.environ.get('HUBTEL_SENDER_ID', 'SDM')
 
+# BulkClix OTP Settings
+BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
+BULKCLIX_OTP_SENDER_ID = os.environ.get('BULKCLIX_OTP_SENDER_ID', '')
+BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
+
 # SDM Business Settings (defaults - can be overridden by DB config)
 SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
 CASHBACK_PENDING_DAYS = int(os.environ.get('CASHBACK_PENDING_DAYS', '7'))
@@ -204,8 +209,10 @@ class SDMUser(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     phone: str
     phone_verified: bool = False
+    password_hash: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    full_name: Optional[str] = None
     email: Optional[str] = None
     qr_code: str = Field(default_factory=lambda: str(uuid.uuid4())[:12].upper())
     referral_code: str = Field(default_factory=lambda: f"SDM{secrets.token_hex(3).upper()}")
@@ -409,8 +416,11 @@ class SDMMerchant(BaseModel):
     business_name: str
     business_type: str  # restaurant, salon, spa, hotel, etc.
     phone: str
+    phone_verified: bool = False
+    password_hash: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    gps_address: Optional[str] = None  # GPS coordinates or Plus Code
     city: str = "Accra"
     cashback_rate: float = 0.05  # 5% default
     api_key: str = Field(default_factory=lambda: f"sdk_{secrets.token_hex(16)}")
@@ -524,26 +534,48 @@ class FloatAlert(BaseModel):
 
 class SendOTPRequest(BaseModel):
     phone: str
-    referral_code: Optional[str] = None  # Optional referral code
+    referral_code: Optional[str] = None
+    user_type: str = "client"  # "client" or "merchant"
 
 class VerifyOTPRequest(BaseModel):
     phone: str
     otp_code: str
+    request_id: str  # BulkClix request ID
+
+class ClientRegisterRequest(BaseModel):
+    phone: str
+    full_name: str
+    password: str
+    referral_code: Optional[str] = None
+    otp_code: str
+    request_id: str
+
+class ClientLoginRequest(BaseModel):
+    phone: str
+    password: str
+
+class MerchantRegisterRequest(BaseModel):
+    business_name: str
+    business_type: str
+    phone: str
+    password: str
+    otp_code: str
+    request_id: str
+    email: Optional[str] = None
+    address: Optional[str] = None
+    gps_address: Optional[str] = None
+    city: str = "Accra"
+    cashback_rate: float = 0.05
+
+class MerchantLoginRequest(BaseModel):
+    phone: str
+    password: str
 
 class UserRegisterRequest(BaseModel):
     phone: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[str] = None
-
-class MerchantRegisterRequest(BaseModel):
-    business_name: str
-    business_type: str
-    phone: str
-    email: Optional[str] = None
-    address: Optional[str] = None
-    city: str = "Accra"
-    cashback_rate: float = 0.05
 
 class CreateTransactionRequest(BaseModel):
     user_qr_code: str
@@ -720,6 +752,95 @@ async def send_sms_hubtel(phone: str, message: str) -> bool:
     except Exception as e:
         logger.error(f"SMS error: {str(e)}")
         return False
+
+# ============== BULKCLIX OTP SERVICE ==============
+
+async def send_otp_bulkclix(phone: str) -> dict:
+    """Send OTP via BulkClix API"""
+    if not BULKCLIX_API_KEY or not BULKCLIX_OTP_SENDER_ID:
+        logger.warning("BulkClix OTP credentials not configured")
+        return {"success": False, "error": "OTP service not configured"}
+    
+    # Normalize phone for BulkClix (remove + prefix)
+    phone_clean = phone.replace("+", "").replace(" ", "")
+    if phone_clean.startswith("233"):
+        phone_clean = "0" + phone_clean[3:]  # Convert to local format
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
+                json={
+                    "phoneNumber": phone_clean,
+                    "senderId": BULKCLIX_OTP_SENDER_ID,
+                    "message": "Your SDMrewards access code is <%otp_code%>",
+                    "expiry": 5,  # 5 minutes
+                    "length": 4   # 4-digit OTP
+                },
+                headers={
+                    "x-api-key": BULKCLIX_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                logger.info(f"BulkClix OTP sent to {phone_clean}")
+                return {
+                    "success": True,
+                    "request_id": data.get("data", {}).get("otp", {}).get("requestId"),
+                    "prefix": data.get("data", {}).get("otp", {}).get("prefix"),
+                    "phone": phone_clean
+                }
+            else:
+                logger.error(f"BulkClix OTP error: {response.text}")
+                return {"success": False, "error": response.text}
+    except Exception as e:
+        logger.error(f"BulkClix OTP error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+async def verify_otp_bulkclix(phone: str, code: str, request_id: str) -> dict:
+    """Verify OTP via BulkClix API"""
+    if not BULKCLIX_API_KEY:
+        logger.warning("BulkClix API key not configured")
+        return {"success": False, "error": "OTP service not configured"}
+    
+    # Normalize phone for BulkClix
+    phone_clean = phone.replace("+", "").replace(" ", "")
+    if phone_clean.startswith("233"):
+        phone_clean = "0" + phone_clean[3:]
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
+                json={
+                    "requestId": request_id,
+                    "phoneNumber": phone_clean,
+                    "code": code
+                },
+                headers={
+                    "x-api-key": BULKCLIX_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                if "successful" in data.get("message", "").lower():
+                    logger.info(f"BulkClix OTP verified for {phone_clean}")
+                    return {"success": True, "phone": phone_clean}
+                else:
+                    return {"success": False, "error": data.get("message", "Verification failed")}
+            else:
+                error_data = response.json() if response.text else {}
+                logger.error(f"BulkClix OTP verify error: {response.text}")
+                return {"success": False, "error": error_data.get("message", "Verification failed")}
+    except Exception as e:
+        logger.error(f"BulkClix OTP verify error: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 # ============== AUTH DEPENDENCIES ==============
 
@@ -935,149 +1056,288 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
 
 # Test account credentials (for development/testing only)
 TEST_PHONE = "+233000000000"
-TEST_OTP = "000000"
+TEST_OTP = "0000"
 
 @sdm_router.post("/auth/send-otp")
 async def send_otp(request: SendOTPRequest):
-    """Send OTP to phone number"""
+    """Send OTP to phone number via BulkClix"""
     phone = normalize_phone(request.phone)
     
-    # Test account - fixed OTP that never expires
+    # Test account - return mock request_id
     if phone == normalize_phone(TEST_PHONE):
-        otp_code = TEST_OTP
-        expires_at = (datetime.now(timezone.utc) + timedelta(days=365)).isoformat()  # 1 year validity
-    else:
-        otp_code = generate_otp()
-        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+        return {
+            "message": "OTP sent (test account)",
+            "phone": phone,
+            "request_id": "test_request_id",
+            "is_test_account": True
+        }
     
-    # Validate referral code if provided
-    referral_code = None
+    # Send real OTP via BulkClix
+    result = await send_otp_bulkclix(phone)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to send OTP"))
+    
+    # Store referral code temporarily if provided
     if request.referral_code:
         referrer = await db.sdm_users.find_one({"referral_code": request.referral_code.upper()}, {"_id": 0})
         if referrer:
-            referral_code = request.referral_code.upper()
-    
-    # Store OTP with referral code
-    otp_record = OTPRecord(phone=phone, otp_code=otp_code, referral_code=referral_code, expires_at=expires_at)
-    await db.otp_records.delete_many({"phone": phone})  # Remove old OTPs
-    await db.otp_records.insert_one(otp_record.model_dump())
-    
-    # Send SMS (skip for test account)
-    sms_sent = False
-    if phone != normalize_phone(TEST_PHONE):
-        message = f"Your SDM verification code is: {otp_code}. Valid for 10 minutes."
-        sms_sent = await send_sms_hubtel(phone, message)
+            await db.otp_temp.update_one(
+                {"phone": phone},
+                {"$set": {"referral_code": request.referral_code.upper(), "request_id": result["request_id"]}},
+                upsert=True
+            )
     
     return {
-        "message": "OTP sent" if sms_sent else "OTP generated (SMS not configured)",
+        "message": "OTP sent",
         "phone": phone,
-        "expires_in": 600,
-        "otp_id": otp_record.id,
-        "referral_valid": referral_code is not None if request.referral_code else None,
-        # For testing only - remove in production
-        "debug_otp": otp_code if not HUBTEL_CLIENT_ID else None,
-        "is_test_account": phone == normalize_phone(TEST_PHONE)
+        "request_id": result["request_id"],
+        "is_test_account": False
     }
 
-@sdm_router.post("/auth/verify-otp")
-async def verify_otp(request: VerifyOTPRequest):
-    """Verify OTP and login/register user"""
+@sdm_router.post("/auth/register")
+async def register_client(request: ClientRegisterRequest):
+    """Register new client with OTP verification"""
     phone = normalize_phone(request.phone)
     
-    # Find OTP record
-    otp_record = await db.otp_records.find_one({"phone": phone, "is_verified": False}, {"_id": 0})
-    if not otp_record:
-        raise HTTPException(status_code=400, detail="No OTP request found")
-    
-    # Check expiration
-    if datetime.fromisoformat(otp_record["expires_at"].replace("Z", "+00:00")) < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="OTP expired")
-    
-    # Check attempts
-    if otp_record["attempts"] >= 3:
-        raise HTTPException(status_code=400, detail="Too many attempts")
+    # Check if user already exists
+    existing = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Phone number already registered. Please login instead.")
     
     # Verify OTP
-    if otp_record["otp_code"] != request.otp_code:
-        await db.otp_records.update_one({"id": otp_record["id"]}, {"$inc": {"attempts": 1}})
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    
-    # Mark as verified
-    await db.otp_records.update_one({"id": otp_record["id"]}, {"$set": {"is_verified": True}})
-    
-    # Find or create user
-    user = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
-    is_new_user = False
-    
-    if not user:
-        is_new_user = True
-        new_user = SDMUser(phone=phone, phone_verified=True)
-        
-        # Handle referral
-        referral_code = otp_record.get("referral_code")
-        if referral_code:
-            referrer = await db.sdm_users.find_one({"referral_code": referral_code}, {"_id": 0})
-            if referrer and referrer["phone"] != phone:  # Can't refer yourself
-                new_user.referred_by = referrer["id"]
-                
-                # Give welcome bonus to new user
-                new_user.wallet_available = REFERRAL_WELCOME_BONUS
-                new_user.total_earned = REFERRAL_WELCOME_BONUS
-                
-                # Record welcome bonus
-                welcome_bonus = ReferralBonus(
-                    referrer_id=referrer["id"],
-                    referred_id=new_user.id,
-                    referred_phone=phone,
-                    bonus_type="welcome_bonus",
-                    amount=REFERRAL_WELCOME_BONUS
-                )
-                await db.referral_bonuses.insert_one(welcome_bonus.model_dump())
-                
-                # Give bonus to referrer
-                await db.sdm_users.update_one(
-                    {"id": referrer["id"]},
-                    {
-                        "$inc": {
-                            "wallet_available": REFERRAL_BONUS,
-                            "total_earned": REFERRAL_BONUS,
-                            "referral_bonus_earned": REFERRAL_BONUS,
-                            "referral_count": 1
-                        }
-                    }
-                )
-                
-                # Record referrer bonus
-                referrer_bonus = ReferralBonus(
-                    referrer_id=referrer["id"],
-                    referred_id=new_user.id,
-                    referred_phone=phone,
-                    bonus_type="referrer_bonus",
-                    amount=REFERRAL_BONUS
-                )
-                await db.referral_bonuses.insert_one(referrer_bonus.model_dump())
-        
-        await db.sdm_users.insert_one(new_user.model_dump())
-        user = new_user.model_dump()
-        
-        # Automatically create client wallet in ledger
-        try:
-            await ledger_service.create_wallet(EntityType.CLIENT, new_user.id)
-        except Exception as e:
-            print(f"Warning: Failed to create client wallet: {e}")
+    if phone == normalize_phone(TEST_PHONE):
+        if request.otp_code != TEST_OTP:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
     else:
-        await db.sdm_users.update_one({"phone": phone}, {"$set": {"phone_verified": True}})
+        verify_result = await verify_otp_bulkclix(phone, request.otp_code, request.request_id)
+        if not verify_result["success"]:
+            raise HTTPException(status_code=400, detail=verify_result.get("error", "OTP verification failed"))
+    
+    # Create new user
+    new_user = SDMUser(
+        phone=phone,
+        phone_verified=True,
+        password_hash=hash_password(request.password),
+        full_name=request.full_name
+    )
+    
+    # Handle referral
+    referral_code = request.referral_code
+    if not referral_code:
+        # Check temp storage
+        temp = await db.otp_temp.find_one({"phone": phone}, {"_id": 0})
+        if temp:
+            referral_code = temp.get("referral_code")
+    
+    if referral_code:
+        referrer = await db.sdm_users.find_one({"referral_code": referral_code.upper()}, {"_id": 0})
+        if referrer and referrer["phone"] != phone:
+            new_user.referred_by = referrer["id"]
+            
+            # Give welcome bonus to new user
+            new_user.wallet_available = REFERRAL_WELCOME_BONUS
+            new_user.total_earned = REFERRAL_WELCOME_BONUS
+            
+            # Record welcome bonus
+            welcome_bonus = ReferralBonus(
+                referrer_id=referrer["id"],
+                referred_id=new_user.id,
+                referred_phone=phone,
+                bonus_type="welcome_bonus",
+                amount=REFERRAL_WELCOME_BONUS
+            )
+            await db.referral_bonuses.insert_one(welcome_bonus.model_dump())
+            
+            # Give bonus to referrer
+            await db.sdm_users.update_one(
+                {"id": referrer["id"]},
+                {
+                    "$inc": {
+                        "wallet_available": REFERRAL_BONUS,
+                        "total_earned": REFERRAL_BONUS,
+                        "referral_bonus_earned": REFERRAL_BONUS,
+                        "referral_count": 1
+                    }
+                }
+            )
+            
+            # Record referrer bonus
+            referrer_bonus = ReferralBonus(
+                referrer_id=referrer["id"],
+                referred_id=new_user.id,
+                referred_phone=phone,
+                bonus_type="referrer_bonus",
+                amount=REFERRAL_BONUS
+            )
+            await db.referral_bonuses.insert_one(referrer_bonus.model_dump())
+    
+    await db.sdm_users.insert_one(new_user.model_dump())
+    
+    # Automatically create client wallet in ledger
+    try:
+        await ledger_service.create_wallet(EntityType.CLIENT, new_user.id)
+    except Exception as e:
+        print(f"Warning: Failed to create client wallet: {e}")
+    
+    # Clean up temp storage
+    await db.otp_temp.delete_many({"phone": phone})
     
     # Generate token
-    token = create_token({"sub": user["id"], "type": "user", "phone": phone}, expires_hours=168)  # 7 days
+    token = create_token({"sub": new_user.id, "type": "user", "phone": phone}, expires_hours=168)
+    
+    user_data = new_user.model_dump()
+    del user_data["password_hash"]
     
     return {
-        "message": "Verification successful",
+        "message": "Registration successful",
         "access_token": token,
         "token_type": "bearer",
-        "user": user,
-        "is_new_user": is_new_user,
-        "welcome_bonus": REFERRAL_WELCOME_BONUS if is_new_user and user.get("referred_by") else 0
+        "user": user_data,
+        "welcome_bonus": REFERRAL_WELCOME_BONUS if new_user.referred_by else 0
+    }
+
+@sdm_router.post("/auth/login")
+async def login_client(request: ClientLoginRequest):
+    """Login client with phone and password"""
+    phone = normalize_phone(request.phone)
+    
+    user = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="Phone number not registered")
+    
+    if not user.get("password_hash"):
+        raise HTTPException(status_code=401, detail="Please set up a password first")
+    
+    if not verify_password(request.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    
+    # Generate token
+    token = create_token({"sub": user["id"], "type": "user", "phone": phone}, expires_hours=168)
+    
+    # Remove password hash from response
+    user_response = {k: v for k, v in user.items() if k != "password_hash"}
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user_response
+    }
+
+@sdm_router.post("/auth/forgot-password")
+async def forgot_password(request: SendOTPRequest):
+    """Send OTP for password reset"""
+    phone = normalize_phone(request.phone)
+    
+    # Check if user exists
+    user = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Phone number not registered")
+    
+    # Test account
+    if phone == normalize_phone(TEST_PHONE):
+        return {
+            "message": "OTP sent (test account)",
+            "phone": phone,
+            "request_id": "test_request_id",
+            "is_test_account": True
+        }
+    
+    # Send OTP
+    result = await send_otp_bulkclix(phone)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to send OTP"))
+    
+    return {
+        "message": "OTP sent for password reset",
+        "phone": phone,
+        "request_id": result["request_id"]
+    }
+
+class ResetPasswordRequest(BaseModel):
+    phone: str
+    otp_code: str
+    request_id: str
+    new_password: str
+
+@sdm_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password after OTP verification"""
+    phone = normalize_phone(request.phone)
+    
+    # Verify OTP
+    if phone == normalize_phone(TEST_PHONE):
+        if request.otp_code != TEST_OTP:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+    else:
+        verify_result = await verify_otp_bulkclix(phone, request.otp_code, request.request_id)
+        if not verify_result["success"]:
+            raise HTTPException(status_code=400, detail=verify_result.get("error", "OTP verification failed"))
+    
+    # Update password
+    result = await db.sdm_users.update_one(
+        {"phone": phone},
+        {"$set": {"password_hash": hash_password(request.new_password)}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "Password reset successful"}
+
+# Legacy endpoint for backward compatibility
+@sdm_router.post("/auth/verify-otp")
+async def verify_otp(request: VerifyOTPRequest):
+    """Verify OTP (legacy - for compatibility)"""
+    phone = normalize_phone(request.phone)
+    
+    # Test account
+    if phone == normalize_phone(TEST_PHONE):
+        if request.otp_code != TEST_OTP:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+        
+        user = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
+        if user:
+            token = create_token({"sub": user["id"], "type": "user", "phone": phone}, expires_hours=168)
+            user_response = {k: v for k, v in user.items() if k != "password_hash"}
+            return {
+                "message": "Verification successful",
+                "access_token": token,
+                "token_type": "bearer",
+                "user": user_response,
+                "is_new_user": False
+            }
+        else:
+            return {
+                "message": "OTP verified - please complete registration",
+                "phone": phone,
+                "verified": True,
+                "is_new_user": True
+            }
+    
+    # Verify via BulkClix
+    verify_result = await verify_otp_bulkclix(phone, request.otp_code, request.request_id)
+    if not verify_result["success"]:
+        raise HTTPException(status_code=400, detail=verify_result.get("error", "OTP verification failed"))
+    
+    # Check if user exists
+    user = await db.sdm_users.find_one({"phone": phone}, {"_id": 0})
+    if user:
+        token = create_token({"sub": user["id"], "type": "user", "phone": phone}, expires_hours=168)
+        user_response = {k: v for k, v in user.items() if k != "password_hash"}
+        return {
+            "message": "Verification successful",
+            "access_token": token,
+            "token_type": "bearer",
+            "user": user_response,
+            "is_new_user": False
+        }
+    
+    return {
+        "message": "OTP verified - please complete registration",
+        "phone": phone,
+        "verified": True,
+        "is_new_user": True
     }
 
 @sdm_router.get("/user/profile")
@@ -1221,22 +1481,59 @@ async def request_withdrawal(request: WithdrawalRequest, user: dict = Depends(ge
 
 # ============== SDM MERCHANT ROUTES ==============
 
+@sdm_router.post("/merchant/send-otp")
+async def send_merchant_otp(request: SendOTPRequest):
+    """Send OTP to merchant phone number"""
+    phone = normalize_phone(request.phone)
+    
+    # Test account
+    if phone == normalize_phone(TEST_PHONE):
+        return {
+            "message": "OTP sent (test account)",
+            "phone": phone,
+            "request_id": "test_request_id",
+            "is_test_account": True
+        }
+    
+    # Send real OTP
+    result = await send_otp_bulkclix(phone)
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to send OTP"))
+    
+    return {
+        "message": "OTP sent",
+        "phone": phone,
+        "request_id": result["request_id"]
+    }
+
 @sdm_router.post("/merchant/register")
 async def register_merchant(request: MerchantRegisterRequest):
-    """Register new merchant"""
+    """Register new merchant with OTP verification"""
     phone = normalize_phone(request.phone)
     
     # Check if exists
     existing = await db.sdm_merchants.find_one({"phone": phone}, {"_id": 0})
     if existing:
-        raise HTTPException(status_code=400, detail="Merchant already registered")
+        raise HTTPException(status_code=400, detail="Phone number already registered. Please login instead.")
+    
+    # Verify OTP
+    if phone == normalize_phone(TEST_PHONE):
+        if request.otp_code != TEST_OTP:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+    else:
+        verify_result = await verify_otp_bulkclix(phone, request.otp_code, request.request_id)
+        if not verify_result["success"]:
+            raise HTTPException(status_code=400, detail=verify_result.get("error", "OTP verification failed"))
     
     merchant = SDMMerchant(
         business_name=request.business_name,
         business_type=request.business_type,
         phone=phone,
+        phone_verified=True,
+        password_hash=hash_password(request.password),
         email=request.email,
         address=request.address,
+        gps_address=request.gps_address,
         city=request.city,
         cashback_rate=request.cashback_rate
     )
@@ -1249,34 +1546,45 @@ async def register_merchant(request: MerchantRegisterRequest):
         print(f"Warning: Failed to create merchant wallet: {e}")
     
     # Generate token
-    token = create_token({"sub": merchant.id, "type": "merchant"}, expires_hours=720)  # 30 days
+    token = create_token({"sub": merchant.id, "type": "merchant"}, expires_hours=720)
+    
+    # Remove sensitive data from response
+    merchant_data = merchant.model_dump()
+    del merchant_data["password_hash"]
     
     return {
         "message": "Merchant registered successfully",
         "merchant_id": merchant.id,
-        "api_key": merchant.api_key,
-        "api_secret": merchant.api_secret,
         "access_token": token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "merchant": merchant_data
     }
-
-class MerchantLoginRequest(BaseModel):
-    phone: str
-    api_key: str
 
 @sdm_router.post("/merchant/login")
 async def merchant_login(request: MerchantLoginRequest):
-    """Merchant login with phone and API key"""
+    """Merchant login with phone and password"""
     phone = normalize_phone(request.phone)
-    merchant = await db.sdm_merchants.find_one({"phone": phone, "api_key": request.api_key}, {"_id": 0})
+    merchant = await db.sdm_merchants.find_one({"phone": phone}, {"_id": 0})
+    
     if not merchant:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Phone number not registered")
+    
+    if not merchant.get("password_hash"):
+        # Legacy merchants without password - allow API key login
+        raise HTTPException(status_code=401, detail="Please contact support to set up your password")
+    
+    if not verify_password(request.password, merchant["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid password")
     
     token = create_token({"sub": merchant["id"], "type": "merchant"}, expires_hours=720)
+    
+    # Remove sensitive data
+    merchant_response = {k: v for k, v in merchant.items() if k != "password_hash"}
+    
     return {
         "access_token": token,
         "token_type": "bearer",
-        "merchant": merchant
+        "merchant": merchant_response
     }
 
 @sdm_router.get("/merchant/profile")

@@ -4,7 +4,8 @@ import {
   Store, ArrowLeft, Loader2, QrCode, Users, BarChart3,
   Settings, LogOut, DollarSign, TrendingUp, Plus, Trash2,
   Check, X, Edit2, Camera, Calendar, Filter,
-  ChevronDown, ChevronUp, Clock, User, Search
+  ChevronDown, ChevronUp, Clock, User, Search,
+  Eye, EyeOff, Lock, MapPin, Send, Phone
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -19,7 +20,7 @@ const LOGO_URL = "/sdm-logo.png";
 
 export default function SDMMerchantPage() {
   const { t, isRTL } = useLanguage();
-  const [step, setStep] = useState('register'); // register, login, dashboard
+  const [step, setStep] = useState('welcome'); // welcome, register, otp, register_form, login, dashboard
   const [isLoading, setIsLoading] = useState(false);
   const [token, setToken] = useState(localStorage.getItem('sdm_merchant_token'));
   const [merchant, setMerchant] = useState(null);
@@ -34,13 +35,22 @@ export default function SDMMerchantPage() {
     phone: '',
     email: '',
     address: '',
+    gps_address: '',
     city: 'Accra',
-    cashback_rate: 0.05
+    cashback_rate: 0.05,
+    password: ''
   });
+  
+  // OTP state
+  const [otp, setOtp] = useState('');
+  const [otpRequestId, setOtpRequestId] = useState('');
+  const [debugOtp, setDebugOtp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Login form
   const [loginPhone, setLoginPhone] = useState('');
-  const [loginApiKey, setLoginApiKey] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Scan form
   const [scanQR, setScanQR] = useState('');
@@ -86,21 +96,51 @@ export default function SDMMerchantPage() {
   const handleQRScanned = (qrCode) => {
     setScanQR(qrCode);
     setShowScanner(false);
-    toast.success(`QR Code scanned: ${qrCode}`);
+    toast.success(`QR Code scanné: ${qrCode}`);
   };
 
-  const handleRegister = async (e) => {
+  const handleSendOTP = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/sdm/merchant/register`, registerForm);
+      const response = await axios.post(`${API_URL}/api/sdm/merchant/send-otp`, {
+        phone: registerForm.phone
+      });
+      setOtpRequestId(response.data.request_id);
+      if (response.data.is_test_account) {
+        setDebugOtp('0000');
+      }
+      toast.success('Code OTP envoyé sur votre téléphone');
+      setStep('otp');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec de l\'envoi de l\'OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOTPAndRegister = async (e) => {
+    e.preventDefault();
+    
+    if (!registerForm.password || registerForm.password.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/sdm/merchant/register`, {
+        ...registerForm,
+        otp_code: otp,
+        request_id: otpRequestId
+      });
       localStorage.setItem('sdm_merchant_token', response.data.access_token);
       setToken(response.data.access_token);
-      toast.success('Registration successful!');
-      toast.info(`Your API Key: ${response.data.api_key}`, { duration: 10000 });
+      setMerchant(response.data.merchant);
+      toast.success('Inscription réussie!');
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      toast.error(error.response?.data?.detail || 'Échec de l\'inscription');
     } finally {
       setIsLoading(false);
     }
@@ -112,15 +152,15 @@ export default function SDMMerchantPage() {
     try {
       const response = await axios.post(
         `${API_URL}/api/sdm/merchant/login`,
-        { phone: loginPhone, api_key: loginApiKey }
+        { phone: loginPhone, password: loginPassword }
       );
       localStorage.setItem('sdm_merchant_token', response.data.access_token);
       setToken(response.data.access_token);
       setMerchant(response.data.merchant);
-      toast.success('Login successful!');
+      toast.success('Connexion réussie!');
       setStep('dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid credentials');
+      toast.error(error.response?.data?.detail || 'Identifiants invalides');
     } finally {
       setIsLoading(false);
     }
@@ -138,12 +178,12 @@ export default function SDMMerchantPage() {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(`Cashback GHS ${response.data.cashback_amount} credited to ${response.data.user_name}!`);
+      toast.success(`Cashback GHS ${response.data.cashback_amount} crédité à ${response.data.user_name}!`);
       setScanQR('');
       setScanAmount('');
       fetchMerchantData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Transaction failed');
+      toast.error(error.response?.data?.detail || 'Échec de la transaction');
     } finally {
       setIsLoading(false);
     }
@@ -185,7 +225,7 @@ export default function SDMMerchantPage() {
     localStorage.removeItem('sdm_merchant_token');
     setToken(null);
     setMerchant(null);
-    setStep('register');
+    setStep('welcome');
   };
 
   // Register/Login Screen
@@ -200,50 +240,59 @@ export default function SDMMerchantPage() {
         <div className="max-w-md mx-auto">
           <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
             <ArrowLeft size={18} />
-            {t('sdm_back')}
+            Retour
           </Link>
 
           <div className="text-center mb-8">
             <img src={LOGO_URL} alt="SDM Merchant" className="w-20 h-20 mx-auto mb-4 rounded-2xl object-cover" />
             <h1 className="text-2xl font-bold text-white">SDM Merchant</h1>
-            <p className="text-slate-400">Partner Dashboard</p>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex mb-6 bg-slate-800 rounded-xl p-1">
-            <button
-              onClick={() => setStep('register')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                step === 'register' ? 'bg-blue-600 text-white' : 'text-slate-400'
-              }`}
-            >
-              Register
-            </button>
-            <button
-              onClick={() => setStep('login')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                step === 'login' ? 'bg-blue-600 text-white' : 'text-slate-400'
-              }`}
-            >
-              Login
-            </button>
+            <p className="text-slate-400">Tableau de bord partenaire</p>
           </div>
 
           <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
-            {step === 'register' ? (
-              <form onSubmit={handleRegister} className="space-y-4">
+            
+            {/* Welcome Screen */}
+            {step === 'welcome' && (
+              <div className="space-y-4">
+                <p className="text-center text-slate-300 mb-6">Bienvenue sur le portail marchand</p>
+                <Button
+                  onClick={() => setStep('register')}
+                  className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
+                  data-testid="merchant-register-btn"
+                >
+                  <Store size={18} className="mr-2" />
+                  Inscrire mon commerce
+                </Button>
+                <Button
+                  onClick={() => setStep('login')}
+                  variant="outline"
+                  className="w-full h-12 border-slate-600 text-slate-300 hover:bg-slate-800"
+                  data-testid="merchant-login-btn"
+                >
+                  <Lock size={18} className="mr-2" />
+                  Se connecter
+                </Button>
+              </div>
+            )}
+
+            {/* Register Step 1: Business Info + Phone */}
+            {step === 'register' && (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Inscription</h3>
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Business Name *</label>
+                  <label className="block text-sm text-slate-300 mb-1">Nom du commerce *</label>
                   <Input
                     value={registerForm.business_name}
                     onChange={(e) => setRegisterForm({...registerForm, business_name: e.target.value})}
-                    placeholder="My Restaurant"
+                    placeholder="Mon Restaurant"
                     className="bg-slate-800/50 border-slate-700 text-white"
                     required
                   />
                 </div>
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Business Type *</label>
+                  <label className="block text-sm text-slate-300 mb-1">Type d'activité *</label>
                   <select
                     value={registerForm.business_type}
                     onChange={(e) => setRegisterForm({...registerForm, business_type: e.target.value})}
@@ -252,33 +301,65 @@ export default function SDMMerchantPage() {
                     <option value="restaurant">Restaurant</option>
                     <option value="salon">Salon / Barbershop</option>
                     <option value="spa">Spa / Massage</option>
-                    <option value="hotel">Hotel</option>
-                    <option value="retail">Retail Store</option>
-                    <option value="other">Other</option>
+                    <option value="hotel">Hôtel</option>
+                    <option value="retail">Commerce de détail</option>
+                    <option value="other">Autre</option>
                   </select>
                 </div>
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Phone *</label>
-                  <Input
-                    value={registerForm.phone}
-                    onChange={(e) => setRegisterForm({...registerForm, phone: e.target.value})}
-                    placeholder="024 XXX XXXX"
-                    className="bg-slate-800/50 border-slate-700 text-white"
-                    required
-                  />
+                  <label className="block text-sm text-slate-300 mb-1">Téléphone *</label>
+                  <div className="flex gap-2">
+                    <div className="flex items-center px-4 bg-slate-800 rounded-lg text-slate-400">
+                      +233
+                    </div>
+                    <Input
+                      value={registerForm.phone}
+                      onChange={(e) => setRegisterForm({...registerForm, phone: e.target.value})}
+                      placeholder="XX XXX XXXX"
+                      className="flex-1 bg-slate-800/50 border-slate-700 text-white"
+                      required
+                    />
+                  </div>
                 </div>
+                
                 <div>
                   <label className="block text-sm text-slate-300 mb-1">Email</label>
                   <Input
                     type="email"
                     value={registerForm.email}
                     onChange={(e) => setRegisterForm({...registerForm, email: e.target.value})}
-                    placeholder="email@example.com"
+                    placeholder="email@exemple.com"
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
                 </div>
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">City</label>
+                  <label className="block text-sm text-slate-300 mb-1">Adresse</label>
+                  <Input
+                    value={registerForm.address}
+                    onChange={(e) => setRegisterForm({...registerForm, address: e.target.value})}
+                    placeholder="Rue et quartier"
+                    className="bg-slate-800/50 border-slate-700 text-white"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">
+                    <MapPin size={14} className="inline mr-1" />
+                    Adresse GPS (Code Plus ou coordonnées)
+                  </label>
+                  <Input
+                    value={registerForm.gps_address}
+                    onChange={(e) => setRegisterForm({...registerForm, gps_address: e.target.value})}
+                    placeholder="Ex: 9G8V+QH Accra ou 5.6037,-0.1870"
+                    className="bg-slate-800/50 border-slate-700 text-white"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Utilisez Google Maps pour obtenir votre code Plus</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">Ville</label>
                   <Input
                     value={registerForm.city}
                     onChange={(e) => setRegisterForm({...registerForm, city: e.target.value})}
@@ -286,8 +367,9 @@ export default function SDMMerchantPage() {
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
                 </div>
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Cashback Rate (%)</label>
+                  <label className="block text-sm text-slate-300 mb-1">Taux de cashback (%)</label>
                   <Input
                     type="number"
                     value={registerForm.cashback_rate * 100}
@@ -296,45 +378,159 @@ export default function SDMMerchantPage() {
                     max="20"
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Between 1% and 20%</p>
+                  <p className="text-xs text-slate-500 mt-1">Entre 1% et 20%</p>
                 </div>
+                
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !registerForm.business_name || !registerForm.phone}
                   className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Register Business'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : (
+                    <>
+                      <Send size={18} className="mr-2" />
+                      Envoyer le code OTP
+                    </>
+                  )}
                 </Button>
+                
+                <button
+                  type="button"
+                  onClick={() => setStep('welcome')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
+                >
+                  Retour
+                </button>
               </form>
-            ) : (
-              <form onSubmit={handleLogin} className="space-y-4">
+            )}
+
+            {/* Register Step 2: OTP + Password */}
+            {step === 'otp' && (
+              <form onSubmit={handleVerifyOTPAndRegister} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Vérification & Mot de passe</h3>
+                <p className="text-slate-400 text-sm text-center mb-4">
+                  Code envoyé au {registerForm.phone}
+                </p>
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Phone Number</label>
+                  <label className="block text-sm text-slate-300 mb-1">Code OTP *</label>
                   <Input
-                    value={loginPhone}
-                    onChange={(e) => setLoginPhone(e.target.value)}
-                    placeholder="024 XXX XXXX"
-                    className="bg-slate-800/50 border-slate-700 text-white"
+                    type="text"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="Entrez le code à 4 chiffres"
+                    maxLength={4}
+                    className="bg-slate-800/50 border-slate-700 text-white text-center text-xl tracking-widest"
                     required
                   />
                 </div>
+                
+                {debugOtp && (
+                  <p className="text-xs text-amber-400 text-center">
+                    Code test: <strong>{debugOtp}</strong>
+                  </p>
+                )}
+                
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">API Key</label>
-                  <Input
-                    value={loginApiKey}
-                    onChange={(e) => setLoginApiKey(e.target.value)}
-                    placeholder="sdk_xxxxxxxx"
-                    className="bg-slate-800/50 border-slate-700 text-white"
-                    required
-                  />
+                  <label className="block text-sm text-slate-300 mb-1">Mot de passe *</label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      value={registerForm.password}
+                      onChange={(e) => setRegisterForm({...registerForm, password: e.target.value})}
+                      placeholder="Min. 6 caractères"
+                      className="bg-slate-800/50 border-slate-700 text-white pl-10 pr-12"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">Ce mot de passe servira pour vos connexions futures</p>
                 </div>
+                
                 <Button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || otp.length !== 4 || registerForm.password.length < 6}
+                  className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Finaliser l\'inscription'}
+                </Button>
+                
+                <button
+                  type="button"
+                  onClick={() => setStep('register')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
+                >
+                  Modifier les informations
+                </button>
+              </form>
+            )}
+
+            {/* Login */}
+            {step === 'login' && (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <h3 className="text-lg font-semibold text-white text-center mb-4">Connexion</h3>
+                
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">Numéro de téléphone</label>
+                  <div className="flex gap-2">
+                    <div className="flex items-center px-4 bg-slate-800 rounded-lg text-slate-400">
+                      +233
+                    </div>
+                    <Input
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(e.target.value)}
+                      placeholder="XX XXX XXXX"
+                      className="flex-1 bg-slate-800/50 border-slate-700 text-white"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-slate-300 mb-1">Mot de passe</label>
+                  <div className="relative">
+                    <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      type={showLoginPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Votre mot de passe"
+                      className="bg-slate-800/50 border-slate-700 text-white pl-10 pr-12"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showLoginPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+                
+                <Button
+                  type="submit"
+                  disabled={isLoading || !loginPhone || !loginPassword}
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Login'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Se connecter'}
                 </Button>
+                
+                <button
+                  type="button"
+                  onClick={() => setStep('welcome')}
+                  className="w-full mt-2 text-sm text-slate-400 hover:text-white"
+                >
+                  Retour
+                </button>
               </form>
             )}
           </div>
