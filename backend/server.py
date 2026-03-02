@@ -3583,6 +3583,263 @@ async def get_service_config(admin: dict = Depends(get_current_admin)):
         "api_configured": bulkclix_service.is_configured()
     }
 
+# ==================== ADMIN PROMOTIONS ENDPOINTS ====================
+
+@sdm_router.post("/admin/promotions")
+async def create_promotion(request: CreatePromotionRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Create a new service promotion"""
+    promo = ServicePromotion(
+        name=request.name,
+        description=request.description,
+        target_service=request.target_service.value,
+        discount_percent=request.discount_percent,
+        min_amount=request.min_amount,
+        days_of_week=request.days_of_week,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        is_active=request.is_active
+    )
+    
+    await db.service_promotions.insert_one(promo.model_dump())
+    
+    return {"message": "Promotion created", "promotion": promo.model_dump()}
+
+@sdm_router.get("/admin/promotions")
+async def get_promotions(admin: dict = Depends(get_current_admin)):
+    """Admin: Get all promotions"""
+    promotions = await db.service_promotions.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"promotions": promotions}
+
+@sdm_router.put("/admin/promotions/{promo_id}")
+async def update_promotion(promo_id: str, request: CreatePromotionRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Update a promotion"""
+    result = await db.service_promotions.update_one(
+        {"id": promo_id},
+        {
+            "$set": {
+                "name": request.name,
+                "description": request.description,
+                "target_service": request.target_service.value,
+                "discount_percent": request.discount_percent,
+                "min_amount": request.min_amount,
+                "days_of_week": request.days_of_week,
+                "start_date": request.start_date,
+                "end_date": request.end_date,
+                "is_active": request.is_active,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Promotion not found")
+    
+    return {"message": "Promotion updated"}
+
+@sdm_router.delete("/admin/promotions/{promo_id}")
+async def delete_promotion(promo_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Delete a promotion"""
+    result = await db.service_promotions.delete_one({"id": promo_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Promotion not found")
+    
+    return {"message": "Promotion deleted"}
+
+@sdm_router.patch("/admin/promotions/{promo_id}/toggle")
+async def toggle_promotion(promo_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Toggle promotion active status"""
+    promo = await db.service_promotions.find_one({"id": promo_id}, {"_id": 0})
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promotion not found")
+    
+    new_status = not promo.get("is_active", True)
+    await db.service_promotions.update_one(
+        {"id": promo_id},
+        {"$set": {"is_active": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": f"Promotion {'activated' if new_status else 'deactivated'}", "is_active": new_status}
+
+# ==================== TOP CLIENTS LEADERBOARD ====================
+
+@sdm_router.get("/admin/leaderboard/cashback")
+async def get_top_cashback_clients(
+    period: str = "month",  # week, month, year
+    limit: int = 10,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Get top clients by cashback earned"""
+    now = datetime.now(timezone.utc)
+    
+    # Calculate start date based on period
+    if period == "week":
+        start_date = (now - timedelta(days=7)).isoformat()
+        period_label = "Cette semaine"
+    elif period == "year":
+        start_date = (now - timedelta(days=365)).isoformat()
+        period_label = "Cette année"
+    else:  # month
+        start_date = (now - timedelta(days=30)).isoformat()
+        period_label = "Ce mois"
+    
+    # Aggregate cashback by user
+    pipeline = [
+        {
+            "$match": {
+                "created_at": {"$gte": start_date},
+                "status": {"$in": ["available", "pending"]}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$user_id",
+                "total_cashback": {"$sum": "$net_cashback"},
+                "transaction_count": {"$sum": 1}
+            }
+        },
+        {"$sort": {"total_cashback": -1}},
+        {"$limit": limit}
+    ]
+    
+    top_users = await db.sdm_transactions.aggregate(pipeline).to_list(limit)
+    
+    # Enrich with user details
+    result = []
+    for i, entry in enumerate(top_users, 1):
+        user = await db.sdm_users.find_one({"id": entry["_id"]}, {"_id": 0, "id": 1, "phone": 1, "first_name": 1, "last_name": 1})
+        if user:
+            result.append({
+                "rank": i,
+                "user_id": entry["_id"],
+                "phone": user.get("phone", "N/A"),
+                "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Client SDM",
+                "total_cashback": round(entry["total_cashback"], 2),
+                "transaction_count": entry["transaction_count"]
+            })
+    
+    return {
+        "period": period,
+        "period_label": period_label,
+        "top_clients": result
+    }
+
+@sdm_router.get("/admin/leaderboard/services")
+async def get_top_service_users(
+    period: str = "month",  # week, month, year
+    limit: int = 10,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Get top clients by service usage (cashback spent)"""
+    now = datetime.now(timezone.utc)
+    
+    # Calculate start date based on period
+    if period == "week":
+        start_date = (now - timedelta(days=7)).isoformat()
+        period_label = "Cette semaine"
+    elif period == "year":
+        start_date = (now - timedelta(days=365)).isoformat()
+        period_label = "Cette année"
+    else:  # month
+        start_date = (now - timedelta(days=30)).isoformat()
+        period_label = "Ce mois"
+    
+    # Aggregate service usage by user
+    pipeline = [
+        {
+            "$match": {
+                "created_at": {"$gte": start_date},
+                "status": "SUCCESS"
+            }
+        },
+        {
+            "$group": {
+                "_id": "$user_id",
+                "total_spent": {"$sum": "$amount"},
+                "transaction_count": {"$sum": 1},
+                "services_used": {"$addToSet": "$service_type"}
+            }
+        },
+        {"$sort": {"total_spent": -1}},
+        {"$limit": limit}
+    ]
+    
+    top_users = await db.service_transactions.aggregate(pipeline).to_list(limit)
+    
+    # Enrich with user details
+    result = []
+    for i, entry in enumerate(top_users, 1):
+        user = await db.sdm_users.find_one({"id": entry["_id"]}, {"_id": 0, "id": 1, "phone": 1, "first_name": 1, "last_name": 1})
+        if user:
+            result.append({
+                "rank": i,
+                "user_id": entry["_id"],
+                "phone": user.get("phone", "N/A"),
+                "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Client SDM",
+                "total_spent": round(entry["total_spent"], 2),
+                "transaction_count": entry["transaction_count"],
+                "services_used": entry["services_used"]
+            })
+    
+    return {
+        "period": period,
+        "period_label": period_label,
+        "top_clients": result
+    }
+
+@sdm_router.post("/admin/leaderboard/announce")
+async def announce_top_clients(
+    period: str = "month",
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Announce top clients via notification"""
+    # Get top cashback earner
+    cashback_leaders = await get_top_cashback_clients(period=period, limit=3, admin=admin)
+    service_leaders = await get_top_service_users(period=period, limit=3, admin=admin)
+    
+    period_label = {
+        "week": "de la semaine",
+        "month": "du mois",
+        "year": "de l'année"
+    }.get(period, "du mois")
+    
+    # Create announcement notification
+    announcement_parts = []
+    
+    if cashback_leaders["top_clients"]:
+        top = cashback_leaders["top_clients"][0]
+        announcement_parts.append(f"🏆 Meilleur Cashback {period_label}: {top['name']} avec GHS {top['total_cashback']:.2f}!")
+    
+    if service_leaders["top_clients"]:
+        top = service_leaders["top_clients"][0]
+        announcement_parts.append(f"⭐ Champion Services {period_label}: {top['name']} avec GHS {top['total_spent']:.2f} utilisés!")
+    
+    if not announcement_parts:
+        return {"message": "No data to announce"}
+    
+    announcement_message = "\n".join(announcement_parts)
+    
+    # Create notification for all users
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "promo",
+        "priority": "high",
+        "title": f"🎉 Top Clients SDM {period_label.title()}",
+        "message": announcement_message,
+        "recipients": "all",
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.notifications.insert_one(notification)
+    
+    return {
+        "message": "Announcement sent",
+        "notification": {k: v for k, v in notification.items() if k != "_id"},
+        "cashback_winners": cashback_leaders["top_clients"][:3],
+        "service_winners": service_leaders["top_clients"][:3]
+    }
+
 # Import for ledger models
 from ledger import LedgerEntry, LedgerTransaction, TransactionStatus, EntryType
 
