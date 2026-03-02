@@ -4029,6 +4029,345 @@ async def get_public_partners(category: Optional[str] = None, city: Optional[str
         "cities": cities
     }
 
+# ==================== LOTTERY ADMIN ENDPOINTS ====================
+
+class CreateLotteryRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    month: str  # e.g., "2026-03"
+    funding_source: str = "FIXED"  # FIXED, COMMISSION, MIXED
+    fixed_amount: float = 0.0
+    commission_percentage: float = 0.0
+    prize_distribution: List[float] = [40, 25, 15, 12, 8]  # 5 winners
+    start_date: str
+    end_date: str
+
+@sdm_router.get("/admin/lotteries")
+async def get_lotteries(admin: dict = Depends(get_current_admin)):
+    """Admin: Get all lotteries"""
+    lotteries = await db.lotteries.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"lotteries": lotteries}
+
+@sdm_router.post("/admin/lotteries")
+async def create_lottery(request: CreateLotteryRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Create a new lottery"""
+    # Calculate total prize pool
+    total_prize = request.fixed_amount
+    
+    if request.funding_source in ["COMMISSION", "MIXED"]:
+        # Get total SDM commissions for the month
+        month_start = f"{request.month}-01T00:00:00"
+        month_parts = request.month.split("-")
+        year, month_num = int(month_parts[0]), int(month_parts[1])
+        if month_num == 12:
+            next_month = f"{year + 1}-01-01T00:00:00"
+        else:
+            next_month = f"{year}-{month_num + 1:02d}-01T00:00:00"
+        
+        pipeline = [
+            {"$match": {"created_at": {"$gte": month_start, "$lt": next_month}}},
+            {"$group": {"_id": None, "total_commission": {"$sum": "$sdm_commission"}}}
+        ]
+        result = await db.sdm_transactions.aggregate(pipeline).to_list(1)
+        if result:
+            commission_amount = result[0]["total_commission"] * (request.commission_percentage / 100)
+            total_prize += commission_amount
+    
+    lottery = SDMLottery(
+        name=request.name,
+        description=request.description,
+        month=request.month,
+        funding_source=request.funding_source,
+        fixed_amount=request.fixed_amount,
+        commission_percentage=request.commission_percentage,
+        total_prize_pool=total_prize,
+        prize_distribution=request.prize_distribution,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        created_by=admin.get("username")
+    )
+    
+    await db.lotteries.insert_one(lottery.model_dump())
+    return {"message": "Lottery created", "lottery": lottery.model_dump()}
+
+@sdm_router.patch("/admin/lotteries/{lottery_id}/activate")
+async def activate_lottery(lottery_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Activate a lottery and register all VIP members"""
+    lottery = await db.lotteries.find_one({"id": lottery_id}, {"_id": 0})
+    if not lottery:
+        raise HTTPException(status_code=404, detail="Lottery not found")
+    
+    if lottery["status"] != "DRAFT":
+        raise HTTPException(status_code=400, detail="Lottery is not in DRAFT status")
+    
+    # Get all active VIP members
+    vip_members = await db.vip_memberships.find({"status": "active"}, {"_id": 0}).to_list(10000)
+    
+    tier_multipliers = {"SILVER": 1, "GOLD": 2, "PLATINUM": 3}
+    total_participants = 0
+    total_entries = 0
+    
+    for member in vip_members:
+        user = await db.sdm_users.find_one({"id": member["user_id"]}, {"_id": 0})
+        if not user:
+            continue
+        
+        entries = tier_multipliers.get(member["tier"], 1)
+        
+        participant = LotteryParticipant(
+            lottery_id=lottery_id,
+            user_id=member["user_id"],
+            user_phone=member["user_phone"],
+            user_name=f"{user.get('first_name') or ''} {user.get('last_name') or ''}".strip() or "Client SDM",
+            vip_tier=member["tier"],
+            entries=entries
+        )
+        
+        await db.lottery_participants.insert_one(participant.model_dump())
+        total_participants += 1
+        total_entries += entries
+    
+    # Update lottery status
+    await db.lotteries.update_one(
+        {"id": lottery_id},
+        {
+            "$set": {
+                "status": "ACTIVE",
+                "total_participants": total_participants,
+                "total_entries": total_entries
+            }
+        }
+    )
+    
+    return {
+        "message": f"Lottery activated with {total_participants} participants ({total_entries} entries)",
+        "total_participants": total_participants,
+        "total_entries": total_entries
+    }
+
+@sdm_router.post("/admin/lotteries/{lottery_id}/draw")
+async def draw_lottery(lottery_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Perform the lottery draw and select 5 winners"""
+    import random
+    
+    lottery = await db.lotteries.find_one({"id": lottery_id}, {"_id": 0})
+    if not lottery:
+        raise HTTPException(status_code=404, detail="Lottery not found")
+    
+    if lottery["status"] != "ACTIVE":
+        raise HTTPException(status_code=400, detail="Lottery must be ACTIVE to draw")
+    
+    # Get all participants
+    participants = await db.lottery_participants.find(
+        {"lottery_id": lottery_id},
+        {"_id": 0}
+    ).to_list(10000)
+    
+    if len(participants) < 5:
+        raise HTTPException(status_code=400, detail=f"Not enough participants. Need at least 5, have {len(participants)}")
+    
+    # Create weighted entry list
+    entry_pool = []
+    for p in participants:
+        for _ in range(p["entries"]):
+            entry_pool.append(p)
+    
+    # Shuffle and select 5 unique winners
+    random.shuffle(entry_pool)
+    winners = []
+    winner_ids = set()
+    
+    for entry in entry_pool:
+        if entry["user_id"] not in winner_ids:
+            winners.append(entry)
+            winner_ids.add(entry["user_id"])
+        if len(winners) >= 5:
+            break
+    
+    # Assign prizes
+    prize_distribution = lottery.get("prize_distribution", [40, 25, 15, 12, 8])
+    total_prize = lottery["total_prize_pool"]
+    
+    winner_results = []
+    for i, winner in enumerate(winners):
+        prize_percentage = prize_distribution[i] if i < len(prize_distribution) else 0
+        prize_amount = round(total_prize * (prize_percentage / 100), 2)
+        
+        winner_result = {
+            "user_id": winner["user_id"],
+            "user_phone": winner["user_phone"],
+            "name": winner["user_name"],
+            "tier": winner["vip_tier"],
+            "rank": i + 1,
+            "prize_percentage": prize_percentage,
+            "prize_amount": prize_amount
+        }
+        winner_results.append(winner_result)
+        
+        # Update participant record
+        await db.lottery_participants.update_one(
+            {"lottery_id": lottery_id, "user_id": winner["user_id"]},
+            {
+                "$set": {
+                    "is_winner": True,
+                    "prize_rank": i + 1,
+                    "prize_amount": prize_amount
+                }
+            }
+        )
+        
+        # Credit winner's wallet
+        from ledger import EntityType
+        wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, winner["user_id"])
+        if wallet:
+            await db.wallets.update_one(
+                {"id": wallet.id},
+                {"$inc": {"available_balance": prize_amount, "balance": prize_amount}}
+            )
+    
+    # Update lottery with winners
+    await db.lotteries.update_one(
+        {"id": lottery_id},
+        {
+            "$set": {
+                "status": "COMPLETED",
+                "winners": winner_results,
+                "draw_date": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    return {
+        "message": "Lottery draw completed!",
+        "winners": winner_results
+    }
+
+@sdm_router.post("/admin/lotteries/{lottery_id}/announce")
+async def announce_lottery_results(lottery_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Announce lottery results via notification"""
+    lottery = await db.lotteries.find_one({"id": lottery_id}, {"_id": 0})
+    if not lottery:
+        raise HTTPException(status_code=404, detail="Lottery not found")
+    
+    if lottery["status"] != "COMPLETED":
+        raise HTTPException(status_code=400, detail="Lottery must be COMPLETED to announce")
+    
+    if lottery.get("is_announced"):
+        raise HTTPException(status_code=400, detail="Results already announced")
+    
+    winners = lottery.get("winners", [])
+    if not winners:
+        raise HTTPException(status_code=400, detail="No winners to announce")
+    
+    # Create announcement message
+    announcement_lines = [f"🎰 {lottery['name']} - Résultats!"]
+    announcement_lines.append(f"🏆 Cagnotte totale: GHS {lottery['total_prize_pool']:.2f}")
+    announcement_lines.append("")
+    
+    rank_emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+    for i, w in enumerate(winners):
+        emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
+        announcement_lines.append(f"{emoji} {w['name']} ({w['tier']}) - GHS {w['prize_amount']:.2f}")
+    
+    announcement_lines.append("")
+    announcement_lines.append("Félicitations aux gagnants! 🎉")
+    
+    # Create notification for all users
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "lottery",
+        "priority": "high",
+        "title": f"🎰 {lottery['name']} - Gagnants!",
+        "message": "\n".join(announcement_lines),
+        "recipients": "all",
+        "is_read": False,
+        "lottery_id": lottery_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.notifications.insert_one(notification)
+    
+    # Create individual notifications for winners
+    for w in winners:
+        winner_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "lottery_win",
+            "priority": "high",
+            "title": f"🎉 Vous avez gagné au {lottery['name']}!",
+            "message": f"Félicitations! Vous êtes {w['rank']}{'er' if w['rank'] == 1 else 'ème'} et avez gagné GHS {w['prize_amount']:.2f}! Le montant a été crédité sur votre compte.",
+            "recipients": [w["user_id"]],
+            "is_read": False,
+            "lottery_id": lottery_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(winner_notification)
+    
+    # Mark as announced
+    await db.lotteries.update_one(
+        {"id": lottery_id},
+        {"$set": {"is_announced": True}}
+    )
+    
+    return {
+        "message": "Results announced!",
+        "notification_sent": True,
+        "winners_notified": len(winners)
+    }
+
+@sdm_router.delete("/admin/lotteries/{lottery_id}")
+async def delete_lottery(lottery_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Delete a lottery (only DRAFT status)"""
+    lottery = await db.lotteries.find_one({"id": lottery_id}, {"_id": 0})
+    if not lottery:
+        raise HTTPException(status_code=404, detail="Lottery not found")
+    
+    if lottery["status"] != "DRAFT":
+        raise HTTPException(status_code=400, detail="Can only delete DRAFT lotteries")
+    
+    await db.lotteries.delete_one({"id": lottery_id})
+    return {"message": "Lottery deleted"}
+
+# ==================== USER LOTTERY ENDPOINTS ====================
+
+@sdm_router.get("/user/lotteries")
+async def get_user_lotteries(user: dict = Depends(get_current_user)):
+    """User: Get active and past lotteries"""
+    # Get active lotteries
+    active = await db.lotteries.find(
+        {"status": "ACTIVE"},
+        {"_id": 0}
+    ).sort("end_date", 1).to_list(10)
+    
+    # Get recent completed lotteries
+    completed = await db.lotteries.find(
+        {"status": "COMPLETED"},
+        {"_id": 0}
+    ).sort("draw_date", -1).to_list(5)
+    
+    # Check user's participation
+    participations = await db.lottery_participants.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).to_list(100)
+    
+    participation_map = {p["lottery_id"]: p for p in participations}
+    
+    return {
+        "active_lotteries": active,
+        "completed_lotteries": completed,
+        "my_participations": participation_map
+    }
+
+@sdm_router.get("/lotteries/results")
+async def get_public_lottery_results():
+    """Public: Get announced lottery results"""
+    results = await db.lotteries.find(
+        {"status": "COMPLETED", "is_announced": True},
+        {"_id": 0}
+    ).sort("draw_date", -1).to_list(10)
+    
+    return {"results": results}
+
 # ==================== USER VIP CARD ENDPOINTS ====================
 
 @sdm_router.get("/user/vip-cards")
