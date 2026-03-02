@@ -1,106 +1,97 @@
-# Backend Architecture Documentation
+# SDM Backend Architecture
 
 ## Current State
-`server.py` contains 5200+ lines of code with all routes and models.
+The backend is currently a monolithic `server.py` file with ~5200+ lines containing all routes, models, and business logic.
 
-## Refactoring Plan
+## Target Architecture
 
-### Phase 1: Models Extraction (Priority: High)
-Create `/app/backend/models/` directory with:
-- `base.py` - Common base classes
-- `users.py` - SDMUser, AdminUser
-- `merchants.py` - SDMMerchant, MerchantMembershipCardType
-- `vip.py` - VIPCardType, VIPMembership
-- `partners.py` - SDMPartner
-- `lottery.py` - SDMLottery, LotteryParticipant
-- `fintech.py` - Wallet, Transaction models
-- `notifications.py` - Notification models
-
-### Phase 2: Router Extraction (Priority: Medium)
-Create `/app/backend/routers/` with:
 ```
-routers/
-├── __init__.py
-├── auth.py          # Admin/User authentication
-├── users.py         # SDM User routes (~300 lines)
-├── merchants.py     # Merchant routes (~250 lines)
-├── services.py      # Super App services (~350 lines)
-├── vip.py           # VIP Cards (~200 lines)
-├── partners.py      # Partners (~100 lines)
-├── lottery.py       # Lottery + Scheduler (~400 lines)
-├── fintech.py       # Ledger/Wallets (~350 lines)
-├── notifications.py # Notifications (~200 lines)
-└── admin.py         # Admin misc (~150 lines)
+/backend
+├── core/                    # Shared utilities and config
+│   ├── __init__.py
+│   ├── config.py           # Database, JWT, API keys config
+│   ├── dependencies.py     # FastAPI dependencies (auth)
+│   └── utils.py            # Helper functions
+│
+├── models/                  # Pydantic models (already created)
+│   ├── __init__.py
+│   ├── base.py
+│   ├── users.py
+│   ├── merchants.py
+│   ├── vip.py
+│   ├── partners.py
+│   ├── lottery.py
+│   └── services.py
+│
+├── routers/                 # API route handlers
+│   ├── __init__.py
+│   ├── auth.py             # SDM authentication (OTP)
+│   ├── users.py            # User profile, wallet, transactions
+│   ├── merchants.py        # Merchant operations
+│   ├── admin.py            # Admin dashboard
+│   ├── vip.py              # VIP cards & memberships
+│   ├── lottery.py          # Lottery system
+│   ├── partners.py         # Partner directory
+│   ├── services.py         # Airtime, data, bills
+│   ├── notifications.py    # Push & in-app notifications
+│   └── fintech.py          # Ledger, wallets, withdrawals
+│
+├── services/               # Business logic services
+│   ├── __init__.py
+│   ├── bulkclix_service.py # Airtime/data provider
+│   └── sms_service.py      # SMS gateway
+│
+├── ledger/                 # Financial ledger system
+│   ├── __init__.py
+│   ├── models.py
+│   └── service.py
+│
+└── server.py               # Main FastAPI app (entry point)
 ```
 
-### Phase 3: Services Extraction (Priority: Low)
-Create `/app/backend/services/` with:
-- `bulkclix_service.py` - Already exists
-- `lottery_scheduler.py` - Scheduler logic
-- `wallet_service.py` - Wallet operations
-- `notification_service.py` - Notification logic
+## Refactoring Progress
 
-## Current server.py Sections
+### Completed
+- [x] Created `/core/` package with config, dependencies, utils
+- [x] Created `/routers/auth.py` template (not yet integrated)
+- [x] Models package structure exists
 
-| Line Range | Section | Lines | Priority |
-|------------|---------|-------|----------|
-| 139-198 | Core Models | 60 | Medium |
-| 199-261 | SDM Models | 62 | High |
-| 262-311 | VIP Models | 50 | High |
-| 312-341 | Partner Models | 30 | Low |
-| 342-522 | Lottery Models | 180 | Medium |
-| 523-624 | Request Models | 100 | Low |
-| 625-723 | Helpers | 100 | Low |
-| 724-800 | Auth | 75 | High |
-| 800-933 | Original Routes | 133 | Low |
-| 934-1221 | User Routes | 287 | High |
-| 1222-1467 | Merchant Routes | 245 | High |
-| 1468-1531 | Card Types | 63 | Low |
-| 1532-1750 | Membership | 218 | Medium |
-| 1751-1904 | Admin Routes | 153 | Medium |
-| 1905-1998 | External API | 93 | Low |
-| 1999-2334 | Fintech API | 335 | High |
-| 2335-2433 | Admin Data | 98 | Low |
-| 2434-2586 | Investor | 152 | Low |
-| 2587-2749 | Float Mgmt | 162 | Medium |
-| 2750-3037 | Notifications | 287 | Medium |
-| 3038-3194 | Client Notif | 156 | Low |
-| 3195-3331 | Push Notif | 136 | Low |
-| 3332-3406 | Services | 74 | High |
-| 3407-3664 | User Services | 257 | High |
-| 3665-3906 | Admin Services | 241 | Medium |
-| 3907-4087 | VIP Admin | 180 | Medium |
-| 4088-4183 | Partners Admin | 95 | Low |
-| 4184-4522 | Lottery Admin | 338 | Medium |
-| 4523-4691 | Auto Lottery | 168 | Medium |
-| 4692-4842 | User VIP | 150 | Medium |
-| 4843-4920 | Promotions | 77 | Low |
-| 4921-5102 | Leaderboard | 181 | Low |
-| 5103-5266 | Scheduler | 163 | Medium |
+### In Progress
+- [ ] Extract auth routes from server.py to routers/auth.py
+- [ ] Extract user routes
+- [ ] Extract merchant routes
 
-## Recommended Extraction Order
-1. **Models** - Create models package first
-2. **Auth** - Extract authentication helpers
-3. **User Routes** - Most frequently used
-4. **Services** - Super App services
-5. **Lottery** - Complex but isolated
-6. **Fintech** - Ledger operations
+### Pending
+- [ ] Extract admin routes
+- [ ] Extract VIP/lottery routes
+- [ ] Extract fintech routes
+- [ ] Extract notification routes
+- [ ] Full integration and testing
 
-## Dependencies to Consider
-- All routes depend on `db` (MongoDB client)
-- Auth dependencies (`get_current_admin`, `get_sdm_user`)
-- Ledger module (`/app/backend/ledger/`)
-- BulkClix service (`/app/backend/services/bulkclix_service.py`)
+## Migration Strategy
 
-## Testing Strategy
-After each extraction:
-1. Run existing tests
-2. Verify all endpoints with curl
-3. Check frontend functionality
-4. Monitor backend logs
+1. **Phase 1 - Core Setup** ✅
+   - Create core/ package with shared utilities
+   - Test imports work correctly
 
-## Notes
-- Keep `server.py` as main entry point
-- Use `include_router()` for new routers
-- Maintain backward compatibility
-- Document all changes in CHANGELOG.md
+2. **Phase 2 - Router Extraction** (Current)
+   - Extract one router at a time
+   - Keep original code in server.py as fallback
+   - Test thoroughly after each extraction
+
+3. **Phase 3 - Integration**
+   - Import and include extracted routers in server.py
+   - Remove duplicate code from server.py
+   - Full integration testing
+
+4. **Phase 4 - Cleanup**
+   - Remove unused code
+   - Update documentation
+   - Final testing
+
+## Important Notes
+
+- **Do not break production**: Always ensure the app works before and after changes
+- **Incremental changes**: Extract and test one section at a time
+- **Test coverage**: Run tests after each extraction
+- **Rollback ready**: Keep original code until new code is verified
