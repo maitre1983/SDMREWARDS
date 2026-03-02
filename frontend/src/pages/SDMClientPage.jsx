@@ -584,9 +584,14 @@ export default function SDMClientPage() {
                 {/* Airtime */}
                 <button
                   onClick={() => setActiveService('airtime')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
                   data-testid="service-airtime"
                 >
+                  {getServicePromo('AIRTIME') && (
+                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                      -{getServicePromo('AIRTIME').discount_percent}%
+                    </div>
+                  )}
                   <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
                     <Phone className="text-orange-600" size={24} />
                   </div>
@@ -600,9 +605,14 @@ export default function SDMClientPage() {
                 {/* Data Bundle */}
                 <button
                   onClick={() => setActiveService('data')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
                   data-testid="service-data"
                 >
+                  {getServicePromo('DATA') && (
+                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                      -{getServicePromo('DATA').discount_percent}%
+                    </div>
+                  )}
                   <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
                     <Wifi className="text-blue-600" size={24} />
                   </div>
@@ -616,9 +626,14 @@ export default function SDMClientPage() {
                 {/* Bill Payment */}
                 <button
                   onClick={() => setActiveService('bill')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
                   data-testid="service-bill"
                 >
+                  {getServicePromo('BILL_PAYMENT') && (
+                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                      -{getServicePromo('BILL_PAYMENT').discount_percent}%
+                    </div>
+                  )}
                   <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
                     <Zap className="text-yellow-600" size={24} />
                   </div>
@@ -632,9 +647,14 @@ export default function SDMClientPage() {
                 {/* MoMo Withdrawal */}
                 <button
                   onClick={() => setActiveService('momo')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors"
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
                   data-testid="service-momo"
                 >
+                  {getServicePromo('MOMO_WITHDRAWAL') && (
+                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                      -{getServicePromo('MOMO_WITHDRAWAL').discount_percent}%
+                    </div>
+                  )}
                   <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
                     <Banknote className="text-green-600" size={24} />
                   </div>
