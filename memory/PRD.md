@@ -383,7 +383,7 @@ REACT_APP_ONESIGNAL_APP_ID=votre_app_id
 
 ---
 
-## PHASE 6: SCALE & SÉCURITÉ (À venir - Mois 5-6)
+## PHASE 7: SCALE & SÉCURITÉ (À venir)
 
 ### Objectifs
 - [ ] Anti-fraud engine (velocity checks, scoring)
