@@ -39,12 +39,15 @@ export default function SDMClientPage() {
   const [withdrawProvider, setWithdrawProvider] = useState('MTN');
 
   // Super App Services state
-  const [activeService, setActiveService] = useState(null); // null, 'airtime', 'data', 'bill', 'momo'
+  const [activeService, setActiveService] = useState(null); // null, 'airtime', 'data', 'bill', 'momo', 'vip'
   const [serviceBalance, setServiceBalance] = useState(null);
   const [dataBundles, setDataBundles] = useState([]);
   const [serviceHistory, setServiceHistory] = useState([]);
   const [isServiceLoading, setIsServiceLoading] = useState(false);
   const [activePromos, setActivePromos] = useState([]);
+  const [vipCards, setVipCards] = useState([]);
+  const [myVipMembership, setMyVipMembership] = useState(null);
+  const [partners, setPartners] = useState([]);
   
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
