@@ -14,9 +14,10 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import SDMConfigPanel from '../components/admin/SDMConfigPanel';
 import FintechDashboard from '../components/admin/FintechDashboard';
+import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/ke4bukaf_WhatsApp%20Image%202026-02-28%20at%2014.47.22.jpeg";
+const LOGO_URL = "/sdm-logo.png";
 
 export default function AdminDashboardPage() {
   const { t } = useLanguage();
