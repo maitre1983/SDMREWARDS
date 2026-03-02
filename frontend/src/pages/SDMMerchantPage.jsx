@@ -45,6 +45,7 @@ export default function SDMMerchantPage() {
   const [otp, setOtp] = useState('');
   const [otpRequestId, setOtpRequestId] = useState('');
   const [debugOtp, setDebugOtp] = useState('');
+  const [ussdCode, setUssdCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // Login form
@@ -109,6 +110,9 @@ export default function SDMMerchantPage() {
       setOtpRequestId(response.data.request_id);
       if (response.data.is_test_account) {
         setDebugOtp('0000');
+      }
+      if (response.data.ussd_code) {
+        setUssdCode(response.data.ussd_code);
       }
       toast.success(t('sdm_otp_sent'));
       setStep('otp');
@@ -453,6 +457,17 @@ export default function SDMMerchantPage() {
                   <p className="text-xs text-amber-400 text-center">
                     {t('sdm_test_code')}: <strong>{debugOtp}</strong>
                   </p>
+                )}
+                
+                {ussdCode && !debugOtp && (
+                  <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                    <p className="text-xs text-slate-400 mb-1">
+                      Didn't receive the SMS? Dial this code:
+                    </p>
+                    <p className="text-lg font-bold text-cyan-400">
+                      {ussdCode}
+                    </p>
+                  </div>
                 )}
                 
                 <Button

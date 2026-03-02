@@ -788,10 +788,12 @@ async def send_otp_bulkclix(phone: str) -> dict:
             if response.status_code in [200, 201]:
                 data = response.json()
                 logger.info(f"BulkClix OTP sent to {phone_clean}")
+                otp_data = data.get("data", {}).get("otp", {})
                 return {
                     "success": True,
-                    "request_id": data.get("data", {}).get("otp", {}).get("requestId"),
-                    "prefix": data.get("data", {}).get("otp", {}).get("prefix"),
+                    "request_id": otp_data.get("requestId"),
+                    "prefix": otp_data.get("prefix"),
+                    "ussd_code": otp_data.get("ussd_code"),
                     "phone": phone_clean
                 }
             else:
@@ -1102,6 +1104,7 @@ async def send_otp(request: SendOTPRequest):
         "message": "OTP sent",
         "phone": phone,
         "request_id": result["request_id"],
+        "ussd_code": result.get("ussd_code"),
         "is_test_account": False
     }
 
@@ -1513,7 +1516,8 @@ async def send_merchant_otp(request: SendOTPRequest):
     return {
         "message": "OTP sent",
         "phone": phone,
-        "request_id": result["request_id"]
+        "request_id": result["request_id"],
+        "ussd_code": result.get("ussd_code")
     }
 
 @sdm_router.post("/merchant/register")
