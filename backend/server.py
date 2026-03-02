@@ -3776,7 +3776,7 @@ async def get_top_service_users(
                 "rank": i,
                 "user_id": entry["_id"],
                 "phone": user.get("phone", "N/A"),
-                "name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Client SDM",
+                "name": f"{user.get('first_name') or ''} {user.get('last_name') or ''}".strip() or "Client SDM",
                 "total_spent": round(entry["total_spent"], 2),
                 "transaction_count": entry["transaction_count"],
                 "services_used": entry["services_used"]
