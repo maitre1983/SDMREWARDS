@@ -3752,6 +3752,156 @@ async def credit_user_wallet(request: CreditUserRequest, admin: dict = Depends(g
     
     return {"message": f"Credited GHS {request.amount} to {phone}", "user_id": user["id"]}
 
+class CreateTestVIPUsersRequest(BaseModel):
+    count: int = 5
+    tiers: List[str] = ["SILVER", "GOLD", "PLATINUM"]
+
+@sdm_router.post("/admin/test/create-vip-users")
+async def create_test_vip_users(request: CreateTestVIPUsersRequest, admin: dict = Depends(get_current_admin)):
+    """Admin: Create test VIP users for lottery testing"""
+    from ledger import EntityType
+    import random
+    
+    created_users = []
+    tier_multipliers = {"SILVER": 1, "GOLD": 2, "PLATINUM": 3}
+    
+    # Get card types
+    card_types = await db.vip_card_types.find({"is_active": True}, {"_id": 0}).to_list(10)
+    tier_to_card = {c["tier"]: c for c in card_types}
+    
+    for i in range(request.count):
+        # Generate unique phone
+        phone = f"02{random.randint(40000000, 99999999)}"
+        
+        # Check if exists
+        existing = await db.sdm_users.find_one({"phone": phone})
+        if existing:
+            continue
+        
+        # Pick random tier from provided list
+        tier = random.choice(request.tiers)
+        card = tier_to_card.get(tier)
+        
+        if not card:
+            continue
+        
+        # Create user
+        user_id = str(uuid.uuid4())
+        first_name = f"TestUser{i+1}"
+        last_name = tier
+        
+        user = {
+            "id": user_id,
+            "phone": phone,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": f"testuser{i+1}@sdm.test",
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.sdm_users.insert_one(user)
+        
+        # Create VIP membership
+        membership = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "user_phone": phone,
+            "card_type_id": card["id"],
+            "tier": tier,
+            "price_paid": card["price"],
+            "status": "active",
+            "start_date": datetime.now(timezone.utc).isoformat(),
+            "expiry_date": (datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.vip_memberships.insert_one(membership)
+        
+        # Create wallet
+        wallet_id = str(uuid.uuid4())
+        wallet = {
+            "id": wallet_id,
+            "entity_type": EntityType.CLIENT.value,
+            "entity_id": user_id,
+            "balance": 10.0,
+            "available_balance": 10.0,
+            "reserved_balance": 0.0,
+            "currency": "GHS",
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.wallets.insert_one(wallet)
+        
+        created_users.append({
+            "phone": phone,
+            "name": f"{first_name} {last_name}",
+            "tier": tier,
+            "user_id": user_id,
+            "lottery_entries": tier_multipliers.get(tier, 1)
+        })
+    
+    return {
+        "message": f"Created {len(created_users)} test VIP users",
+        "users": created_users
+    }
+
+@sdm_router.post("/admin/lotteries/{lottery_id}/add-test-participants")
+async def add_test_participants_to_lottery(lottery_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Add all active VIP members to a lottery (for testing)"""
+    lottery = await db.lotteries.find_one({"id": lottery_id}, {"_id": 0})
+    if not lottery:
+        raise HTTPException(status_code=404, detail="Lottery not found")
+    
+    if lottery["status"] not in ["DRAFT", "ACTIVE"]:
+        raise HTTPException(status_code=400, detail="Lottery must be DRAFT or ACTIVE")
+    
+    # Get all active VIP members
+    vip_members = await db.vip_memberships.find({"status": "active"}, {"_id": 0}).to_list(10000)
+    
+    tier_multipliers = {"SILVER": 1, "GOLD": 2, "PLATINUM": 3}
+    added = 0
+    total_entries = lottery.get("total_entries", 0)
+    
+    for member in vip_members:
+        # Check if already participant
+        existing = await db.lottery_participants.find_one({
+            "lottery_id": lottery_id, 
+            "user_id": member["user_id"]
+        })
+        if existing:
+            continue
+        
+        user = await db.sdm_users.find_one({"id": member["user_id"]}, {"_id": 0})
+        if not user:
+            continue
+        
+        entries = tier_multipliers.get(member["tier"], 1)
+        
+        participant = LotteryParticipant(
+            lottery_id=lottery_id,
+            user_id=member["user_id"],
+            user_phone=member["user_phone"],
+            user_name=f"{user.get('first_name') or ''} {user.get('last_name') or ''}".strip() or "Client SDM",
+            vip_tier=member["tier"],
+            entries=entries
+        )
+        
+        await db.lottery_participants.insert_one(participant.model_dump())
+        added += 1
+        total_entries += entries
+    
+    # Update lottery participant count
+    total_participants = lottery.get("total_participants", 0) + added
+    await db.lotteries.update_one(
+        {"id": lottery_id},
+        {"$set": {"total_participants": total_participants, "total_entries": total_entries}}
+    )
+    
+    return {
+        "message": f"Added {added} participants to lottery",
+        "total_participants": total_participants,
+        "total_entries": total_entries
+    }
+
 # ==================== VIP CARDS ADMIN ENDPOINTS ====================
 
 # Default VIP card types to seed
