@@ -2404,6 +2404,100 @@ async def reset_settings_pin(request: ResetSettingsPINRequest, merchant: dict = 
     
     return {"success": True, "message": "Settings PIN has been reset"}
 
+# ============== INSTANT MOMO SETTLEMENT ==============
+
+async def process_instant_momo_settlement(merchant: dict, amount: float, transaction_id: str) -> dict:
+    """
+    Process instant MoMo transfer to merchant after a customer payment
+    
+    Args:
+        merchant: Merchant document with settlement details
+        amount: Amount to transfer (merchant_receives after cashback deduction)
+        transaction_id: Original transaction reference
+        
+    Returns:
+        Settlement result with status and details
+    """
+    # Validate amount
+    if amount <= 0:
+        logging.warning(f"Skipping settlement - invalid amount: {amount}")
+        return {
+            "status": "skipped",
+            "message": "Settlement amount must be positive",
+            "amount": amount
+        }
+    
+    try:
+        client_reference = f"SET_{transaction_id[-10:]}"
+        account_name = merchant.get("momo_account_name") or merchant.get("business_name", "Merchant")
+        
+        logging.info(f"Processing instant MoMo settlement: {amount} GHS to {merchant.get('momo_number')} for txn {transaction_id}")
+        
+        # Send MoMo transfer via BulkClix
+        result = await bulkclix_payment_service.transfer_momo(
+            amount=amount,
+            account_number=merchant["momo_number"],
+            network=merchant["momo_provider"],
+            account_name=account_name,
+            client_reference=client_reference
+        )
+        
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Record settlement
+        settlement_record = {
+            "id": str(uuid.uuid4()),
+            "merchant_id": merchant["id"],
+            "transaction_id": transaction_id,
+            "client_reference": client_reference,
+            "amount": amount,
+            "momo_number": merchant["momo_number"],
+            "momo_provider": merchant["momo_provider"],
+            "account_name": account_name,
+            "status": "completed" if result.get("success") else "failed",
+            "bulkclix_response": result.get("data"),
+            "error_message": result.get("error") if not result.get("success") else None,
+            "created_at": now,
+            "test_mode": result.get("test_mode", False)
+        }
+        await db.merchant_settlements.insert_one(settlement_record)
+        
+        # Update transaction with settlement info
+        await db.sdm_transactions.update_one(
+            {"transaction_id": transaction_id},
+            {"$set": {
+                "settlement_status": settlement_record["status"],
+                "settlement_ref": client_reference,
+                "settlement_completed_at": now if result.get("success") else None
+            }}
+        )
+        
+        if result.get("success"):
+            logging.info(f"Instant settlement successful: {client_reference}")
+            return {
+                "status": "completed",
+                "client_reference": client_reference,
+                "amount": amount,
+                "momo_number": merchant["momo_number"],
+                "message": "Funds transferred to merchant MoMo"
+            }
+        else:
+            logging.error(f"Instant settlement failed: {result.get('error')}")
+            return {
+                "status": "failed",
+                "client_reference": client_reference,
+                "error": result.get("error"),
+                "message": "Settlement will be retried or processed manually"
+            }
+            
+    except Exception as e:
+        logging.error(f"Instant settlement error: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Settlement processing error"
+        }
+
 @sdm_router.post("/merchant/transaction")
 async def create_transaction(request: CreateTransactionRequest, merchant: dict = Depends(get_current_merchant)):
     """Create cashback transaction (scan QR + amount) - Direct Payment Flow
@@ -2436,11 +2530,14 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
     
     try:
         # Use the new direct payment flow via ledger service
+        # Convert cashback_rate from percentage (e.g. 2.5) to decimal (0.025)
+        cashback_rate_decimal = merchant["cashback_rate"] / 100
+        
         result = await ledger_service.process_direct_payment_transaction(
             merchant_id=merchant["id"],
             client_id=user["id"],
             payment_amount=request.amount,
-            cashback_rate=merchant["cashback_rate"],
+            cashback_rate=cashback_rate_decimal,
             commission_rate=commission_rate,
             pending_days=pending_days,
             payment_method="QR_SCAN",
@@ -2483,7 +2580,17 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
             {"$inc": {"total_transactions": 1, "total_cashback_given": result["splits"]["client_cashback"]}}
         )
         
-        return {
+        # Process instant MoMo settlement if configured
+        settlement_result = None
+        if merchant.get("settlement_mode") == "instant" and merchant.get("settlement_type") == "momo":
+            if merchant.get("momo_number") and merchant.get("momo_provider"):
+                settlement_result = await process_instant_momo_settlement(
+                    merchant=merchant,
+                    amount=result["splits"]["merchant_receives"],
+                    transaction_id=result["reference"]
+                )
+        
+        response = {
             "message": "Transaction created - Direct Payment Flow",
             "transaction_id": result["reference"],
             "ledger_transaction_id": result["transaction_id"],
@@ -2495,6 +2602,11 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
             "available_date": result["available_date"],
             "user_name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM User"
         }
+        
+        if settlement_result:
+            response["settlement"] = settlement_result
+        
+        return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
