@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -25,10 +25,10 @@ export default function AdminLoginPage({ adminPath }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [credentials, setCredentials] = useState({
-    username: '',
-    password: '',
-  });
+  
+  // Use refs for Playwright compatibility - reads actual DOM values
+  const usernameRef = useRef(null);
+  const passwordRef = useRef(null);
 
   const dynamicAdminPath = adminPath || getAdminPath();
 
@@ -36,8 +36,18 @@ export default function AdminLoginPage({ adminPath }) {
     e.preventDefault();
     setIsLoading(true);
 
+    // Read values directly from DOM (Playwright compatible)
+    const username = usernameRef.current?.value || '';
+    const password = passwordRef.current?.value || '';
+
+    if (!username || !password) {
+      toast.error('Please fill in all fields');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post(`${API_URL}/api/admin/login`, credentials);
+      const response = await axios.post(`${API_URL}/api/admin/login`, { username, password });
       login(response.data.access_token);
       toast.success('Login successful');
       navigate(dynamicAdminPath);
@@ -81,9 +91,9 @@ export default function AdminLoginPage({ adminPath }) {
               {t('admin_username')}
             </label>
             <Input
+              ref={usernameRef}
               type="text"
-              value={credentials.username}
-              onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+              name="username"
               required
               placeholder="admin"
               className="h-12 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 rounded-xl focus:border-blue-500"
@@ -96,9 +106,9 @@ export default function AdminLoginPage({ adminPath }) {
               {t('admin_password')}
             </label>
             <Input
+              ref={passwordRef}
               type="password"
-              value={credentials.password}
-              onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+              name="password"
               required
               placeholder="••••••••"
               className="h-12 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 rounded-xl focus:border-blue-500"
