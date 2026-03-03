@@ -66,6 +66,7 @@ export default function SDMClientPage() {
   const [myVipMembership, setMyVipMembership] = useState(null);
   const [partners, setPartners] = useState([]);
   const [lotteries, setLotteries] = useState(null);
+  const [serviceFees, setServiceFees] = useState(null); // NEW: Dynamic service fees
   
   // Pending payments state
   const [pendingPayments, setPendingPayments] = useState([]);
@@ -187,7 +188,7 @@ export default function SDMClientPage() {
   const fetchServiceData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [balanceRes, bundlesRes, historyRes, promosRes, vipCardsRes, vipMembershipRes, partnersRes, lotteriesRes] = await Promise.all([
+      const [balanceRes, bundlesRes, historyRes, promosRes, vipCardsRes, vipMembershipRes, partnersRes, lotteriesRes, feesRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/user/services/balance`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/services/data-bundles`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/services/history`, { headers }),
@@ -195,7 +196,8 @@ export default function SDMClientPage() {
         axios.get(`${API_URL}/api/sdm/user/vip-cards`),
         axios.get(`${API_URL}/api/sdm/user/my-vip-membership`, { headers }),
         axios.get(`${API_URL}/api/sdm/partners`),
-        axios.get(`${API_URL}/api/sdm/user/lotteries`, { headers })
+        axios.get(`${API_URL}/api/sdm/user/lotteries`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/services/fees`) // NEW: Fetch service fees
       ]);
       setServiceBalance(balanceRes.data);
       setDataBundles(bundlesRes.data.bundles || []);
@@ -205,6 +207,7 @@ export default function SDMClientPage() {
       setMyVipMembership(vipMembershipRes.data.membership);
       setPartners(partnersRes.data.partners || []);
       setLotteries(lotteriesRes.data);
+      setServiceFees(feesRes.data); // NEW: Set service fees
     } catch (error) {
       console.error('Service data fetch error:', error);
     }
@@ -1404,10 +1407,29 @@ export default function SDMClientPage() {
                     </select>
                   </div>
 
-                  {serviceBalance && parseFloat(airtimeForm.amount) > serviceBalance.cashback_balance && (
+                  {/* Fee Display */}
+                  {serviceFees && airtimeForm.amount && parseFloat(airtimeForm.amount) > 0 && (
+                    <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Montant:</span>
+                        <span className="font-medium">GHS {parseFloat(airtimeForm.amount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Frais SDM ({serviceFees.airtime_fee_percent}%):</span>
+                        <span className="font-medium text-orange-600">GHS {(parseFloat(airtimeForm.amount) * serviceFees.airtime_fee_percent / 100).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold border-t pt-1">
+                        <span>Total à déduire:</span>
+                        <span className="text-slate-900">GHS {(parseFloat(airtimeForm.amount) * (1 + serviceFees.airtime_fee_percent / 100)).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {serviceBalance && airtimeForm.amount && 
+                    (parseFloat(airtimeForm.amount) * (1 + (serviceFees?.airtime_fee_percent || 0) / 100)) > serviceBalance.cashback_balance && (
                     <div className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 p-3 rounded-lg">
                       <AlertCircle size={16} />
-                      Insufficient balance
+                      Solde insuffisant
                     </div>
                   )}
 
@@ -1624,10 +1646,29 @@ export default function SDMClientPage() {
                       required
                       data-testid="momo-amount"
                     />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Fee: GHS 1.00 | You will receive: GHS {Math.max(0, (parseFloat(momoForm.amount) || 0) - 1).toFixed(2)}
-                    </p>
                   </div>
+
+                  {/* Dynamic Fee Display */}
+                  {serviceFees && momoForm.amount && parseFloat(momoForm.amount) > 0 && (
+                    <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Montant:</span>
+                        <span className="font-medium">GHS {parseFloat(momoForm.amount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Frais % ({serviceFees.momo_withdraw_fee_percent}%):</span>
+                        <span className="font-medium text-red-500">- GHS {(parseFloat(momoForm.amount) * serviceFees.momo_withdraw_fee_percent / 100).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Frais fixe:</span>
+                        <span className="font-medium text-red-500">- GHS {serviceFees.momo_withdraw_fee_flat?.toFixed(2) || '1.00'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold border-t pt-1">
+                        <span>Vous recevrez:</span>
+                        <span className="text-green-600">GHS {Math.max(0, parseFloat(momoForm.amount) - (parseFloat(momoForm.amount) * serviceFees.momo_withdraw_fee_percent / 100) - (serviceFees.momo_withdraw_fee_flat || 1)).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Network (optional)</label>

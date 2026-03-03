@@ -909,6 +909,12 @@ class UpdateSDMConfigRequest(BaseModel):
     # Service configuration (Airtime, Data, Bills)
     monthly_service_limit: Optional[float] = None  # Monthly limit for services
     service_commission_rate: Optional[float] = None  # Commission rate on services
+    # NEW: Service Fees (dynamic, configurable)
+    airtime_fee_percent: Optional[float] = None  # % fee on airtime purchases
+    data_fee_percent: Optional[float] = None  # % fee on data purchases
+    bill_fee_percent: Optional[float] = None  # % fee on bill payments
+    momo_withdraw_fee_percent: Optional[float] = None  # % fee on MoMo withdrawals
+    momo_withdraw_fee_flat: Optional[float] = None  # Flat fee on MoMo withdrawals
 
 class CreateNotificationRequest(BaseModel):
     recipient_type: str  # "all", "clients", "merchants", "specific"
@@ -1938,29 +1944,47 @@ async def get_user_transactions(user: dict = Depends(get_current_user), limit: i
 
 @sdm_router.post("/user/withdraw")
 async def request_withdrawal(request: WithdrawalRequest, user: dict = Depends(get_current_user)):
-    """Request withdrawal to Mobile Money"""
+    """Request withdrawal to Mobile Money - Dynamic fees from config"""
     if request.amount <= 0:
         raise HTTPException(status_code=400, detail="Invalid amount")
     
-    if request.amount > user["wallet_available"]:
-        raise HTTPException(status_code=400, detail="Insufficient balance")
+    # Get dynamic fees from config
+    config = await get_sdm_config()
+    flat_fee = config.get("momo_withdraw_fee_flat", 1.0)
+    percent_fee = config.get("momo_withdraw_fee_percent", 1.0)
     
-    fee = WITHDRAWAL_FEE
-    net_amount = request.amount - fee
+    # Calculate total fee (flat + percentage)
+    percentage_amount = round(request.amount * (percent_fee / 100), 2)
+    total_fee = flat_fee + percentage_amount
+    net_amount = request.amount - total_fee
     
     if net_amount <= 0:
-        raise HTTPException(status_code=400, detail="Amount too small after fee")
+        raise HTTPException(status_code=400, detail=f"Amount too small after fees. Fee: GHS {total_fee}")
+    
+    if request.amount > user["wallet_available"]:
+        raise HTTPException(status_code=400, detail="Insufficient balance")
     
     # Create withdrawal request
     withdrawal = SDMWithdrawal(
         user_id=user["id"],
         amount=request.amount,
-        fee=fee,
+        fee=total_fee,
         net_amount=net_amount,
         mobile_money_number=normalize_phone(request.mobile_money_number),
         mobile_money_provider=request.mobile_money_provider
     )
     await db.sdm_withdrawals.insert_one(withdrawal.model_dump())
+    
+    # Record SDM fee as commission (the percentage part)
+    if percentage_amount > 0:
+        await db.sdm_commissions.insert_one({
+            "id": str(uuid.uuid4()),
+            "transaction_id": withdrawal.id,
+            "amount": percentage_amount,
+            "source": "momo_withdrawal",
+            "user_id": user["id"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
     
     # Deduct from wallet
     await db.sdm_users.update_one(
@@ -1972,7 +1996,10 @@ async def request_withdrawal(request: WithdrawalRequest, user: dict = Depends(ge
         "message": "Withdrawal request submitted",
         "withdrawal_id": withdrawal.id,
         "amount": request.amount,
-        "fee": fee,
+        "flat_fee": flat_fee,
+        "percent_fee": percent_fee,
+        "percent_fee_amount": percentage_amount,
+        "total_fee": total_fee,
         "net_amount": net_amount,
         "status": "pending"
     }
@@ -6261,15 +6288,43 @@ async def get_data_bundles(network: Optional[str] = None):
     bundles = bulkclix_service.get_data_bundles(net)
     return {"bundles": bundles}
 
+@sdm_router.get("/user/services/fees")
+async def get_service_fees():
+    """Get current service fees - public endpoint for client display"""
+    config = await get_sdm_config()
+    return {
+        "airtime_fee_percent": config.get("airtime_fee_percent", 2.0),
+        "data_fee_percent": config.get("data_fee_percent", 2.0),
+        "bill_fee_percent": config.get("bill_fee_percent", 2.0),
+        "momo_withdraw_fee_percent": config.get("momo_withdraw_fee_percent", 1.0),
+        "momo_withdraw_fee_flat": config.get("momo_withdraw_fee_flat", 1.0),
+        "message": "All fees are subject to change. Check before each transaction."
+    }
+
 @sdm_router.post("/user/services/airtime")
 async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_current_user)):
-    """User: Buy airtime using cashback balance"""
+    """User: Buy airtime using cashback balance - SDM fee applied"""
     network = None
     if request.network:
         try:
             network = NetworkProvider(request.network)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid network: {request.network}")
+    
+    # Get dynamic fee from config
+    config = await get_sdm_config()
+    airtime_fee_percent = config.get("airtime_fee_percent", 2.0)
+    
+    # Calculate SDM fee
+    sdm_fee = round(request.amount * (airtime_fee_percent / 100), 2)
+    total_to_deduct = request.amount + sdm_fee
+    
+    # Check balance
+    if total_to_deduct > user["wallet_available"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient balance. Need GHS {total_to_deduct} (Amount: {request.amount} + Fee: {sdm_fee})"
+        )
     
     # Check for promotions
     promo_info = await apply_promotion("AIRTIME", request.amount)
@@ -6282,8 +6337,23 @@ async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_curre
             amount=effective_amount,
             network=network
         )
-        # Add promo info to result
+        
+        # Record SDM fee as commission
+        if sdm_fee > 0:
+            await db.sdm_commissions.insert_one({
+                "id": str(uuid.uuid4()),
+                "transaction_id": result.get("transaction_id", str(uuid.uuid4())),
+                "amount": sdm_fee,
+                "source": "airtime_service",
+                "user_id": user["id"],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        
+        # Add fee info to result
         result["original_amount"] = request.amount
+        result["sdm_fee"] = sdm_fee
+        result["sdm_fee_percent"] = airtime_fee_percent
+        result["total_deducted"] = total_to_deduct
         result["promotion"] = promo_info
         
         # Update promo usage stats
@@ -6304,7 +6374,7 @@ async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_curre
 
 @sdm_router.post("/user/services/data")
 async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_user)):
-    """User: Buy data bundle using cashback balance"""
+    """User: Buy data bundle using cashback balance - SDM fee applied"""
     try:
         # Get bundle price for promo calculation
         bundles = bulkclix_service.get_data_bundles()
@@ -6312,8 +6382,25 @@ async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_use
         if not bundle:
             raise HTTPException(status_code=400, detail=f"Invalid bundle: {request.bundle_id}")
         
+        bundle_price = bundle["price"]
+        
+        # Get dynamic fee from config
+        config = await get_sdm_config()
+        data_fee_percent = config.get("data_fee_percent", 2.0)
+        
+        # Calculate SDM fee
+        sdm_fee = round(bundle_price * (data_fee_percent / 100), 2)
+        total_to_deduct = bundle_price + sdm_fee
+        
+        # Check balance
+        if total_to_deduct > user["wallet_available"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient balance. Need GHS {total_to_deduct} (Bundle: {bundle_price} + Fee: {sdm_fee})"
+            )
+        
         # Check for promotions
-        promo_info = await apply_promotion("DATA", bundle["price"])
+        promo_info = await apply_promotion("DATA", bundle_price)
         
         result = await bulkclix_service.buy_data(
             user_id=user["id"],
@@ -6321,6 +6408,22 @@ async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_use
             bundle_id=request.bundle_id,
             discount_amount=promo_info["discount_amount"] if promo_info["has_discount"] else 0
         )
+        
+        # Record SDM fee as commission
+        if sdm_fee > 0:
+            await db.sdm_commissions.insert_one({
+                "id": str(uuid.uuid4()),
+                "transaction_id": result.get("transaction_id", str(uuid.uuid4())),
+                "amount": sdm_fee,
+                "source": "data_service",
+                "user_id": user["id"],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        
+        # Add fee info to result
+        result["sdm_fee"] = sdm_fee
+        result["sdm_fee_percent"] = data_fee_percent
+        result["total_deducted"] = total_to_deduct
         result["promotion"] = promo_info
         
         # Update promo usage stats
@@ -6341,11 +6444,26 @@ async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_use
 
 @sdm_router.post("/user/services/bill")
 async def pay_bill(request: PayBillRequest, user: dict = Depends(get_current_user)):
-    """User: Pay utility bill using cashback balance"""
+    """User: Pay utility bill using cashback balance - SDM fee applied"""
     try:
         provider = BillProvider(request.provider)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid provider: {request.provider}")
+    
+    # Get dynamic fee from config
+    config = await get_sdm_config()
+    bill_fee_percent = config.get("bill_fee_percent", 2.0)
+    
+    # Calculate SDM fee
+    sdm_fee = round(request.amount * (bill_fee_percent / 100), 2)
+    total_to_deduct = request.amount + sdm_fee
+    
+    # Check balance
+    if total_to_deduct > user["wallet_available"]:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient balance. Need GHS {total_to_deduct} (Bill: {request.amount} + Fee: {sdm_fee})"
+        )
     
     # Check for promotions
     promo_info = await apply_promotion("BILL_PAYMENT", request.amount)
@@ -6359,7 +6477,23 @@ async def pay_bill(request: PayBillRequest, user: dict = Depends(get_current_use
             amount=effective_amount,
             customer_name=request.customer_name
         )
+        
+        # Record SDM fee as commission
+        if sdm_fee > 0:
+            await db.sdm_commissions.insert_one({
+                "id": str(uuid.uuid4()),
+                "transaction_id": result.get("transaction_id", str(uuid.uuid4())),
+                "amount": sdm_fee,
+                "source": "bill_service",
+                "user_id": user["id"],
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+        
+        # Add fee info to result
         result["original_amount"] = request.amount
+        result["sdm_fee"] = sdm_fee
+        result["sdm_fee_percent"] = bill_fee_percent
+        result["total_deducted"] = total_to_deduct
         result["promotion"] = promo_info
         
         # Update promo usage stats

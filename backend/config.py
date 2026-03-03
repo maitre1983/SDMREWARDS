@@ -142,5 +142,11 @@ DEFAULT_SDM_CONFIG = {
     "birthday_bonus_enabled": True,
     "birthday_bonus_amount": 5.0,
     "sdm_commission_rate": SDM_COMMISSION_RATE,  # Configurable commission rate (0.5% to 20%)
-    "cashback_pending_days": 0  # Immediate cashback (was 7 days)
+    "cashback_pending_days": 0,  # Immediate cashback (was 7 days)
+    # Service Fees (percentage) - Configurable from Admin Dashboard
+    "airtime_fee_percent": 2.0,    # 2% fee on airtime purchases
+    "data_fee_percent": 2.0,       # 2% fee on data purchases
+    "bill_fee_percent": 2.0,       # 2% fee on bill payments
+    "momo_withdraw_fee_percent": 1.0,  # 1% fee on MoMo withdrawals (additional to flat fee)
+    "momo_withdraw_fee_flat": 1.0,     # Flat fee for MoMo withdrawals in GHS
 }

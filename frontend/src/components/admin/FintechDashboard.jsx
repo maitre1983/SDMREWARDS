@@ -2679,10 +2679,16 @@ function StatusBadge({ status }) {
 function FintechConfigPanel({ config, onSave, isSaving }) {
   const [formData, setFormData] = useState({
     sdm_commission_rate: config.sdm_commission_rate || 0.02,
-    cashback_pending_days: config.cashback_pending_days || 7,
+    cashback_pending_days: config.cashback_pending_days || 0,
     withdrawal_fee: config.withdrawal_fee || 1.0,
     float_low_threshold: config.float_low_threshold || 5000,
     float_critical_threshold: config.float_critical_threshold || 1000,
+    // Service fees
+    airtime_fee_percent: config.airtime_fee_percent || 2.0,
+    data_fee_percent: config.data_fee_percent || 2.0,
+    bill_fee_percent: config.bill_fee_percent || 2.0,
+    momo_withdraw_fee_percent: config.momo_withdraw_fee_percent || 1.0,
+    momo_withdraw_fee_flat: config.momo_withdraw_fee_flat || 1.0,
   });
 
   const handleChange = (key, value) => {
@@ -2697,6 +2703,12 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
       withdrawal_fee: parseFloat(formData.withdrawal_fee),
       float_low_threshold: parseFloat(formData.float_low_threshold),
       float_critical_threshold: parseFloat(formData.float_critical_threshold),
+      // Service fees
+      airtime_fee_percent: parseFloat(formData.airtime_fee_percent),
+      data_fee_percent: parseFloat(formData.data_fee_percent),
+      bill_fee_percent: parseFloat(formData.bill_fee_percent),
+      momo_withdraw_fee_percent: parseFloat(formData.momo_withdraw_fee_percent),
+      momo_withdraw_fee_flat: parseFloat(formData.momo_withdraw_fee_flat),
     });
   };
 
@@ -2707,11 +2719,109 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Service Fees Section - NEW */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Percent size={18} className="text-purple-600" />
+            Frais de Services SDM
+          </h4>
+          <p className="text-sm text-slate-500 mb-4">
+            Ces frais sont prélevés sur chaque transaction et reversés à SDM.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Airtime Fee (%)
+              </label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={formData.airtime_fee_percent}
+                onChange={(e) => handleChange('airtime_fee_percent', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Frais achat crédit téléphone
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Data Fee (%)
+              </label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={formData.data_fee_percent}
+                onChange={(e) => handleChange('data_fee_percent', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Frais achat data/internet
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Bill Pay Fee (%)
+              </label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={formData.bill_fee_percent}
+                onChange={(e) => handleChange('bill_fee_percent', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Frais paiement factures
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                MoMo Withdraw (%)
+              </label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                value={formData.momo_withdraw_fee_percent}
+                onChange={(e) => handleChange('momo_withdraw_fee_percent', e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Frais % retrait MoMo
+              </p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              MoMo Withdraw Flat Fee (GHS)
+            </label>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              max="50"
+              value={formData.momo_withdraw_fee_flat}
+              onChange={(e) => handleChange('momo_withdraw_fee_flat', e.target.value)}
+              className="w-32"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Frais fixe additionnel pour retrait MoMo
+            </p>
+          </div>
+        </div>
+
         {/* Commission & Fees */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <DollarSign size={18} className="text-emerald-600" />
-            Commission & Fees
+            Commission & Fees (Cashback)
           </h4>
           <div className="grid grid-cols-3 gap-6">
             <div>
@@ -2733,7 +2843,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Withdrawal Fee (GHS)
+                Withdrawal Fee (GHS) - Legacy
               </label>
               <Input
                 type="number"
@@ -2744,7 +2854,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Mobile Money withdrawal fee
+                (Ancien) Utilisez MoMo Withdraw Fee
               </p>
             </div>
             <div>
@@ -2760,7 +2870,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Days before cashback becomes available
+                Jours avant disponibilité (0 = immédiat)
               </p>
             </div>
           </div>
@@ -2808,26 +2918,50 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
 
         {/* Current Values Display */}
         <div className="bg-slate-50 rounded-xl border border-slate-200 p-6">
-          <h4 className="font-semibold text-slate-700 mb-4">Current Active Configuration</h4>
-          <div className="grid grid-cols-5 gap-4 text-sm">
+          <h4 className="font-semibold text-slate-700 mb-4">Configuration Active</h4>
+          
+          {/* Service Fees Row */}
+          <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Frais de Services</p>
+          <div className="grid grid-cols-5 gap-4 text-sm mb-4">
             <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-slate-500">Commission</p>
+              <p className="text-slate-500">Airtime</p>
+              <p className="text-lg font-bold text-orange-600">{config.airtime_fee_percent || 2}%</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Data</p>
+              <p className="text-lg font-bold text-blue-600">{config.data_fee_percent || 2}%</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Bill Pay</p>
+              <p className="text-lg font-bold text-green-600">{config.bill_fee_percent || 2}%</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">MoMo %</p>
+              <p className="text-lg font-bold text-purple-600">{config.momo_withdraw_fee_percent || 1}%</p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">MoMo Flat</p>
+              <p className="text-lg font-bold text-purple-600">GHS {config.momo_withdraw_fee_flat || 1}</p>
+            </div>
+          </div>
+          
+          {/* Other Config Row */}
+          <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Autres Paramètres</p>
+          <div className="grid grid-cols-4 gap-4 text-sm">
+            <div className="bg-white rounded-lg p-3 text-center">
+              <p className="text-slate-500">Commission Cashback</p>
               <p className="text-lg font-bold text-emerald-600">{(config.sdm_commission_rate * 100).toFixed(1)}%</p>
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-slate-500">Withdrawal Fee</p>
-              <p className="text-lg font-bold text-blue-600">GHS {config.withdrawal_fee}</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 text-center">
               <p className="text-slate-500">Pending Days</p>
-              <p className="text-lg font-bold text-purple-600">{config.cashback_pending_days} days</p>
+              <p className="text-lg font-bold text-slate-600">{config.cashback_pending_days} jours</p>
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-slate-500">Low Threshold</p>
+              <p className="text-slate-500">Float Low</p>
               <p className="text-lg font-bold text-amber-600">GHS {config.float_low_threshold}</p>
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-slate-500">Critical</p>
+              <p className="text-slate-500">Float Critical</p>
               <p className="text-lg font-bold text-red-600">GHS {config.float_critical_threshold}</p>
             </div>
           </div>

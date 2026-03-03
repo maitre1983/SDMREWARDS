@@ -78,6 +78,30 @@ Amount: 1000 GHS @ 10% Cashback
 - Modifiable par le super_admin dans l'onglet "Commissions SDM"
 - API: `GET/PUT /api/sdm/admin/commission-rate`
 
+### Service Fees Configuration (NEW - March 3, 2026)
+Tous les frais de services sont maintenant dynamiques et configurables depuis l'admin:
+- **Airtime Fee**: 2% par défaut (configurable)
+- **Data Fee**: 2% par défaut (configurable)
+- **Bill Pay Fee**: 2% par défaut (configurable)
+- **MoMo Withdraw Fee**: 1% + 1 GHS flat (configurables)
+
+Configuration via:
+- **Admin Panel**: Fintech Ledger → Config
+- **API**: `PUT /api/sdm/admin/config` avec les champs:
+  - `airtime_fee_percent`
+  - `data_fee_percent`
+  - `bill_fee_percent`
+  - `momo_withdraw_fee_percent`
+  - `momo_withdraw_fee_flat`
+- **Client API**: `GET /api/sdm/user/services/fees` (public)
+
+### Flow des frais:
+1. Client initie un service (Airtime, Data, Bill, MoMo Withdraw)
+2. Système récupère les frais dynamiques de la config
+3. Frais SDM calculés et affichés au client AVANT validation
+4. Frais enregistrés dans `sdm_commissions` comme revenu SDM
+5. Client débité du montant + frais
+
 ### Cashback Policy (Updated March 3, 2026)
 - **Cashback disponible IMMÉDIATEMENT** (plus de période d'attente)
 - Crédité dans `wallet_available` au lieu de `wallet_pending`
