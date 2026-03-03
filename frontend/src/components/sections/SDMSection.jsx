@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Wallet, QrCode, Store, CreditCard, Smartphone, 
@@ -7,9 +7,29 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../ui/button';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export const SDMSection = () => {
   const { t, language } = useLanguage();
+  const [stats, setStats] = useState({
+    total_users: 0,
+    total_partners: 100,
+    total_transactions: 0
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/sdm/stats`);
+        setStats(response.data);
+      } catch (error) {
+        console.log('Stats fetch error:', error);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const features = [
     { 
@@ -34,9 +54,9 @@ export const SDMSection = () => {
     },
   ];
 
-  const stats = [
+  const displayStats = [
     { value: '5%', label: language === 'fr' ? 'Cashback moyen' : 'Average Cashback' },
-    { value: '100+', label: language === 'fr' ? 'Commerces partenaires' : 'Partner Merchants' },
+    { value: `${stats.total_partners || 100}+`, label: language === 'fr' ? 'Commerces partenaires' : 'Partner Merchants' },
     { value: '24/7', label: language === 'fr' ? 'Disponible' : 'Available' },
   ];
 
@@ -73,8 +93,8 @@ export const SDMSection = () => {
           </p>
 
           {/* Stats */}
-          <div className="flex flex-wrap justify-center gap-8 mb-12">
-            {stats.map((stat, i) => (
+          <div className="flex flex-wrap justify-center gap-6 md:gap-8 mb-12">
+            {displayStats.map((stat, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, scale: 0.9 }}

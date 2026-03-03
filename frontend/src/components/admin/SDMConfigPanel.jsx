@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Settings, Save, Loader2, Users, CreditCard, 
-  TrendingUp, DollarSign, Award, RefreshCw
+  TrendingUp, DollarSign, Award, RefreshCw, Crown, Plus, Trash2, Edit2, X
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import axios from 'axios';
 
@@ -15,25 +16,30 @@ export default function SDMConfigPanel({ token }) {
   const [stats, setStats] = useState(null);
   const [memberships, setMemberships] = useState([]);
   const [cardTypes, setCardTypes] = useState([]);
+  const [vipCards, setVipCards] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState('overview');
+  const [editingCard, setEditingCard] = useState(null);
+  const [showCardForm, setShowCardForm] = useState(false);
   
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [configRes, statsRes, membershipsRes, cardTypesRes] = await Promise.all([
+      const [configRes, statsRes, membershipsRes, cardTypesRes, vipCardsRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/admin/config`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/sdm-stats`, { headers }),
         axios.get(`${API_URL}/api/sdm/admin/memberships?limit=50`, { headers }),
-        axios.get(`${API_URL}/api/sdm/admin/card-types`, { headers })
+        axios.get(`${API_URL}/api/sdm/admin/card-types`, { headers }),
+        axios.get(`${API_URL}/api/sdm/admin/vip-cards`, { headers })
       ]);
       setConfig(configRes.data);
       setStats(statsRes.data);
       setMemberships(membershipsRes.data);
       setCardTypes(cardTypesRes.data);
+      setVipCards(vipCardsRes.data.cards || []);
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error('Failed to load SDM data');
@@ -58,6 +64,17 @@ export default function SDMConfigPanel({ token }) {
     }
   };
 
+  const handleDeleteVipCard = async (cardId) => {
+    if (!confirm('Are you sure you want to delete this VIP card?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/sdm/admin/vip-cards/${cardId}`, { headers });
+      toast.success('Card deleted');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to delete card');
+    }
+  };
+
   const updateConfig = (key, value) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
@@ -73,9 +90,10 @@ export default function SDMConfigPanel({ token }) {
   return (
     <div className="space-y-6" data-testid="sdm-config-panel">
       {/* Sub Tabs */}
-      <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+      <div className="flex gap-2 bg-slate-100 p-1 rounded-lg overflow-x-auto">
         {[
           { id: 'overview', label: 'Overview', icon: TrendingUp },
+          { id: 'vip-cards', label: 'VIP Cards', icon: Crown },
           { id: 'config', label: 'Configuration', icon: Settings },
           { id: 'memberships', label: 'Memberships', icon: CreditCard },
           { id: 'card-types', label: 'Card Types', icon: Award },
@@ -145,6 +163,100 @@ export default function SDMConfigPanel({ token }) {
       )}
 
       {/* Configuration */}
+      {/* VIP Cards Management */}
+      {activeSubTab === 'vip-cards' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">VIP Cards (Landing Page)</h3>
+            <Button onClick={() => { setEditingCard(null); setShowCardForm(true); }} className="gap-2">
+              <Plus size={16} />
+              Add Card
+            </Button>
+          </div>
+          
+          <p className="text-sm text-slate-500">
+            Ces cartes sont affichées sur la landing page et disponibles à l'achat par les clients.
+          </p>
+
+          {/* VIP Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {vipCards.map((card) => (
+              <div 
+                key={card.id} 
+                className={`bg-white rounded-xl border-2 p-4 ${
+                  card.tier === 'GOLD' ? 'border-yellow-400' : 
+                  card.tier === 'PLATINUM' ? 'border-slate-400' : 'border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <Crown size={24} className={
+                    card.tier === 'GOLD' ? 'text-yellow-500' : 
+                    card.tier === 'PLATINUM' ? 'text-slate-400' : 'text-amber-700'
+                  } />
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => { setEditingCard(card); setShowCardForm(true); }}
+                      className="p-1 text-slate-400 hover:text-blue-600"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteVipCard(card.id)}
+                      className="p-1 text-slate-400 hover:text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                
+                <h4 className="font-bold text-slate-900">{card.name}</h4>
+                <p className="text-2xl font-bold text-blue-600 mb-2">{card.price} GHS</p>
+                <p className="text-xs text-slate-500 mb-3">{card.validity_days} days</p>
+                
+                <div className="space-y-1 text-xs text-slate-600 mb-3">
+                  <p>+{card.cashback_boost}% cashback boost</p>
+                  <p>x{card.lottery_multiplier} lottery chances</p>
+                  <p>{card.monthly_withdrawal_limit} GHS/month limit</p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 text-xs rounded-full ${
+                    card.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {card.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="text-xs text-slate-400">{card.tier}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Card Edit Modal */}
+          {showCardForm && (
+            <VIPCardForm 
+              card={editingCard}
+              onClose={() => { setShowCardForm(false); setEditingCard(null); }}
+              onSave={async (cardData) => {
+                try {
+                  if (editingCard) {
+                    await axios.put(`${API_URL}/api/sdm/admin/vip-cards/${editingCard.id}`, cardData, { headers });
+                    toast.success('Card updated');
+                  } else {
+                    await axios.post(`${API_URL}/api/sdm/admin/vip-cards`, cardData, { headers });
+                    toast.success('Card created');
+                  }
+                  setShowCardForm(false);
+                  setEditingCard(null);
+                  fetchData();
+                } catch (error) {
+                  toast.error(error.response?.data?.detail || 'Failed to save');
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
+
       {activeSubTab === 'config' && config && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h3 className="font-semibold text-slate-900 mb-6">Platform Configuration</h3>
@@ -410,6 +522,165 @@ function StatCard({ icon: Icon, label, value, color }) {
       </div>
       <p className="text-xl font-bold text-slate-900">{value}</p>
       <p className="text-xs text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+// VIP Card Form Component
+function VIPCardForm({ card, onClose, onSave }) {
+  const [formData, setFormData] = useState({
+    name: card?.name || '',
+    tier: card?.tier || 'SILVER',
+    price: card?.price || 25,
+    validity_days: card?.validity_days || 365,
+    cashback_boost: card?.cashback_boost || 5,
+    lottery_multiplier: card?.lottery_multiplier || 1,
+    monthly_withdrawal_limit: card?.monthly_withdrawal_limit || 500,
+    benefits_list: card?.benefits_list?.join('\n') || '',
+    is_active: card?.is_active ?? true,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    const data = {
+      ...formData,
+      benefits_list: formData.benefits_list.split('\n').filter(b => b.trim()),
+    };
+    
+    await onSave(data);
+    setIsSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold text-lg">{card ? 'Edit VIP Card' : 'New VIP Card'}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded">
+            <X size={20} />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Card Name</label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                placeholder="VIP Gold Member"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Tier</label>
+              <select
+                value={formData.tier}
+                onChange={(e) => setFormData({...formData, tier: e.target.value})}
+                className="w-full h-10 px-3 rounded-md border border-slate-300 text-sm"
+              >
+                <option value="BRONZE">Bronze</option>
+                <option value="SILVER">Silver</option>
+                <option value="GOLD">Gold</option>
+                <option value="PLATINUM">Platinum</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Price (GHS)</label>
+              <Input
+                type="number"
+                value={formData.price}
+                onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value)})}
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Validity (days)</label>
+              <Input
+                type="number"
+                value={formData.validity_days}
+                onChange={(e) => setFormData({...formData, validity_days: parseInt(e.target.value)})}
+                min="1"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Cashback Boost %</label>
+              <Input
+                type="number"
+                value={formData.cashback_boost}
+                onChange={(e) => setFormData({...formData, cashback_boost: parseFloat(e.target.value)})}
+                min="0"
+                step="0.1"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Lottery Multiplier</label>
+              <Input
+                type="number"
+                value={formData.lottery_multiplier}
+                onChange={(e) => setFormData({...formData, lottery_multiplier: parseFloat(e.target.value)})}
+                min="1"
+                step="0.5"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Withdrawal Limit</label>
+              <Input
+                type="number"
+                value={formData.monthly_withdrawal_limit}
+                onChange={(e) => setFormData({...formData, monthly_withdrawal_limit: parseFloat(e.target.value)})}
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Benefits (one per line)
+            </label>
+            <Textarea
+              value={formData.benefits_list}
+              onChange={(e) => setFormData({...formData, benefits_list: e.target.value})}
+              placeholder={"5% cashback on all purchases\nPriority customer support\n..."}
+              rows={5}
+              className="resize-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is_active"
+              checked={formData.is_active}
+              onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
+              className="w-4 h-4 rounded"
+            />
+            <label htmlFor="is_active" className="text-sm text-slate-700">Active (visible on landing page)</label>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSaving} className="flex-1 gap-2">
+              {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+              {card ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

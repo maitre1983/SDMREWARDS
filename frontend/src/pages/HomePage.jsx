@@ -11,6 +11,7 @@ import { BonusSection } from '../components/sections/BonusSection';
 import { CommitmentSection } from '../components/sections/CommitmentSection';
 import { ContactSection } from '../components/sections/ContactSection';
 import { SDMSection } from '../components/sections/SDMSection';
+import { VIPCardsSection } from '../components/sections/VIPCardsSection';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -39,6 +40,7 @@ export default function HomePage() {
         <WhyWebsiteSection />
         <ServicesSection />
         <SDMSection />
+        <VIPCardsSection />
         <PricingSection />
         <PortfolioSection />
         <BonusSection />

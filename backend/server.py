@@ -4423,6 +4423,37 @@ async def delete_vip_card(card_id: str, admin: dict = Depends(get_current_admin)
         raise HTTPException(status_code=404, detail="VIP card not found")
     return {"message": "VIP card deleted"}
 
+# Public endpoint for VIP cards (for landing page)
+@sdm_router.get("/vip-cards")
+async def get_public_vip_cards():
+    """Public: Get active VIP card types for landing page display"""
+    cards = await db.vip_card_types.find({"is_active": True}, {"_id": 0}).sort("price", 1).to_list(100)
+    
+    # Seed default cards if none exist
+    if not cards:
+        for card_data in DEFAULT_VIP_CARDS:
+            card = VIPCardType(**card_data)
+            await db.vip_card_types.insert_one(card.model_dump())
+        cards = await db.vip_card_types.find({"is_active": True}, {"_id": 0}).sort("price", 1).to_list(100)
+    
+    return {"cards": cards}
+
+# Public stats endpoint (for landing page)
+@sdm_router.get("/stats")
+async def get_public_stats():
+    """Public: Get platform statistics for landing page"""
+    total_users = await db.sdm_users.count_documents({})
+    total_merchants = await db.sdm_merchants.count_documents({"is_verified": True})
+    total_partners = await db.sdm_partners.count_documents({"is_active": True})
+    total_transactions = await db.sdm_transactions.count_documents({})
+    
+    return {
+        "total_users": total_users,
+        "total_merchants": total_merchants,
+        "total_partners": total_partners + total_merchants,
+        "total_transactions": total_transactions
+    }
+
 # ==================== PARTNERS ADMIN ENDPOINTS ====================
 
 class CreatePartnerRequest(BaseModel):
@@ -4500,23 +4531,54 @@ async def delete_partner(partner_id: str, admin: dict = Depends(get_current_admi
 # Public endpoint for partners list
 @sdm_router.get("/partners")
 async def get_public_partners(category: Optional[str] = None, city: Optional[str] = None):
-    """Public: Get partners list for display"""
+    """Public: Get partners list for display (includes verified merchants)"""
     query = {"is_active": True}
     if category:
         query["category"] = category
     if city:
         query["city"] = city
     
+    # Get partners from partners collection
     partners = await db.sdm_partners.find(query, {"_id": 0}).sort("name", 1).to_list(500)
+    
+    # Also get verified merchants
+    merchant_query = {"is_verified": True}
+    if category:
+        merchant_query["business_category"] = category
+    if city:
+        merchant_query["city"] = city
+    
+    merchants = await db.sdm_merchants.find(merchant_query, {"_id": 0}).to_list(500)
+    
+    # Convert merchants to partner format
+    for m in merchants:
+        partners.append({
+            "id": m.get("id"),
+            "name": m.get("business_name", m.get("name", "Unknown")),
+            "category": m.get("business_category", "General"),
+            "city": m.get("city", ""),
+            "address": m.get("gps_location", m.get("address", "")),
+            "phone": m.get("phone", ""),
+            "cashback_rate": m.get("cashback_rate", 1.0),
+            "is_active": True,
+            "is_merchant": True,
+            "logo": m.get("logo", None),
+            "description": m.get("description", "SDM Partner Merchant")
+        })
     
     # Get unique categories for filter
     categories = await db.sdm_partners.distinct("category", {"is_active": True})
+    merchant_categories = await db.sdm_merchants.distinct("business_category", {"is_verified": True})
+    all_categories = list(set(categories + merchant_categories))
+    
     cities = await db.sdm_partners.distinct("city", {"is_active": True})
+    merchant_cities = await db.sdm_merchants.distinct("city", {"is_verified": True})
+    all_cities = list(set(cities + merchant_cities))
     
     return {
         "partners": partners,
-        "categories": categories,
-        "cities": cities
+        "categories": all_categories,
+        "cities": all_cities
     }
 
 # ==================== LOTTERY ADMIN ENDPOINTS ====================
