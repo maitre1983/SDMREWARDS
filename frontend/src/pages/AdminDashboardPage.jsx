@@ -4,7 +4,7 @@ import {
   Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
   ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet,
-  CreditCard, Wallet, Users, Store, Shield, Gift
+  CreditCard, Wallet, Users, Store, Shield, Gift, ArrowRightLeft
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,7 @@ import UsersAndMerchantsPanel from '../components/admin/UsersAndMerchantsPanel';
 import AdminManagementPanel from '../components/admin/AdminManagementPanel';
 import ReferralHistoryPanel from '../components/admin/ReferralHistoryPanel';
 import MessagesPanel from '../components/admin/MessagesPanel';
+import TransactionHistoryPanel from '../components/admin/TransactionHistoryPanel';
 import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -235,6 +236,15 @@ export default function AdminDashboardPage() {
           </button>
           
           <button
+            onClick={() => setActiveTab('transactions')}
+            data-testid="transactions-tab"
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'transactions' ? 'active' : ''}`}
+          >
+            <ArrowRightLeft size={18} />
+            <span>Transactions</span>
+          </button>
+          
+          <button
             onClick={() => setActiveTab('referrals')}
             data-testid="referrals-tab"
             className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'referrals' ? 'active' : ''}`}
@@ -424,6 +434,10 @@ export default function AdminDashboardPage() {
 
           {activeTab === 'fintech' && (
             <FintechDashboard token={token} />
+          )}
+
+          {activeTab === 'transactions' && (
+            <TransactionHistoryPanel token={token} />
           )}
 
           {activeTab === 'referrals' && (

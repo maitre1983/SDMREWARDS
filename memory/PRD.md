@@ -377,22 +377,49 @@ Amount: 1000 GHS @ 10% Cashback
   4. **MoMo Transfer** (`/api/admin/withdrawals/{id}/send-momo`): Admin can send withdrawals via MoMo
   5. **KYC Verification** (`/api/sdm/merchant/verify-momo`): Verify MoMo account name before settlement config
   6. **Merchant Settlement Config** (`/api/sdm/merchant/settlement`): Configure settlement with KYC verification
-- **Test Mode**: Enabled by default (PAYMENT_TEST_MODE=true). Set to 'false' in production with valid BulkClix API key
+- **Test Mode**: Disabled - Real payments working with whitelisted IP
 - **Files Created**:
   - `/app/backend/services/bulkclix_payment.py`: Payment service with collection, transfer, and KYC
 - **Files Modified**:
   - `/app/backend/server.py`: Added payment endpoints and webhook
   - `/app/backend/services/__init__.py`: Export new payment service
 
+### Customer-to-Merchant Payment Flow (March 3, 2026)
+- **Critical Fix**: Implemented correct payment flow where customer pays FIRST
+- **Flow**:
+  1. Customer scans merchant QR → System collects from customer's MoMo
+  2. Customer approves payment on phone
+  3. Webhook confirms → Merchant receives funds instantly
+  4. SDM receives commission
+  5. Customer receives cashback
+- **New Endpoints**:
+  - `POST /api/sdm/merchant/transaction`: Initiates MoMo collection from customer
+  - `POST /api/sdm/payments/webhook/transaction`: Processes payment confirmation
+  - `GET /api/sdm/merchant/transaction/{id}/status`: Check transaction status
+- **Tested**: Real payment of 15 GHS completed in ~8 seconds
+
+### Admin Transaction History Panel (March 3, 2026)
+- **New Feature**: Full transaction history for Super Admin
+- **Components**:
+  - `/app/frontend/src/components/admin/TransactionHistoryPanel.jsx`: New panel
+  - Added "Transactions" tab in Admin Dashboard sidebar
+- **Endpoints**:
+  - `GET /api/sdm/admin/transactions`: Get all transactions with filters
+  - `GET /api/sdm/admin/transactions/stats`: Get transaction statistics
+
+### Merchant Settlement Configuration UI (March 3, 2026)
+- **New Feature**: Settlement configuration in merchant Settings
+- **Includes**:
+  - Settlement mode selection (Instant / Daily)
+  - Settlement type (MoMo / Bank)
+  - MoMo configuration with KYC verification
+  - Bank account configuration
+- **Backend**: KYC verification via BulkClix when saving MoMo number
+
 ---
 
 *Last Updated: March 3, 2026*
-*Merchant Dashboard Features Tested and Working*
-*Birthday Bonus Feature Complete*
-*Admin Management Panel: Create/Delete Admins, Change Passwords*
-*Merchant Delete Feature: Super Admin can delete merchants*
-*Partners Visibility: Blocked/Suspended/Deleted merchants hidden from clients*
-*Referral System: Bonuses paid only on card purchase, Admin history panel added*
-*Super Admin Account: emileparfait2003@gmail.com configured at startup*
-*Admin Login Playwright Test: FIXED - Race condition resolved*
-*BulkClix Payment Integration: IMPLEMENTED (Test Mode Active)*
+*BulkClix Payment Integration: FULLY WORKING - Real payments enabled*
+*Customer Payment Flow: Customer pays first, then merchant receives*
+*Admin Transaction History: Complete visibility for Super Admin*
+*Merchant Settlement Config: MoMo/Bank with KYC verification*

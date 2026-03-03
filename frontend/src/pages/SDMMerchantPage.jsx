@@ -1742,6 +1742,230 @@ export default function SDMMerchantPage() {
               </div>
             </div>
 
+            {/* Settlement Configuration */}
+            <div className="bg-white rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Banknote className="text-purple-600" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Règlement des paiements</h3>
+                  <p className="text-sm text-slate-500">Configurez comment recevoir vos paiements</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Settlement Mode */}
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <p className="font-medium text-slate-900 mb-3">Mode de règlement</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await axios.put(`${API_URL}/api/sdm/merchant/settlement`,
+                            { settlement_mode: 'instant' },
+                            { headers: { Authorization: `Bearer ${token}` }}
+                          );
+                          setMerchant({...merchant, settlement_mode: 'instant'});
+                          toast.success('Mode instant activé');
+                        } catch (error) {
+                          toast.error('Erreur de mise à jour');
+                        }
+                      }}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        merchant?.settlement_mode === 'instant'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-slate-200 hover:border-purple-300'
+                      }`}
+                    >
+                      <Smartphone className={`mx-auto mb-2 ${
+                        merchant?.settlement_mode === 'instant' ? 'text-purple-600' : 'text-slate-400'
+                      }`} size={24} />
+                      <p className="font-medium text-sm">Instant</p>
+                      <p className="text-xs text-slate-500">Paiement immédiat</p>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await axios.put(`${API_URL}/api/sdm/merchant/settlement`,
+                            { settlement_mode: 'daily' },
+                            { headers: { Authorization: `Bearer ${token}` }}
+                          );
+                          setMerchant({...merchant, settlement_mode: 'daily'});
+                          toast.success('Mode journalier activé');
+                        } catch (error) {
+                          toast.error('Erreur de mise à jour');
+                        }
+                      }}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        merchant?.settlement_mode === 'daily'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-slate-200 hover:border-purple-300'
+                      }`}
+                    >
+                      <Calendar className={`mx-auto mb-2 ${
+                        merchant?.settlement_mode === 'daily' ? 'text-purple-600' : 'text-slate-400'
+                      }`} size={24} />
+                      <p className="font-medium text-sm">Journalier</p>
+                      <p className="text-xs text-slate-500">Fin de journée</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Settlement Type */}
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <p className="font-medium text-slate-900 mb-3">Méthode de réception</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setMerchant({...merchant, settlement_type: 'momo'})}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        merchant?.settlement_type === 'momo'
+                          ? 'border-yellow-500 bg-yellow-50'
+                          : 'border-slate-200 hover:border-yellow-300'
+                      }`}
+                    >
+                      <Smartphone className={`mx-auto mb-2 ${
+                        merchant?.settlement_type === 'momo' ? 'text-yellow-600' : 'text-slate-400'
+                      }`} size={24} />
+                      <p className="font-medium text-sm">Mobile Money</p>
+                    </button>
+                    <button
+                      onClick={() => setMerchant({...merchant, settlement_type: 'bank'})}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        merchant?.settlement_type === 'bank'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <CreditCard className={`mx-auto mb-2 ${
+                        merchant?.settlement_type === 'bank' ? 'text-blue-600' : 'text-slate-400'
+                      }`} size={24} />
+                      <p className="font-medium text-sm">Compte Bancaire</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* MoMo Settings */}
+                {merchant?.settlement_type === 'momo' && (
+                  <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                    <p className="font-medium text-yellow-800 mb-4">Configuration Mobile Money</p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-800 mb-1">Numéro MoMo</label>
+                        <Input
+                          value={merchant?.momo_number || ''}
+                          onChange={(e) => setMerchant({...merchant, momo_number: e.target.value})}
+                          placeholder="0541008285"
+                          className="bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-yellow-800 mb-1">Réseau</label>
+                        <select
+                          value={merchant?.momo_provider || 'MTN'}
+                          onChange={(e) => setMerchant({...merchant, momo_provider: e.target.value})}
+                          className="w-full p-3 border rounded-xl bg-white"
+                        >
+                          <option value="MTN">MTN Mobile Money</option>
+                          <option value="TELECEL">Telecel Cash (Vodafone)</option>
+                          <option value="AIRTELTIGO">AirtelTigo Money</option>
+                        </select>
+                      </div>
+                      {merchant?.momo_verified && (
+                        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-2 rounded-lg">
+                          <CheckCircle size={16} />
+                          <span className="text-sm">Vérifié: {merchant?.momo_account_name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bank Settings */}
+                {merchant?.settlement_type === 'bank' && (
+                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <p className="font-medium text-blue-800 mb-4">Configuration Bancaire</p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-blue-800 mb-1">Nom de la banque</label>
+                        <Input
+                          value={merchant?.bank_name || ''}
+                          onChange={(e) => setMerchant({...merchant, bank_name: e.target.value})}
+                          placeholder="Ghana Commercial Bank"
+                          className="bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-blue-800 mb-1">Numéro de compte</label>
+                        <Input
+                          value={merchant?.bank_account_number || ''}
+                          onChange={(e) => setMerchant({...merchant, bank_account_number: e.target.value})}
+                          placeholder="1234567890"
+                          className="bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-blue-800 mb-1">Nom du titulaire</label>
+                        <Input
+                          value={merchant?.bank_account_name || ''}
+                          onChange={(e) => setMerchant({...merchant, bank_account_name: e.target.value})}
+                          placeholder="John Doe"
+                          className="bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Save Button */}
+                <Button
+                  onClick={async () => {
+                    try {
+                      setIsLoading(true);
+                      const payload = {
+                        settlement_type: merchant?.settlement_type,
+                        settlement_mode: merchant?.settlement_mode,
+                      };
+                      if (merchant?.settlement_type === 'momo') {
+                        payload.momo_number = merchant?.momo_number;
+                        payload.momo_provider = merchant?.momo_provider;
+                      } else {
+                        payload.bank_name = merchant?.bank_name;
+                        payload.bank_account_number = merchant?.bank_account_number;
+                        payload.bank_account_name = merchant?.bank_account_name;
+                      }
+                      const res = await axios.put(`${API_URL}/api/sdm/merchant/settlement`,
+                        payload,
+                        { headers: { Authorization: `Bearer ${token}` }}
+                      );
+                      setMerchant(res.data.merchant);
+                      if (res.data.momo_verified) {
+                        toast.success('Configuration sauvegardée et numéro vérifié!');
+                      } else {
+                        toast.success('Configuration sauvegardée!');
+                      }
+                    } catch (error) {
+                      toast.error(error.response?.data?.detail || 'Erreur de sauvegarde');
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} className="mr-2" />}
+                  Sauvegarder la configuration
+                </Button>
+
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <p className="text-sm text-purple-700">
+                    <strong>Info:</strong> En mode instant, vous recevez vos paiements immédiatement après chaque transaction.
+                    En mode journalier, tous les paiements sont regroupés et envoyés à la fin de la journée.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* API Credentials - Also protected by PIN */}
             <div className="bg-white rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-6">

@@ -4018,10 +4018,76 @@ async def admin_verify_merchant(
     return {"message": f"Merchant {'verified' if is_verified else 'unverified'}"}
 
 @sdm_router.get("/admin/transactions")
-async def admin_get_transactions(admin: dict = Depends(get_current_admin), limit: int = 100):
-    """Admin: Get all transactions"""
-    transactions = await db.sdm_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
-    return transactions
+async def admin_get_transactions(
+    admin: dict = Depends(get_current_admin), 
+    limit: int = 100,
+    status: Optional[str] = None,
+    period: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Admin: Get all transactions with filters"""
+    # Build query
+    query = {}
+    
+    if status and status != 'all':
+        query["payment_status"] = status
+    
+    # Period filter
+    if period:
+        now = datetime.now(timezone.utc)
+        if period == 'today':
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            query["created_at"] = {"$gte": start.isoformat()}
+        elif period == 'week':
+            start = now - timedelta(days=7)
+            query["created_at"] = {"$gte": start.isoformat()}
+        elif period == 'month':
+            start = now - timedelta(days=30)
+            query["created_at"] = {"$gte": start.isoformat()}
+    
+    # Get from both collections (pending_payments has the new flow, sdm_transactions has old)
+    pending = await db.pending_payments.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    old_txns = await db.sdm_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    
+    # Merge and sort
+    all_transactions = pending + old_txns
+    all_transactions.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    # Apply search filter
+    if search:
+        search = search.lower()
+        all_transactions = [
+            t for t in all_transactions 
+            if search in (t.get("transaction_id", "").lower() or "") or
+               search in (t.get("merchant_name", "").lower() or "") or
+               search in (t.get("user_phone", "") or "")
+        ]
+    
+    return {"transactions": all_transactions[:limit]}
+
+@sdm_router.get("/admin/transactions/stats")
+async def admin_get_transaction_stats(admin: dict = Depends(get_current_admin)):
+    """Admin: Get transaction statistics"""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
+    # Today's stats from pending_payments
+    today_txns = await db.pending_payments.find(
+        {"created_at": {"$gte": today_start}, "payment_status": "completed"},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    today_volume = sum(t.get("amount", 0) for t in today_txns)
+    today_count = len(today_txns)
+    total_commission = sum(t.get("sdm_commission", 0) for t in today_txns)
+    total_cashback = sum(t.get("net_cashback", 0) for t in today_txns)
+    
+    return {
+        "today_volume": today_volume,
+        "today_count": today_count,
+        "total_commission": total_commission,
+        "total_cashback": total_cashback
+    }
 
 @sdm_router.get("/admin/withdrawals")
 async def admin_get_withdrawals(admin: dict = Depends(get_current_admin), status: Optional[str] = None):
