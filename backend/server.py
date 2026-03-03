@@ -1207,6 +1207,22 @@ async def create_contact_message(input_data: ContactMessageCreate):
 async def health_check():
     return {"status": "healthy", "service": "Smart Digital Solutions & SDM"}
 
+@api_router.get("/server-info")
+async def get_server_info():
+    """Get server IP for whitelisting purposes (BulkClix, etc.)"""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get("https://api.ipify.org?format=json")
+            ip_data = response.json()
+            return {
+                "server_ip": ip_data.get("ip"),
+                "environment": os.environ.get("ENVIRONMENT", "production"),
+                "message": "Use this IP for BulkClix whitelisting"
+            }
+    except Exception as e:
+        return {"error": str(e), "message": "Could not fetch server IP"}
+
 @api_router.post("/track")
 async def track_visit(visit_data: VisitCreate, request: Request):
     user_agent = request.headers.get("user-agent", "")
