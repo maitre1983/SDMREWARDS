@@ -6,7 +6,8 @@ import {
   Check, X, Edit2, Camera, Calendar, Filter,
   ChevronDown, ChevronUp, Clock, User, Search,
   Eye, EyeOff, Lock, MapPin, Send, Phone, Copy, 
-  Code, Book, Key, Shield, Percent, ToggleLeft, ToggleRight, Save
+  Code, Book, Key, Shield, Percent, ToggleLeft, ToggleRight, Save,
+  CreditCard, Smartphone, Banknote, Wallet, AlertCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -16,6 +17,7 @@ import axios from 'axios';
 import QRScanner from '../components/QRScanner';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
+import { PaymentMethodSelector, PaymentSplitDisplay } from '../components/PaymentComponents';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
@@ -40,7 +42,15 @@ export default function SDMMerchantPage() {
     gps_address: '',
     city: 'Accra',
     cashback_rate: 5,  // 5% default
-    password: ''
+    password: '',
+    // Settlement configuration
+    settlement_type: 'momo',  // momo or bank
+    momo_number: '',
+    momo_provider: 'MTN',
+    bank_name: '',
+    bank_account_number: '',
+    bank_account_name: '',
+    settlement_mode: 'instant'  // instant or daily
   });
   
   // OTP state
@@ -60,6 +70,15 @@ export default function SDMMerchantPage() {
   const [scanAmount, setScanAmount] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [scanNotes, setScanNotes] = useState('');
+  
+  // Payment system
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [momoPhone, setMomoPhone] = useState('');
+  const [momoNetwork, setMomoNetwork] = useState('MTN');
+  const [merchantQrData, setMerchantQrData] = useState(null);
+  const [cashBalance, setCashBalance] = useState(null);
+  const [paymentSplit, setPaymentSplit] = useState(null);
+  const [showMyQR, setShowMyQR] = useState(false);
 
   // Staff form
   const [newStaffName, setNewStaffName] = useState('');
@@ -81,14 +100,18 @@ export default function SDMMerchantPage() {
   const fetchMerchantData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [profileRes, txnRes, reportRes] = await Promise.all([
+      const [profileRes, txnRes, reportRes, qrRes, cashRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/merchant/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/transactions?limit=${txnLimit}`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers })
+        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers }),
+        axios.get(`${API_URL}/api/sdm/merchant/qr-code`, { headers }).catch(() => ({ data: null })),
+        axios.get(`${API_URL}/api/sdm/merchant/cash-balance`, { headers }).catch(() => ({ data: null }))
       ]);
       setMerchant(profileRes.data);
       setTransactions(txnRes.data);
       setReport(reportRes.data);
+      if (qrRes.data) setMerchantQrData(qrRes.data);
+      if (cashRes.data) setCashBalance(cashRes.data);
     } catch (error) {
       if (error.response?.status === 401) {
         handleLogout();
@@ -210,24 +233,61 @@ export default function SDMMerchantPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // Use new payment system API
       const response = await axios.post(
-        `${API_URL}/api/sdm/merchant/transaction`,
+        `${API_URL}/api/sdm/payments/merchant-initiate`,
         {
-          user_qr_code: scanQR,
-          amount: parseFloat(scanAmount)
+          client_qr_code: scanQR,
+          amount: parseFloat(scanAmount),
+          payment_method: paymentMethod,
+          payer_phone: paymentMethod === 'momo' ? momoPhone : undefined,
+          payer_network: paymentMethod === 'momo' ? momoNetwork : undefined,
+          notes: scanNotes
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(t('sdm_cashback_credited') + ` ${response.data.user_name}!`);
-      setScanQR('');
-      setScanAmount('');
-      fetchMerchantData();
+      
+      if (response.data.success) {
+        if (response.data.requires_client_confirmation) {
+          toast.info(`Cash payment created - Client must confirm. Phone: ${response.data.client_phone}`);
+        } else {
+          toast.success(`Payment successful! Cashback: GHS ${response.data.split.client_cashback.toFixed(2)}`);
+        }
+        setScanQR('');
+        setScanAmount('');
+        setScanNotes('');
+        setPaymentSplit(null);
+        fetchMerchantData();
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || t('sdm_transaction_failed'));
     } finally {
       setIsLoading(false);
     }
   };
+  
+  // Calculate payment split when amount changes
+  useEffect(() => {
+    if (scanAmount && parseFloat(scanAmount) > 0 && merchant?.cashback_rate) {
+      const amount = parseFloat(scanAmount);
+      const cashbackRate = paymentMethod === 'cash' 
+        ? Math.min(merchant.cashback_rate, merchant.max_cash_cashback_rate || 15)
+        : merchant.cashback_rate;
+      const totalCashback = amount * (cashbackRate / 100);
+      const sdmCommission = totalCashback * 0.10;
+      const clientCashback = totalCashback - sdmCommission;
+      const merchantAmount = amount - totalCashback;
+      
+      setPaymentSplit({
+        total_cashback: totalCashback,
+        sdm_commission: sdmCommission,
+        client_cashback: clientCashback,
+        merchant_amount: merchantAmount
+      });
+    } else {
+      setPaymentSplit(null);
+    }
+  }, [scanAmount, paymentMethod, merchant]);
 
   const handleAddStaff = async (e) => {
     e.preventDefault();
@@ -419,6 +479,158 @@ export default function SDMMerchantPage() {
                     className="bg-slate-800/50 border-slate-700 text-white"
                   />
                   <p className="text-xs text-slate-500 mt-1">{t('sdm_between_1_20')}</p>
+                </div>
+                
+                {/* Settlement Configuration */}
+                <div className="border-t border-slate-700 pt-4 mt-4">
+                  <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                    <Wallet size={18} className="text-cyan-400" />
+                    Payment Settlement *
+                  </h4>
+                  
+                  {/* Settlement Type Selector */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => setRegisterForm({...registerForm, settlement_type: 'momo'})}
+                      className={`p-3 rounded-xl border-2 transition-all ${
+                        registerForm.settlement_type === 'momo' 
+                          ? 'border-yellow-500 bg-yellow-500/10' 
+                          : 'border-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      <Smartphone className={`w-6 h-6 mx-auto mb-1 ${
+                        registerForm.settlement_type === 'momo' ? 'text-yellow-400' : 'text-slate-400'
+                      }`} />
+                      <p className={`text-sm font-medium ${
+                        registerForm.settlement_type === 'momo' ? 'text-yellow-400' : 'text-slate-400'
+                      }`}>Mobile Money</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegisterForm({...registerForm, settlement_type: 'bank'})}
+                      className={`p-3 rounded-xl border-2 transition-all ${
+                        registerForm.settlement_type === 'bank' 
+                          ? 'border-blue-500 bg-blue-500/10' 
+                          : 'border-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      <CreditCard className={`w-6 h-6 mx-auto mb-1 ${
+                        registerForm.settlement_type === 'bank' ? 'text-blue-400' : 'text-slate-400'
+                      }`} />
+                      <p className={`text-sm font-medium ${
+                        registerForm.settlement_type === 'bank' ? 'text-blue-400' : 'text-slate-400'
+                      }`}>Bank Account</p>
+                    </button>
+                  </div>
+                  
+                  {/* MoMo Details */}
+                  {registerForm.settlement_type === 'momo' && (
+                    <div className="space-y-3 bg-yellow-900/20 rounded-xl p-4 border border-yellow-700/30">
+                      <div>
+                        <label className="block text-sm text-slate-300 mb-2">Network *</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['MTN', 'Vodafone', 'AirtelTigo'].map(network => (
+                            <button
+                              key={network}
+                              type="button"
+                              onClick={() => setRegisterForm({...registerForm, momo_provider: network})}
+                              className={`py-2 rounded-lg border text-sm font-medium transition-all ${
+                                registerForm.momo_provider === network 
+                                  ? 'border-yellow-500 bg-yellow-500/20 text-yellow-400' 
+                                  : 'border-slate-700 text-slate-400'
+                              }`}
+                            >
+                              {network}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-slate-300 mb-1">MoMo Number *</label>
+                        <Input
+                          type="tel"
+                          value={registerForm.momo_number}
+                          onChange={(e) => setRegisterForm({...registerForm, momo_number: e.target.value})}
+                          placeholder="0XX XXX XXXX"
+                          className="bg-slate-800/50 border-slate-700 text-white"
+                          required={registerForm.settlement_type === 'momo'}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Your payments will be sent here</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Bank Details */}
+                  {registerForm.settlement_type === 'bank' && (
+                    <div className="space-y-3 bg-blue-900/20 rounded-xl p-4 border border-blue-700/30">
+                      <div>
+                        <label className="block text-sm text-slate-300 mb-1">Bank Name *</label>
+                        <Input
+                          value={registerForm.bank_name}
+                          onChange={(e) => setRegisterForm({...registerForm, bank_name: e.target.value})}
+                          placeholder="e.g., GCB Bank"
+                          className="bg-slate-800/50 border-slate-700 text-white"
+                          required={registerForm.settlement_type === 'bank'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-slate-300 mb-1">Account Number *</label>
+                        <Input
+                          value={registerForm.bank_account_number}
+                          onChange={(e) => setRegisterForm({...registerForm, bank_account_number: e.target.value})}
+                          placeholder="Account number"
+                          className="bg-slate-800/50 border-slate-700 text-white"
+                          required={registerForm.settlement_type === 'bank'}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-slate-300 mb-1">Account Name *</label>
+                        <Input
+                          value={registerForm.bank_account_name}
+                          onChange={(e) => setRegisterForm({...registerForm, bank_account_name: e.target.value})}
+                          placeholder="Name on account"
+                          className="bg-slate-800/50 border-slate-700 text-white"
+                          required={registerForm.settlement_type === 'bank'}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Settlement Mode */}
+                  <div className="mt-4">
+                    <label className="block text-sm text-slate-300 mb-2">Settlement Mode</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setRegisterForm({...registerForm, settlement_mode: 'instant'})}
+                        className={`p-3 rounded-xl border transition-all text-left ${
+                          registerForm.settlement_mode === 'instant' 
+                            ? 'border-emerald-500 bg-emerald-500/10' 
+                            : 'border-slate-700'
+                        }`}
+                      >
+                        <p className={`text-sm font-medium ${
+                          registerForm.settlement_mode === 'instant' ? 'text-emerald-400' : 'text-slate-400'
+                        }`}>Instant</p>
+                        <p className="text-xs text-slate-500">Receive payment immediately</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegisterForm({...registerForm, settlement_mode: 'daily'})}
+                        className={`p-3 rounded-xl border transition-all text-left ${
+                          registerForm.settlement_mode === 'daily' 
+                            ? 'border-blue-500 bg-blue-500/10' 
+                            : 'border-slate-700'
+                        }`}
+                      >
+                        <p className={`text-sm font-medium ${
+                          registerForm.settlement_mode === 'daily' ? 'text-blue-400' : 'text-slate-400'
+                        }`}>Daily</p>
+                        <p className="text-xs text-slate-500">Batched once per day</p>
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
@@ -659,72 +871,223 @@ export default function SDMMerchantPage() {
       {/* Content */}
       <div className="max-w-4xl mx-auto p-4">
         {activeTab === 'scan' && (
-          <div className="bg-white rounded-2xl p-6">
-            <h3 className="font-semibold text-slate-900 mb-4">Create Transaction</h3>
-            <form onSubmit={handleCreateTransaction} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Customer QR Code</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={scanQR}
-                    onChange={(e) => setScanQR(e.target.value.toUpperCase())}
-                    placeholder="Enter or scan QR code"
-                    className="flex-1 h-12 text-lg font-mono uppercase"
-                    required
+          <div className="space-y-4">
+            {/* My QR Code Section */}
+            <div className="bg-white rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-900">My Payment QR Code</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMyQR(!showMyQR)}
+                  className="text-cyan-600 border-cyan-300"
+                >
+                  <QrCode size={16} className="mr-2" />
+                  {showMyQR ? 'Hide' : 'Show'} QR
+                </Button>
+              </div>
+              
+              {showMyQR && merchantQrData && (
+                <div className="flex flex-col items-center py-4">
+                  <img 
+                    src={merchantQrData.qr_image} 
+                    alt="Merchant QR Code" 
+                    className="w-48 h-48 rounded-xl shadow-lg"
                   />
-                  <Button
-                    type="button"
-                    onClick={() => setShowScanner(true)}
-                    className="h-12 px-4 bg-blue-600 hover:bg-blue-700 text-white"
-                    data-testid="open-scanner-btn"
-                  >
-                    <Camera size={20} className="mr-2" />
-                    Scan
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Transaction Amount (GHS)</label>
-                <Input
-                  type="number"
-                  value={scanAmount}
-                  onChange={(e) => setScanAmount(e.target.value)}
-                  placeholder="0.00"
-                  min="1"
-                  step="0.01"
-                  className="h-12 text-lg"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Notes (optional)</label>
-                <Input
-                  value={scanNotes}
-                  onChange={(e) => setScanNotes(e.target.value)}
-                  placeholder="e.g., Table 5, Order #123"
-                  className="h-10"
-                />
-              </div>
-              {scanAmount && (
-                <div className="bg-emerald-50 rounded-lg p-4">
-                  <p className="text-sm text-emerald-700">
-                    Customer will receive: <strong>GHS {(parseFloat(scanAmount) * (merchant?.cashback_rate || 5) / 100 * 0.98).toFixed(2)}</strong> cashback
+                  <p className="mt-3 text-sm text-slate-500">
+                    Customers can scan this to pay you
+                  </p>
+                  <p className="mt-1 font-mono text-xs text-slate-400">
+                    {merchantQrData.qr_code}
                   </p>
                 </div>
               )}
-              <Button
-                type="submit"
-                disabled={isLoading || !scanQR || !scanAmount}
-                className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
-              >
-                {isLoading ? <Loader2 className="animate-spin" /> : (
-                  <>
-                    <Check size={18} className="mr-2" />
-                    Confirm Transaction
-                  </>
+              
+              {/* Cash Balance Alert */}
+              {cashBalance && cashBalance.cash_debit_balance < 0 && (
+                <div className="mt-4 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                  <div className="flex items-center gap-3">
+                    <Wallet className="text-amber-600" size={20} />
+                    <div>
+                      <p className="font-medium text-amber-800">Cash Debit Balance</p>
+                      <p className="text-2xl font-bold text-amber-700">
+                        GHS {Math.abs(cashBalance.cash_debit_balance).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        Limit: GHS {cashBalance.cash_debit_limit} | Available: GHS {cashBalance.available_limit?.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Create Transaction Form */}
+            <div className="bg-white rounded-2xl p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">Create Transaction</h3>
+              <form onSubmit={handleCreateTransaction} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Customer QR Code</label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={scanQR}
+                      onChange={(e) => setScanQR(e.target.value.toUpperCase())}
+                      placeholder="Enter or scan QR code"
+                      className="flex-1 h-12 text-lg font-mono uppercase"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="h-12 px-4 bg-blue-600 hover:bg-blue-700 text-white"
+                      data-testid="open-scanner-btn"
+                    >
+                      <Camera size={20} className="mr-2" />
+                      Scan
+                    </Button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Amount (GHS)</label>
+                  <Input
+                    type="number"
+                    value={scanAmount}
+                    onChange={(e) => setScanAmount(e.target.value)}
+                    placeholder="0.00"
+                    min="1"
+                    step="0.01"
+                    className="h-12 text-lg"
+                    required
+                  />
+                </div>
+                
+                {/* Payment Method Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'cash', label: 'Cash', icon: Banknote, color: 'text-green-600' },
+                      { id: 'momo', label: 'MoMo', icon: Smartphone, color: 'text-yellow-600' },
+                      { id: 'card', label: 'Card', icon: CreditCard, color: 'text-blue-600' }
+                    ].map(method => (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`p-3 rounded-xl border-2 transition-all ${
+                          paymentMethod === method.id 
+                            ? 'border-cyan-500 bg-cyan-50' 
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <method.icon className={`w-6 h-6 mx-auto mb-1 ${
+                          paymentMethod === method.id ? 'text-cyan-600' : method.color
+                        }`} />
+                        <p className={`text-xs font-medium ${
+                          paymentMethod === method.id ? 'text-cyan-700' : 'text-slate-600'
+                        }`}>{method.label}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* MoMo Details */}
+                {paymentMethod === 'momo' && (
+                  <div className="space-y-3 bg-yellow-50 rounded-xl p-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Network</label>
+                      <div className="flex gap-2">
+                        {['MTN', 'Vodafone', 'AirtelTigo'].map(network => (
+                          <button
+                            key={network}
+                            type="button"
+                            onClick={() => setMomoNetwork(network)}
+                            className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                              momoNetwork === network 
+                                ? 'border-yellow-500 bg-yellow-100 text-yellow-700' 
+                                : 'border-slate-200 text-slate-600'
+                            }`}
+                          >
+                            {network}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">MoMo Number</label>
+                      <Input
+                        type="tel"
+                        value={momoPhone}
+                        onChange={(e) => setMomoPhone(e.target.value)}
+                        placeholder="0XX XXX XXXX"
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
                 )}
-              </Button>
-            </form>
+                
+                {/* Cash Payment Info */}
+                {paymentMethod === 'cash' && (
+                  <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="text-green-600 flex-shrink-0 mt-0.5" size={18} />
+                      <div>
+                        <p className="font-medium text-green-800 text-sm">Cash Payment</p>
+                        <p className="text-xs text-green-700 mt-1">
+                          Customer will receive a notification to confirm. 
+                          Cashback will be debited from your cash account.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Notes (optional)</label>
+                  <Input
+                    value={scanNotes}
+                    onChange={(e) => setScanNotes(e.target.value)}
+                    placeholder="e.g., Table 5, Order #123"
+                    className="h-10"
+                  />
+                </div>
+                
+                {/* Payment Split Preview */}
+                {paymentSplit && (
+                  <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                    <h4 className="font-medium text-slate-700 text-sm">Payment Breakdown</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Amount</span>
+                        <span className="font-semibold">GHS {parseFloat(scanAmount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-600">
+                        <span>Customer Cashback</span>
+                        <span className="font-semibold">+GHS {paymentSplit.client_cashback.toFixed(2)}</span>
+                      </div>
+                      <div className="border-t pt-1 flex justify-between">
+                        <span className="text-slate-500">You Receive</span>
+                        <span className="font-bold text-slate-900">GHS {paymentSplit.merchant_amount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <Button
+                  type="submit"
+                  disabled={isLoading || !scanQR || !scanAmount || (paymentMethod === 'momo' && !momoPhone)}
+                  className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" /> : (
+                    <>
+                      <Check size={18} className="mr-2" />
+                      Confirm {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'momo' ? 'MoMo' : 'Card'} Payment
+                    </>
+                  )}
+                </Button>
+              </form>
+            </div>
           </div>
         )}
 

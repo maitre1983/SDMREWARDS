@@ -5,7 +5,7 @@ import {
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
   Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket,
-  Eye, EyeOff, User, Lock, Calendar, Cake
+  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -64,6 +64,10 @@ export default function SDMClientPage() {
   const [partners, setPartners] = useState([]);
   const [lotteries, setLotteries] = useState(null);
   
+  // Pending payments state
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [showPendingPayments, setShowPendingPayments] = useState(false);
+  
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
   const [dataForm, setDataForm] = useState({ phone: '', bundleId: '' });
@@ -108,6 +112,56 @@ export default function SDMClientPage() {
       }
     }
   };
+  
+  // Fetch pending cash payments
+  const fetchPendingPayments = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API_URL}/api/sdm/payments/pending`, { headers });
+      setPendingPayments(response.data.pending_payments || []);
+      if (response.data.pending_payments?.length > 0) {
+        setShowPendingPayments(true);
+      }
+    } catch (error) {
+      console.error('Pending payments fetch error:', error);
+    }
+  };
+  
+  // Confirm or reject cash payment
+  const handleConfirmCashPayment = async (paymentId, confirm) => {
+    try {
+      setIsLoading(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(
+        `${API_URL}/api/sdm/payments/confirm-cash`,
+        { payment_id: paymentId, confirm },
+        { headers }
+      );
+      
+      if (response.data.success) {
+        if (confirm) {
+          toast.success(`Payment confirmed! Cashback: GHS ${response.data.cashback_credited?.toFixed(2)}`);
+        } else {
+          toast.info('Payment cancelled');
+        }
+        fetchPendingPayments();
+        fetchUserData();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to process payment');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Poll for pending payments every 30 seconds when logged in
+  useEffect(() => {
+    if (token) {
+      fetchPendingPayments();
+      const interval = setInterval(fetchPendingPayments, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [token]);
 
   // Fetch service-related data
   const fetchServiceData = async () => {
@@ -916,25 +970,80 @@ export default function SDMClientPage() {
       {/* Content */}
       <div className="max-w-lg mx-auto p-4">
         {activeTab === 'wallet' && user && (
-          <div className="bg-white rounded-2xl p-6 text-center">
-            <h3 className="font-semibold text-slate-900 mb-4">{t('sdm_your_qr')}</h3>
-            {user.qr_code_image && (
-              <img 
-                src={user.qr_code_image} 
-                alt="QR Code" 
-                className="w-48 h-48 mx-auto mb-4"
-              />
+          <div className="space-y-4">
+            {/* Pending Cash Payments Alert */}
+            {pendingPayments.length > 0 && (
+              <div className="bg-amber-50 rounded-2xl p-4 border-2 border-amber-300">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center">
+                    <AlertCircle className="text-amber-700" size={18} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-800">Pending Payment{pendingPayments.length > 1 ? 's' : ''}</p>
+                    <p className="text-xs text-amber-600">{pendingPayments.length} payment{pendingPayments.length > 1 ? 's' : ''} awaiting confirmation</p>
+                  </div>
+                </div>
+                
+                {pendingPayments.map((payment) => (
+                  <div key={payment.id} className="bg-white rounded-xl p-4 mb-3 last:mb-0">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="font-medium text-slate-900">{payment.merchant_name}</p>
+                        <p className="text-2xl font-bold text-slate-900">GHS {payment.amount?.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-emerald-600 font-semibold">+GHS {payment.cashback_amount?.toFixed(2)}</p>
+                        <p className="text-xs text-slate-500">cashback</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleConfirmCashPayment(payment.payment_id, false)}
+                        disabled={isLoading}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                      >
+                        <X size={16} className="mr-1" />
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => handleConfirmCashPayment(payment.payment_id, true)}
+                        disabled={isLoading}
+                        size="sm"
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} className="mr-1" />}
+                        Confirm
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-            <p className="text-2xl font-mono font-bold text-blue-600 mb-2">{user.qr_code}</p>
-            <p className="text-sm text-slate-500 mb-4">{t('sdm_show_merchant')}</p>
-            <Button
-              onClick={copyQRCode}
-              variant="outline"
-              className="gap-2"
-            >
-              <Copy size={16} />
-              Copy Code
-            </Button>
+            
+            {/* QR Code Section */}
+            <div className="bg-white rounded-2xl p-6 text-center">
+              <h3 className="font-semibold text-slate-900 mb-4">{t('sdm_your_qr')}</h3>
+              {user.qr_code_image && (
+                <img 
+                  src={user.qr_code_image} 
+                  alt="QR Code" 
+                  className="w-48 h-48 mx-auto mb-4"
+                />
+              )}
+              <p className="text-2xl font-mono font-bold text-blue-600 mb-2">{user.qr_code}</p>
+              <p className="text-sm text-slate-500 mb-4">{t('sdm_show_merchant')}</p>
+              <Button
+                onClick={copyQRCode}
+                variant="outline"
+                className="gap-2"
+              >
+                <Copy size={16} />
+                Copy Code
+              </Button>
+            </div>
           </div>
         )}
 

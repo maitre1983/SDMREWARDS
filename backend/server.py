@@ -63,6 +63,11 @@ SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
 CASHBACK_PENDING_DAYS = int(os.environ.get('CASHBACK_PENDING_DAYS', '7'))
 WITHDRAWAL_FEE = float(os.environ.get('WITHDRAWAL_FEE', '1.0'))  # GHS
 
+# Payment System Settings
+DEFAULT_CASH_DEBIT_LIMIT = float(os.environ.get('DEFAULT_CASH_DEBIT_LIMIT', '5000.0'))  # GHS
+DEFAULT_GRACE_PERIOD_DAYS = int(os.environ.get('DEFAULT_GRACE_PERIOD_DAYS', '3'))
+MAX_CASH_CASHBACK_RATE = float(os.environ.get('MAX_CASH_CASHBACK_RATE', '15.0'))  # 15% max
+
 # Referral bonus constants (used before membership system)
 REFERRAL_BONUS = 3.0  # GHS for referrer when referral buys a card
 REFERRAL_WELCOME_BONUS = 1.0  # GHS for new user when buying a card
@@ -226,9 +231,18 @@ class SDMUser(BaseModel):
     membership_card_id: Optional[str] = None
     wallet_pending: float = 0.0
     wallet_available: float = 0.0
+    wallet_frozen: bool = False  # Admin can freeze wallet
     total_earned: float = 0.0
     total_withdrawn: float = 0.0
     is_active: bool = True
+    
+    # Admin Controls
+    is_blocked: bool = False
+    is_suspended: bool = False
+    block_reason: Optional[str] = None
+    blocked_at: Optional[str] = None
+    blocked_by: Optional[str] = None
+    
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -424,8 +438,10 @@ class SDMMerchant(BaseModel):
     gps_address: Optional[str] = None  # GPS coordinates or Plus Code
     city: str = "Accra"
     cashback_rate: float = 5.0  # Percentage (5.0 means 5%)
+    cashback_enabled: bool = True
     api_key: str = Field(default_factory=lambda: f"sdk_{secrets.token_hex(16)}")
     api_secret: str = Field(default_factory=lambda: secrets.token_hex(32))
+    qr_code: str = Field(default_factory=lambda: f"MERCH_{secrets.token_hex(6).upper()}")
     is_active: bool = True
     is_verified: bool = False
     subscription_plan: str = "basic"  # basic, pro, enterprise
@@ -434,6 +450,32 @@ class SDMMerchant(BaseModel):
     total_cashback_given: float = 0.0
     balance: float = 0.0  # Merchant balance for cashback pool
     staff: List[Dict] = Field(default_factory=list)
+    
+    # Payment Settlement Configuration (REQUIRED)
+    settlement_type: str = "momo"  # momo, bank
+    momo_number: Optional[str] = None  # Mobile Money number for settlements
+    momo_provider: Optional[str] = None  # MTN, Vodafone, AirtelTigo
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_name: Optional[str] = None
+    bank_branch: Optional[str] = None
+    settlement_mode: str = "instant"  # instant, daily
+    
+    # Cash Payment Mode Settings
+    cash_mode_enabled: bool = True
+    cash_debit_balance: float = 0.0  # Current cash debit balance (can be negative)
+    cash_debit_limit: float = 5000.0  # Maximum allowed negative balance
+    cash_grace_period_days: int = 3  # Days before blocking cash mode
+    cash_grace_deadline: Optional[str] = None  # Date when grace period expires
+    max_cash_cashback_rate: float = 15.0  # Max cashback % for cash payments
+    
+    # Admin Controls
+    is_blocked: bool = False
+    is_suspended: bool = False
+    block_reason: Optional[str] = None
+    blocked_at: Optional[str] = None
+    blocked_by: Optional[str] = None
+    
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class SDMTransaction(BaseModel):
@@ -469,6 +511,148 @@ class SDMWithdrawal(BaseModel):
     status: str = "pending"  # pending, processing, completed, failed
     reference: Optional[str] = None
     processed_at: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# ============ PAYMENT SYSTEM MODELS ============
+
+class PaymentMethod(str, Enum):
+    """Payment method types"""
+    MOMO = "momo"
+    CARD = "card"
+    CASH = "cash"
+
+class PaymentStatus(str, Enum):
+    """Payment status types"""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    CONFIRMED = "confirmed"
+    SPLIT_COMPLETED = "split_completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    REFUNDED = "refunded"
+
+class SDMPayment(BaseModel):
+    """SDM Payment Record - Tracks all payment transactions"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    payment_ref: str = Field(default_factory=lambda: f"PAY{datetime.now().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(4).upper()}")
+    
+    # Transaction parties
+    client_id: str
+    client_phone: str
+    merchant_id: str
+    merchant_name: str
+    
+    # Payment details
+    amount: float  # Total payment amount
+    payment_method: str  # momo, card, cash
+    
+    # For MoMo/Card payments
+    payer_phone: Optional[str] = None  # Phone used for MoMo payment
+    payer_network: Optional[str] = None  # MTN, Vodafone, AirtelTigo
+    card_last_four: Optional[str] = None  # Last 4 digits of card
+    
+    # External provider references
+    bulkclix_ref: Optional[str] = None  # Bulkclix transaction reference
+    provider_ref: Optional[str] = None  # MoMo/Card provider reference
+    
+    # Split calculation
+    cashback_rate: float  # Merchant's cashback rate at time of payment
+    cashback_amount: float  # Amount going to client wallet
+    sdm_commission: float  # SDM's commission
+    merchant_amount: float  # Amount going to merchant
+    
+    # Status tracking
+    status: str = "pending"  # pending, processing, confirmed, split_completed, failed
+    payment_confirmed_at: Optional[str] = None
+    split_completed_at: Optional[str] = None
+    
+    # Settlement to merchant
+    settlement_status: str = "pending"  # pending, processing, completed, failed
+    settlement_ref: Optional[str] = None
+    settlement_completed_at: Optional[str] = None
+    
+    # QR scan info
+    initiated_by: str = "client"  # client (scanned merchant) or merchant (scanned client)
+    
+    # Cash payment specific
+    client_confirmed: bool = False  # Client confirmation for cash payments
+    client_confirmed_at: Optional[str] = None
+    
+    # Metadata
+    notes: Optional[str] = None
+    error_message: Optional[str] = None
+    webhook_received: bool = False
+    webhook_data: Optional[Dict] = None
+    
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class MerchantCashDebitLog(BaseModel):
+    """Log of merchant cash debit balance changes"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    merchant_id: str
+    merchant_name: str
+    
+    # Balance change
+    previous_balance: float
+    change_amount: float  # Negative for debits
+    new_balance: float
+    
+    # Context
+    reason: str  # cash_payment, daily_settlement, manual_adjustment, top_up
+    payment_id: Optional[str] = None
+    settlement_date: Optional[str] = None
+    
+    # Admin info (for manual adjustments)
+    adjusted_by: Optional[str] = None
+    adjustment_notes: Optional[str] = None
+    
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class AdminActionLog(BaseModel):
+    """Log of admin actions on accounts"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    
+    # Admin info
+    admin_id: str
+    admin_email: str
+    
+    # Target info
+    target_type: str  # client, merchant
+    target_id: str
+    target_identifier: str  # Phone or business name
+    
+    # Action details
+    action: str  # block, unblock, suspend, unsuspend, delete, freeze_wallet, unfreeze_wallet, adjust_balance
+    action_details: Dict = Field(default_factory=dict)
+    reason: Optional[str] = None
+    
+    # Previous state (for rollback reference)
+    previous_state: Dict = Field(default_factory=dict)
+    
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class PendingCashPayment(BaseModel):
+    """Pending cash payment awaiting client confirmation"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    payment_id: str  # Reference to SDMPayment
+    
+    client_id: str
+    merchant_id: str
+    merchant_name: str
+    amount: float
+    cashback_amount: float
+    
+    # Expiry (client must confirm within X minutes)
+    expires_at: str
+    
+    # Status
+    status: str = "pending"  # pending, confirmed, expired, cancelled
+    
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class OTPRecord(BaseModel):
@@ -568,6 +752,16 @@ class MerchantRegisterRequest(BaseModel):
     gps_address: Optional[str] = None
     city: str = "Accra"
     cashback_rate: float = 5.0  # Percentage (5.0 = 5%)
+    
+    # Payment Settlement Configuration (REQUIRED)
+    settlement_type: str = "momo"  # momo, bank
+    momo_number: Optional[str] = None
+    momo_provider: Optional[str] = None  # MTN, Vodafone, AirtelTigo
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_name: Optional[str] = None
+    bank_branch: Optional[str] = None
+    settlement_mode: str = "instant"  # instant, daily
 
 class MerchantLoginRequest(BaseModel):
     phone: str
@@ -594,6 +788,57 @@ class AddStaffRequest(BaseModel):
     name: str
     phone: str
     role: str = "cashier"
+
+# ============ PAYMENT SYSTEM REQUESTS ============
+
+class InitiatePaymentRequest(BaseModel):
+    """Request to initiate a payment"""
+    merchant_qr_code: Optional[str] = None  # If client scans merchant QR
+    client_qr_code: Optional[str] = None  # If merchant scans client QR
+    amount: float
+    payment_method: str  # momo, card, cash
+    payer_phone: Optional[str] = None  # Phone for MoMo payment
+    payer_network: Optional[str] = None  # MTN, Vodafone, AirtelTigo
+    notes: Optional[str] = None
+
+class ConfirmCashPaymentRequest(BaseModel):
+    """Client confirmation for cash payment"""
+    payment_id: str
+    confirm: bool = True
+
+class UpdateMerchantSettlementRequest(BaseModel):
+    """Update merchant settlement configuration"""
+    settlement_type: Optional[str] = None  # momo, bank
+    momo_number: Optional[str] = None
+    momo_provider: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_name: Optional[str] = None
+    bank_branch: Optional[str] = None
+    settlement_mode: Optional[str] = None  # instant, daily
+    otp_code: Optional[str] = None  # Required for sensitive changes
+    request_id: Optional[str] = None
+
+class AdminMerchantControlRequest(BaseModel):
+    """Admin control over merchant"""
+    action: str  # block, unblock, suspend, unsuspend, update_cash_limit, toggle_cash_mode
+    reason: Optional[str] = None
+    cash_debit_limit: Optional[float] = None
+    cash_grace_period_days: Optional[int] = None
+    max_cash_cashback_rate: Optional[float] = None
+
+class AdminClientControlRequest(BaseModel):
+    """Admin control over client"""
+    action: str  # block, unblock, suspend, unsuspend, delete, freeze_wallet, unfreeze_wallet, adjust_balance
+    reason: Optional[str] = None
+    balance_adjustment: Optional[float] = None  # Positive or negative
+    adjustment_type: Optional[str] = None  # add, subtract, set
+
+class MerchantCashTopUpRequest(BaseModel):
+    """Merchant top-up for cash debit account"""
+    amount: float
+    payment_method: str  # momo, bank_transfer
+    reference: Optional[str] = None
 
 class PurchaseMembershipRequest(BaseModel):
     card_type_id: str  # The merchant's card type to purchase
@@ -1605,7 +1850,16 @@ async def register_merchant(request: MerchantRegisterRequest):
         address=request.address,
         gps_address=request.gps_address,
         city=request.city,
-        cashback_rate=request.cashback_rate
+        cashback_rate=request.cashback_rate,
+        # Settlement configuration
+        settlement_type=request.settlement_type,
+        momo_number=request.momo_number,
+        momo_provider=request.momo_provider,
+        bank_name=request.bank_name,
+        bank_account_number=request.bank_account_number,
+        bank_account_name=request.bank_account_name,
+        bank_branch=request.bank_branch,
+        settlement_mode=request.settlement_mode
     )
     await db.sdm_merchants.insert_one(merchant.model_dump())
     
@@ -1886,6 +2140,764 @@ async def get_merchant_report(merchant: dict = Depends(get_current_merchant), da
         "average_transaction": round(total_amount / transaction_count, 2) if transaction_count > 0 else 0,
         "daily_breakdown": [{"date": k, **v} for k, v in sorted(daily_stats.items())]
     }
+
+# ============== PAYMENT SYSTEM ROUTES ==============
+
+def calculate_payment_split(amount: float, cashback_rate: float, sdm_commission_rate: float = 0.10) -> Dict:
+    """
+    Calculate payment split between client cashback, SDM commission, and merchant
+    
+    Example with 1000 GHS at 10% cashback:
+    - Cashback total: 100 GHS (10% of 1000)
+    - SDM Commission: 10 GHS (10% of cashback)
+    - Client receives: 90 GHS (cashback - SDM commission)
+    - Merchant receives: 900 GHS (1000 - 100)
+    """
+    total_cashback = amount * (cashback_rate / 100)
+    sdm_commission = total_cashback * sdm_commission_rate
+    client_cashback = total_cashback - sdm_commission
+    merchant_amount = amount - total_cashback
+    
+    return {
+        "total_cashback": round(total_cashback, 2),
+        "sdm_commission": round(sdm_commission, 2),
+        "client_cashback": round(client_cashback, 2),
+        "merchant_amount": round(merchant_amount, 2)
+    }
+
+@sdm_router.post("/payments/initiate")
+async def initiate_payment(request: InitiatePaymentRequest, user: dict = Depends(get_current_user)):
+    """
+    Initiate a payment transaction
+    Can be called by client (scanning merchant QR) or merchant (scanning client QR)
+    """
+    # Check if user is blocked
+    if user.get("is_blocked") or user.get("is_suspended"):
+        raise HTTPException(status_code=403, detail="Your account is blocked or suspended")
+    
+    # Determine merchant and client based on QR codes provided
+    merchant = None
+    client = user
+    
+    if request.merchant_qr_code:
+        # Client scans merchant QR
+        merchant = await db.sdm_merchants.find_one(
+            {"qr_code": request.merchant_qr_code, "is_active": True, "is_verified": True},
+            {"_id": 0}
+        )
+        if not merchant:
+            raise HTTPException(status_code=404, detail="Merchant not found or not active")
+        initiated_by = "client"
+    elif request.client_qr_code:
+        raise HTTPException(status_code=400, detail="Use /payments/merchant-initiate endpoint for merchant-initiated payments")
+    else:
+        raise HTTPException(status_code=400, detail="Merchant QR code required")
+    
+    # Check merchant status
+    if merchant.get("is_blocked") or merchant.get("is_suspended"):
+        raise HTTPException(status_code=403, detail="This merchant is currently unavailable")
+    
+    # Validate payment method
+    if request.payment_method not in ["momo", "card", "cash"]:
+        raise HTTPException(status_code=400, detail="Invalid payment method")
+    
+    # For cash payments, check if merchant has cash mode enabled and within limits
+    if request.payment_method == "cash":
+        if not merchant.get("cash_mode_enabled", True):
+            raise HTTPException(status_code=400, detail="This merchant does not accept cash payments")
+        
+        # Check merchant's cash debit balance
+        cash_debit_balance = merchant.get("cash_debit_balance", 0)
+        cash_debit_limit = merchant.get("cash_debit_limit", DEFAULT_CASH_DEBIT_LIMIT)
+        
+        # Calculate potential new balance
+        cashback_rate = min(merchant.get("cashback_rate", 5.0), merchant.get("max_cash_cashback_rate", MAX_CASH_CASHBACK_RATE))
+        split = calculate_payment_split(request.amount, cashback_rate)
+        potential_new_balance = cash_debit_balance - split["client_cashback"]
+        
+        if abs(potential_new_balance) > cash_debit_limit:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Merchant's cash debit limit exceeded. Maximum allowed: {cash_debit_limit} GHS"
+            )
+    
+    # Calculate split
+    cashback_rate = merchant.get("cashback_rate", 5.0)
+    if request.payment_method == "cash":
+        cashback_rate = min(cashback_rate, merchant.get("max_cash_cashback_rate", MAX_CASH_CASHBACK_RATE))
+    
+    split = calculate_payment_split(request.amount, cashback_rate)
+    
+    # Create payment record
+    payment = SDMPayment(
+        client_id=client["id"],
+        client_phone=client["phone"],
+        merchant_id=merchant["id"],
+        merchant_name=merchant["business_name"],
+        amount=request.amount,
+        payment_method=request.payment_method,
+        payer_phone=request.payer_phone or client["phone"],
+        payer_network=request.payer_network,
+        cashback_rate=cashback_rate,
+        cashback_amount=split["client_cashback"],
+        sdm_commission=split["sdm_commission"],
+        merchant_amount=split["merchant_amount"],
+        initiated_by=initiated_by,
+        notes=request.notes
+    )
+    
+    # For cash payments, create pending confirmation
+    if request.payment_method == "cash":
+        payment.status = "awaiting_confirmation"
+        await db.sdm_payments.insert_one(payment.model_dump())
+        
+        # Create pending cash payment record
+        pending = PendingCashPayment(
+            payment_id=payment.id,
+            client_id=client["id"],
+            merchant_id=merchant["id"],
+            merchant_name=merchant["business_name"],
+            amount=request.amount,
+            cashback_amount=split["client_cashback"],
+            expires_at=(datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+        )
+        await db.pending_cash_payments.insert_one(pending.model_dump())
+        
+        return {
+            "success": True,
+            "payment_id": payment.id,
+            "payment_ref": payment.payment_ref,
+            "status": "awaiting_confirmation",
+            "requires_client_confirmation": True,
+            "confirmation_expires_at": pending.expires_at,
+            "split": split
+        }
+    
+    # For MoMo/Card payments - SIMULATED for now
+    if request.payment_method == "momo":
+        # In production: Call Bulkclix API to initiate MoMo collection
+        payment.status = "processing"
+        payment.bulkclix_ref = f"BCMOMO{secrets.token_hex(8).upper()}"
+        await db.sdm_payments.insert_one(payment.model_dump())
+        
+        # SIMULATED: Auto-confirm after short delay (in production, webhook confirms)
+        # For demo purposes, we'll mark it as confirmed immediately
+        await process_payment_confirmation(payment.id)
+        
+        return {
+            "success": True,
+            "payment_id": payment.id,
+            "payment_ref": payment.payment_ref,
+            "bulkclix_ref": payment.bulkclix_ref,
+            "status": "confirmed",
+            "message": "Payment confirmed (SIMULATED)",
+            "split": split
+        }
+    
+    elif request.payment_method == "card":
+        # In production: Call Bulkclix API to initiate card payment
+        payment.status = "processing"
+        payment.bulkclix_ref = f"BCCARD{secrets.token_hex(8).upper()}"
+        await db.sdm_payments.insert_one(payment.model_dump())
+        
+        # SIMULATED: Auto-confirm
+        await process_payment_confirmation(payment.id)
+        
+        return {
+            "success": True,
+            "payment_id": payment.id,
+            "payment_ref": payment.payment_ref,
+            "bulkclix_ref": payment.bulkclix_ref,
+            "status": "confirmed",
+            "message": "Payment confirmed (SIMULATED)",
+            "split": split
+        }
+
+@sdm_router.post("/payments/merchant-initiate")
+async def merchant_initiate_payment(request: InitiatePaymentRequest, merchant: dict = Depends(get_current_merchant)):
+    """
+    Merchant initiates payment by scanning client QR
+    """
+    # Check merchant status
+    if merchant.get("is_blocked") or merchant.get("is_suspended"):
+        raise HTTPException(status_code=403, detail="Your merchant account is blocked or suspended")
+    
+    if not merchant.get("is_verified"):
+        raise HTTPException(status_code=403, detail="Your merchant account is not verified yet")
+    
+    if not request.client_qr_code:
+        raise HTTPException(status_code=400, detail="Client QR code required")
+    
+    # Find client by QR code
+    client = await db.sdm_users.find_one(
+        {"qr_code": request.client_qr_code, "is_active": True},
+        {"_id": 0}
+    )
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Check client status
+    if client.get("is_blocked") or client.get("is_suspended"):
+        raise HTTPException(status_code=403, detail="This client's account is blocked or suspended")
+    
+    # Validate payment method
+    if request.payment_method not in ["momo", "card", "cash"]:
+        raise HTTPException(status_code=400, detail="Invalid payment method")
+    
+    # For cash payments, check limits
+    if request.payment_method == "cash":
+        if not merchant.get("cash_mode_enabled", True):
+            raise HTTPException(status_code=400, detail="Cash payments are disabled for your account")
+        
+        cash_debit_balance = merchant.get("cash_debit_balance", 0)
+        cash_debit_limit = merchant.get("cash_debit_limit", DEFAULT_CASH_DEBIT_LIMIT)
+        
+        cashback_rate = min(merchant.get("cashback_rate", 5.0), merchant.get("max_cash_cashback_rate", MAX_CASH_CASHBACK_RATE))
+        split = calculate_payment_split(request.amount, cashback_rate)
+        potential_new_balance = cash_debit_balance - split["client_cashback"]
+        
+        if abs(potential_new_balance) > cash_debit_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Your cash debit limit exceeded. Maximum allowed: {cash_debit_limit} GHS"
+            )
+    
+    # Calculate split
+    cashback_rate = merchant.get("cashback_rate", 5.0)
+    if request.payment_method == "cash":
+        cashback_rate = min(cashback_rate, merchant.get("max_cash_cashback_rate", MAX_CASH_CASHBACK_RATE))
+    
+    split = calculate_payment_split(request.amount, cashback_rate)
+    
+    # Create payment record
+    payment = SDMPayment(
+        client_id=client["id"],
+        client_phone=client["phone"],
+        merchant_id=merchant["id"],
+        merchant_name=merchant["business_name"],
+        amount=request.amount,
+        payment_method=request.payment_method,
+        payer_phone=request.payer_phone or client["phone"],
+        payer_network=request.payer_network,
+        cashback_rate=cashback_rate,
+        cashback_amount=split["client_cashback"],
+        sdm_commission=split["sdm_commission"],
+        merchant_amount=split["merchant_amount"],
+        initiated_by="merchant",
+        notes=request.notes
+    )
+    
+    # For cash payments, require client confirmation
+    if request.payment_method == "cash":
+        payment.status = "awaiting_confirmation"
+        await db.sdm_payments.insert_one(payment.model_dump())
+        
+        pending = PendingCashPayment(
+            payment_id=payment.id,
+            client_id=client["id"],
+            merchant_id=merchant["id"],
+            merchant_name=merchant["business_name"],
+            amount=request.amount,
+            cashback_amount=split["client_cashback"],
+            expires_at=(datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+        )
+        await db.pending_cash_payments.insert_one(pending.model_dump())
+        
+        # TODO: Send push notification to client
+        
+        return {
+            "success": True,
+            "payment_id": payment.id,
+            "payment_ref": payment.payment_ref,
+            "status": "awaiting_confirmation",
+            "client_phone": client["phone"][-4:].rjust(len(client["phone"]), '*'),
+            "requires_client_confirmation": True,
+            "confirmation_expires_at": pending.expires_at,
+            "split": split
+        }
+    
+    # For MoMo/Card - SIMULATED
+    payment.status = "processing"
+    payment.bulkclix_ref = f"BC{request.payment_method.upper()}{secrets.token_hex(8).upper()}"
+    await db.sdm_payments.insert_one(payment.model_dump())
+    
+    # SIMULATED: Auto-confirm
+    await process_payment_confirmation(payment.id)
+    
+    return {
+        "success": True,
+        "payment_id": payment.id,
+        "payment_ref": payment.payment_ref,
+        "bulkclix_ref": payment.bulkclix_ref,
+        "status": "confirmed",
+        "message": "Payment confirmed (SIMULATED)",
+        "split": split
+    }
+
+async def process_payment_confirmation(payment_id: str):
+    """Process payment confirmation and execute split"""
+    payment = await db.sdm_payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        return False
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Update payment status
+    await db.sdm_payments.update_one(
+        {"id": payment_id},
+        {"$set": {
+            "status": "confirmed",
+            "payment_confirmed_at": now,
+            "updated_at": now
+        }}
+    )
+    
+    # Credit client wallet with cashback
+    await db.sdm_users.update_one(
+        {"id": payment["client_id"]},
+        {"$inc": {
+            "wallet_available": payment["cashback_amount"],
+            "total_earned": payment["cashback_amount"]
+        }}
+    )
+    
+    # Get merchant for settlement
+    merchant = await db.sdm_merchants.find_one({"id": payment["merchant_id"]}, {"_id": 0})
+    
+    if payment["payment_method"] == "cash":
+        # For cash payments, debit merchant's cash account
+        previous_balance = merchant.get("cash_debit_balance", 0)
+        new_balance = previous_balance - payment["cashback_amount"]
+        
+        await db.sdm_merchants.update_one(
+            {"id": merchant["id"]},
+            {"$inc": {
+                "cash_debit_balance": -payment["cashback_amount"],
+                "total_transactions": 1,
+                "total_cashback_given": payment["cashback_amount"]
+            }}
+        )
+        
+        # Log the cash debit
+        cash_log = MerchantCashDebitLog(
+            merchant_id=merchant["id"],
+            merchant_name=merchant["business_name"],
+            previous_balance=previous_balance,
+            change_amount=-payment["cashback_amount"],
+            new_balance=new_balance,
+            reason="cash_payment",
+            payment_id=payment_id
+        )
+        await db.merchant_cash_logs.insert_one(cash_log.model_dump())
+        
+        # Mark payment as completed (no settlement needed for cash)
+        await db.sdm_payments.update_one(
+            {"id": payment_id},
+            {"$set": {
+                "status": "split_completed",
+                "split_completed_at": now,
+                "settlement_status": "not_applicable"
+            }}
+        )
+    else:
+        # For MoMo/Card, initiate settlement to merchant
+        settlement_ref = f"SETTLE{secrets.token_hex(6).upper()}"
+        
+        # SIMULATED: In production, call Bulkclix API for transfer
+        await db.sdm_payments.update_one(
+            {"id": payment_id},
+            {"$set": {
+                "status": "split_completed",
+                "split_completed_at": now,
+                "settlement_status": "completed",
+                "settlement_ref": settlement_ref,
+                "settlement_completed_at": now
+            }}
+        )
+        
+        await db.sdm_merchants.update_one(
+            {"id": merchant["id"]},
+            {"$inc": {
+                "total_transactions": 1,
+                "total_cashback_given": payment["cashback_amount"]
+            }}
+        )
+    
+    return True
+
+@sdm_router.post("/payments/confirm-cash")
+async def confirm_cash_payment(request: ConfirmCashPaymentRequest, user: dict = Depends(get_current_user)):
+    """Client confirms a cash payment"""
+    # Find pending payment
+    pending = await db.pending_cash_payments.find_one(
+        {"payment_id": request.payment_id, "client_id": user["id"], "status": "pending"},
+        {"_id": 0}
+    )
+    
+    if not pending:
+        raise HTTPException(status_code=404, detail="Pending payment not found")
+    
+    # Check expiry
+    if datetime.fromisoformat(pending["expires_at"].replace('Z', '+00:00')) < datetime.now(timezone.utc):
+        await db.pending_cash_payments.update_one(
+            {"payment_id": request.payment_id},
+            {"$set": {"status": "expired"}}
+        )
+        await db.sdm_payments.update_one(
+            {"id": request.payment_id},
+            {"$set": {"status": "expired"}}
+        )
+        raise HTTPException(status_code=400, detail="Payment confirmation has expired")
+    
+    if not request.confirm:
+        # Client rejected
+        await db.pending_cash_payments.update_one(
+            {"payment_id": request.payment_id},
+            {"$set": {"status": "cancelled"}}
+        )
+        await db.sdm_payments.update_one(
+            {"id": request.payment_id},
+            {"$set": {"status": "cancelled"}}
+        )
+        return {"success": True, "message": "Payment cancelled"}
+    
+    # Update pending record
+    now = datetime.now(timezone.utc).isoformat()
+    await db.pending_cash_payments.update_one(
+        {"payment_id": request.payment_id},
+        {"$set": {"status": "confirmed"}}
+    )
+    
+    # Update payment record
+    await db.sdm_payments.update_one(
+        {"id": request.payment_id},
+        {"$set": {
+            "client_confirmed": True,
+            "client_confirmed_at": now
+        }}
+    )
+    
+    # Process the payment
+    await process_payment_confirmation(request.payment_id)
+    
+    return {
+        "success": True,
+        "message": "Payment confirmed",
+        "cashback_credited": pending["cashback_amount"]
+    }
+
+@sdm_router.get("/payments/pending")
+async def get_pending_payments(user: dict = Depends(get_current_user)):
+    """Get pending cash payments awaiting client confirmation"""
+    pending = await db.pending_cash_payments.find(
+        {"client_id": user["id"], "status": "pending"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(20)
+    
+    # Filter expired ones
+    now = datetime.now(timezone.utc)
+    active = []
+    for p in pending:
+        expires = datetime.fromisoformat(p["expires_at"].replace('Z', '+00:00'))
+        if expires > now:
+            active.append(p)
+        else:
+            # Mark as expired
+            await db.pending_cash_payments.update_one(
+                {"id": p["id"]},
+                {"$set": {"status": "expired"}}
+            )
+    
+    return {"pending_payments": active}
+
+@sdm_router.get("/payments/history")
+async def get_payment_history(user: dict = Depends(get_current_user), limit: int = 50):
+    """Get client's payment history"""
+    payments = await db.sdm_payments.find(
+        {"client_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(limit)
+    return {"payments": payments}
+
+@sdm_router.get("/merchant/payments")
+async def get_merchant_payments(merchant: dict = Depends(get_current_merchant), limit: int = 50):
+    """Get merchant's payment history"""
+    payments = await db.sdm_payments.find(
+        {"merchant_id": merchant["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(limit)
+    return {"payments": payments}
+
+@sdm_router.get("/merchant/cash-balance")
+async def get_merchant_cash_balance(merchant: dict = Depends(get_current_merchant)):
+    """Get merchant's cash debit balance and status"""
+    return {
+        "cash_debit_balance": merchant.get("cash_debit_balance", 0),
+        "cash_debit_limit": merchant.get("cash_debit_limit", DEFAULT_CASH_DEBIT_LIMIT),
+        "cash_mode_enabled": merchant.get("cash_mode_enabled", True),
+        "cash_grace_period_days": merchant.get("cash_grace_period_days", DEFAULT_GRACE_PERIOD_DAYS),
+        "cash_grace_deadline": merchant.get("cash_grace_deadline"),
+        "max_cash_cashback_rate": merchant.get("max_cash_cashback_rate", MAX_CASH_CASHBACK_RATE),
+        "available_limit": merchant.get("cash_debit_limit", DEFAULT_CASH_DEBIT_LIMIT) - abs(merchant.get("cash_debit_balance", 0))
+    }
+
+@sdm_router.get("/merchant/qr-code")
+async def get_merchant_qr_code(merchant: dict = Depends(get_current_merchant)):
+    """Get merchant's QR code for payments"""
+    qr_code = merchant.get("qr_code")
+    if not qr_code:
+        # Generate one if not exists
+        qr_code = f"MERCH_{secrets.token_hex(6).upper()}"
+        await db.sdm_merchants.update_one(
+            {"id": merchant["id"]},
+            {"$set": {"qr_code": qr_code}}
+        )
+    
+    # Generate QR code image
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(qr_code)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    qr_image = base64.b64encode(buffer.getvalue()).decode()
+    
+    return {
+        "qr_code": qr_code,
+        "qr_image": f"data:image/png;base64,{qr_image}",
+        "merchant_name": merchant["business_name"],
+        "cashback_rate": merchant.get("cashback_rate", 5.0)
+    }
+
+# ============== WEBHOOK FOR BULKCLIX ==============
+
+@sdm_router.post("/payments/webhook/bulkclix")
+async def bulkclix_payment_webhook(request: Request):
+    """
+    Webhook endpoint for Bulkclix payment confirmations
+    Called by Bulkclix when payment status changes
+    """
+    try:
+        data = await request.json()
+        logging.info(f"Bulkclix webhook received: {data}")
+        
+        transaction_ref = data.get("reference") or data.get("transaction_id")
+        status = data.get("status", "").lower()
+        
+        if not transaction_ref:
+            return {"success": False, "error": "Missing reference"}
+        
+        # Find payment by bulkclix reference
+        payment = await db.sdm_payments.find_one(
+            {"bulkclix_ref": transaction_ref},
+            {"_id": 0}
+        )
+        
+        if not payment:
+            logging.warning(f"Payment not found for ref: {transaction_ref}")
+            return {"success": False, "error": "Payment not found"}
+        
+        # Update webhook data
+        await db.sdm_payments.update_one(
+            {"id": payment["id"]},
+            {"$set": {
+                "webhook_received": True,
+                "webhook_data": data,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Process based on status
+        if status in ["success", "successful", "completed"]:
+            await process_payment_confirmation(payment["id"])
+            return {"success": True, "message": "Payment processed"}
+        elif status in ["failed", "declined", "cancelled"]:
+            await db.sdm_payments.update_one(
+                {"id": payment["id"]},
+                {"$set": {
+                    "status": "failed",
+                    "error_message": data.get("message", "Payment failed")
+                }}
+            )
+            return {"success": True, "message": "Payment marked as failed"}
+        
+        return {"success": True, "message": "Webhook received"}
+        
+    except Exception as e:
+        logging.error(f"Webhook error: {e}")
+        return {"success": False, "error": str(e)}
+
+# ============== ADMIN CONTROL ROUTES ==============
+
+@sdm_router.post("/admin/clients/{client_id}/control")
+async def admin_control_client(client_id: str, request: AdminClientControlRequest, admin: dict = Depends(get_current_admin)):
+    """Admin control over client accounts"""
+    client = await db.sdm_users.find_one({"id": client_id}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    updates = {}
+    previous_state = {
+        "is_blocked": client.get("is_blocked", False),
+        "is_suspended": client.get("is_suspended", False),
+        "wallet_frozen": client.get("wallet_frozen", False),
+        "wallet_available": client.get("wallet_available", 0)
+    }
+    
+    if request.action == "block":
+        updates = {
+            "is_blocked": True,
+            "block_reason": request.reason,
+            "blocked_at": now,
+            "blocked_by": admin.get("email", "admin")
+        }
+    elif request.action == "unblock":
+        updates = {
+            "is_blocked": False,
+            "block_reason": None,
+            "blocked_at": None,
+            "blocked_by": None
+        }
+    elif request.action == "suspend":
+        updates = {
+            "is_suspended": True,
+            "block_reason": request.reason,
+            "blocked_at": now,
+            "blocked_by": admin.get("email", "admin")
+        }
+    elif request.action == "unsuspend":
+        updates = {"is_suspended": False}
+    elif request.action == "freeze_wallet":
+        updates = {"wallet_frozen": True}
+    elif request.action == "unfreeze_wallet":
+        updates = {"wallet_frozen": False}
+    elif request.action == "adjust_balance":
+        if request.adjustment_type == "add":
+            updates = {"$inc": {"wallet_available": request.balance_adjustment}}
+        elif request.adjustment_type == "subtract":
+            updates = {"$inc": {"wallet_available": -request.balance_adjustment}}
+        elif request.adjustment_type == "set":
+            updates = {"wallet_available": request.balance_adjustment}
+    elif request.action == "delete":
+        updates = {"is_active": False}
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {request.action}")
+    
+    # Apply updates
+    if "$inc" in updates:
+        await db.sdm_users.update_one({"id": client_id}, updates)
+    else:
+        await db.sdm_users.update_one({"id": client_id}, {"$set": updates})
+    
+    # Log admin action
+    action_log = AdminActionLog(
+        admin_id=admin.get("id", "admin"),
+        admin_email=admin.get("email", "admin"),
+        target_type="client",
+        target_id=client_id,
+        target_identifier=client["phone"],
+        action=request.action,
+        action_details={"adjustment": request.balance_adjustment, "type": request.adjustment_type} if request.action == "adjust_balance" else {},
+        reason=request.reason,
+        previous_state=previous_state
+    )
+    await db.admin_action_logs.insert_one(action_log.model_dump())
+    
+    return {
+        "success": True,
+        "action": request.action,
+        "client_id": client_id,
+        "message": f"Client {request.action} successful"
+    }
+
+@sdm_router.post("/admin/merchants/{merchant_id}/control")
+async def admin_control_merchant(merchant_id: str, request: AdminMerchantControlRequest, admin: dict = Depends(get_current_admin)):
+    """Admin control over merchant accounts"""
+    merchant = await db.sdm_merchants.find_one({"id": merchant_id}, {"_id": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    updates = {}
+    previous_state = {
+        "is_blocked": merchant.get("is_blocked", False),
+        "is_suspended": merchant.get("is_suspended", False),
+        "cash_mode_enabled": merchant.get("cash_mode_enabled", True),
+        "cash_debit_limit": merchant.get("cash_debit_limit", DEFAULT_CASH_DEBIT_LIMIT)
+    }
+    
+    if request.action == "block":
+        updates = {
+            "is_blocked": True,
+            "block_reason": request.reason,
+            "blocked_at": now,
+            "blocked_by": admin.get("email", "admin")
+        }
+    elif request.action == "unblock":
+        updates = {
+            "is_blocked": False,
+            "block_reason": None,
+            "blocked_at": None,
+            "blocked_by": None
+        }
+    elif request.action == "suspend":
+        updates = {
+            "is_suspended": True,
+            "block_reason": request.reason,
+            "blocked_at": now,
+            "blocked_by": admin.get("email", "admin")
+        }
+    elif request.action == "unsuspend":
+        updates = {"is_suspended": False}
+    elif request.action == "update_cash_limit":
+        updates = {
+            "cash_debit_limit": request.cash_debit_limit or DEFAULT_CASH_DEBIT_LIMIT,
+            "cash_grace_period_days": request.cash_grace_period_days or DEFAULT_GRACE_PERIOD_DAYS,
+            "max_cash_cashback_rate": request.max_cash_cashback_rate or MAX_CASH_CASHBACK_RATE
+        }
+    elif request.action == "toggle_cash_mode":
+        updates = {"cash_mode_enabled": not merchant.get("cash_mode_enabled", True)}
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {request.action}")
+    
+    await db.sdm_merchants.update_one({"id": merchant_id}, {"$set": updates})
+    
+    # Log admin action
+    action_log = AdminActionLog(
+        admin_id=admin.get("id", "admin"),
+        admin_email=admin.get("email", "admin"),
+        target_type="merchant",
+        target_id=merchant_id,
+        target_identifier=merchant["business_name"],
+        action=request.action,
+        action_details={
+            "cash_debit_limit": request.cash_debit_limit,
+            "cash_grace_period_days": request.cash_grace_period_days,
+            "max_cash_cashback_rate": request.max_cash_cashback_rate
+        } if request.action == "update_cash_limit" else {},
+        reason=request.reason,
+        previous_state=previous_state
+    )
+    await db.admin_action_logs.insert_one(action_log.model_dump())
+    
+    return {
+        "success": True,
+        "action": request.action,
+        "merchant_id": merchant_id,
+        "message": f"Merchant {request.action} successful"
+    }
+
+@sdm_router.get("/admin/action-logs")
+async def get_admin_action_logs(admin: dict = Depends(get_current_admin), target_type: str = None, limit: int = 100):
+    """Get admin action logs"""
+    query = {}
+    if target_type:
+        query["target_type"] = target_type
+    
+    logs = await db.admin_action_logs.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    return {"logs": logs}
 
 # ============== MERCHANT MEMBERSHIP CARD TYPES ==============
 
@@ -5822,6 +6834,102 @@ scheduler.add_job(
     CronTrigger(hour=8, minute=0),
     id="birthday_bonus",
     name="Daily Birthday Bonus Processor",
+    replace_existing=True
+)
+
+# ============== DAILY CASH SETTLEMENT JOB ==============
+async def process_daily_cash_settlement():
+    """
+    Daily settlement of merchant cash debit accounts
+    Runs at 00:00 UTC each day
+    """
+    logging.info("🏦 Starting daily cash settlement job...")
+    
+    try:
+        # Get all merchants with cash mode enabled
+        merchants = await db.sdm_merchants.find(
+            {"cash_mode_enabled": True},
+            {"_id": 0}
+        ).to_list(10000)
+        
+        processed = 0
+        alerts_sent = 0
+        
+        for merchant in merchants:
+            cash_balance = merchant.get("cash_debit_balance", 0)
+            cash_limit = merchant.get("cash_debit_limit", DEFAULT_CASH_DEBIT_LIMIT)
+            grace_days = merchant.get("cash_grace_period_days", DEFAULT_GRACE_PERIOD_DAYS)
+            
+            # Check if merchant is in deficit
+            if cash_balance < 0:
+                deficit = abs(cash_balance)
+                
+                # Check if deficit exceeds limit
+                if deficit > cash_limit:
+                    grace_deadline = merchant.get("cash_grace_deadline")
+                    
+                    if not grace_deadline:
+                        # Start grace period
+                        deadline = (datetime.now(timezone.utc) + timedelta(days=grace_days)).isoformat()
+                        await db.sdm_merchants.update_one(
+                            {"id": merchant["id"]},
+                            {"$set": {"cash_grace_deadline": deadline}}
+                        )
+                        
+                        # Send warning notification (TODO: implement SMS/Push)
+                        logging.warning(f"⚠️ Merchant {merchant['business_name']} exceeded cash limit. Grace period started.")
+                        alerts_sent += 1
+                        
+                    else:
+                        # Check if grace period expired
+                        deadline_dt = datetime.fromisoformat(grace_deadline.replace('Z', '+00:00'))
+                        if datetime.now(timezone.utc) > deadline_dt:
+                            # Disable cash mode
+                            await db.sdm_merchants.update_one(
+                                {"id": merchant["id"]},
+                                {"$set": {"cash_mode_enabled": False}}
+                            )
+                            
+                            logging.warning(f"🚫 Merchant {merchant['business_name']} cash mode disabled due to unpaid deficit.")
+                            alerts_sent += 1
+                
+                processed += 1
+            else:
+                # Clear any grace deadline if balance is positive
+                if merchant.get("cash_grace_deadline"):
+                    await db.sdm_merchants.update_one(
+                        {"id": merchant["id"]},
+                        {"$set": {"cash_grace_deadline": None}}
+                    )
+        
+        logging.info(f"✅ Daily cash settlement complete. Processed: {processed}, Alerts: {alerts_sent}")
+        
+        # Log to scheduler history
+        await db.scheduler_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "job_type": "daily_cash_settlement",
+            "status": "SUCCESS",
+            "merchants_processed": processed,
+            "alerts_sent": alerts_sent,
+            "executed_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"❌ Daily cash settlement error: {e}")
+        await db.scheduler_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "job_type": "daily_cash_settlement",
+            "status": "ERROR",
+            "error": str(e),
+            "executed_at": datetime.now(timezone.utc).isoformat()
+        })
+
+# Schedule: Run daily at 00:00 UTC for cash settlement
+scheduler.add_job(
+    process_daily_cash_settlement,
+    CronTrigger(hour=0, minute=0),
+    id="daily_cash_settlement",
+    name="Daily Cash Settlement Processor",
     replace_existing=True
 )
 
