@@ -28,6 +28,48 @@ from apscheduler.triggers.cron import CronTrigger
 # Import Ledger Service
 from ledger import LedgerService, EntityType, TransactionType, WithdrawalStatus
 
+# Import utility functions from refactored modules
+from utils.helpers import (
+    hash_password,
+    verify_password,
+    create_token,
+    generate_otp,
+    normalize_phone,
+    generate_qr_code_base64,
+    parse_user_agent,
+    generate_referral_code,
+    format_currency,
+    mask_phone
+)
+
+# Import configuration constants
+from config import (
+    JWT_SECRET,
+    JWT_ALGORITHM,
+    RESEND_API_KEY,
+    SENDER_EMAIL,
+    ADMIN_EMAIL,
+    HUBTEL_CLIENT_ID,
+    HUBTEL_CLIENT_SECRET,
+    HUBTEL_SENDER_ID,
+    BULKCLIX_API_KEY,
+    BULKCLIX_OTP_SENDER_ID,
+    BULKCLIX_BASE_URL,
+    SDM_COMMISSION_RATE,
+    CASHBACK_PENDING_DAYS,
+    WITHDRAWAL_FEE,
+    DEFAULT_CASH_DEBIT_LIMIT,
+    DEFAULT_GRACE_PERIOD_DAYS,
+    MAX_CASH_CASHBACK_RATE,
+    REFERRAL_BONUS,
+    REFERRAL_WELCOME_BONUS,
+    TEST_PHONE,
+    TEST_OTP,
+    ADMIN_ROLES,
+    DEFAULT_VIP_CARDS,
+    DEFAULT_SDM_CONFIG
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -39,66 +81,8 @@ db = client[os.environ['DB_NAME']]
 # Initialize Ledger Service
 ledger_service = LedgerService(db)
 
-# JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'smart-digital-solutions-secret-key-2024')
-JWT_ALGORITHM = "HS256"
-
-# Resend Settings
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
-SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'emileparfait2003@gmail.com')
-
-# Hubtel Settings
-HUBTEL_CLIENT_ID = os.environ.get('HUBTEL_CLIENT_ID', '')
-HUBTEL_CLIENT_SECRET = os.environ.get('HUBTEL_CLIENT_SECRET', '')
-HUBTEL_SENDER_ID = os.environ.get('HUBTEL_SENDER_ID', 'SDM')
-
-# BulkClix OTP Settings
-BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
-BULKCLIX_OTP_SENDER_ID = os.environ.get('BULKCLIX_OTP_SENDER_ID', '')
-BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
-
-# SDM Business Settings (defaults - can be overridden by DB config)
-SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
-CASHBACK_PENDING_DAYS = int(os.environ.get('CASHBACK_PENDING_DAYS', '7'))
-WITHDRAWAL_FEE = float(os.environ.get('WITHDRAWAL_FEE', '1.0'))  # GHS
-
-# Payment System Settings
-DEFAULT_CASH_DEBIT_LIMIT = float(os.environ.get('DEFAULT_CASH_DEBIT_LIMIT', '5000.0'))  # GHS
-DEFAULT_GRACE_PERIOD_DAYS = int(os.environ.get('DEFAULT_GRACE_PERIOD_DAYS', '3'))
-MAX_CASH_CASHBACK_RATE = float(os.environ.get('MAX_CASH_CASHBACK_RATE', '15.0'))  # 15% max
-
-# Referral bonus constants (used before membership system)
-REFERRAL_BONUS = 3.0  # GHS for referrer when referral buys a card
-REFERRAL_WELCOME_BONUS = 1.0  # GHS for new user when buying a card
-
-# Default config (will be loaded from DB)
-DEFAULT_SDM_CONFIG = {
-    "membership_card_price": 50.0,  # GHS - Default for platform cards
-    "referral_bonus_bronze": 3.0,   # GHS per referral at Bronze level
-    "referral_bonus_silver": 4.0,   # GHS per referral at Silver level  
-    "referral_bonus_gold": 5.0,     # GHS per referral at Gold level
-    "welcome_bonus": 1.0,           # GHS for new member
-    "bronze_min_referrals": 0,
-    "silver_min_referrals": 5,
-    "gold_min_referrals": 15,
-    "membership_validity_days": 365,
-    "require_membership_for_referral": False,  # If true, only members can refer
-    # Fintech configuration
-    "sdm_commission_rate": 0.02,    # 2% SDM commission on cashback
-    "cashback_pending_days": 7,     # Days before cashback becomes available
-    "withdrawal_fee": 1.0,          # GHS fee for withdrawals
-    "float_low_threshold": 5000.0,  # Alert when float below this
-    "float_critical_threshold": 1000.0,  # Critical alert threshold
-    # Alert configuration
-    "float_alert_webhook_url": None,  # Webhook URL for float alerts
-    "float_alert_emails": [],  # Email addresses for float alerts
-    "alert_on_low_threshold": True,  # Send alert on low threshold
-    "alert_on_critical_threshold": True,  # Send alert on critical threshold
-    # Service configuration (Airtime, Data, Bills)
-    "monthly_service_limit": 2500.0,  # Monthly limit for services
-    "service_commission_rate": 0.001,  # 0.1% commission on services
-}
+# NOTE: DEFAULT_SDM_CONFIG is now imported from config.py
+# Additional DB-specific config can be extended in get_sdm_config()
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -187,25 +171,7 @@ class AdminUser(BaseModel):
     last_login: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-# Admin Roles and Permissions
-ADMIN_ROLES = {
-    "super_admin": {
-        "name": "Super Admin",
-        "permissions": ["*"]  # All permissions
-    },
-    "admin": {
-        "name": "Admin",
-        "permissions": [
-            "view_users", "manage_users",
-            "view_merchants", "manage_merchants", 
-            "view_logs", "verify_merchants"
-        ]
-    },
-    "viewer": {
-        "name": "Viewer",
-        "permissions": ["view_users", "view_merchants", "view_logs"]
-    }
-}
+# NOTE: ADMIN_ROLES is now imported from config.py
 
 class AdminLogin(BaseModel):
     username: str
@@ -962,69 +928,12 @@ class UpdateNotificationRequest(BaseModel):
     expires_at: Optional[str] = None
 
 # ============== HELPER FUNCTIONS ==============
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
-def create_token(data: dict, expires_hours: int = 24) -> str:
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(hours=expires_hours)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def generate_otp() -> str:
-    return str(secrets.randbelow(900000) + 100000)
-
-def normalize_phone(phone: str) -> str:
-    """Normalize phone to E.164 format for Ghana"""
-    try:
-        parsed = phonenumbers.parse(phone, "GH")
-        if phonenumbers.is_valid_number(parsed):
-            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-    except:
-        pass
-    # Fallback: basic normalization
-    phone = phone.replace(" ", "").replace("-", "")
-    if phone.startswith("0"):
-        phone = "+233" + phone[1:]
-    elif phone.startswith("233"):
-        phone = "+" + phone
-    elif not phone.startswith("+"):
-        phone = "+233" + phone
-    return phone
-
-def generate_qr_code_base64(data: str) -> str:
-    """Generate QR code as base64 string"""
-    qr = qrcode.QRCode(version=1, box_size=10, border=5)
-    qr.add_data(data)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    buffer = io.BytesIO()
-    img.save(buffer, format='PNG')
-    return b64.b64encode(buffer.getvalue()).decode()
-
-def parse_user_agent(user_agent: str) -> dict:
-    ua_lower = user_agent.lower() if user_agent else ""
-    device_type = "desktop"
-    if "mobile" in ua_lower or "android" in ua_lower and "mobile" in ua_lower:
-        device_type = "mobile"
-    elif "tablet" in ua_lower or "ipad" in ua_lower:
-        device_type = "tablet"
-    browser = "unknown"
-    if "edg" in ua_lower: browser = "Edge"
-    elif "chrome" in ua_lower: browser = "Chrome"
-    elif "firefox" in ua_lower: browser = "Firefox"
-    elif "safari" in ua_lower: browser = "Safari"
-    os_name = "unknown"
-    if "windows" in ua_lower: os_name = "Windows"
-    elif "mac" in ua_lower: os_name = "MacOS"
-    elif "linux" in ua_lower: os_name = "Linux"
-    elif "android" in ua_lower: os_name = "Android"
-    elif "iphone" in ua_lower or "ipad" in ua_lower: os_name = "iOS"
-    return {"device_type": device_type, "browser": browser, "os": os_name}
+# NOTE: Core helper functions have been extracted to utils/helpers.py
+# The following functions are now imported at the top of this file:
+# - hash_password, verify_password, create_token
+# - generate_otp, normalize_phone
+# - generate_qr_code_base64, parse_user_agent
+# - generate_referral_code, format_currency, mask_phone
 
 async def send_sms_hubtel(phone: str, message: str) -> bool:
     """Send SMS via Hubtel API"""
@@ -1641,9 +1550,7 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
 
 # ============== SDM USER ROUTES ==============
 
-# Test account credentials (for development/testing only)
-TEST_PHONE = "+233000000000"
-TEST_OTP = "0000"
+# NOTE: Test account credentials (TEST_PHONE, TEST_OTP) are now imported from config.py
 
 async def verify_otp_helper(phone: str, otp_code: str, request_id: str) -> bool:
     """Helper function to verify OTP for internal use (PIN operations)"""
@@ -5763,7 +5670,8 @@ async def add_test_participants_to_lottery(lottery_id: str, admin: dict = Depend
 
 # ==================== VIP CARDS ADMIN ENDPOINTS ====================
 
-# Default VIP card types to seed
+# NOTE: DEFAULT_VIP_CARDS with detailed tiers is defined locally here
+# (Extended version with more fields than the one in config.py)
 DEFAULT_VIP_CARDS = [
     {
         "tier": "SILVER",

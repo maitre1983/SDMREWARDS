@@ -116,10 +116,17 @@ Amount: 1000 GHS @ 10% Cashback
 ```
 
 ### Migration Strategy
-1. Create models package with shared Pydantic models
-2. Migrate routes one section at a time
-3. Test each migration before proceeding
-4. Keep server.py functional during migration
+1. ✅ **Phase 1**: Extract utility functions to `utils/helpers.py`
+2. ✅ **Phase 2**: Extract configuration constants to `config.py`
+3. **Phase 3** (Next): Extract auth routes to `routers/auth.py`
+4. **Phase 4**: Extract user routes to `routers/users.py`
+5. **Phase 5**: Extract merchant routes to `routers/merchants.py`
+
+### Progress
+- `server.py`: 7658 → 7565 lines (-93 lines, ~1.2% reduction)
+- New files created:
+  - `/app/backend/utils/helpers.py`
+  - `/app/backend/config.py`
 
 ---
 
