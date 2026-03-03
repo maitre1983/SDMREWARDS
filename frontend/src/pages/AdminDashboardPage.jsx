@@ -57,6 +57,9 @@ export default function AdminDashboardPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      // Fetch admin profile FIRST to ensure role is available
+      await fetchAdminProfile();
+      
       const [messagesRes, statsRes, analyticsRes] = await Promise.all([
         axios.get(`${API_URL}/api/admin/messages`, { headers }),
         axios.get(`${API_URL}/api/admin/stats`, { headers }),
@@ -65,9 +68,6 @@ export default function AdminDashboardPage() {
       setMessages(messagesRes.data);
       setStats(statsRes.data);
       setAnalytics(analyticsRes.data);
-      
-      // Also fetch admin profile
-      fetchAdminProfile();
     } catch (error) {
       console.error('Fetch error:', error);
       if (error.response?.status === 401) {

@@ -44,7 +44,12 @@ export default function AdminManagementPanel({ token, currentAdmin }) {
   const isSuperAdmin = currentAdmin?.role === 'super_admin';
 
   const fetchAdmins = async () => {
-    if (!isSuperAdmin) {
+    // Wait for currentAdmin to be loaded
+    if (!currentAdmin) {
+      return;
+    }
+    
+    if (currentAdmin.role !== 'super_admin') {
       setIsLoading(false);
       return;
     }
@@ -60,8 +65,11 @@ export default function AdminManagementPanel({ token, currentAdmin }) {
   };
 
   useEffect(() => {
-    fetchAdmins();
-  }, []);
+    // Re-fetch when currentAdmin changes
+    if (currentAdmin) {
+      fetchAdmins();
+    }
+  }, [currentAdmin]);
 
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
