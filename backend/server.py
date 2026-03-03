@@ -1681,18 +1681,42 @@ async def get_merchant_profile(merchant: dict = Depends(get_current_merchant)):
     return merchant
 
 @sdm_router.put("/merchant/settings")
-async def update_merchant_settings(cashback_rate: Optional[float] = None, merchant: dict = Depends(get_current_merchant)):
-    """Update merchant settings"""
+async def update_merchant_settings(
+    body: dict,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Update merchant settings including cashback rate"""
     updates = {}
-    if cashback_rate is not None:
-        if cashback_rate < 0.01 or cashback_rate > 0.20:
-            raise HTTPException(status_code=400, detail="Cashback rate must be between 1% and 20%")
-        updates["cashback_rate"] = cashback_rate
+    
+    # Update cashback rate
+    if "cashback_rate" in body:
+        cashback_rate = body["cashback_rate"]
+        if cashback_rate is not None:
+            if cashback_rate < 0 or cashback_rate > 50:
+                raise HTTPException(status_code=400, detail="Cashback rate must be between 0% and 50%")
+            updates["cashback_rate"] = float(cashback_rate)
+    
+    # Enable/disable cashback
+    if "cashback_enabled" in body:
+        updates["cashback_enabled"] = bool(body["cashback_enabled"])
+    
+    # Update business info
+    if "business_name" in body:
+        updates["business_name"] = body["business_name"]
+    if "business_category" in body:
+        updates["business_category"] = body["business_category"]
+    if "gps_location" in body:
+        updates["gps_location"] = body["gps_location"]
+    if "city" in body:
+        updates["city"] = body["city"]
     
     if updates:
         await db.sdm_merchants.update_one({"id": merchant["id"]}, {"$set": updates})
     
-    return {"message": "Settings updated"}
+    # Get updated merchant data
+    updated_merchant = await db.sdm_merchants.find_one({"id": merchant["id"]}, {"_id": 0, "password_hash": 0})
+    
+    return {"message": "Settings updated", "merchant": updated_merchant}
 
 @sdm_router.post("/merchant/staff")
 async def add_staff(request: AddStaffRequest, merchant: dict = Depends(get_current_merchant)):

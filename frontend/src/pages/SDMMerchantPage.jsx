@@ -5,7 +5,8 @@ import {
   Settings, LogOut, DollarSign, TrendingUp, Plus, Trash2,
   Check, X, Edit2, Camera, Calendar, Filter,
   ChevronDown, ChevronUp, Clock, User, Search,
-  Eye, EyeOff, Lock, MapPin, Send, Phone
+  Eye, EyeOff, Lock, MapPin, Send, Phone, Copy, 
+  Code, Book, Key, Shield, Percent, ToggleLeft, ToggleRight, Save
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -38,7 +39,7 @@ export default function SDMMerchantPage() {
     address: '',
     gps_address: '',
     city: 'Accra',
-    cashback_rate: 0.05,
+    cashback_rate: 5,  // 5% default
     password: ''
   });
   
@@ -957,25 +958,298 @@ export default function SDMMerchantPage() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="bg-white rounded-2xl p-6">
-            <h3 className="font-semibold text-slate-900 mb-4">API Credentials</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-500 mb-1">API Key</label>
-                <code className="block p-3 bg-slate-100 rounded-lg text-sm font-mono break-all">
-                  {merchant?.api_key}
-                </code>
+          <div className="space-y-6">
+            {/* Cashback Settings */}
+            <div className="bg-white rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <Percent className="text-emerald-600" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Cashback Settings</h3>
+                  <p className="text-sm text-slate-500">Configure your cashback rewards for customers</p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm text-slate-500 mb-1">API Secret</label>
-                <code className="block p-3 bg-slate-100 rounded-lg text-sm font-mono break-all">
-                  {merchant?.api_secret}
-                </code>
+              
+              <div className="space-y-4">
+                {/* Cashback Toggle */}
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div>
+                    <p className="font-medium text-slate-900">Enable Cashback</p>
+                    <p className="text-sm text-slate-500">When disabled, customers won't earn cashback at your store</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const newState = !(merchant?.cashback_enabled ?? true);
+                        await axios.put(`${API_URL}/api/sdm/merchant/settings`, 
+                          { cashback_enabled: newState },
+                          { headers: { Authorization: `Bearer ${token}` }}
+                        );
+                        setMerchant({...merchant, cashback_enabled: newState});
+                        toast.success(newState ? 'Cashback enabled' : 'Cashback disabled');
+                      } catch (error) {
+                        toast.error('Failed to update setting');
+                      }
+                    }}
+                    className={`w-14 h-8 rounded-full transition-colors ${
+                      (merchant?.cashback_enabled ?? true) ? 'bg-emerald-500' : 'bg-slate-300'
+                    } relative`}
+                  >
+                    <div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-transform ${
+                      (merchant?.cashback_enabled ?? true) ? 'translate-x-7' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                
+                {/* Cashback Rate Slider */}
+                <div className="p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-medium text-slate-900">Cashback Rate</p>
+                    <span className="text-2xl font-bold text-emerald-600">{merchant?.cashback_rate || 5}%</span>
+                  </div>
+                  
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="0.5"
+                    value={merchant?.cashback_rate || 5}
+                    onChange={(e) => setMerchant({...merchant, cashback_rate: parseFloat(e.target.value)})}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  />
+                  
+                  <div className="flex justify-between text-xs text-slate-400 mt-1">
+                    <span>1%</span>
+                    <span>5%</span>
+                    <span>10%</span>
+                    <span>15%</span>
+                    <span>20%</span>
+                  </div>
+                  
+                  <Button
+                    onClick={async () => {
+                      try {
+                        setIsLoading(true);
+                        await axios.put(`${API_URL}/api/sdm/merchant/settings`, 
+                          { cashback_rate: merchant?.cashback_rate || 5 },
+                          { headers: { Authorization: `Bearer ${token}` }}
+                        );
+                        toast.success(`Cashback rate updated to ${merchant?.cashback_rate || 5}%`);
+                      } catch (error) {
+                        toast.error('Failed to update cashback rate');
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} className="mr-2" />}
+                    Save Cashback Rate
+                  </Button>
+                </div>
+                
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <p className="text-sm text-blue-700">
+                    <strong>Tip:</strong> Higher cashback rates attract more customers. The average rate is 5%. 
+                    You can adjust this anytime based on your marketing strategy.
+                  </p>
+                </div>
               </div>
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-blue-700">
-                  Use these credentials to integrate SDM with your website or POS system.
-                </p>
+            </div>
+
+            {/* API Credentials */}
+            <div className="bg-white rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Key className="text-blue-600" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">API Credentials</h3>
+                  <p className="text-sm text-slate-500">Use these to integrate SDM with your systems</p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Merchant ID</label>
+                  <div className="flex gap-2">
+                    <code className="flex-1 p-3 bg-slate-100 rounded-lg text-sm font-mono break-all">
+                      {merchant?.id}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {navigator.clipboard.writeText(merchant?.id); toast.success('Copied!')}}
+                    >
+                      <Copy size={16} />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
+                  <div className="flex gap-2">
+                    <code className="flex-1 p-3 bg-slate-100 rounded-lg text-sm font-mono break-all">
+                      {merchant?.api_key}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {navigator.clipboard.writeText(merchant?.api_key); toast.success('Copied!')}}
+                    >
+                      <Copy size={16} />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">API Secret</label>
+                  <div className="flex gap-2">
+                    <code className="flex-1 p-3 bg-slate-100 rounded-lg text-sm font-mono break-all">
+                      {merchant?.api_secret || 'Not generated'}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {navigator.clipboard.writeText(merchant?.api_secret || ''); toast.success('Copied!')}}
+                    >
+                      <Copy size={16} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* API Documentation */}
+            <div className="bg-white rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Book className="text-purple-600" size={20} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">API Documentation</h3>
+                  <p className="text-sm text-slate-500">Integrate SDM with your website or POS system</p>
+                </div>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Quick Start */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Code size={18} className="text-purple-600" />
+                    Quick Start
+                  </h4>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Use the following endpoints to process cashback transactions:
+                  </p>
+                  <div className="bg-slate-900 rounded-lg p-4 text-sm font-mono text-green-400 overflow-x-auto">
+                    <p className="text-slate-400"># Base URL</p>
+                    <p className="mb-3">https://sdmrewards.com/api</p>
+                    <p className="text-slate-400"># Process a transaction</p>
+                    <p>POST /sdm/merchant/transaction</p>
+                  </div>
+                </div>
+
+                {/* Endpoint: Process Transaction */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-900 mb-3">
+                    POST /sdm/merchant/transaction
+                  </h4>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Process a cashback transaction when a customer makes a purchase.
+                  </p>
+                  
+                  <div className="bg-slate-900 rounded-lg p-4 text-sm font-mono overflow-x-auto mb-4">
+                    <p className="text-slate-400 mb-2">// Request Headers</p>
+                    <p className="text-yellow-400">Authorization: Bearer YOUR_API_KEY</p>
+                    <p className="text-yellow-400 mb-3">Content-Type: application/json</p>
+                    
+                    <p className="text-slate-400 mb-2">// Request Body</p>
+                    <pre className="text-green-400">{`{
+  "customer_phone": "+233XXXXXXXXX",
+  "amount": 100.00,
+  "reference": "ORDER-12345"
+}`}</pre>
+                  </div>
+                  
+                  <div className="bg-slate-900 rounded-lg p-4 text-sm font-mono overflow-x-auto">
+                    <p className="text-slate-400 mb-2">// Success Response (200)</p>
+                    <pre className="text-green-400">{`{
+  "success": true,
+  "transaction_id": "txn_xxxxx",
+  "cashback_amount": 5.00,
+  "customer_new_balance": 25.00
+}`}</pre>
+                  </div>
+                </div>
+
+                {/* Endpoint: Scan QR Code */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-900 mb-3">
+                    POST /sdm/merchant/scan-qr
+                  </h4>
+                  <p className="text-sm text-slate-600 mb-3">
+                    Process transaction by scanning customer's QR code.
+                  </p>
+                  
+                  <div className="bg-slate-900 rounded-lg p-4 text-sm font-mono overflow-x-auto">
+                    <pre className="text-green-400">{`{
+  "qr_code": "SDM_USER_xxxxx",
+  "amount": 50.00
+}`}</pre>
+                  </div>
+                </div>
+
+                {/* Error Codes */}
+                <div className="border border-slate-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Shield size={18} className="text-red-500" />
+                    Error Codes
+                  </h4>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 text-slate-600">Code</th>
+                        <th className="text-left py-2 text-slate-600">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-slate-700">
+                      <tr className="border-b">
+                        <td className="py-2 font-mono text-red-600">401</td>
+                        <td className="py-2">Invalid or missing API key</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2 font-mono text-red-600">400</td>
+                        <td className="py-2">Invalid request (check amount, phone format)</td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2 font-mono text-red-600">404</td>
+                        <td className="py-2">Customer not found</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 font-mono text-red-600">500</td>
+                        <td className="py-2">Server error - contact support</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Support */}
+                <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl p-4 text-white">
+                  <h4 className="font-semibold mb-2">Need Help?</h4>
+                  <p className="text-sm opacity-90 mb-3">
+                    Our technical team is available to help you integrate SDM into your systems.
+                  </p>
+                  <a 
+                    href="mailto:support@sdmrewards.com"
+                    className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Send size={16} />
+                    Contact Support
+                  </a>
+                </div>
               </div>
             </div>
           </div>
