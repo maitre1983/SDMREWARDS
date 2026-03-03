@@ -5,7 +5,7 @@ import {
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
   Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket,
-  Eye, EyeOff, User, Lock
+  Eye, EyeOff, User, Lock, Calendar, Cake
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -41,6 +41,7 @@ export default function SDMClientPage() {
   
   // Auth form states
   const [fullName, setFullName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginPassword, setLoginPassword] = useState('');
@@ -307,6 +308,7 @@ export default function SDMClientPage() {
           const response = await axios.post(`${API_URL}/api/sdm/auth/register`, {
             phone,
             full_name: fullName,
+            birth_date: birthDate || null,
             password,
             referral_code: referralCode || null,
             otp_code: autoFilledOtp,
@@ -347,7 +349,7 @@ export default function SDMClientPage() {
         }
       }, 300);
     }
-  }, [phone, fullName, password, referralCode, otpId, t]);
+  }, [phone, fullName, birthDate, password, referralCode, otpId, t]);
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
@@ -357,6 +359,7 @@ export default function SDMClientPage() {
       const response = await axios.post(`${API_URL}/api/sdm/auth/register`, {
         phone,
         full_name: fullName,
+        birth_date: birthDate || null,
         password,
         referral_code: referralCode || null,
         otp_code: otp,
@@ -647,6 +650,22 @@ export default function SDMClientPage() {
                       data-testid="sdm-fullname-input"
                     />
                   </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <Cake size={14} className="inline mr-1" />
+                    {t('sdm_birth_date')}
+                  </label>
+                  <Input
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="h-12 bg-slate-800/50 border-slate-700 text-white rounded-xl"
+                    data-testid="sdm-birthdate-input"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">{t('sdm_birth_date_hint')}</p>
                 </div>
                 
                 <div>

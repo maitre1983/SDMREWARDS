@@ -93,8 +93,10 @@
 - ✅ Merchant Card Management Removed
 - ✅ BulkClix OTP SMS Integration (Real)
 - ✅ **BulkClix Notification SMS** (for merchants)
-- ✅ Client: Phone + Password + Full Name Registration
+- ✅ Client: Phone + Password + Full Name + **Birth Date** Registration
 - ✅ Merchant: Phone + Password + GPS Address Registration
+- ✅ **Merchant Dashboard: Cashback Rate Management** (Settings tab)
+- ✅ **Merchant Dashboard: API Credentials Display** (ID, Key, Secret)
 - ✅ Favicon & Title (www.sdmrewards.com)
 - ✅ "Made with Emergent" Badge Removed
 - ✅ English Priority Language (all pages translated)
@@ -120,12 +122,13 @@
 - Public partner directory
 - Landing optimization
 
-### Birthday Bonus ✅ IMPLEMENTED
+### Birthday Bonus ✅ COMPLETE
 - Auto bonus job runs daily @ 8 UTC
 - Checks for VIP members with birthday today
 - Credits configurable bonus amount (default: 5 GHS)
 - Sends birthday SMS notification
 - Prevents duplicate bonuses per year
+- **Birth date field added to client registration form**
 
 ### Merchant Notifications ✅ IMPLEMENTED
 - SMS sent when merchant registers (pending verification)
@@ -168,6 +171,6 @@
 
 ---
 
-*Last Updated: March 2, 2026*
-*Dynamic Admin URL Tested and Working*
-*Session Persistence Verified*
+*Last Updated: March 3, 2026*
+*Merchant Dashboard Features Tested and Working*
+*Birthday Bonus Feature Complete*

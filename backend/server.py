@@ -214,6 +214,7 @@ class SDMUser(BaseModel):
     last_name: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[str] = None
+    birth_date: Optional[str] = None  # Format: YYYY-MM-DD for birthday bonus
     qr_code: str = Field(default_factory=lambda: str(uuid.uuid4())[:12].upper())
     referral_code: str = Field(default_factory=lambda: f"SDM{secrets.token_hex(3).upper()}")
     referred_by: Optional[str] = None  # User ID who referred this user
@@ -1186,7 +1187,8 @@ async def register_client(request: ClientRegisterRequest):
         phone=phone,
         phone_verified=True,
         password_hash=hash_password(request.password),
-        full_name=request.full_name
+        full_name=request.full_name,
+        birth_date=request.birth_date
     )
     
     # Handle referral
