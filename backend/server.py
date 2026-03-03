@@ -2516,25 +2516,38 @@ async def process_instant_momo_settlement(merchant: dict, amount: float, transac
 
 @sdm_router.post("/merchant/transaction")
 async def create_transaction(request: CreateTransactionRequest, merchant: dict = Depends(get_current_merchant)):
-    """Create cashback transaction (scan QR + amount) - Direct Payment Flow
+    """Initiate payment transaction - Client pays first via MoMo
     
-    The client pays directly and the system automatically splits:
-    - Merchant receives: payment - cashback
-    - Client receives: cashback - SDM commission (pending)
-    - SDM receives: commission
+    Flow:
+    1. Client scans merchant QR and confirms amount
+    2. System initiates MoMo collection from client
+    3. Client approves payment on phone
+    4. Webhook confirms payment
+    5. Merchant receives funds (instant MoMo transfer)
+    6. SDM receives commission
+    7. Client receives cashback
     """
     # Get dynamic config
     config = await get_sdm_config()
     commission_rate = config.get("sdm_commission_rate", SDM_COMMISSION_RATE)
-    pending_days = config.get("cashback_pending_days", CASHBACK_PENDING_DAYS)
     
     # Find user by QR code
     user = await db.sdm_users.find_one({"qr_code": request.user_qr_code}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if not user["is_active"]:
+    if not user.get("is_active", True) == False:
+        pass  # Allow if is_active is True or not set
+    elif user.get("is_active") == False:
         raise HTTPException(status_code=400, detail="User account inactive")
+    
+    # Get user's MoMo details for payment collection
+    user_phone = user.get("phone", "").replace("+233", "0").replace(" ", "")
+    if not user_phone:
+        raise HTTPException(status_code=400, detail="User phone number not found")
+    
+    # Detect network from phone number or use default
+    user_network = user.get("momo_provider") or detect_network_from_phone(user_phone)
     
     # Get staff info
     staff_name = None
@@ -2544,87 +2557,312 @@ async def create_transaction(request: CreateTransactionRequest, merchant: dict =
                 staff_name = s["name"]
                 break
     
+    # Generate unique transaction ID
+    transaction_id = f"TXN_{uuid.uuid4().hex[:12].upper()}"
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Calculate amounts
+    cashback_rate = merchant.get("cashback_rate", 2.5) / 100  # Convert % to decimal
+    cashback_amount = round(request.amount * cashback_rate, 2)
+    sdm_commission = round(cashback_amount * commission_rate, 2)
+    net_cashback = round(cashback_amount - sdm_commission, 2)
+    merchant_receives = round(request.amount - cashback_amount, 2)
+    
+    # Create pending transaction record
+    pending_transaction = {
+        "id": str(uuid.uuid4()),
+        "transaction_id": transaction_id,
+        "merchant_id": merchant["id"],
+        "merchant_name": merchant["business_name"],
+        "user_id": user["id"],
+        "user_phone": user_phone,
+        "user_network": user_network,
+        "amount": request.amount,
+        "cashback_rate": merchant.get("cashback_rate", 2.5),
+        "cashback_amount": cashback_amount,
+        "sdm_commission": sdm_commission,
+        "net_cashback": net_cashback,
+        "merchant_receives": merchant_receives,
+        "payment_status": "pending",  # pending -> collected -> settled -> completed
+        "staff_id": request.staff_id,
+        "staff_name": staff_name,
+        "notes": request.notes,
+        "created_at": now,
+        "settlement_type": merchant.get("settlement_type", "momo"),
+        "merchant_momo_number": merchant.get("momo_number"),
+        "merchant_momo_provider": merchant.get("momo_provider")
+    }
+    
+    # Store pending transaction
+    await db.pending_payments.insert_one(pending_transaction)
+    
+    # Initiate MoMo collection from client
+    callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/transaction"
+    
+    collection_result = await bulkclix_payment_service.collect_momo_payment(
+        amount=request.amount,
+        phone_number=user_phone,
+        network=user_network,
+        transaction_id=transaction_id,
+        callback_url=callback_url,
+        reference=f"Pay {merchant['business_name'][:15]}"
+    )
+    
+    if not collection_result.get("success"):
+        # Payment initiation failed
+        await db.pending_payments.update_one(
+            {"transaction_id": transaction_id},
+            {"$set": {"payment_status": "failed", "error": collection_result.get("error")}}
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Payment initiation failed: {collection_result.get('error', 'Unknown error')}"
+        )
+    
+    # Update with BulkClix response
+    await db.pending_payments.update_one(
+        {"transaction_id": transaction_id},
+        {"$set": {
+            "bulkclix_collection_response": collection_result.get("data"),
+            "payment_initiated_at": now
+        }}
+    )
+    
+    return {
+        "message": "Payment initiated. Customer must approve on their phone.",
+        "transaction_id": transaction_id,
+        "amount": request.amount,
+        "customer_phone": user_phone[-4:].rjust(len(user_phone), '*'),  # Masked
+        "merchant_receives": merchant_receives,
+        "cashback_amount": net_cashback,
+        "status": "pending_customer_approval",
+        "instructions": "Customer will receive a prompt to approve the payment."
+    }
+
+def detect_network_from_phone(phone: str) -> str:
+    """Detect MoMo network from Ghana phone number"""
+    phone = phone.replace("+233", "0").replace(" ", "").replace("-", "")
+    if phone.startswith("024") or phone.startswith("054") or phone.startswith("055") or phone.startswith("059"):
+        return "MTN"
+    elif phone.startswith("020") or phone.startswith("050"):
+        return "TELECEL"
+    elif phone.startswith("026") or phone.startswith("056") or phone.startswith("027") or phone.startswith("057"):
+        return "AIRTELTIGO"
+    return "MTN"  # Default to MTN
+
+# ============== TRANSACTION PAYMENT WEBHOOK ==============
+
+@sdm_router.post("/payments/webhook/transaction")
+async def transaction_payment_webhook(request: Request):
+    """
+    Webhook for customer payment confirmation
+    Called when customer approves MoMo payment
+    
+    Flow after confirmation:
+    1. Mark payment as collected
+    2. Transfer to merchant's MoMo
+    3. Credit SDM commission
+    4. Credit customer cashback
+    """
     try:
-        # Use the new direct payment flow via ledger service
-        # Convert cashback_rate from percentage (e.g. 2.5) to decimal (0.025)
-        cashback_rate_decimal = merchant["cashback_rate"] / 100
+        data = await request.json()
+        logging.info(f"Transaction Payment webhook received: {data}")
         
-        result = await ledger_service.process_direct_payment_transaction(
-            merchant_id=merchant["id"],
-            client_id=user["id"],
-            payment_amount=request.amount,
-            cashback_rate=cashback_rate_decimal,
-            commission_rate=commission_rate,
-            pending_days=pending_days,
-            payment_method="QR_SCAN",
-            metadata={
-                "staff_id": request.staff_id,
-                "staff_name": staff_name,
-                "notes": request.notes,
-                "merchant_name": merchant["business_name"]
-            },
-            created_by=f"merchant:{merchant['id']}"
+        transaction_id = data.get("transaction_id")
+        status = data.get("status", "").lower()
+        ext_transaction_id = data.get("ext_transaction_id")
+        
+        if not transaction_id:
+            return {"success": False, "error": "Missing transaction_id"}
+        
+        # Find pending transaction
+        pending = await db.pending_payments.find_one(
+            {"transaction_id": transaction_id},
+            {"_id": 0}
         )
         
-        # Also record in sdm_transactions for backward compatibility
-        transaction = SDMTransaction(
-            user_id=user["id"],
-            merchant_id=merchant["id"],
-            merchant_name=merchant["business_name"],
-            amount=request.amount,
-            cashback_rate=merchant["cashback_rate"],
-            cashback_amount=result["splits"]["client_cashback"] + result["splits"]["sdm_commission"],
-            sdm_commission=result["splits"]["sdm_commission"],
-            net_cashback=result["splits"]["client_cashback"],
-            available_date=result["available_date"],
-            staff_id=request.staff_id,
-            staff_name=staff_name,
-            notes=request.notes
-        )
-        transaction.transaction_id = result["reference"]
-        await db.sdm_transactions.insert_one(transaction.model_dump())
+        if not pending:
+            logging.warning(f"Transaction not found: {transaction_id}")
+            return {"success": False, "error": "Transaction not found"}
         
-        # Update user wallet (pending) - sync with ledger
-        await db.sdm_users.update_one(
-            {"id": user["id"]},
-            {"$inc": {"wallet_pending": result["splits"]["client_cashback"], "total_earned": result["splits"]["client_cashback"]}}
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Update with webhook data
+        await db.pending_payments.update_one(
+            {"transaction_id": transaction_id},
+            {"$set": {
+                "webhook_received": True,
+                "webhook_data": data,
+                "ext_transaction_id": ext_transaction_id,
+                "webhook_received_at": now
+            }}
         )
         
-        # Update merchant stats
-        await db.sdm_merchants.update_one(
-            {"id": merchant["id"]},
-            {"$inc": {"total_transactions": 1, "total_cashback_given": result["splits"]["client_cashback"]}}
+        if status == "success":
+            # Process the full payment flow
+            await process_successful_transaction(pending, ext_transaction_id)
+            return {"success": True, "message": "Payment processed successfully"}
+        elif status in ["failed", "declined", "cancelled"]:
+            await db.pending_payments.update_one(
+                {"transaction_id": transaction_id},
+                {"$set": {
+                    "payment_status": "failed",
+                    "error_message": data.get("message", "Payment failed"),
+                    "failed_at": now
+                }}
+            )
+            return {"success": True, "message": "Payment marked as failed"}
+        
+        return {"success": True, "message": "Webhook received"}
+        
+    except Exception as e:
+        logging.error(f"Transaction webhook error: {e}")
+        return {"success": False, "error": str(e)}
+
+async def process_successful_transaction(pending: dict, ext_transaction_id: str):
+    """
+    Process successful customer payment:
+    1. Mark as collected
+    2. Transfer to merchant MoMo
+    3. Record SDM commission
+    4. Credit customer cashback
+    """
+    from ledger import EntityType
+    
+    now = datetime.now(timezone.utc).isoformat()
+    transaction_id = pending["transaction_id"]
+    
+    # Step 1: Mark as collected
+    await db.pending_payments.update_one(
+        {"transaction_id": transaction_id},
+        {"$set": {
+            "payment_status": "collected",
+            "collected_at": now
+        }}
+    )
+    logging.info(f"Payment collected: {transaction_id}")
+    
+    # Step 2: Transfer to merchant's MoMo (if instant settlement)
+    merchant = await db.sdm_merchants.find_one({"id": pending["merchant_id"]}, {"_id": 0})
+    settlement_result = None
+    
+    if merchant and merchant.get("momo_number") and merchant.get("momo_provider"):
+        settlement_ref = f"SET_{transaction_id[-10:]}"
+        
+        transfer_result = await bulkclix_payment_service.transfer_momo(
+            amount=pending["merchant_receives"],
+            account_number=merchant["momo_number"],
+            network=merchant["momo_provider"],
+            account_name=merchant.get("momo_account_name", merchant["business_name"]),
+            client_reference=settlement_ref
         )
         
-        # Process instant MoMo settlement if configured
-        settlement_result = None
-        if merchant.get("settlement_mode") == "instant" and merchant.get("settlement_type") == "momo":
-            if merchant.get("momo_number") and merchant.get("momo_provider"):
-                settlement_result = await process_instant_momo_settlement(
-                    merchant=merchant,
-                    amount=result["splits"]["merchant_receives"],
-                    transaction_id=result["reference"]
-                )
-        
-        response = {
-            "message": "Transaction created - Direct Payment Flow",
-            "transaction_id": result["reference"],
-            "ledger_transaction_id": result["transaction_id"],
-            "amount": request.amount,
-            "splits": result["splits"],
-            "cashback_amount": round(result["splits"]["client_cashback"], 2),
-            "merchant_receives": round(result["splits"]["merchant_receives"], 2),
-            "sdm_commission": round(result["splits"]["sdm_commission"], 2),
-            "available_date": result["available_date"],
-            "user_name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "SDM User"
+        settlement_result = {
+            "status": "completed" if transfer_result.get("success") else "failed",
+            "reference": settlement_ref,
+            "amount": pending["merchant_receives"],
+            "response": transfer_result.get("data"),
+            "error": transfer_result.get("error") if not transfer_result.get("success") else None
         }
         
-        if settlement_result:
-            response["settlement"] = settlement_result
+        # Record settlement
+        await db.merchant_settlements.insert_one({
+            "id": str(uuid.uuid4()),
+            "transaction_id": transaction_id,
+            "merchant_id": pending["merchant_id"],
+            "client_reference": settlement_ref,
+            "amount": pending["merchant_receives"],
+            "status": settlement_result["status"],
+            "created_at": now
+        })
         
-        return response
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logging.info(f"Merchant settlement: {settlement_result['status']} - {pending['merchant_receives']} GHS")
+    
+    # Step 3: Record SDM commission (credit to SDM wallet)
+    sdm_commission = pending["sdm_commission"]
+    await db.sdm_commissions.insert_one({
+        "id": str(uuid.uuid4()),
+        "transaction_id": transaction_id,
+        "amount": sdm_commission,
+        "merchant_id": pending["merchant_id"],
+        "created_at": now
+    })
+    logging.info(f"SDM commission recorded: {sdm_commission} GHS")
+    
+    # Step 4: Credit customer cashback
+    user_id = pending["user_id"]
+    net_cashback = pending["net_cashback"]
+    
+    # Update user wallet
+    await db.sdm_users.update_one(
+        {"id": user_id},
+        {"$inc": {
+            "wallet_pending": net_cashback,
+            "total_cashback_earned": net_cashback
+        }}
+    )
+    
+    # Also update ledger wallet if exists
+    user_wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user_id)
+    if user_wallet:
+        await db.wallets.update_one(
+            {"id": user_wallet.id},
+            {"$inc": {"pending_balance": net_cashback}}
+        )
+    
+    logging.info(f"Customer cashback credited: {net_cashback} GHS (pending)")
+    
+    # Step 5: Mark transaction as completed
+    await db.pending_payments.update_one(
+        {"transaction_id": transaction_id},
+        {"$set": {
+            "payment_status": "completed",
+            "settlement_result": settlement_result,
+            "completed_at": now
+        }}
+    )
+    
+    # Also record in sdm_transactions for history
+    await db.sdm_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "transaction_id": transaction_id,
+        "user_id": user_id,
+        "merchant_id": pending["merchant_id"],
+        "merchant_name": pending["merchant_name"],
+        "amount": pending["amount"],
+        "cashback_amount": pending["net_cashback"],
+        "merchant_receives": pending["merchant_receives"],
+        "sdm_commission": pending["sdm_commission"],
+        "status": "completed",
+        "payment_method": "MOMO",
+        "created_at": pending["created_at"],
+        "completed_at": now,
+        "ext_transaction_id": ext_transaction_id
+    })
+    
+    logging.info(f"Transaction completed: {transaction_id}")
+
+@sdm_router.get("/merchant/transaction/{transaction_id}/status")
+async def get_transaction_status(transaction_id: str, merchant: dict = Depends(get_current_merchant)):
+    """Check status of a pending transaction"""
+    pending = await db.pending_payments.find_one(
+        {"transaction_id": transaction_id, "merchant_id": merchant["id"]},
+        {"_id": 0}
+    )
+    
+    if not pending:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    return {
+        "transaction_id": transaction_id,
+        "status": pending.get("payment_status"),
+        "amount": pending.get("amount"),
+        "merchant_receives": pending.get("merchant_receives"),
+        "cashback_amount": pending.get("net_cashback"),
+        "created_at": pending.get("created_at"),
+        "completed_at": pending.get("completed_at"),
+        "settlement_result": pending.get("settlement_result")
+    }
 
 @sdm_router.get("/merchant/transactions")
 async def get_merchant_transactions(merchant: dict = Depends(get_current_merchant), limit: int = 100):
