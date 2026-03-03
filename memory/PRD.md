@@ -38,7 +38,7 @@ New panel in Admin Dashboard showing:
 ### Payment Methods
 | Method | Status | Notes |
 |--------|--------|-------|
-| Mobile Money | ✅ SIMULATED | Bulkclix API (pending real credentials) |
+| Mobile Money | ✅ REAL | BulkClix API - Real payments |
 | Card Payment | ✅ SIMULATED | Bulkclix API (pending real credentials) |
 | Cash | ✅ COMPLETE | Client confirmation required |
 
@@ -46,18 +46,33 @@ New panel in Admin Dashboard showing:
 1. **Client Scans Merchant QR** OR **Merchant Scans Client QR**
 2. Amount + Payment Method selected
 3. Split calculated (Cashback → SDM Commission → Client)
-4. For MoMo/Card: SIMULATED auto-confirmation
+4. For MoMo: Real collection via BulkClix API
 5. For Cash: Client must confirm via app notification
-6. Funds split: Client wallet credited, Merchant settled
+6. Funds split: Client wallet credited (IMMEDIATELY), Merchant settled
 
 ### Split Formula
 ```
 Amount: 1000 GHS @ 10% Cashback
 - Total Cashback: 100 GHS (10% of amount)
-- SDM Commission: 10 GHS (10% of cashback)
-- Client Receives: 90 GHS
+- SDM Commission: 2-20 GHS (configurable 2-20% of cashback)
+- Client Receives: 80-98 GHS (immediately available)
 - Merchant Receives: 900 GHS
 ```
+
+### Commission Configuration (Updated March 3, 2026)
+- **Taux de commission SDM**: Paramétrable entre 0.5% et 20%
+- Modifiable par le super_admin dans l'onglet "Commissions SDM"
+- API: `GET/PUT /api/sdm/admin/commission-rate`
+
+### Cashback Policy (Updated March 3, 2026)
+- **Cashback disponible IMMÉDIATEMENT** (plus de période d'attente)
+- Crédité dans `wallet_available` au lieu de `wallet_pending`
+
+### SDM Commission Management (NEW - March 3, 2026)
+- Onglet "Commissions SDM" dans le tableau de bord admin (super_admin seulement)
+- Affiche: Total gagné, Total retiré, Solde disponible
+- **Retrait via MoMo**: Le super admin peut retirer les commissions vers son compte MoMo
+- API: `GET /api/sdm/admin/commissions`, `POST /api/sdm/admin/commissions/withdraw`
 
 ### Merchant Settlement Configuration
 - **Mobile Money**: Network (MTN/Vodafone/AirtelTigo) + Phone
