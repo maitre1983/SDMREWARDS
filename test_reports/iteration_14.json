@@ -1,0 +1,56 @@
+{
+  "summary": "Verified merchant dashboard bug fix for cashback rate display. Cashback rate correctly shows 8% (not 800%) in header, settings, and cashback preview calculation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_merchant_dashboard.py",
+    "/app/test_reports/pytest/merchant_dashboard_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_merchant_dashboard.py - Created test suite for merchant dashboard"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "100% (all Playwright tests passed)"
+  },
+  "seed_data_creation": "Used existing test merchant account (phone: 0000000000, password: TestPass123)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix verified: Cashback rate was previously multiplied by 100 in display (800% instead of 8%). Fix confirmed working in: 1) Header stats card (line 630), 2) Settings slider (line 1009), 3) Cashback preview calculation (line 711). All merchant dashboard features tested: login, profile, settings update (cashback rate + toggle), API credentials display, cashback preview calculation.",
+  "tested_features": [
+    "Merchant login (phone: 0000000000, password: TestPass123) - PASS",
+    "Cashback Rate header display: Shows 8% correctly - PASS (BUG FIXED)",
+    "Settings tab - Cashback Settings section visible - PASS",
+    "Settings tab - Enable Cashback toggle works (enable/disable) - PASS",
+    "Settings tab - Cashback rate slider (1% to 20% range) - PASS",
+    "Settings tab - Save Cashback Rate button works - PASS",
+    "Settings tab - API Credentials section visible - PASS",
+    "Settings tab - Merchant ID displayed - PASS",
+    "Settings tab - API Key displayed - PASS",
+    "Settings tab - API Secret displayed - PASS",
+    "Scan QR tab - Cashback preview calculation correct (100 GHS * 8% * 0.98 = 7.84 GHS) - PASS (BUG FIXED)"
+  ],
+  "bug_verification": {
+    "original_bug": "Cashback rate was multiplied by 100 in display (8% showed as 800%)",
+    "fix_locations": [
+      "Header stats (line 630): merchant?.cashback_rate?.toFixed(0) || 5",
+      "Settings slider (line 1009): merchant?.cashback_rate || 5",
+      "Cashback preview (line 711): parseFloat(scanAmount) * (merchant?.cashback_rate || 5) / 100 * 0.98"
+    ],
+    "backend_storage": "cashback_rate is stored as percentage directly (8.0 = 8%)",
+    "verification_result": "All displays now show correct percentage values"
+  },
+  "mocked_apis": {
+    "has_mocked_apis": true,
+    "mocked_apis_list": ["BulkClix airtime/data/bills services (NOT OTP - OTP is real)"]
+  }
+}

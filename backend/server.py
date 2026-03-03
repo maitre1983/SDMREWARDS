@@ -2370,8 +2370,8 @@ async def external_create_transaction(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Calculate cashback
-    cashback_amount = amount * merchant["cashback_rate"]
+    # Calculate cashback (cashback_rate is stored as percentage, e.g., 8.0 means 8%)
+    cashback_amount = amount * (merchant["cashback_rate"] / 100)
     sdm_commission = cashback_amount * SDM_COMMISSION_RATE
     net_cashback = cashback_amount - sdm_commission
     available_date = (datetime.now(timezone.utc) + timedelta(days=CASHBACK_PENDING_DAYS)).isoformat()

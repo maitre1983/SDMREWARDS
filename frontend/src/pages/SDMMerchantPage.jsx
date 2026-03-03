@@ -412,8 +412,8 @@ export default function SDMMerchantPage() {
                   <label className="block text-sm text-slate-300 mb-1">{t('sdm_cashback_rate')}</label>
                   <Input
                     type="number"
-                    value={registerForm.cashback_rate * 100}
-                    onChange={(e) => setRegisterForm({...registerForm, cashback_rate: parseFloat(e.target.value) / 100})}
+                    value={registerForm.cashback_rate}
+                    onChange={(e) => setRegisterForm({...registerForm, cashback_rate: parseFloat(e.target.value) || 5})}
                     min="1"
                     max="20"
                     className="bg-slate-800/50 border-slate-700 text-white"
@@ -627,7 +627,7 @@ export default function SDMMerchantPage() {
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-white">
             <Users size={20} className="mb-2 opacity-70" />
-            <p className="text-2xl font-bold">{(merchant?.cashback_rate * 100)?.toFixed(0)}%</p>
+            <p className="text-2xl font-bold">{merchant?.cashback_rate?.toFixed(0) || 5}%</p>
             <p className="text-xs opacity-70">Cashback Rate</p>
           </div>
         </div>
@@ -708,7 +708,7 @@ export default function SDMMerchantPage() {
               {scanAmount && (
                 <div className="bg-emerald-50 rounded-lg p-4">
                   <p className="text-sm text-emerald-700">
-                    Customer will receive: <strong>GHS {(parseFloat(scanAmount) * merchant?.cashback_rate * 0.98).toFixed(2)}</strong> cashback
+                    Customer will receive: <strong>GHS {(parseFloat(scanAmount) * (merchant?.cashback_rate || 5) / 100 * 0.98).toFixed(2)}</strong> cashback
                   </p>
                 </div>
               )}
@@ -868,7 +868,7 @@ export default function SDMMerchantPage() {
                             </div>
                             <div>
                               <p className="text-slate-500">Cashback Rate</p>
-                              <p className="font-medium text-slate-900">{(txn.cashback_rate * 100).toFixed(1)}%</p>
+                              <p className="font-medium text-slate-900">{txn.cashback_rate?.toFixed(1)}%</p>
                             </div>
                             <div>
                               <p className="text-slate-500">Gross Cashback</p>
