@@ -6832,7 +6832,7 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         network=request.momo_provider,
         transaction_id=transaction_id,
         callback_url=callback_url,
-        reference=f"SDM {card_type['name']} Membership"
+        reference=f"SDM VIP {card_type['tier']}"  # Keep under 20 chars
     )
     
     if not payment_result.get("success"):

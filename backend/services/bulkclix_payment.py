@@ -10,6 +10,12 @@ import logging
 import uuid
 from typing import Optional, Dict, Any
 from enum import Enum
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+ROOT_DIR = Path(__file__).parent.parent
+load_dotenv(ROOT_DIR / '.env')
 
 # Configuration
 BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
