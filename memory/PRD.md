@@ -38,25 +38,39 @@ New panel in Admin Dashboard showing:
 ### Payment Methods
 | Method | Status | Notes |
 |--------|--------|-------|
-| Mobile Money | ✅ REAL | BulkClix API - Real payments |
-| Card Payment | ✅ SIMULATED | Bulkclix API (pending real credentials) |
+| Mobile Money | ✅ REAL | BulkClix API - Real payments with webhook confirmation |
+| Card Payment | ❌ Disabled | Not yet implemented - returns error |
 | Cash | ✅ COMPLETE | Client confirmation required |
 
-### Payment Flow
-1. **Client Scans Merchant QR** OR **Merchant Scans Client QR**
-2. Amount + Payment Method selected
-3. Split calculated (Cashback → SDM Commission → Client)
-4. For MoMo: Real collection via BulkClix API
-5. For Cash: Client must confirm via app notification
-6. Funds split: Client wallet credited (IMMEDIATELY), Merchant settled
+### Payment Flow (CORRECTED - March 3, 2026)
+**Le cashback n'est crédité qu'APRÈS l'approbation du paiement par le client.**
+
+1. **Client/Merchant initie le paiement**
+2. **Système envoie le prompt MoMo au client** (via BulkClix API)
+3. **Client reçoit le prompt sur son téléphone et approuve**
+4. **BulkClix envoie un webhook** avec `status: success`
+5. **Webhook traite le paiement:**
+   - Transfert MoMo au marchand
+   - Commission SDM enregistrée
+   - Cashback crédité au client (IMMÉDIATEMENT disponible)
+6. **Transaction marquée comme "completed"**
+
+### ⚠️ BUG CRITIQUE CORRIGÉ (Mars 3, 2026)
+L'ancien flux créditait le cashback SANS attendre l'approbation du client.
+**CORRIGÉ:** Les deux endpoints `/payments/initiate` et `/payments/merchant-initiate` 
+utilisent maintenant le vrai flux BulkClix et retournent `pending_customer_approval`.
+
+### Webhooks
+- `/api/sdm/payments/webhook/transaction` - Pour le flux `/merchant/transaction`
+- `/api/sdm/payments/webhook/legacy` - Pour le flux `/payments/initiate` et `/payments/merchant-initiate`
 
 ### Split Formula
 ```
 Amount: 1000 GHS @ 10% Cashback
 - Total Cashback: 100 GHS (10% of amount)
 - SDM Commission: 2-20 GHS (configurable 2-20% of cashback)
-- Client Receives: 80-98 GHS (immediately available)
-- Merchant Receives: 900 GHS
+- Client Receives: 80-98 GHS (immediately available AFTER approval)
+- Merchant Receives: 900 GHS (via MoMo transfer)
 ```
 
 ### Commission Configuration (Updated March 3, 2026)

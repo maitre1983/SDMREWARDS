@@ -2719,6 +2719,162 @@ async def transaction_payment_webhook(request: Request):
         logging.error(f"Transaction webhook error: {e}")
         return {"success": False, "error": str(e)}
 
+# ============== LEGACY PAYMENT WEBHOOK ==============
+
+@sdm_router.post("/payments/webhook/legacy")
+async def legacy_payment_webhook(request: Request):
+    """
+    Webhook for legacy payment flow (sdm_payments collection)
+    Called when customer approves MoMo payment initiated via /payments/initiate
+    
+    Flow after confirmation:
+    1. Mark payment as confirmed
+    2. Transfer to merchant MoMo
+    3. Credit SDM commission
+    4. Credit customer cashback
+    """
+    try:
+        data = await request.json()
+        logging.info(f"Legacy Payment webhook received: {data}")
+        
+        payment_id = data.get("transaction_id")  # BulkClix uses transaction_id
+        status = data.get("status", "").lower()
+        ext_transaction_id = data.get("ext_transaction_id")
+        
+        if not payment_id:
+            return {"success": False, "error": "Missing payment_id/transaction_id"}
+        
+        # Find payment in sdm_payments collection
+        payment = await db.sdm_payments.find_one({"id": payment_id}, {"_id": 0})
+        
+        if not payment:
+            logging.warning(f"Legacy payment not found: {payment_id}")
+            return {"success": False, "error": "Payment not found"}
+        
+        now = datetime.now(timezone.utc).isoformat()
+        
+        # Update with webhook data
+        await db.sdm_payments.update_one(
+            {"id": payment_id},
+            {"$set": {
+                "webhook_received": True,
+                "webhook_data": data,
+                "ext_transaction_id": ext_transaction_id,
+                "webhook_received_at": now
+            }}
+        )
+        
+        if status == "success":
+            # Process the full payment flow
+            await process_legacy_payment_confirmation(payment, ext_transaction_id)
+            return {"success": True, "message": "Payment processed successfully"}
+        elif status in ["failed", "declined", "cancelled"]:
+            await db.sdm_payments.update_one(
+                {"id": payment_id},
+                {"$set": {
+                    "status": "failed",
+                    "error_message": data.get("message", "Payment failed"),
+                    "failed_at": now
+                }}
+            )
+            return {"success": True, "message": "Payment marked as failed"}
+        
+        return {"success": True, "message": "Webhook received"}
+        
+    except Exception as e:
+        logging.error(f"Legacy payment webhook error: {e}")
+        return {"success": False, "error": str(e)}
+
+async def process_legacy_payment_confirmation(payment: dict, ext_transaction_id: str):
+    """
+    Process legacy payment after customer confirmation:
+    1. Mark as confirmed
+    2. Transfer to merchant MoMo
+    3. Record SDM commission
+    4. Credit customer cashback (IMMEDIATELY)
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    payment_id = payment["id"]
+    
+    # Step 1: Mark as confirmed/collected
+    await db.sdm_payments.update_one(
+        {"id": payment_id},
+        {"$set": {
+            "status": "confirmed",
+            "payment_confirmed_at": now
+        }}
+    )
+    logging.info(f"Legacy payment confirmed: {payment_id}")
+    
+    # Step 2: Transfer to merchant's MoMo
+    merchant = await db.sdm_merchants.find_one({"id": payment["merchant_id"]}, {"_id": 0})
+    settlement_result = None
+    
+    if merchant and merchant.get("momo_number") and merchant.get("momo_provider"):
+        settlement_ref = f"LSET_{payment_id[-10:]}"
+        
+        transfer_result = await bulkclix_payment_service.transfer_momo(
+            amount=payment["merchant_amount"],
+            account_number=merchant["momo_number"],
+            network=merchant["momo_provider"],
+            account_name=merchant.get("momo_account_name", merchant["business_name"]),
+            client_reference=settlement_ref
+        )
+        
+        settlement_result = {
+            "status": "completed" if transfer_result.get("success") else "failed",
+            "reference": settlement_ref,
+            "amount": payment["merchant_amount"],
+            "response": transfer_result.get("data"),
+            "error": transfer_result.get("error") if not transfer_result.get("success") else None
+        }
+        
+        logging.info(f"Legacy merchant settlement: {settlement_result['status']} - {payment['merchant_amount']} GHS")
+    
+    # Step 3: Record SDM commission
+    sdm_commission = payment["sdm_commission"]
+    await db.sdm_commissions.insert_one({
+        "id": str(uuid.uuid4()),
+        "transaction_id": payment_id,
+        "amount": sdm_commission,
+        "merchant_id": payment["merchant_id"],
+        "created_at": now,
+        "source": "legacy_payment"
+    })
+    logging.info(f"SDM commission recorded: {sdm_commission} GHS")
+    
+    # Step 4: Credit customer cashback - AVAILABLE IMMEDIATELY
+    client_id = payment["client_id"]
+    cashback_amount = payment["cashback_amount"]
+    
+    await db.sdm_users.update_one(
+        {"id": client_id},
+        {"$inc": {
+            "wallet_available": cashback_amount,
+            "total_earned": cashback_amount
+        }}
+    )
+    logging.info(f"Legacy customer cashback credited: {cashback_amount} GHS (immediately available)")
+    
+    # Step 5: Mark payment as completed
+    await db.sdm_payments.update_one(
+        {"id": payment_id},
+        {"$set": {
+            "status": "split_completed",
+            "split_completed_at": now,
+            "settlement_result": settlement_result,
+            "ext_transaction_id": ext_transaction_id
+        }}
+    )
+    
+    # Update merchant stats
+    await db.sdm_merchants.update_one(
+        {"id": payment["merchant_id"]},
+        {"$inc": {"total_transactions": 1, "total_cashback_given": cashback_amount}}
+    )
+    
+    logging.info(f"Legacy payment completed: {payment_id}")
+
 async def process_successful_transaction(pending: dict, ext_transaction_id: str):
     """
     Process successful customer payment:
@@ -3039,45 +3195,66 @@ async def initiate_payment(request: InitiatePaymentRequest, user: dict = Depends
             "split": split
         }
     
-    # For MoMo/Card payments - SIMULATED for now
+    # For MoMo/Card payments - REAL BulkClix integration
     if request.payment_method == "momo":
-        # In production: Call Bulkclix API to initiate MoMo collection
-        payment.status = "processing"
-        payment.bulkclix_ref = f"BCMOMO{secrets.token_hex(8).upper()}"
+        # Create pending payment record (waiting for customer approval)
+        payment.status = "pending"
         await db.sdm_payments.insert_one(payment.model_dump())
         
-        # SIMULATED: Auto-confirm after short delay (in production, webhook confirms)
-        # For demo purposes, we'll mark it as confirmed immediately
-        await process_payment_confirmation(payment.id)
+        # Initiate BulkClix MoMo collection
+        payer_phone = request.payer_phone or client["phone"]
+        payer_phone = payer_phone.replace("+233", "0").replace(" ", "")
+        payer_network = request.payer_network or detect_network_from_phone(payer_phone)
+        
+        callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/legacy"
+        
+        collection_result = await bulkclix_payment_service.collect_momo_payment(
+            amount=request.amount,
+            phone_number=payer_phone,
+            network=payer_network,
+            transaction_id=payment.id,
+            callback_url=callback_url,
+            reference=f"Pay {merchant['business_name'][:15]}"
+        )
+        
+        if not collection_result.get("success"):
+            # Payment initiation failed
+            await db.sdm_payments.update_one(
+                {"id": payment.id},
+                {"$set": {"status": "failed", "error": collection_result.get("error")}}
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payment initiation failed: {collection_result.get('error', 'Unknown error')}"
+            )
+        
+        # Update with BulkClix response
+        await db.sdm_payments.update_one(
+            {"id": payment.id},
+            {"$set": {
+                "bulkclix_ref": collection_result.get("data", {}).get("ext_transaction_id"),
+                "bulkclix_response": collection_result.get("data"),
+                "payment_initiated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
         
         return {
             "success": True,
             "payment_id": payment.id,
             "payment_ref": payment.payment_ref,
-            "bulkclix_ref": payment.bulkclix_ref,
-            "status": "confirmed",
-            "message": "Payment confirmed (SIMULATED)",
+            "status": "pending_customer_approval",
+            "message": "Payment prompt sent. Customer must approve on their phone.",
+            "instructions": "Customer will receive a MoMo prompt to approve the payment.",
             "split": split
         }
     
     elif request.payment_method == "card":
-        # In production: Call Bulkclix API to initiate card payment
-        payment.status = "processing"
-        payment.bulkclix_ref = f"BCCARD{secrets.token_hex(8).upper()}"
-        await db.sdm_payments.insert_one(payment.model_dump())
-        
-        # SIMULATED: Auto-confirm
-        await process_payment_confirmation(payment.id)
-        
-        return {
-            "success": True,
-            "payment_id": payment.id,
-            "payment_ref": payment.payment_ref,
-            "bulkclix_ref": payment.bulkclix_ref,
-            "status": "confirmed",
-            "message": "Payment confirmed (SIMULATED)",
-            "split": split
-        }
+        # Card payments - Not yet implemented in production
+        # Return error until card integration is available
+        raise HTTPException(
+            status_code=400,
+            detail="Card payments are not yet available. Please use Mobile Money."
+        )
 
 @sdm_router.post("/payments/merchant-initiate")
 async def merchant_initiate_payment(request: InitiatePaymentRequest, merchant: dict = Depends(get_current_merchant)):
@@ -3182,23 +3359,61 @@ async def merchant_initiate_payment(request: InitiatePaymentRequest, merchant: d
             "split": split
         }
     
-    # For MoMo/Card - SIMULATED
-    payment.status = "processing"
-    payment.bulkclix_ref = f"BC{request.payment_method.upper()}{secrets.token_hex(8).upper()}"
-    await db.sdm_payments.insert_one(payment.model_dump())
+    # For MoMo - Use real BulkClix integration
+    if request.payment_method == "momo":
+        payment.status = "pending"
+        await db.sdm_payments.insert_one(payment.model_dump())
+        
+        # Initiate BulkClix MoMo collection
+        payer_phone = request.payer_phone or client["phone"]
+        payer_phone = payer_phone.replace("+233", "0").replace(" ", "")
+        payer_network = request.payer_network or detect_network_from_phone(payer_phone)
+        
+        callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/legacy"
+        
+        collection_result = await bulkclix_payment_service.collect_momo_payment(
+            amount=request.amount,
+            phone_number=payer_phone,
+            network=payer_network,
+            transaction_id=payment.id,
+            callback_url=callback_url,
+            reference=f"Pay {merchant['business_name'][:15]}"
+        )
+        
+        if not collection_result.get("success"):
+            await db.sdm_payments.update_one(
+                {"id": payment.id},
+                {"$set": {"status": "failed", "error": collection_result.get("error")}}
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payment initiation failed: {collection_result.get('error', 'Unknown error')}"
+            )
+        
+        await db.sdm_payments.update_one(
+            {"id": payment.id},
+            {"$set": {
+                "bulkclix_ref": collection_result.get("data", {}).get("ext_transaction_id"),
+                "bulkclix_response": collection_result.get("data"),
+                "payment_initiated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "payment_id": payment.id,
+            "payment_ref": payment.payment_ref,
+            "status": "pending_customer_approval",
+            "message": "Payment prompt sent to customer's phone.",
+            "instructions": "Customer must approve the MoMo prompt to complete payment.",
+            "split": split
+        }
     
-    # SIMULATED: Auto-confirm
-    await process_payment_confirmation(payment.id)
-    
-    return {
-        "success": True,
-        "payment_id": payment.id,
-        "payment_ref": payment.payment_ref,
-        "bulkclix_ref": payment.bulkclix_ref,
-        "status": "confirmed",
-        "message": "Payment confirmed (SIMULATED)",
-        "split": split
-    }
+    elif request.payment_method == "card":
+        raise HTTPException(
+            status_code=400,
+            detail="Card payments are not yet available. Please use Mobile Money."
+        )
 
 async def process_payment_confirmation(payment_id: str):
     """Process payment confirmation and execute split"""
