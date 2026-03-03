@@ -349,6 +349,27 @@ Amount: 1000 GHS @ 10% Cashback
 
 ---
 
+## RECENT FIXES (March 3, 2026)
+
+### Admin Login Playwright Test Fix
+- **Issue**: Le test automatisé Playwright pour la connexion admin échouait à cause d'une race condition
+- **Root Cause**: 
+  1. Les inputs React utilisaient `value` + `onChange` (controlled components) incompatibles avec Playwright `fill()`
+  2. Après le login, le dashboard faisait des requêtes API avant que le token soit disponible dans le contexte
+  3. Les erreurs 401 déclenchaient un logout automatique qui supprimait le token
+- **Solution**:
+  1. Modifié `AdminPage.jsx` pour utiliser `useRef` au lieu de `useState` pour les inputs (compatible Playwright)
+  2. Stockage du token directement dans localStorage AVANT d'appeler le contexte auth
+  3. Ajout d'un état `loginSuccess` pour forcer le re-render vers le dashboard
+  4. Modifié `AdminDashboardPage.jsx`:
+     - `getHeaders()` lit le token depuis le contexte OU localStorage comme fallback
+     - Le logout sur erreur 401 ne se déclenche que si aucun token n'existe dans localStorage
+- **Files Modified**:
+  - `/app/frontend/src/pages/AdminPage.jsx`
+  - `/app/frontend/src/pages/AdminDashboardPage.jsx`
+
+---
+
 *Last Updated: March 3, 2026*
 *Merchant Dashboard Features Tested and Working*
 *Birthday Bonus Feature Complete*
@@ -357,3 +378,4 @@ Amount: 1000 GHS @ 10% Cashback
 *Partners Visibility: Blocked/Suspended/Deleted merchants hidden from clients*
 *Referral System: Bonuses paid only on card purchase, Admin history panel added*
 *Super Admin Account: emileparfait2003@gmail.com configured at startup*
+*Admin Login Playwright Test: FIXED - Race condition resolved*

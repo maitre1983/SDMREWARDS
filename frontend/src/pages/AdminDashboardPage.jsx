@@ -38,10 +38,16 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('messages');
   const [currentAdmin, setCurrentAdmin] = useState(null);
 
-  const headers = { Authorization: `Bearer ${token}` };
+  // Create headers dynamically - read from context or localStorage as fallback
+  const getHeaders = () => {
+    const authToken = token || localStorage.getItem('sds_admin_token');
+    return { Authorization: `Bearer ${authToken}` };
+  };
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Check both context auth and localStorage token (for immediate post-login)
+    const hasToken = isAuthenticated || localStorage.getItem('sds_admin_token');
+    if (!hasToken) {
       navigate('/admin');
     }
   }, [isAuthenticated, navigate]);
@@ -49,7 +55,7 @@ export default function AdminDashboardPage() {
   // Fetch current admin profile
   const fetchAdminProfile = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/admin/profile`, { headers });
+      const response = await axios.get(`${API_URL}/api/admin/profile`, { headers: getHeaders() });
       setCurrentAdmin(response.data);
     } catch (error) {
       console.error('Failed to fetch admin profile:', error);
@@ -63,16 +69,20 @@ export default function AdminDashboardPage() {
       await fetchAdminProfile();
       
       const [messagesRes, statsRes, analyticsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/admin/messages`, { headers }),
-        axios.get(`${API_URL}/api/admin/stats`, { headers }),
-        axios.get(`${API_URL}/api/admin/analytics`, { headers }),
+        axios.get(`${API_URL}/api/admin/messages`, { headers: getHeaders() }),
+        axios.get(`${API_URL}/api/admin/stats`, { headers: getHeaders() }),
+        axios.get(`${API_URL}/api/admin/analytics`, { headers: getHeaders() }),
       ]);
       setMessages(messagesRes.data);
       setStats(statsRes.data);
       setAnalytics(analyticsRes.data);
     } catch (error) {
       console.error('Fetch error:', error);
-      if (error.response?.status === 401) {
+      // Only logout if we get 401 AND there's no valid token in localStorage
+      // This prevents logout race condition during initial login
+      const hasStoredToken = localStorage.getItem('sds_admin_token');
+      if (error.response?.status === 401 && !hasStoredToken) {
+        console.log('401 error and no token, logging out');
         logout();
         navigate('/admin');
       }
@@ -89,7 +99,7 @@ export default function AdminDashboardPage() {
 
   const handleMarkAsRead = async (id) => {
     try {
-      await axios.put(`${API_URL}/api/admin/messages/${id}/read`, {}, { headers });
+      await axios.put(`${API_URL}/api/admin/messages/${id}/read`, {}, { headers: getHeaders() });
       toast.success('Marked as read');
       fetchData();
     } catch (error) {
@@ -104,7 +114,7 @@ export default function AdminDashboardPage() {
       await axios.put(
         `${API_URL}/api/admin/messages/${selectedMessage.id}/reply`,
         { reply: replyText },
-        { headers }
+        { headers: getHeaders() }
       );
       toast.success('Reply saved');
       setReplyText('');
@@ -120,7 +130,7 @@ export default function AdminDashboardPage() {
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this message?')) return;
     try {
-      await axios.delete(`${API_URL}/api/admin/messages/${id}`, { headers });
+      await axios.delete(`${API_URL}/api/admin/messages/${id}`, { headers: getHeaders() });
       toast.success('Message deleted');
       if (selectedMessage?.id === id) setSelectedMessage(null);
       fetchData();

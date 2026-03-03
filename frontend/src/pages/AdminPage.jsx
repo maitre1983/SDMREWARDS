@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Loader2, Lock } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,13 +15,14 @@ export default function AdminPage() {
   const { t } = useLanguage();
   const { token, isAuthenticated, login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [credentials, setCredentials] = useState({
-    username: '',
-    password: '',
-  });
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  
+  // Use refs for Playwright compatibility - reads actual DOM values
+  const usernameRef = useRef(null);
+  const passwordRef = useRef(null);
 
-  // If authenticated, show dashboard
-  if (isAuthenticated && token) {
+  // If authenticated OR just successfully logged in, show dashboard
+  if ((isAuthenticated && token) || loginSuccess) {
     return <AdminDashboardPage />;
   }
 
@@ -30,12 +31,28 @@ export default function AdminPage() {
     e.preventDefault();
     setIsLoading(true);
 
+    // Read values directly from DOM refs (Playwright compatible)
+    const username = usernameRef.current?.value || '';
+    const password = passwordRef.current?.value || '';
+
+    if (!username || !password) {
+      toast.error('Please fill in all fields');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post(`${API_URL}/api/admin/login`, credentials);
-      login(response.data.access_token);
+      const response = await axios.post(`${API_URL}/api/admin/login`, { username, password });
+      
+      // Store token directly in localStorage FIRST to ensure it's available immediately
+      const accessToken = response.data.access_token;
+      localStorage.setItem('sds_admin_token', accessToken);
+      
+      // Then update context
+      login(accessToken);
       toast.success('Login successful');
-      // Force reload to show dashboard
-      window.location.reload();
+      // Trigger re-render to show dashboard
+      setLoginSuccess(true);
     } catch (error) {
       console.error('Login error:', error);
       toast.error('Invalid credentials');
@@ -76,9 +93,9 @@ export default function AdminPage() {
               Email
             </label>
             <Input
+              ref={usernameRef}
               type="text"
-              value={credentials.username}
-              onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+              name="username"
               required
               placeholder="emileparfait2003@gmail.com"
               className="h-12 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 rounded-xl focus:border-blue-500"
@@ -91,9 +108,9 @@ export default function AdminPage() {
               {t('admin_password') || 'Password'}
             </label>
             <Input
+              ref={passwordRef}
               type="password"
-              value={credentials.password}
-              onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+              name="password"
               required
               placeholder="••••••••"
               className="h-12 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 rounded-xl focus:border-blue-500"
