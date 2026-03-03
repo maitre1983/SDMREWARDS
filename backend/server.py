@@ -422,7 +422,7 @@ class SDMMerchant(BaseModel):
     address: Optional[str] = None
     gps_address: Optional[str] = None  # GPS coordinates or Plus Code
     city: str = "Accra"
-    cashback_rate: float = 0.05  # 5% default
+    cashback_rate: float = 5.0  # Percentage (5.0 means 5%)
     api_key: str = Field(default_factory=lambda: f"sdk_{secrets.token_hex(16)}")
     api_secret: str = Field(default_factory=lambda: secrets.token_hex(32))
     is_active: bool = True
@@ -566,7 +566,7 @@ class MerchantRegisterRequest(BaseModel):
     address: Optional[str] = None
     gps_address: Optional[str] = None
     city: str = "Accra"
-    cashback_rate: float = 0.05
+    cashback_rate: float = 5.0  # Percentage (5.0 = 5%)
 
 class MerchantLoginRequest(BaseModel):
     phone: str
