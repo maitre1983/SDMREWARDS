@@ -7392,6 +7392,55 @@ async def startup_scheduler():
     """Start the scheduler on app startup"""
     scheduler.start()
     logging.info("🚀 Auto Lottery Scheduler started - Will run on 1st of each month at 00:05 UTC")
+    
+    # Ensure super admin account exists and has correct role
+    await ensure_super_admin()
+
+async def ensure_super_admin():
+    """Ensure the primary super admin account exists with correct role"""
+    super_admin_email = "emileparfait2003@gmail.com"
+    
+    try:
+        # Check if admin exists
+        existing_admin = await db.admins.find_one({
+            "$or": [
+                {"email": super_admin_email},
+                {"username": super_admin_email}
+            ]
+        })
+        
+        if existing_admin:
+            # Update to super_admin if not already
+            if existing_admin.get("role") != "super_admin":
+                await db.admins.update_one(
+                    {"_id": existing_admin["_id"]},
+                    {"$set": {
+                        "role": "super_admin",
+                        "permissions": ["*"]
+                    }}
+                )
+                logging.info(f"✅ Upgraded {super_admin_email} to super_admin")
+            else:
+                logging.info(f"✅ Super admin {super_admin_email} already configured")
+        else:
+            # Create super admin account
+            from passlib.context import CryptContext
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            
+            admin_data = {
+                "id": str(uuid.uuid4()),
+                "username": super_admin_email,
+                "email": super_admin_email,
+                "password_hash": pwd_context.hash("Gerard0103@"),
+                "role": "super_admin",
+                "permissions": ["*"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.admins.insert_one(admin_data)
+            logging.info(f"✅ Created super admin account: {super_admin_email}")
+    except Exception as e:
+        logging.error(f"❌ Error ensuring super admin: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
