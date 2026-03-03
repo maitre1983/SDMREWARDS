@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Wallet, QrCode, ArrowLeft, Phone, Loader2, 
-  Send, History, DollarSign, ArrowDownToLine, CheckCircle2,
+  Send, History, DollarSign, ArrowDownToLine, CheckCircle2, CheckCircle,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
   Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket,
-  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X
+  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X, Clock
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
+import { QRCodeSVG } from 'qrcode.react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
@@ -35,6 +36,7 @@ export default function SDMClientPage() {
   const [transactions, setTransactions] = useState([]);
   const [referralData, setReferralData] = useState(null);
   const [referralPeriod, setReferralPeriod] = useState('all');
+  const [showReferralQR, setShowReferralQR] = useState(false);
   const [activeTab, setActiveTab] = useState('wallet');
   const [availableCards, setAvailableCards] = useState([]);
   const [userMemberships, setUserMemberships] = useState([]);
@@ -2071,8 +2073,14 @@ export default function SDMClientPage() {
           </div>
         )}
 
-        {activeTab === 'referral' && referralData && (
+        {activeTab === 'referral' && (
           <div className="space-y-4">
+            {!referralData ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+            <>
             {/* Referral Card */}
             <div className="bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl p-6 text-white">
               <div className="flex items-center gap-3 mb-4">
@@ -2088,6 +2096,37 @@ export default function SDMClientPage() {
               <div className="bg-white/10 rounded-xl p-4 mb-4">
                 <p className="text-xs opacity-70 mb-1">Your Referral Code</p>
                 <p className="text-2xl font-mono font-bold">{referralData.referral_code}</p>
+              </div>
+              
+              {/* QR Code Section */}
+              <div className="mb-4">
+                <button
+                  onClick={() => setShowReferralQR(!showReferralQR)}
+                  className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  <QrCode size={18} />
+                  {showReferralQR ? 'Hide QR Code' : 'Show QR Code'}
+                </button>
+                
+                {showReferralQR && (
+                  <div className="mt-4 bg-white rounded-xl p-4 flex flex-col items-center">
+                    <QRCodeSVG 
+                      value={`${window.location.origin}/sdm/client?ref=${referralData.referral_code}`}
+                      size={180}
+                      level="H"
+                      includeMargin={true}
+                      imageSettings={{
+                        src: LOGO_URL,
+                        height: 30,
+                        width: 30,
+                        excavate: true,
+                      }}
+                    />
+                    <p className="text-xs text-slate-500 mt-2 text-center">
+                      Scan this QR code to join SDM with your referral code
+                    </p>
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-2">
@@ -2210,6 +2249,8 @@ export default function SDMClientPage() {
                   ))}
                 </div>
               </div>
+            )}
+            </>
             )}
           </div>
         )}

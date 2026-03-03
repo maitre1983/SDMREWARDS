@@ -83,6 +83,46 @@ Amount: 1000 GHS @ 10% Cashback
 
 ---
 
+### Referral QR Code (NEW - March 3, 2026)
+- Each user has a scannable QR code containing their referral link
+- QR code visible via "Show QR Code" button in the Invite tab
+- When scanned, opens the SDM registration page with the referral code pre-filled
+- Uses `qrcode.react` library with SDM logo embedded
+
+---
+
+## BACKEND REFACTORING (P0 - Planned)
+
+### Current State
+- `server.py`: **7600+ lines** (monolithic)
+- Existing router files: `/app/backend/routers/` (mostly placeholders)
+
+### Target Architecture
+```
+/app/backend/
+├── server.py           # Main app, imports routers
+├── models/             # Pydantic models
+├── routers/
+│   ├── auth.py         # OTP, login, register
+│   ├── users.py        # User profile, wallet, transactions
+│   ├── merchants.py    # Merchant dashboard, settings
+│   ├── payments.py     # MoMo, Card, Cash payments
+│   ├── admin.py        # Admin controls
+│   ├── vip.py          # VIP cards, lottery
+│   └── services.py     # Airtime, data, bills
+└── services/
+    ├── bulkclix.py     # OTP & Payment service
+    └── ledger.py       # Financial ledger
+```
+
+### Migration Strategy
+1. Create models package with shared Pydantic models
+2. Migrate routes one section at a time
+3. Test each migration before proceeding
+4. Keep server.py functional during migration
+
+---
+
 ## ADMIN CONTROLS (Phase 2 - COMPLETE)
 
 ### Client Controls
