@@ -125,8 +125,18 @@ Amount: 1000 GHS @ 10% Cashback
 ### Progress
 - `server.py`: 7658 → 7565 lines (-93 lines, ~1.2% reduction)
 - New files created:
-  - `/app/backend/utils/helpers.py`
-  - `/app/backend/config.py`
+  - `/app/backend/utils/helpers.py` - Utility functions
+  - `/app/backend/config.py` - Configuration constants
+- Frontend:
+  - `/app/frontend/src/components/admin/MessagesPanel.jsx` - Messages with Promos & Notifications
+  - `/app/frontend/src/App.js` - Fixed admin routing
+
+### Dashboard Reorganization (March 3, 2026)
+- **Moved to Messages Panel**:
+  - Inbox (messages)
+  - Promotions 
+  - Notifications
+- **Fintech Ledger** now focuses on financial features only
 
 ---
 
