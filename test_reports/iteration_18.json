@@ -1,0 +1,78 @@
+{
+  "summary": "Testing of Merchant Delete and Admin Features completed successfully. Backend: 12/12 tests passed (100%). Frontend: All UI components verified working.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Clients & Marchands Panel",
+        "issues": ["HTML hydration warning: <tr> and <span> as children of <tbody> - React console warning but does not affect functionality"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_merchant_delete_admin_features.py",
+    "/app/test_reports/pytest/merchant_delete_admin_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_merchant_delete_admin_features.py - New test file for merchant delete and admin features"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 tests passed)",
+    "frontend": "100% (all UI components verified)"
+  },
+  "seed_data_creation": "Used existing merchants for testing. Merchants 'Test Restaurant' and 'Push Test Merchant' already marked as deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All requested features working correctly. Merchant delete action works via POST /api/sdm/admin/merchants/{id}/control with action='delete'. Deleted/blocked/suspended merchants filtered from public partners list. Admin Management panel shows 'Create Admin' button for super admins.",
+  "tested_features": {
+    "backend_apis": [
+      "POST /api/sdm/admin/merchants/{id}/control (action='delete') - PASS (Super Admin only, returns 403 for normal admin)",
+      "GET /api/sdm/partners - PASS (filters out blocked/suspended/deleted merchants)",
+      "GET /api/admin/profile - PASS (returns admin role and permissions)",
+      "GET /api/admin/list - PASS (super_admin only, excludes password_hash)",
+      "POST /api/admin/create - PASS (creates admin with role)",
+      "GET /api/admin/roles - PASS (returns available roles)"
+    ],
+    "frontend_ui": [
+      "Clients & Marchands Panel - Tabs working (Clients/Marchands/Action Logs)",
+      "Merchant Modal - 'Supprimer le Marchand' button visible with '(Réservé aux Super Admins)' note",
+      "Admin & Security Panel - 'Create Admin' button visible for Super Admin",
+      "Create New Admin Modal - All fields present (Username, Email, Password, Role)",
+      "Merchant table shows proper Status badges (Active, Deleted, Blocked, Cash Off)"
+    ]
+  },
+  "verified_requirements": {
+    "super_admin_can_delete_merchant": "PASS - action='delete' in merchant control endpoint works",
+    "deleted_merchants_hidden_from_partners": "PASS - is_deleted filter applied in GET /api/sdm/partners",
+    "blocked_merchants_hidden_from_partners": "PASS - is_blocked filter applied in GET /api/sdm/partners",
+    "suspended_merchants_hidden_from_partners": "PASS - is_suspended filter applied in GET /api/sdm/partners",
+    "create_admin_button_visible": "PASS - visible in Admin & Security panel for super admins",
+    "create_admin_modal_works": "PASS - modal has all required fields",
+    "delete_button_in_merchant_modal": "PASS - 'Supprimer le Marchand' button visible at bottom of modal",
+    "normal_admin_cannot_delete": "PASS - returns 403 Forbidden for non-super_admin role"
+  },
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "test_credentials": {
+    "super_admin": {
+      "email": "emileparfait2003@gmail.com",
+      "password": "Gerard0103@"
+    },
+    "test_admin": {
+      "username": "test_admin",
+      "email": "test@sdm.com",
+      "password": "TestAdmin123",
+      "role": "admin"
+    },
+    "admin_url": "/admin030326"
+  }
+}

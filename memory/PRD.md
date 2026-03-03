@@ -82,6 +82,12 @@ Amount: 1000 GHS @ 10% Cashback
 | Update Cash Limit | Set max negative balance | ✅ |
 | Update Grace Period | Days before auto-block | ✅ |
 | Update Max Cash Rate | Max cashback % for cash | ✅ |
+| **Delete** | **Soft delete merchant (Super Admin only)** | ✅ |
+
+### Partners Visibility Rules
+- Blocked, suspended, or deleted merchants are **automatically hidden** from the public partners list
+- Clients will no longer see these merchants in their Partners tab
+- This filter applies to `/api/sdm/partners` endpoint
 
 ### Action Logs
 - All admin actions logged with timestamp
@@ -263,3 +269,6 @@ Amount: 1000 GHS @ 10% Cashback
 *Last Updated: March 3, 2026*
 *Merchant Dashboard Features Tested and Working*
 *Birthday Bonus Feature Complete*
+*Admin Management Panel: Create/Delete Admins, Change Passwords*
+*Merchant Delete Feature: Super Admin can delete merchants*
+*Partners Visibility: Blocked/Suspended/Deleted merchants hidden from clients*

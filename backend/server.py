@@ -3281,6 +3281,18 @@ async def admin_control_merchant(merchant_id: str, request: AdminMerchantControl
         }
     elif request.action == "toggle_cash_mode":
         updates = {"cash_mode_enabled": not merchant.get("cash_mode_enabled", True)}
+    elif request.action == "delete":
+        # Soft delete the merchant - requires super_admin role
+        admin_role = admin.get("role", "admin")
+        if admin_role != "super_admin":
+            raise HTTPException(status_code=403, detail="Only super admin can delete merchants")
+        updates = {
+            "is_deleted": True,
+            "is_active": False,
+            "deleted_at": now,
+            "deleted_by": admin.get("email", "admin"),
+            "delete_reason": request.reason
+        }
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {request.action}")
     
@@ -6077,8 +6089,15 @@ async def get_public_partners(category: Optional[str] = None, city: Optional[str
     # Get partners from partners collection
     partners = await db.sdm_partners.find(query, {"_id": 0}).sort("name", 1).to_list(500)
     
-    # Also get verified merchants
-    merchant_query = {"is_verified": True}
+    # Also get verified merchants - exclude blocked, suspended and deleted
+    merchant_query = {
+        "is_verified": True,
+        "$and": [
+            {"$or": [{"is_blocked": {"$exists": False}}, {"is_blocked": False}]},
+            {"$or": [{"is_suspended": {"$exists": False}}, {"is_suspended": False}]},
+            {"$or": [{"is_deleted": {"$exists": False}}, {"is_deleted": False}]}
+        ]
+    }
     if category:
         merchant_query["business_category"] = category
     if city:

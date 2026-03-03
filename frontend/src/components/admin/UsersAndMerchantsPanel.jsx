@@ -336,14 +336,14 @@ export default function UsersAndMerchantsPanel({ token }) {
                   </tr>
                 ) : (
                   filteredMerchants.map((merchant) => (
-                    <tr key={merchant.id} className={`hover:bg-slate-50 ${merchant.is_blocked || merchant.is_suspended ? 'bg-red-50' : ''}`}>
+                    <tr key={merchant.id} className={`hover:bg-slate-50 ${merchant.is_deleted ? 'bg-slate-100' : merchant.is_blocked || merchant.is_suspended ? 'bg-red-50' : ''}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            merchant.is_blocked ? 'bg-red-100' : merchant.is_suspended ? 'bg-amber-100' : 'bg-cyan-100'
+                            merchant.is_deleted ? 'bg-slate-200' : merchant.is_blocked ? 'bg-red-100' : merchant.is_suspended ? 'bg-amber-100' : 'bg-cyan-100'
                           }`}>
                             <Store size={14} className={`${
-                              merchant.is_blocked ? 'text-red-600' : merchant.is_suspended ? 'text-amber-600' : 'text-cyan-600'
+                              merchant.is_deleted ? 'text-slate-500' : merchant.is_blocked ? 'text-red-600' : merchant.is_suspended ? 'text-amber-600' : 'text-cyan-600'
                             }`} />
                           </div>
                           <div>
@@ -365,7 +365,11 @@ export default function UsersAndMerchantsPanel({ token }) {
                         GHS {merchant.cash_debit_limit || 5000}
                       </td>
                       <td className="px-4 py-3">
-                        {merchant.is_blocked ? (
+                        {merchant.is_deleted ? (
+                          <span className="px-2 py-1 text-xs rounded-full bg-slate-200 text-slate-700 flex items-center gap-1 w-fit">
+                            <Trash2 size={12} /> Deleted
+                          </span>
+                        ) : merchant.is_blocked ? (
                           <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 flex items-center gap-1 w-fit">
                             <Ban size={12} /> Blocked
                           </span>
@@ -457,6 +461,7 @@ export default function UsersAndMerchantsPanel({ token }) {
                           log.action === 'unblock' ? 'bg-emerald-100 text-emerald-700' :
                           log.action === 'suspend' ? 'bg-amber-100 text-amber-700' :
                           log.action === 'freeze_wallet' ? 'bg-blue-100 text-blue-700' :
+                          log.action === 'delete' ? 'bg-slate-200 text-slate-700' :
                           'bg-slate-100 text-slate-700'
                         }`}>
                           {log.action}
@@ -689,6 +694,7 @@ export default function UsersAndMerchantsPanel({ token }) {
                 <p className="text-sm text-slate-500">{selectedMerchant.phone} • {selectedMerchant.business_type}</p>
                 <div className="mt-2 flex gap-2 flex-wrap">
                   {selectedMerchant.is_verified && <span className="px-2 py-1 text-xs rounded bg-emerald-100 text-emerald-700">Verified</span>}
+                  {selectedMerchant.is_deleted && <span className="px-2 py-1 text-xs rounded bg-slate-200 text-slate-700">Deleted</span>}
                   {selectedMerchant.is_blocked && <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-700">Blocked</span>}
                   {selectedMerchant.is_suspended && <span className="px-2 py-1 text-xs rounded bg-amber-100 text-amber-700">Suspended</span>}
                   {!selectedMerchant.cash_mode_enabled && <span className="px-2 py-1 text-xs rounded bg-slate-100 text-slate-600">Cash Mode Off</span>}
@@ -821,6 +827,25 @@ export default function UsersAndMerchantsPanel({ token }) {
                 >
                   <Save size={16} /> Save Cash Settings
                 </Button>
+              </div>
+              
+              {/* Delete Merchant (Super Admin Only) */}
+              <div className="pt-4 border-t border-slate-200">
+                <Button 
+                  variant="outline" 
+                  className="w-full gap-2 border-red-200 text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce marchand ? Cette action ne peut pas être annulée et le marchand ne sera plus visible pour les clients.')) {
+                      handleMerchantAction('delete');
+                    }
+                  }}
+                  data-testid="delete-merchant-btn"
+                >
+                  <Trash2 size={16} /> Supprimer le Marchand
+                </Button>
+                <p className="text-xs text-slate-500 mt-2 text-center">
+                  (Réservé aux Super Admins)
+                </p>
               </div>
             </div>
           </div>
