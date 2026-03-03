@@ -7,6 +7,56 @@
 
 ---
 
+## PAYMENT SYSTEM (Phase 1 - COMPLETE)
+
+### Payment Methods
+| Method | Status | Notes |
+|--------|--------|-------|
+| Mobile Money | ✅ SIMULATED | Bulkclix API (pending real credentials) |
+| Card Payment | ✅ SIMULATED | Bulkclix API (pending real credentials) |
+| Cash | ✅ COMPLETE | Client confirmation required |
+
+### Payment Flow
+1. **Client Scans Merchant QR** OR **Merchant Scans Client QR**
+2. Amount + Payment Method selected
+3. Split calculated (Cashback → SDM Commission → Client)
+4. For MoMo/Card: SIMULATED auto-confirmation
+5. For Cash: Client must confirm via app notification
+6. Funds split: Client wallet credited, Merchant settled
+
+### Split Formula
+```
+Amount: 1000 GHS @ 10% Cashback
+- Total Cashback: 100 GHS (10% of amount)
+- SDM Commission: 10 GHS (10% of cashback)
+- Client Receives: 90 GHS
+- Merchant Receives: 900 GHS
+```
+
+### Merchant Settlement Configuration
+- **Mobile Money**: Network (MTN/Vodafone/AirtelTigo) + Phone
+- **Bank Account**: Bank Name + Account Number + Account Name
+- **Settlement Mode**: Instant or Daily batch
+
+### Cash Debit System
+- Merchants have a "Cash Debit Balance" (can go negative)
+- Default limit: 5000 GHS
+- Grace period before blocking: 3 days
+- Daily job at 00:00 UTC checks balances
+
+### APIs Implemented
+- `POST /api/sdm/payments/initiate` - Client initiates payment
+- `POST /api/sdm/payments/merchant-initiate` - Merchant initiates payment
+- `POST /api/sdm/payments/confirm-cash` - Client confirms cash payment
+- `GET /api/sdm/payments/pending` - Client pending payments
+- `GET /api/sdm/payments/history` - Client payment history
+- `GET /api/sdm/merchant/payments` - Merchant payment history
+- `GET /api/sdm/merchant/qr-code` - Merchant QR code
+- `GET /api/sdm/merchant/cash-balance` - Merchant cash balance
+- `POST /api/sdm/payments/webhook/bulkclix` - Webhook endpoint
+
+---
+
 ## BACKEND ARCHITECTURE (Refactored)
 
 ### Directory Structure
