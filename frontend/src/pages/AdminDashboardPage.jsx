@@ -253,6 +253,18 @@ export default function AdminDashboardPage() {
             <Gift size={18} />
             <span>Referral History</span>
           </button>
+          
+          {/* SDM Commissions - Only visible to super_admin */}
+          {currentAdmin?.role === 'super_admin' && (
+            <button
+              onClick={() => setActiveTab('sdm-commissions')}
+              data-testid="sdm-commissions-tab"
+              className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'sdm-commissions' ? 'active' : ''}`}
+            >
+              <DollarSign size={18} />
+              <span>Commissions SDM</span>
+            </button>
+          )}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800">
@@ -443,6 +455,10 @@ export default function AdminDashboardPage() {
 
           {activeTab === 'referrals' && (
             <ReferralHistoryPanel token={token} />
+          )}
+
+          {activeTab === 'sdm-commissions' && (
+            <SDMCommissionsPanel token={token} currentAdmin={currentAdmin} />
           )}
         </div>
       </main>

@@ -140,5 +140,7 @@ DEFAULT_SDM_CONFIG = {
     "sms_provider": "bulkclix",
     "lottery_enabled": True,
     "birthday_bonus_enabled": True,
-    "birthday_bonus_amount": 5.0
+    "birthday_bonus_amount": 5.0,
+    "sdm_commission_rate": SDM_COMMISSION_RATE,  # Configurable commission rate (0.5% to 20%)
+    "cashback_pending_days": 0  # Immediate cashback (was 7 days)
 }

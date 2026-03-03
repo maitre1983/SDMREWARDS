@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   DollarSign, ArrowUpRight, Wallet, RefreshCw, Send,
-  TrendingUp, History, CheckCircle, XCircle, Clock
+  TrendingUp, History, CheckCircle, XCircle, Clock,
+  Settings, Percent
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -21,11 +22,18 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
     momo_provider: 'MTN',
     account_name: ''
   });
+  
+  // Commission rate state
+  const [commissionRate, setCommissionRate] = useState(null);
+  const [newRate, setNewRate] = useState('');
+  const [isUpdatingRate, setIsUpdatingRate] = useState(false);
+  const [showRateForm, setShowRateForm] = useState(false);
 
   const headers = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
     fetchCommissions();
+    fetchCommissionRate();
   }, []);
 
   const fetchCommissions = async () => {
@@ -38,6 +46,36 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
       toast.error('Erreur de chargement des commissions');
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const fetchCommissionRate = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/sdm/admin/commission-rate`, { headers });
+      setCommissionRate(res.data.rate_percentage);
+      setNewRate(res.data.rate_percentage.toString());
+    } catch (error) {
+      console.error('Error fetching commission rate:', error);
+    }
+  };
+  
+  const handleUpdateRate = async () => {
+    const rate = parseFloat(newRate);
+    if (isNaN(rate) || rate < 0.5 || rate > 20) {
+      toast.error('Le taux doit être entre 0.5% et 20%');
+      return;
+    }
+    
+    try {
+      setIsUpdatingRate(true);
+      const res = await axios.put(`${API_URL}/api/sdm/admin/commission-rate`, { rate }, { headers });
+      toast.success(res.data.message);
+      setCommissionRate(rate);
+      setShowRateForm(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur de mise à jour');
+    } finally {
+      setIsUpdatingRate(false);
     }
   };
 
@@ -155,6 +193,68 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
           <p className="text-sm opacity-80 mt-1">Solde disponible</p>
         </div>
       </div>
+
+      {/* Commission Rate Configuration */}
+      {currentAdmin?.role === 'super_admin' && (
+        <div className="bg-white rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Settings size={20} className="text-slate-600" />
+              <h3 className="font-semibold text-lg">Taux de Commission SDM</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg">
+                <Percent size={18} className="text-purple-600" />
+                <span className="text-xl font-bold text-slate-900">{commissionRate ?? '...'} %</span>
+              </div>
+              {!showRateForm && (
+                <Button
+                  onClick={() => setShowRateForm(true)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Modifier
+                </Button>
+              )}
+            </div>
+          </div>
+          
+          {showRateForm && (
+            <div className="mt-4 p-4 bg-slate-50 rounded-lg space-y-4">
+              <p className="text-sm text-slate-600">
+                Définissez le taux de commission prélevé sur chaque cashback (entre 0.5% et 20%)
+              </p>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1">Nouveau taux (%)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.5"
+                    max="20"
+                    value={newRate}
+                    onChange={(e) => setNewRate(e.target.value)}
+                    placeholder="Ex: 2.5"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex gap-2 pt-6">
+                  <Button
+                    onClick={handleUpdateRate}
+                    disabled={isUpdatingRate}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {isUpdatingRate ? <RefreshCw className="animate-spin" size={16} /> : 'Enregistrer'}
+                  </Button>
+                  <Button onClick={() => { setShowRateForm(false); setNewRate(commissionRate?.toString() || ''); }} variant="outline">
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Withdraw Button */}
       {currentAdmin?.role === 'super_admin' && (

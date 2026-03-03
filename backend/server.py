@@ -4207,6 +4207,47 @@ async def admin_withdraw_commission(request: SDMCommissionWithdrawRequest, admin
             detail=f"Transfer failed: {transfer_result.get('error')}"
         )
 
+# ============== SDM COMMISSION RATE CONFIGURATION ==============
+
+class UpdateCommissionRateRequest(BaseModel):
+    rate: float  # Rate in percentage (0.5 to 20)
+
+@sdm_router.put("/admin/commission-rate")
+async def admin_update_commission_rate(request: UpdateCommissionRateRequest, admin: dict = Depends(get_current_admin)):
+    """Super Admin: Update SDM commission rate (0.5% to 20%)"""
+    # Only super_admin can change commission rate
+    if admin.get("role") != "super_admin":
+        raise HTTPException(status_code=403, detail="Only Super Admin can change commission rate")
+    
+    # Validate rate range
+    if request.rate < 0.5 or request.rate > 20:
+        raise HTTPException(status_code=400, detail="Commission rate must be between 0.5% and 20%")
+    
+    # Convert percentage to decimal for storage
+    rate_decimal = request.rate / 100
+    
+    # Update config
+    await update_sdm_config({"sdm_commission_rate": rate_decimal})
+    
+    return {
+        "success": True,
+        "message": f"Commission rate updated to {request.rate}%",
+        "new_rate": request.rate,
+        "rate_decimal": rate_decimal
+    }
+
+@sdm_router.get("/admin/commission-rate")
+async def admin_get_commission_rate(admin: dict = Depends(get_current_admin)):
+    """Admin: Get current SDM commission rate"""
+    config = await get_sdm_config()
+    rate_decimal = config.get("sdm_commission_rate", SDM_COMMISSION_RATE)
+    rate_percentage = rate_decimal * 100
+    
+    return {
+        "rate_percentage": round(rate_percentage, 2),
+        "rate_decimal": rate_decimal
+    }
+
 @sdm_router.get("/admin/withdrawals")
 async def admin_get_withdrawals(admin: dict = Depends(get_current_admin), status: Optional[str] = None):
     """Admin: Get withdrawal requests"""
@@ -4437,7 +4478,8 @@ async def external_create_transaction(
     cashback_amount = amount * (merchant["cashback_rate"] / 100)
     sdm_commission = cashback_amount * SDM_COMMISSION_RATE
     net_cashback = cashback_amount - sdm_commission
-    available_date = (datetime.now(timezone.utc) + timedelta(days=CASHBACK_PENDING_DAYS)).isoformat()
+    # Cashback available immediately (no pending period)
+    available_date = datetime.now(timezone.utc).isoformat()
     
     # Create transaction
     transaction = SDMTransaction(
@@ -4454,10 +4496,10 @@ async def external_create_transaction(
     )
     await db.sdm_transactions.insert_one(transaction.model_dump())
     
-    # Update user wallet
+    # Update user wallet - IMMEDIATELY available
     await db.sdm_users.update_one(
         {"id": user["id"]},
-        {"$inc": {"wallet_pending": net_cashback, "total_earned": net_cashback}}
+        {"$inc": {"wallet_available": net_cashback, "total_earned": net_cashback}}
     )
     
     # Update merchant stats
