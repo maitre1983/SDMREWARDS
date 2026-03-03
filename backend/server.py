@@ -1723,7 +1723,7 @@ async def register_client(request: ClientRegisterRequest):
         birth_date=request.birth_date
     )
     
-    # Handle referral
+    # Handle referral - only store referred_by, bonuses paid on card purchase
     referral_code = request.referral_code
     if not referral_code:
         # Check temp storage
@@ -1735,45 +1735,14 @@ async def register_client(request: ClientRegisterRequest):
         referrer = await db.sdm_users.find_one({"referral_code": referral_code.upper()}, {"_id": 0})
         if referrer and referrer["phone"] != phone:
             new_user.referred_by = referrer["id"]
-            
-            # Give welcome bonus to new user
-            new_user.wallet_available = REFERRAL_WELCOME_BONUS
-            new_user.total_earned = REFERRAL_WELCOME_BONUS
-            
-            # Record welcome bonus
-            welcome_bonus = ReferralBonus(
-                referrer_id=referrer["id"],
-                referred_id=new_user.id,
-                referred_phone=phone,
-                bonus_type="welcome_bonus",
-                amount=REFERRAL_WELCOME_BONUS
-            )
-            await db.referral_bonuses.insert_one(welcome_bonus.model_dump())
-            
-            # Give bonus to referrer
-            await db.sdm_users.update_one(
-                {"id": referrer["id"]},
-                {
-                    "$inc": {
-                        "wallet_available": REFERRAL_BONUS,
-                        "total_earned": REFERRAL_BONUS,
-                        "referral_bonus_earned": REFERRAL_BONUS,
-                        "referral_count": 1
-                    }
-                }
-            )
-            
-            # Record referrer bonus
-            referrer_bonus = ReferralBonus(
-                referrer_id=referrer["id"],
-                referred_id=new_user.id,
-                referred_phone=phone,
-                bonus_type="referrer_bonus",
-                amount=REFERRAL_BONUS
-            )
-            await db.referral_bonuses.insert_one(referrer_bonus.model_dump())
+            # NO bonus given at registration - will be given when membership card is purchased
     
-    await db.sdm_users.insert_one(new_user.model_dump())
+    # Set membership status as pending (will be active after card purchase)
+    new_user_data = new_user.model_dump()
+    new_user_data["membership_status"] = "pending"  # pending, active
+    new_user_data["membership_confirmed_at"] = None
+    
+    await db.sdm_users.insert_one(new_user_data)
     
     # Automatically create client wallet in ledger
     try:
@@ -1789,13 +1758,15 @@ async def register_client(request: ClientRegisterRequest):
     
     user_data = new_user.model_dump()
     del user_data["password_hash"]
+    user_data["membership_status"] = "pending"
     
     return {
-        "message": "Registration successful",
+        "message": "Registration successful. Please purchase a membership card to activate your account.",
         "access_token": token,
         "token_type": "bearer",
         "user": user_data,
-        "welcome_bonus": REFERRAL_WELCOME_BONUS if new_user.referred_by else 0
+        "membership_status": "pending",
+        "referral_bonus_pending": REFERRAL_WELCOME_BONUS if new_user.referred_by else 0
     }
 
 @sdm_router.post("/auth/login")
@@ -6671,11 +6642,25 @@ async def get_my_vip_membership(user: dict = Depends(get_current_user)):
 
 class PurchaseVIPCardRequest(BaseModel):
     card_type_id: str
+    payment_method: str = "momo"  # "momo" or "card" only (no cash)
+    momo_number: Optional[str] = None  # For MoMo payments
+    momo_provider: Optional[str] = None  # MTN, Vodafone, AirtelTigo
 
 @sdm_router.post("/user/vip-cards/purchase")
 async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depends(get_current_user)):
-    """User: Purchase or upgrade VIP card using cashback balance"""
+    """User: Purchase membership card using Mobile Money or Card (required to activate account)"""
     from ledger import EntityType
+    
+    # Validate payment method - only MoMo or Card allowed
+    if request.payment_method not in ["momo", "card"]:
+        raise HTTPException(status_code=400, detail="Payment method must be 'momo' or 'card'. Cash payments not allowed for membership cards.")
+    
+    # Validate MoMo details if using MoMo
+    if request.payment_method == "momo":
+        if not request.momo_number or not request.momo_provider:
+            raise HTTPException(status_code=400, detail="MoMo number and provider are required for Mobile Money payment")
+        if request.momo_provider not in ["MTN", "Vodafone", "AirtelTigo"]:
+            raise HTTPException(status_code=400, detail="Invalid MoMo provider. Must be MTN, Vodafone, or AirtelTigo")
     
     # Get card type
     card_type = await db.vip_card_types.find_one({"id": request.card_type_id, "is_active": True}, {"_id": 0})
@@ -6690,6 +6675,7 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
     
     price_to_pay = card_type["price"]
     is_upgrade = False
+    is_first_purchase = user.get("membership_status") != "active"
     
     # If upgrading, calculate price difference
     if current_membership:
@@ -6705,20 +6691,12 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         if current_card:
             price_to_pay = card_type["price"] - current_card["price"]
         is_upgrade = True
+        is_first_purchase = False
     
-    # Check cashback balance
-    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user["id"])
-    if not wallet or wallet.available_balance < price_to_pay:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Insufficient cashback balance. Need: GHS {price_to_pay}, Available: GHS {wallet.available_balance if wallet else 0}"
-        )
-    
-    # Debit cashback
-    await db.wallets.update_one(
-        {"id": wallet.id},
-        {"$inc": {"available_balance": -price_to_pay, "balance": -price_to_pay}}
-    )
+    # For MoMo/Card payment - simulate payment processing
+    # In production, this would integrate with BulkClix or another payment provider
+    payment_reference = f"VIP_{uuid.uuid4().hex[:8].upper()}"
+    payment_status = "completed"  # SIMULATED - would be pending until webhook confirms
     
     # Mark old membership as upgraded
     if current_membership:
@@ -6729,6 +6707,7 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
     
     # Create new membership
     expires_at = (datetime.now(timezone.utc) + timedelta(days=card_type["validity_days"])).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     
     membership = VIPMembership(
         user_id=user["id"],
@@ -6737,49 +6716,97 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         tier=card_type["tier"],
         card_name=card_type["name"],
         price_paid=price_to_pay,
-        payment_method="cashback",
+        payment_method=request.payment_method,
         expires_at=expires_at,
         upgraded_from=current_membership["tier"] if current_membership else None
     )
     
-    await db.vip_memberships.insert_one(membership.model_dump())
+    membership_data = membership.model_dump()
+    membership_data["payment_reference"] = payment_reference
+    membership_data["momo_number"] = request.momo_number if request.payment_method == "momo" else None
+    membership_data["momo_provider"] = request.momo_provider if request.payment_method == "momo" else None
     
-    # Update user record with VIP tier
+    await db.vip_memberships.insert_one(membership_data)
+    
+    # Update user record with VIP tier and confirm membership
+    user_updates = {
+        "vip_tier": card_type["tier"],
+        "vip_membership_id": membership.id,
+        "monthly_withdrawal_limit": card_type["monthly_withdrawal_limit"],
+        "membership_status": "active",
+        "membership_confirmed_at": now
+    }
+    
     await db.sdm_users.update_one(
         {"id": user["id"]},
-        {"$set": {
-            "vip_tier": card_type["tier"],
-            "vip_membership_id": membership.id,
-            "monthly_withdrawal_limit": card_type["monthly_withdrawal_limit"]
-        }}
+        {"$set": user_updates}
     )
     
+    # Get or create wallet for the user
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user["id"])
+    if not wallet:
+        wallet = await ledger_service.create_wallet(EntityType.CLIENT, user["id"])
+    
+    referral_bonuses_paid = {"welcome_bonus": 0, "referrer_bonus": 0}
+    
     # Award referral bonuses if this is first purchase and user was referred
-    if not is_upgrade and user.get("referred_by"):
-        # Award welcome bonus to user (1 GHS)
-        await db.wallets.update_one(
-            {"id": wallet.id},
-            {"$inc": {"available_balance": REFERRAL_WELCOME_BONUS, "balance": REFERRAL_WELCOME_BONUS}}
+    if is_first_purchase and user.get("referred_by"):
+        # Award welcome bonus to new user (1 GHS)
+        await db.sdm_users.update_one(
+            {"id": user["id"]},
+            {"$inc": {
+                "wallet_available": REFERRAL_WELCOME_BONUS,
+                "total_earned": REFERRAL_WELCOME_BONUS
+            }}
         )
+        if wallet:
+            await db.wallets.update_one(
+                {"id": wallet.id},
+                {"$inc": {"available_balance": REFERRAL_WELCOME_BONUS, "balance": REFERRAL_WELCOME_BONUS}}
+            )
+        
+        # Record welcome bonus
+        welcome_bonus_record = ReferralBonus(
+            referrer_id=user["referred_by"],
+            referred_id=user["id"],
+            referred_phone=user["phone"],
+            bonus_type="welcome_bonus",
+            amount=REFERRAL_WELCOME_BONUS
+        )
+        await db.referral_bonuses.insert_one(welcome_bonus_record.model_dump())
+        referral_bonuses_paid["welcome_bonus"] = REFERRAL_WELCOME_BONUS
         
         # Award referrer bonus (3 GHS)
         referrer = await db.sdm_users.find_one({"id": user["referred_by"]})
         if referrer:
+            # Update referrer's wallet and stats
+            await db.sdm_users.update_one(
+                {"id": referrer["id"]},
+                {"$inc": {
+                    "wallet_available": REFERRAL_BONUS,
+                    "total_earned": REFERRAL_BONUS,
+                    "referral_bonus_earned": REFERRAL_BONUS,
+                    "referral_count": 1
+                }}
+            )
+            
             referrer_wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, referrer["id"])
             if referrer_wallet:
                 await db.wallets.update_one(
                     {"id": referrer_wallet.id},
                     {"$inc": {"available_balance": REFERRAL_BONUS, "balance": REFERRAL_BONUS}}
                 )
-                
-                # Record referral bonus
-                bonus_record = ReferralBonus(
-                    referrer_id=referrer["id"],
-                    referred_id=user["id"],
-                    bonus_type="referrer_bonus",
-                    amount=REFERRAL_BONUS
-                )
-                await db.referral_bonuses.insert_one(bonus_record.model_dump())
+            
+            # Record referrer bonus
+            referrer_bonus_record = ReferralBonus(
+                referrer_id=referrer["id"],
+                referred_id=user["id"],
+                referred_phone=user["phone"],
+                bonus_type="referrer_bonus",
+                amount=REFERRAL_BONUS
+            )
+            await db.referral_bonuses.insert_one(referrer_bonus_record.model_dump())
+            referral_bonuses_paid["referrer_bonus"] = REFERRAL_BONUS
         
         # Mark as processed
         await db.vip_memberships.update_one(
@@ -6788,11 +6815,192 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         )
     
     return {
-        "message": f"{'Upgraded to' if is_upgrade else 'Purchased'} {card_type['name']}!",
+        "message": f"{'Upgraded to' if is_upgrade else 'Purchased'} {card_type['name']}! Your membership is now active.",
         "membership": membership.model_dump(),
         "price_paid": price_to_pay,
+        "payment_method": request.payment_method,
+        "payment_reference": payment_reference,
         "is_upgrade": is_upgrade,
-        "referral_bonus_received": REFERRAL_WELCOME_BONUS if not is_upgrade and user.get("referred_by") else 0
+        "is_first_purchase": is_first_purchase,
+        "membership_status": "active",
+        "referral_bonuses": referral_bonuses_paid
+    }
+
+# ==================== REFERRAL HISTORY ENDPOINTS ====================
+
+@sdm_router.get("/user/referrals")
+async def get_user_referrals(
+    user: dict = Depends(get_current_user),
+    period: str = "all"  # all, day, week, month, year
+):
+    """Get user's referral history with filters"""
+    now = datetime.now(timezone.utc)
+    
+    # Calculate date filter based on period
+    date_filter = {}
+    if period == "day":
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    elif period == "week":
+        start_date = now - timedelta(days=now.weekday())
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    elif period == "month":
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    elif period == "year":
+        start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    
+    # Get users referred by this user
+    query = {"referred_by": user["id"]}
+    if date_filter:
+        query.update(date_filter)
+    
+    referred_users = await db.sdm_users.find(
+        query,
+        {"_id": 0, "id": 1, "full_name": 1, "phone": 1, "membership_status": 1, "created_at": 1, "membership_confirmed_at": 1}
+    ).sort("created_at", -1).to_list(500)
+    
+    # Get referral bonuses earned
+    bonus_query = {"referrer_id": user["id"], "bonus_type": "referrer_bonus"}
+    if date_filter:
+        bonus_query.update(date_filter)
+    
+    bonuses = await db.referral_bonuses.find(bonus_query, {"_id": 0}).to_list(500)
+    total_bonus_earned = sum(b.get("amount", 0) for b in bonuses)
+    
+    # Calculate stats
+    total_referrals = len(referred_users)
+    active_referrals = len([r for r in referred_users if r.get("membership_status") == "active"])
+    pending_referrals = len([r for r in referred_users if r.get("membership_status") == "pending"])
+    
+    return {
+        "referral_code": user.get("referral_code"),
+        "period": period,
+        "stats": {
+            "total_referrals": total_referrals,
+            "active_referrals": active_referrals,
+            "pending_referrals": pending_referrals,
+            "total_bonus_earned": total_bonus_earned
+        },
+        "referrals": [
+            {
+                "id": r["id"],
+                "name": r.get("full_name", "N/A"),
+                "phone": r.get("phone", "")[-4:].rjust(len(r.get("phone", "")), "*"),  # Mask phone
+                "status": r.get("membership_status", "pending"),
+                "registered_at": r.get("created_at"),
+                "confirmed_at": r.get("membership_confirmed_at"),
+                "bonus_earned": REFERRAL_BONUS if r.get("membership_status") == "active" else 0
+            }
+            for r in referred_users
+        ],
+        "how_it_works": {
+            "step_1": "Share your referral code with friends",
+            "step_2": "They sign up using your code",
+            "step_3": f"When they buy a membership card: You get GHS {REFERRAL_BONUS}, they get GHS {REFERRAL_WELCOME_BONUS}!"
+        }
+    }
+
+@sdm_router.get("/admin/referrals")
+async def get_admin_referral_history(
+    admin: dict = Depends(get_current_admin),
+    limit: int = 100,
+    period: str = "all"
+):
+    """Admin: Get complete referral history (who referred who)"""
+    now = datetime.now(timezone.utc)
+    
+    # Calculate date filter based on period
+    date_filter = {}
+    if period == "day":
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    elif period == "week":
+        start_date = now - timedelta(days=now.weekday())
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    elif period == "month":
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    elif period == "year":
+        start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        date_filter = {"created_at": {"$gte": start_date.isoformat()}}
+    
+    # Get all referral bonuses
+    bonus_query = {"bonus_type": "referrer_bonus"}
+    if date_filter:
+        bonus_query.update(date_filter)
+    
+    bonuses = await db.referral_bonuses.find(bonus_query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    
+    # Enrich with user details
+    referral_history = []
+    for bonus in bonuses:
+        referrer = await db.sdm_users.find_one({"id": bonus["referrer_id"]}, {"_id": 0, "full_name": 1, "phone": 1})
+        referred = await db.sdm_users.find_one({"id": bonus["referred_id"]}, {"_id": 0, "full_name": 1, "phone": 1, "membership_status": 1})
+        
+        referral_history.append({
+            "id": bonus.get("id"),
+            "referrer": {
+                "id": bonus["referrer_id"],
+                "name": referrer.get("full_name", "N/A") if referrer else "N/A",
+                "phone": referrer.get("phone", "") if referrer else ""
+            },
+            "referred": {
+                "id": bonus["referred_id"],
+                "name": referred.get("full_name", "N/A") if referred else "N/A",
+                "phone": referred.get("phone", "") if referred else "",
+                "status": referred.get("membership_status", "pending") if referred else "unknown"
+            },
+            "bonus_amount": bonus.get("amount", 0),
+            "date": bonus.get("created_at")
+        })
+    
+    # Get all users who were referred but haven't purchased yet
+    pending_referrals_query = {"referred_by": {"$exists": True, "$ne": None}, "membership_status": "pending"}
+    if date_filter:
+        pending_referrals_query.update(date_filter)
+    
+    pending_users = await db.sdm_users.find(
+        pending_referrals_query,
+        {"_id": 0, "id": 1, "full_name": 1, "phone": 1, "referred_by": 1, "created_at": 1}
+    ).to_list(limit)
+    
+    pending_referrals = []
+    for pu in pending_users:
+        referrer = await db.sdm_users.find_one({"id": pu["referred_by"]}, {"_id": 0, "full_name": 1, "phone": 1})
+        pending_referrals.append({
+            "referred": {
+                "id": pu["id"],
+                "name": pu.get("full_name", "N/A"),
+                "phone": pu.get("phone", "")
+            },
+            "referrer": {
+                "id": pu["referred_by"],
+                "name": referrer.get("full_name", "N/A") if referrer else "N/A",
+                "phone": referrer.get("phone", "") if referrer else ""
+            },
+            "registered_at": pu.get("created_at"),
+            "status": "pending_card_purchase"
+        })
+    
+    # Calculate stats
+    total_referrals = len(referral_history)
+    total_bonus_paid = sum(r["bonus_amount"] for r in referral_history)
+    
+    return {
+        "period": period,
+        "stats": {
+            "total_completed_referrals": total_referrals,
+            "total_pending_referrals": len(pending_referrals),
+            "total_bonus_paid": total_bonus_paid,
+            "referrer_bonus": REFERRAL_BONUS,
+            "welcome_bonus": REFERRAL_WELCOME_BONUS
+        },
+        "completed_referrals": referral_history,
+        "pending_referrals": pending_referrals
     }
 
 # ==================== ADMIN PROMOTIONS ENDPOINTS ====================

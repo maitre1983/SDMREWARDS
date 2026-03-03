@@ -34,6 +34,7 @@ export default function SDMClientPage() {
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [referralData, setReferralData] = useState(null);
+  const [referralPeriod, setReferralPeriod] = useState('all');
   const [activeTab, setActiveTab] = useState('wallet');
   const [availableCards, setAvailableCards] = useState([]);
   const [userMemberships, setUserMemberships] = useState([]);
@@ -95,7 +96,7 @@ export default function SDMClientPage() {
         axios.get(`${API_URL}/api/sdm/user/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/wallet`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/transactions`, { headers }),
-        axios.get(`${API_URL}/api/sdm/user/referral`, { headers }),
+        axios.get(`${API_URL}/api/sdm/user/referrals?period=${referralPeriod}`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/available-cards`, { headers }),
         axios.get(`${API_URL}/api/sdm/user/memberships`, { headers })
       ]);
@@ -162,6 +163,23 @@ export default function SDMClientPage() {
       return () => clearInterval(interval);
     }
   }, [token]);
+
+  // Reload referral data when period filter changes
+  const fetchReferrals = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API_URL}/api/sdm/user/referrals?period=${referralPeriod}`, { headers });
+      setReferralData(response.data);
+    } catch (error) {
+      console.error('Failed to fetch referrals:', error);
+    }
+  };
+  
+  useEffect(() => {
+    if (token && activeTab === 'referral') {
+      fetchReferrals();
+    }
+  }, [referralPeriod, token, activeTab]);
 
   // Fetch service-related data
   const fetchServiceData = async () => {
@@ -2063,7 +2081,7 @@ export default function SDMClientPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">Invite Friends</h3>
-                  <p className="text-sm opacity-80">Earn GHS {referralData.bonus_per_referral} per friend</p>
+                  <p className="text-sm opacity-80">Earn GHS 3 per friend who buys a card</p>
                 </div>
               </div>
               
@@ -2090,17 +2108,50 @@ export default function SDMClientPage() {
               </div>
             </div>
 
+            {/* Period Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {['all', 'day', 'week', 'month', 'year'].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setReferralPeriod(p)}
+                  className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all ${
+                    referralPeriod === p 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {p === 'all' ? 'All Time' : p === 'day' ? 'Today' : p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : 'This Year'}
+                </button>
+              ))}
+            </div>
+
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div className="bg-white rounded-xl p-4 text-center">
-                <Users size={24} className="mx-auto mb-2 text-blue-600" />
-                <p className="text-2xl font-bold text-slate-900">{referralData.total_referrals}</p>
-                <p className="text-xs text-slate-500">Friends Invited</p>
+                <Users size={20} className="mx-auto mb-2 text-blue-600" />
+                <p className="text-xl font-bold text-slate-900">{referralData.stats?.total_referrals || 0}</p>
+                <p className="text-xs text-slate-500">Total</p>
               </div>
               <div className="bg-white rounded-xl p-4 text-center">
-                <DollarSign size={24} className="mx-auto mb-2 text-emerald-600" />
-                <p className="text-2xl font-bold text-slate-900">GHS {referralData.total_bonus_earned?.toFixed(2)}</p>
-                <p className="text-xs text-slate-500">Bonus Earned</p>
+                <CheckCircle size={20} className="mx-auto mb-2 text-emerald-600" />
+                <p className="text-xl font-bold text-emerald-600">{referralData.stats?.active_referrals || 0}</p>
+                <p className="text-xs text-slate-500">Active</p>
+              </div>
+              <div className="bg-white rounded-xl p-4 text-center">
+                <Clock size={20} className="mx-auto mb-2 text-amber-600" />
+                <p className="text-xl font-bold text-amber-600">{referralData.stats?.pending_referrals || 0}</p>
+                <p className="text-xs text-slate-500">Pending</p>
+              </div>
+            </div>
+            
+            {/* Total Bonus */}
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-80">Total Bonus Earned</p>
+                  <p className="text-2xl font-bold">GHS {(referralData.stats?.total_bonus_earned || 0).toFixed(2)}</p>
+                </div>
+                <DollarSign size={32} className="opacity-50" />
               </div>
             </div>
 
@@ -2117,9 +2168,14 @@ export default function SDMClientPage() {
                   <p className="text-sm text-slate-600">They sign up using your code</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">3</div>
-                  <p className="text-sm text-slate-600">You get GHS 3, they get GHS 1 when they buy a membership card!</p>
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">3</div>
+                  <p className="text-sm text-slate-600"><span className="font-semibold text-emerald-600">When they buy a membership card:</span> You get GHS 3, they get GHS 1!</p>
                 </div>
+              </div>
+              <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="text-xs text-amber-700">
+                  <span className="font-semibold">Note:</span> Referral bonuses are only paid when your friend purchases their membership card using Mobile Money or Card payment.
+                </p>
               </div>
             </div>
 
@@ -2131,17 +2187,25 @@ export default function SDMClientPage() {
                   {referralData.referrals.map((ref, i) => (
                     <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Users size={14} className="text-blue-600" />
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          ref.status === 'active' ? 'bg-emerald-100' : 'bg-amber-100'
+                        }`}>
+                          <Users size={14} className={ref.status === 'active' ? 'text-emerald-600' : 'text-amber-600'} />
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-900">
-                            {ref.first_name || ref.last_name ? `${ref.first_name || ''} ${ref.last_name || ''}`.trim() : 'SDM User'}
+                            {ref.name || 'SDM User'}
                           </p>
-                          <p className="text-xs text-slate-500">{new Date(ref.created_at).toLocaleDateString()}</p>
+                          <p className="text-xs text-slate-500">
+                            {ref.phone} • {ref.status === 'active' ? 'Card Purchased' : 'Pending Card'}
+                          </p>
                         </div>
                       </div>
-                      <span className="text-sm font-semibold text-emerald-600">+GHS {referralData.bonus_per_referral}</span>
+                      {ref.status === 'active' ? (
+                        <span className="text-sm font-semibold text-emerald-600">+GHS {ref.bonus_earned}</span>
+                      ) : (
+                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">Pending</span>
+                      )}
                     </div>
                   ))}
                 </div>

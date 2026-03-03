@@ -4,7 +4,7 @@ import {
   Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
   ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet,
-  CreditCard, Wallet, Users, Store, Shield
+  CreditCard, Wallet, Users, Store, Shield, Gift
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +16,7 @@ import SDMConfigPanel from '../components/admin/SDMConfigPanel';
 import FintechDashboard from '../components/admin/FintechDashboard';
 import UsersAndMerchantsPanel from '../components/admin/UsersAndMerchantsPanel';
 import AdminManagementPanel from '../components/admin/AdminManagementPanel';
+import ReferralHistoryPanel from '../components/admin/ReferralHistoryPanel';
 import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -220,6 +221,15 @@ export default function AdminDashboardPage() {
           >
             <Wallet size={18} />
             <span>Fintech Ledger</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('referrals')}
+            data-testid="referrals-tab"
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'referrals' ? 'active' : ''}`}
+          >
+            <Gift size={18} />
+            <span>Referral History</span>
           </button>
         </nav>
 
@@ -573,6 +583,10 @@ export default function AdminDashboardPage() {
 
           {activeTab === 'fintech' && (
             <FintechDashboard token={token} />
+          )}
+
+          {activeTab === 'referrals' && (
+            <ReferralHistoryPanel token={token} />
           )}
         </div>
       </main>

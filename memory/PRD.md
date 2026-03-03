@@ -7,6 +7,32 @@
 
 ---
 
+## REFERRAL SYSTEM (Updated March 3, 2026)
+
+### Referral Bonus Rules
+| Who | Amount | When Paid |
+|-----|--------|-----------|
+| Referrer (Parrain) | GHS 3 | When referred user purchases membership card |
+| New User (Filleul) | GHS 1 | When they purchase their membership card |
+
+### Key Changes
+- **Bonuses are ONLY paid when the referred user purchases a membership card**
+- **Inscription is "pending" until card purchase** (`membership_status: pending → active`)
+- **Card payment must be via Mobile Money or Card** (no cash)
+
+### APIs
+- `GET /api/sdm/user/referrals?period=all|day|week|month|year` - User's referral history with filters
+- `GET /api/sdm/admin/referrals?period=all|day|week|month|year` - Admin: Complete referral history
+
+### Admin Referral Dashboard
+New panel in Admin Dashboard showing:
+- Completed referrals (who referred who)
+- Pending referrals (registered but no card yet)
+- Total bonus paid
+- Filters by period (day/week/month/year)
+
+---
+
 ## PAYMENT SYSTEM (Phase 1 - COMPLETE)
 
 ### Payment Methods
@@ -272,3 +298,5 @@ Amount: 1000 GHS @ 10% Cashback
 *Admin Management Panel: Create/Delete Admins, Change Passwords*
 *Merchant Delete Feature: Super Admin can delete merchants*
 *Partners Visibility: Blocked/Suspended/Deleted merchants hidden from clients*
+*Referral System: Bonuses paid only on card purchase, Admin history panel added*
+*Super Admin Account: emileparfait2003@gmail.com configured at startup*
