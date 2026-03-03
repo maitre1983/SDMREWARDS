@@ -79,18 +79,20 @@
 ## IMPLEMENTED FEATURES
 - ✅ Central Ledger (Double-Entry)
 - ✅ Super App Services (SIMULATED)
-- ✅ VIP Card System (3 tiers)
-- ✅ Partner Directory
+- ✅ VIP Card System (3 tiers) - **Dynamic from Admin Dashboard**
+- ✅ Partner Directory - **Synced with verified merchants**
 - ✅ Promotions Engine
 - ✅ Leaderboards
 - ✅ VIP Lottery (5 winners)
 - ✅ Multilingual (4 languages - EN default)
-- ✅ Auto Lottery Scheduler
+- ✅ Auto Lottery Scheduler (1st of each month)
+- ✅ **Birthday Bonus Scheduler** (Daily @ 8 UTC)
 - ✅ Models Package Extraction
-- ✅ SDM Rewards Landing Page
+- ✅ SDM Rewards Landing Page - **Dynamic VIP Cards**
 - ✅ Core Package (config, utils, dependencies)
 - ✅ Merchant Card Management Removed
 - ✅ BulkClix OTP SMS Integration (Real)
+- ✅ **BulkClix Notification SMS** (for merchants)
 - ✅ Client: Phone + Password + Full Name Registration
 - ✅ Merchant: Phone + Password + GPS Address Registration
 - ✅ Favicon & Title (www.sdmrewards.com)
@@ -100,6 +102,10 @@
 - ✅ Dynamic Admin URL (/admin<DDMMYY>) - Security enhancement
 - ✅ Session Persistence (localStorage tokens for admin, client, merchant)
 - ✅ Web OTP API Integration (auto-fill OTP from SMS on Chrome Android)
+- ✅ **Admin Panel: Clients & Merchants Management**
+- ✅ **Client Portal: Partners Tab** with cashback rates
+- ✅ **Landing Page: Lazy Loading** for performance
+- ✅ **Login Button** in Navbar
 
 ---
 
@@ -114,8 +120,17 @@
 - Public partner directory
 - Landing optimization
 
-### Birthday Bonus
-- Auto bonus for VIP members
+### Birthday Bonus ✅ IMPLEMENTED
+- Auto bonus job runs daily @ 8 UTC
+- Checks for VIP members with birthday today
+- Credits configurable bonus amount (default: 5 GHS)
+- Sends birthday SMS notification
+- Prevents duplicate bonuses per year
+
+### Merchant Notifications ✅ IMPLEMENTED
+- SMS sent when merchant registers (pending verification)
+- SMS sent when merchant is verified by admin
+- Admin notification created for new registrations
 
 ### Auto-read OTP (Web OTP API) ✅ IMPLEMENTED
 - OTPInput component with Web OTP API support

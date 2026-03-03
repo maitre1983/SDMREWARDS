@@ -1,65 +1,81 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ArrowLeft, Crown, Gift, Wallet, Users, Store, Ticket, 
-  CheckCircle, Smartphone, Shield, Globe, TrendingUp
+  CheckCircle, Smartphone, Shield, Globe, TrendingUp, Loader2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useLanguage } from '../context/LanguageContext';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
+
+// Tier styling configuration
+const tierStyles = {
+  BRONZE: {
+    color: 'from-amber-700 to-amber-600',
+    textColor: 'text-white',
+    borderColor: 'border-amber-500',
+  },
+  SILVER: {
+    color: 'from-slate-400 to-slate-300',
+    textColor: 'text-slate-800',
+    borderColor: 'border-slate-400',
+  },
+  GOLD: {
+    color: 'from-amber-500 to-yellow-400',
+    textColor: 'text-amber-900',
+    borderColor: 'border-amber-300',
+    popular: true,
+  },
+  PLATINUM: {
+    color: 'from-slate-700 to-slate-500',
+    textColor: 'text-white',
+    borderColor: 'border-slate-400',
+  }
+};
 
 export default function SDMRewardsPage() {
   const { t, language } = useLanguage();
+  const [vipCards, setVipCards] = useState([]);
+  const [stats, setStats] = useState({ total_partners: 100, total_users: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const vipTiers = [
-    {
-      name: 'SILVER',
-      price: 25,
-      color: 'from-slate-300 to-slate-200',
-      textColor: 'text-slate-700',
-      borderColor: 'border-slate-400',
-      benefits: [
-        'Access to all partner merchants',
-        'Cashback on every purchase',
-        'Monthly lottery participation (x1)',
-        'Birthday bonus',
-        'SDM app full access'
+  // Fetch VIP cards and stats from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [cardsRes, statsRes] = await Promise.all([
+          axios.get(`${API_URL}/api/sdm/vip-cards`),
+          axios.get(`${API_URL}/api/sdm/stats`)
+        ]);
+        setVipCards(cardsRes.data.cards || []);
+        setStats(statsRes.data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Format card benefits for display
+  const formatCard = (card) => {
+    const style = tierStyles[card.tier] || tierStyles.SILVER;
+    return {
+      ...card,
+      ...style,
+      benefits: card.benefits_list || [
+        `+${card.cashback_boost}% cashback boost`,
+        `x${card.lottery_multiplier} lottery chances`,
+        `GHS ${card.monthly_withdrawal_limit}/month limit`
       ]
-    },
-    {
-      name: 'GOLD',
-      price: 50,
-      color: 'from-amber-500 to-yellow-400',
-      textColor: 'text-amber-900',
-      borderColor: 'border-amber-300',
-      popular: true,
-      benefits: [
-        'All Silver benefits',
-        '+0.2% extra cashback boost',
-        'Double lottery chances (x2)',
-        'Priority withdrawal processing',
-        'Gold-exclusive merchant deals'
-      ]
-    },
-    {
-      name: 'PLATINUM',
-      price: 100,
-      color: 'from-slate-700 to-slate-500',
-      textColor: 'text-white',
-      borderColor: 'border-slate-400',
-      benefits: [
-        'All Gold benefits',
-        '+0.5% extra cashback boost',
-        'Triple lottery chances (x3)',
-        'GHS 5,000/month withdrawal limit',
-        'Ambassador program access',
-        'Business & investment opportunities'
-      ]
-    }
-  ];
+    };
+  };
 
   const features = [
     {
@@ -190,58 +206,80 @@ export default function SDMRewardsPage() {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {vipTiers.map((tier, index) => (
-              <div 
-                key={index}
-                className={`relative bg-slate-800/50 backdrop-blur rounded-3xl p-8 border ${
-                  tier.popular ? 'border-amber-500 scale-105' : 'border-slate-700'
-                }`}
-              >
-                {tier.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="bg-amber-500 text-amber-900 px-4 py-1 rounded-full text-sm font-semibold">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${tier.color} flex items-center justify-center mx-auto mb-6`}>
-                  <Crown className={tier.textColor} size={32} />
-                </div>
-                
-                <h3 className="text-2xl font-bold text-white text-center mb-2">
-                  {tier.name}
-                </h3>
-                
-                <div className="text-center mb-6">
-                  <span className="text-4xl font-bold text-white">GHS {tier.price}</span>
-                  <span className="text-slate-400">/year</span>
-                </div>
-                
-                <ul className="space-y-3 mb-8">
-                  {tier.benefits.map((benefit, i) => (
-                    <li key={i} className="flex items-start gap-2 text-slate-300">
-                      <CheckCircle className="text-emerald-400 shrink-0 mt-0.5" size={18} />
-                      <span>{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-                
-                <Link to="/sdm/client" className="block">
-                  <Button 
-                    className={`w-full py-6 ${
-                      tier.popular 
-                        ? 'bg-amber-500 hover:bg-amber-600 text-amber-900' 
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="animate-spin text-blue-500" size={40} />
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {vipCards.map((card) => {
+                const formattedCard = formatCard(card);
+                return (
+                  <div 
+                    key={card.id}
+                    className={`relative bg-slate-800/50 backdrop-blur rounded-3xl p-8 border ${
+                      formattedCard.popular ? 'border-amber-500 scale-105' : 'border-slate-700'
                     }`}
+                    data-testid={`rewards-card-${card.tier.toLowerCase()}`}
                   >
-                    Get {tier.name} Card
-                  </Button>
-                </Link>
-              </div>
-            ))}
-          </div>
+                    {formattedCard.popular && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                        <span className="bg-amber-500 text-amber-900 px-4 py-1 rounded-full text-sm font-semibold">
+                          Most Popular
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${formattedCard.color} flex items-center justify-center mx-auto mb-6`}>
+                      <Crown className={formattedCard.textColor} size={32} />
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold text-white text-center mb-2">
+                      {card.name}
+                    </h3>
+                    
+                    <div className="text-center mb-6">
+                      <span className="text-4xl font-bold text-white">GHS {card.price}</span>
+                      <span className="text-slate-400">/{card.validity_days} days</span>
+                    </div>
+
+                    {/* Key Stats */}
+                    <div className="grid grid-cols-2 gap-2 mb-6 py-4 border-y border-slate-700">
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-emerald-400">+{card.cashback_boost}%</p>
+                        <p className="text-xs text-slate-400">Cashback Boost</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-blue-400">x{card.lottery_multiplier}</p>
+                        <p className="text-xs text-slate-400">Lottery Chances</p>
+                      </div>
+                    </div>
+                    
+                    <ul className="space-y-3 mb-8">
+                      {(card.benefits_list || formattedCard.benefits).slice(0, 5).map((benefit, i) => (
+                        <li key={i} className="flex items-start gap-2 text-slate-300">
+                          <CheckCircle className="text-emerald-400 shrink-0 mt-0.5" size={18} />
+                          <span className="text-sm">{benefit}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    
+                    <Link to="/sdm/client" className="block">
+                      <Button 
+                        className={`w-full py-6 ${
+                          formattedCard.popular 
+                            ? 'bg-amber-500 hover:bg-amber-600 text-amber-900' 
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                      >
+                        Get {card.tier} Card
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 

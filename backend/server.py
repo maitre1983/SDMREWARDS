@@ -549,6 +549,7 @@ class ClientRegisterRequest(BaseModel):
     referral_code: Optional[str] = None
     otp_code: str
     request_id: str
+    birth_date: Optional[str] = None  # Format: YYYY-MM-DD
 
 class ClientLoginRequest(BaseModel):
     phone: str
@@ -801,6 +802,43 @@ async def send_otp_bulkclix(phone: str) -> dict:
                 return {"success": False, "error": response.text}
     except Exception as e:
         logger.error(f"BulkClix OTP error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+async def send_sms_bulkclix(phone: str, message: str) -> dict:
+    """Send simple SMS notification via BulkClix API"""
+    if not BULKCLIX_API_KEY:
+        logger.warning("BulkClix API key not configured")
+        return {"success": False, "error": "SMS service not configured"}
+    
+    # Normalize phone for BulkClix
+    phone_clean = phone.replace("+", "").replace(" ", "")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BULKCLIX_BASE_URL}/sms-api/send",
+                json={
+                    "sender_id": BULKCLIX_OTP_SENDER_ID or "SDMRewards",
+                    "recipients": [phone_clean],
+                    "message": message,
+                    "type": "transactional"
+                },
+                headers={
+                    "x-api-key": BULKCLIX_API_KEY,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"SMS sent to {phone_clean}")
+                return {"success": True}
+            else:
+                logger.error(f"BulkClix SMS error: {response.text}")
+                return {"success": False, "error": response.text}
+    except Exception as e:
+        logger.error(f"BulkClix SMS error: {str(e)}")
         return {"success": False, "error": str(e)}
 
 async def verify_otp_bulkclix(phone: str, code: str, request_id: str) -> dict:
@@ -1582,6 +1620,26 @@ async def register_merchant(request: MerchantRegisterRequest):
     merchant_data = merchant.model_dump()
     del merchant_data["password_hash"]
     
+    # Send welcome SMS to merchant (pending verification notification)
+    try:
+        sms_message = f"Welcome to SDM Rewards! Your merchant account '{request.business_name}' is pending verification. You will be notified once approved. Questions? Contact support."
+        await send_sms_bulkclix(phone, sms_message)
+    except Exception as e:
+        print(f"Warning: Failed to send welcome SMS to merchant: {e}")
+    
+    # Notify admin about new merchant registration
+    try:
+        admin_notification = Notification(
+            recipient_type="admin",
+            title="New Merchant Registration",
+            message=f"New merchant '{request.business_name}' registered and awaiting verification. Phone: {phone}",
+            notification_type="alert",
+            priority="high"
+        )
+        await db.notifications.insert_one(admin_notification.model_dump())
+    except Exception as e:
+        print(f"Warning: Failed to create admin notification: {e}")
+    
     return {
         "message": "Merchant registered successfully",
         "merchant_id": merchant.id,
@@ -2115,15 +2173,33 @@ async def admin_get_merchants(admin: dict = Depends(get_current_admin), limit: i
     return merchants
 
 @sdm_router.put("/admin/merchants/{merchant_id}/verify")
-async def admin_verify_merchant(merchant_id: str, admin: dict = Depends(get_current_admin)):
-    """Admin: Verify merchant"""
+async def admin_verify_merchant(
+    merchant_id: str, 
+    body: dict = None,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Verify or unverify merchant"""
+    is_verified = body.get("is_verified", True) if body else True
+    
+    # Get merchant info first
+    merchant = await db.sdm_merchants.find_one({"id": merchant_id}, {"_id": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
     result = await db.sdm_merchants.update_one(
         {"id": merchant_id},
-        {"$set": {"is_verified": True}}
+        {"$set": {"is_verified": is_verified}}
     )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Merchant not found")
-    return {"message": "Merchant verified"}
+    
+    # Send SMS notification to merchant
+    if is_verified and result.modified_count > 0:
+        try:
+            sms_message = f"Congratulations! Your SDM Rewards merchant account '{merchant.get('business_name', '')}' has been verified. You can now accept cashback payments from customers. Welcome to our network!"
+            await send_sms_bulkclix(merchant.get("phone", ""), sms_message)
+        except Exception as e:
+            print(f"Warning: Failed to send verification SMS: {e}")
+    
+    return {"message": f"Merchant {'verified' if is_verified else 'unverified'}"}
 
 @sdm_router.get("/admin/transactions")
 async def admin_get_transactions(admin: dict = Depends(get_current_admin), limit: int = 100):
@@ -5636,6 +5712,90 @@ scheduler.add_job(
     CronTrigger(day=1, hour=0, minute=5),
     id="monthly_lottery",
     name="Auto Monthly Lottery Creator",
+    replace_existing=True
+)
+
+# ============== BIRTHDAY BONUS JOB ==============
+async def process_birthday_bonuses():
+    """Process birthday bonuses for VIP members"""
+    from datetime import datetime, timezone
+    
+    today = datetime.now(timezone.utc)
+    current_month = today.month
+    current_day = today.day
+    
+    try:
+        # Find VIP users with birthday this month who haven't received bonus yet
+        birthday_users = await db.sdm_users.find({
+            "vip_membership_id": {"$exists": True, "$ne": None},
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$month": {"$dateFromString": {"dateString": "$birth_date"}}}, current_month]},
+                    {"$eq": [{"$dayOfMonth": {"$dateFromString": {"dateString": "$birth_date"}}}, current_day]}
+                ]
+            },
+            f"birthday_bonus_{today.year}": {"$exists": False}
+        }, {"_id": 0}).to_list(1000)
+        
+        config = await db.sdm_config.find_one({}, {"_id": 0}) or {}
+        birthday_bonus_amount = config.get("birthday_bonus_amount", 5.0)  # Default 5 GHS
+        
+        for user in birthday_users:
+            try:
+                # Credit birthday bonus
+                await db.sdm_users.update_one(
+                    {"id": user["id"]},
+                    {
+                        "$inc": {"balance": birthday_bonus_amount, "total_earned": birthday_bonus_amount},
+                        "$set": {f"birthday_bonus_{today.year}": True}
+                    }
+                )
+                
+                # Record transaction
+                await db.sdm_transactions.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "user_id": user["id"],
+                    "type": "birthday_bonus",
+                    "amount": birthday_bonus_amount,
+                    "description": f"Happy Birthday! VIP Birthday Bonus",
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+                
+                # Send birthday SMS
+                if user.get("phone"):
+                    await send_sms_bulkclix(
+                        user["phone"],
+                        f"Happy Birthday from SDM Rewards! 🎉 We've added GHS {birthday_bonus_amount} to your wallet as a special birthday gift. Enjoy your day!"
+                    )
+                
+                logging.info(f"Birthday bonus credited to user {user['id']}")
+                
+            except Exception as e:
+                logging.error(f"Error processing birthday bonus for user {user.get('id')}: {e}")
+        
+        # Log job execution
+        await db.scheduler_logs.insert_one({
+            "job_type": "birthday_bonus",
+            "status": "SUCCESS",
+            "users_processed": len(birthday_users),
+            "executed_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Birthday bonus job error: {e}")
+        await db.scheduler_logs.insert_one({
+            "job_type": "birthday_bonus",
+            "status": "ERROR",
+            "error": str(e),
+            "executed_at": datetime.now(timezone.utc).isoformat()
+        })
+
+# Schedule: Run daily at 08:00 UTC to check for birthdays
+scheduler.add_job(
+    process_birthday_bonuses,
+    CronTrigger(hour=8, minute=0),
+    id="birthday_bonus",
+    name="Daily Birthday Bonus Processor",
     replace_existing=True
 )
 
