@@ -368,6 +368,22 @@ Amount: 1000 GHS @ 10% Cashback
   - `/app/frontend/src/pages/AdminPage.jsx`
   - `/app/frontend/src/pages/AdminDashboardPage.jsx`
 
+### BulkClix Payment Integration (March 3, 2026)
+- **New Feature**: Real MoMo payment integration via BulkClix API
+- **Implemented**:
+  1. **MoMo Collection** (`/api/sdm/user/vip-cards/purchase`): Initiates payment collection from customer
+  2. **Payment Webhook** (`/api/sdm/payments/webhook/vip-card`): Receives payment confirmation and activates membership
+  3. **Payment Status Check** (`/api/sdm/user/vip-cards/payment-status/{transaction_id}`): Check payment/membership status
+  4. **MoMo Transfer** (`/api/admin/withdrawals/{id}/send-momo`): Admin can send withdrawals via MoMo
+  5. **KYC Verification** (`/api/sdm/merchant/verify-momo`): Verify MoMo account name before settlement config
+  6. **Merchant Settlement Config** (`/api/sdm/merchant/settlement`): Configure settlement with KYC verification
+- **Test Mode**: Enabled by default (PAYMENT_TEST_MODE=true). Set to 'false' in production with valid BulkClix API key
+- **Files Created**:
+  - `/app/backend/services/bulkclix_payment.py`: Payment service with collection, transfer, and KYC
+- **Files Modified**:
+  - `/app/backend/server.py`: Added payment endpoints and webhook
+  - `/app/backend/services/__init__.py`: Export new payment service
+
 ---
 
 *Last Updated: March 3, 2026*
@@ -379,3 +395,4 @@ Amount: 1000 GHS @ 10% Cashback
 *Referral System: Bonuses paid only on card purchase, Admin history panel added*
 *Super Admin Account: emileparfait2003@gmail.com configured at startup*
 *Admin Login Playwright Test: FIXED - Race condition resolved*
+*BulkClix Payment Integration: IMPLEMENTED (Test Mode Active)*

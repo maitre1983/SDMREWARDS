@@ -1,7 +1,7 @@
 """
 SDM Services Module
 ===================
-Provides Airtime, Data, Bill Payment, and MoMo Withdrawal services
+Provides Airtime, Data, Bill Payment, MoMo Withdrawal, and Payment services
 """
 
 from .bulkclix_service import (
@@ -16,6 +16,13 @@ from .bulkclix_service import (
     detect_network
 )
 
+from .bulkclix_payment import (
+    BulkClixPaymentService,
+    bulkclix_payment_service,
+    MoMoNetwork,
+    PaymentStatus
+)
+
 __all__ = [
     "BulkClixService",
     "ServiceTransaction",
@@ -25,5 +32,9 @@ __all__ = [
     "BillProvider",
     "DataBundle",
     "DATA_BUNDLES",
-    "detect_network"
+    "detect_network",
+    "BulkClixPaymentService",
+    "bulkclix_payment_service",
+    "MoMoNetwork",
+    "PaymentStatus"
 ]

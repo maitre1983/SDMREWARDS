@@ -28,6 +28,9 @@ from apscheduler.triggers.cron import CronTrigger
 # Import Ledger Service
 from ledger import LedgerService, EntityType, TransactionType, WithdrawalStatus
 
+# Import Payment Service
+from services.bulkclix_payment import bulkclix_payment_service
+
 # Import utility functions from refactored modules
 from utils.helpers import (
     hash_password,
@@ -2139,6 +2142,103 @@ async def update_merchant_settings(
     
     return {"message": "Settings updated", "merchant": updated_merchant}
 
+# ============ MERCHANT SETTLEMENT CONFIGURATION ============
+
+@sdm_router.post("/merchant/verify-momo")
+async def verify_momo_account(phone_number: str, merchant: dict = Depends(get_current_merchant)):
+    """Verify MoMo account name for settlement configuration"""
+    result = await bulkclix_payment_service.verify_account_name(phone_number)
+    
+    if result.get("success") and result.get("verified"):
+        return {
+            "success": True,
+            "verified": True,
+            "account_name": result.get("account_name"),
+            "phone_number": phone_number
+        }
+    elif result.get("success"):
+        return {
+            "success": True,
+            "verified": False,
+            "message": "Could not verify account name",
+            "phone_number": phone_number
+        }
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Verification failed")
+        )
+
+@sdm_router.put("/merchant/settlement")
+async def update_merchant_settlement(
+    request: UpdateMerchantSettlementRequest,
+    merchant: dict = Depends(get_current_merchant)
+):
+    """Update merchant settlement configuration with KYC verification"""
+    updates = {}
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Settlement type
+    if request.settlement_type:
+        if request.settlement_type not in ["momo", "bank"]:
+            raise HTTPException(status_code=400, detail="Settlement type must be 'momo' or 'bank'")
+        updates["settlement_type"] = request.settlement_type
+    
+    # MoMo settings with KYC verification
+    if request.momo_number:
+        # Verify MoMo account first
+        kyc_result = await bulkclix_payment_service.verify_account_name(request.momo_number)
+        
+        if kyc_result.get("success") and kyc_result.get("verified"):
+            updates["momo_number"] = request.momo_number
+            updates["momo_provider"] = request.momo_provider
+            updates["momo_account_name"] = kyc_result.get("account_name")
+            updates["momo_verified"] = True
+            updates["momo_verified_at"] = now
+        else:
+            # Allow update but mark as unverified
+            updates["momo_number"] = request.momo_number
+            updates["momo_provider"] = request.momo_provider
+            updates["momo_verified"] = False
+            updates["momo_verification_error"] = kyc_result.get("error", "Verification failed")
+    
+    if request.momo_provider:
+        # Normalize provider
+        provider_map = {"MTN": "MTN", "VODAFONE": "TELECEL", "TELECEL": "TELECEL", "AIRTELTIGO": "AIRTELTIGO"}
+        updates["momo_provider"] = provider_map.get(request.momo_provider.upper(), request.momo_provider.upper())
+    
+    # Bank settings
+    if request.bank_name:
+        updates["bank_name"] = request.bank_name
+    if request.bank_account_number:
+        updates["bank_account_number"] = request.bank_account_number
+    if request.bank_account_name:
+        updates["bank_account_name"] = request.bank_account_name
+    if request.bank_branch:
+        updates["bank_branch"] = request.bank_branch
+    
+    # Settlement mode
+    if request.settlement_mode:
+        if request.settlement_mode not in ["instant", "daily"]:
+            raise HTTPException(status_code=400, detail="Settlement mode must be 'instant' or 'daily'")
+        updates["settlement_mode"] = request.settlement_mode
+    
+    if updates:
+        updates["settlement_updated_at"] = now
+        await db.sdm_merchants.update_one({"id": merchant["id"]}, {"$set": updates})
+    
+    # Get updated merchant
+    updated_merchant = await db.sdm_merchants.find_one(
+        {"id": merchant["id"]}, 
+        {"_id": 0, "password_hash": 0}
+    )
+    
+    return {
+        "message": "Settlement configuration updated",
+        "merchant": updated_merchant,
+        "momo_verified": updates.get("momo_verified", None)
+    }
+
 @sdm_router.post("/merchant/staff")
 async def add_staff(request: AddStaffRequest, merchant: dict = Depends(get_current_merchant)):
     """Add staff member"""
@@ -3595,6 +3695,93 @@ async def admin_process_withdrawal(withdrawal_id: str, status: str, reference: O
         )
     
     return {"message": f"Withdrawal {status}"}
+
+@sdm_router.post("/admin/withdrawals/{withdrawal_id}/send-momo")
+async def admin_send_momo_withdrawal(withdrawal_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Send MoMo transfer for withdrawal using BulkClix API"""
+    # Get withdrawal details
+    withdrawal = await db.sdm_withdrawals.find_one({"id": withdrawal_id}, {"_id": 0})
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    
+    if withdrawal.get("status") != "pending":
+        raise HTTPException(status_code=400, detail=f"Withdrawal is not pending (current: {withdrawal.get('status')})")
+    
+    # Get user details
+    user = await db.sdm_users.find_one({"id": withdrawal["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Determine network from phone number or user preference
+    network = withdrawal.get("network") or user.get("momo_provider") or "MTN"
+    phone = withdrawal.get("phone") or user.get("phone")
+    
+    if not phone:
+        raise HTTPException(status_code=400, detail="No phone number for withdrawal")
+    
+    # Generate client reference
+    client_reference = f"WDR_{withdrawal_id[:12].upper()}"
+    account_name = user.get("full_name") or "SDM User"
+    
+    # Mark as processing
+    await db.sdm_withdrawals.update_one(
+        {"id": withdrawal_id},
+        {"$set": {
+            "status": "processing",
+            "momo_transfer_initiated_at": datetime.now(timezone.utc).isoformat(),
+            "admin_processed_by": admin["id"]
+        }}
+    )
+    
+    # Send MoMo transfer via BulkClix
+    result = await bulkclix_payment_service.transfer_momo(
+        amount=withdrawal["net_amount"],
+        account_number=phone,
+        network=network,
+        account_name=account_name,
+        client_reference=client_reference
+    )
+    
+    if result.get("success"):
+        # Update withdrawal with transfer details
+        await db.sdm_withdrawals.update_one(
+            {"id": withdrawal_id},
+            {"$set": {
+                "momo_transfer_response": result.get("data"),
+                "client_reference": client_reference
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": "MoMo transfer initiated",
+            "client_reference": client_reference,
+            "amount": withdrawal["net_amount"],
+            "phone": phone,
+            "network": network,
+            "response": result.get("data")
+        }
+    else:
+        # Mark as failed and refund
+        await db.sdm_withdrawals.update_one(
+            {"id": withdrawal_id},
+            {"$set": {
+                "status": "failed",
+                "error_message": result.get("error"),
+                "failed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Refund user
+        await db.sdm_users.update_one(
+            {"id": withdrawal["user_id"]},
+            {"$inc": {"wallet_available": withdrawal["amount"]}}
+        )
+        
+        raise HTTPException(
+            status_code=400,
+            detail=f"MoMo transfer failed: {result.get('error')}"
+        )
 
 @sdm_router.get("/admin/sdm-stats")
 async def admin_get_sdm_stats(admin: dict = Depends(get_current_admin)):
@@ -6552,23 +6739,27 @@ class PurchaseVIPCardRequest(BaseModel):
     card_type_id: str
     payment_method: str = "momo"  # "momo" or "card" only (no cash)
     momo_number: Optional[str] = None  # For MoMo payments
-    momo_provider: Optional[str] = None  # MTN, Vodafone, AirtelTigo
+    momo_provider: Optional[str] = None  # MTN, TELECEL, AIRTELTIGO
 
 @sdm_router.post("/user/vip-cards/purchase")
 async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depends(get_current_user)):
-    """User: Purchase membership card using Mobile Money or Card (required to activate account)"""
+    """User: Purchase membership card using Mobile Money (required to activate account)"""
     from ledger import EntityType
     
-    # Validate payment method - only MoMo or Card allowed
-    if request.payment_method not in ["momo", "card"]:
-        raise HTTPException(status_code=400, detail="Payment method must be 'momo' or 'card'. Cash payments not allowed for membership cards.")
+    # Validate payment method - only MoMo allowed for now
+    if request.payment_method not in ["momo"]:
+        raise HTTPException(status_code=400, detail="Only Mobile Money payment is currently supported")
     
-    # Validate MoMo details if using MoMo
+    # Validate MoMo details
     if request.payment_method == "momo":
         if not request.momo_number or not request.momo_provider:
             raise HTTPException(status_code=400, detail="MoMo number and provider are required for Mobile Money payment")
-        if request.momo_provider not in ["MTN", "Vodafone", "AirtelTigo"]:
-            raise HTTPException(status_code=400, detail="Invalid MoMo provider. Must be MTN, Vodafone, or AirtelTigo")
+        # Normalize provider names
+        provider_map = {"VODAFONE": "TELECEL", "MTN": "MTN", "TELECEL": "TELECEL", "AIRTELTIGO": "AIRTELTIGO"}
+        normalized_provider = provider_map.get(request.momo_provider.upper())
+        if not normalized_provider:
+            raise HTTPException(status_code=400, detail="Invalid MoMo provider. Must be MTN, Telecel (Vodafone), or AirtelTigo")
+        request.momo_provider = normalized_provider
     
     # Get card type
     card_type = await db.vip_card_types.find_one({"id": request.card_type_id, "is_active": True}, {"_id": 0})
@@ -6601,21 +6792,12 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         is_upgrade = True
         is_first_purchase = False
     
-    # For MoMo/Card payment - simulate payment processing
-    # In production, this would integrate with BulkClix or another payment provider
-    payment_reference = f"VIP_{uuid.uuid4().hex[:8].upper()}"
-    payment_status = "completed"  # SIMULATED - would be pending until webhook confirms
-    
-    # Mark old membership as upgraded
-    if current_membership:
-        await db.vip_memberships.update_one(
-            {"id": current_membership["id"]},
-            {"$set": {"status": "upgraded"}}
-        )
-    
-    # Create new membership
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=card_type["validity_days"])).isoformat()
+    # Generate unique transaction ID
+    transaction_id = f"VIP_{uuid.uuid4().hex[:12].upper()}"
     now = datetime.now(timezone.utc).isoformat()
+    
+    # Create pending membership record
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=card_type["validity_days"])).isoformat()
     
     membership = VIPMembership(
         user_id=user["id"],
@@ -6626,42 +6808,191 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         price_paid=price_to_pay,
         payment_method=request.payment_method,
         expires_at=expires_at,
-        upgraded_from=current_membership["tier"] if current_membership else None
+        upgraded_from=current_membership["tier"] if current_membership else None,
+        status="pending"  # Will be activated on payment confirmation
     )
     
     membership_data = membership.model_dump()
-    membership_data["payment_reference"] = payment_reference
-    membership_data["momo_number"] = request.momo_number if request.payment_method == "momo" else None
-    membership_data["momo_provider"] = request.momo_provider if request.payment_method == "momo" else None
+    membership_data["payment_reference"] = transaction_id
+    membership_data["momo_number"] = request.momo_number
+    membership_data["momo_provider"] = request.momo_provider
+    membership_data["payment_status"] = "pending"
+    membership_data["is_first_purchase"] = is_first_purchase
+    membership_data["created_at"] = now
     
+    # Store pending membership
     await db.vip_memberships.insert_one(membership_data)
     
-    # Update user record with VIP tier and confirm membership
+    # Initiate BulkClix MoMo collection
+    callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/vip-card"
+    
+    payment_result = await bulkclix_payment_service.collect_momo_payment(
+        amount=price_to_pay,
+        phone_number=request.momo_number,
+        network=request.momo_provider,
+        transaction_id=transaction_id,
+        callback_url=callback_url,
+        reference=f"SDM {card_type['name']} Membership"
+    )
+    
+    if not payment_result.get("success"):
+        # Payment initiation failed - delete pending membership
+        await db.vip_memberships.delete_one({"id": membership.id})
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Payment initiation failed: {payment_result.get('error', 'Unknown error')}"
+        )
+    
+    # Update membership with BulkClix response
+    await db.vip_memberships.update_one(
+        {"id": membership.id},
+        {"$set": {
+            "bulkclix_response": payment_result.get("data"),
+            "payment_initiated_at": now
+        }}
+    )
+    
+    return {
+        "message": "Payment initiated. Please approve the payment on your phone.",
+        "transaction_id": transaction_id,
+        "amount": price_to_pay,
+        "payment_method": request.payment_method,
+        "momo_number": request.momo_number,
+        "momo_provider": request.momo_provider,
+        "status": "pending",
+        "card_name": card_type["name"],
+        "is_upgrade": is_upgrade,
+        "instructions": "You will receive a prompt on your phone to approve the payment. Once approved, your membership will be activated automatically."
+    }
+
+# ============== VIP CARD PAYMENT WEBHOOK ==============
+
+@sdm_router.post("/payments/webhook/vip-card")
+async def vip_card_payment_webhook(request: Request):
+    """
+    Webhook endpoint for VIP card payment confirmations from BulkClix
+    Called when payment status changes
+    """
+    try:
+        data = await request.json()
+        logging.info(f"VIP Card Payment webhook received: {data}")
+        
+        # Extract transaction details from webhook
+        transaction_id = data.get("transaction_id")
+        ext_transaction_id = data.get("ext_transaction_id")
+        status = data.get("status", "").lower()
+        amount = data.get("amount")
+        phone_number = data.get("phone_number")
+        
+        if not transaction_id:
+            logging.warning("VIP Card webhook: Missing transaction_id")
+            return {"success": False, "error": "Missing transaction_id"}
+        
+        # Find pending membership by transaction ID
+        membership = await db.vip_memberships.find_one(
+            {"payment_reference": transaction_id},
+            {"_id": 0}
+        )
+        
+        if not membership:
+            logging.warning(f"VIP Card webhook: Membership not found for transaction: {transaction_id}")
+            return {"success": False, "error": "Membership not found"}
+        
+        # Update with webhook data
+        now = datetime.now(timezone.utc).isoformat()
+        await db.vip_memberships.update_one(
+            {"id": membership["id"]},
+            {"$set": {
+                "webhook_received": True,
+                "webhook_data": data,
+                "ext_transaction_id": ext_transaction_id,
+                "webhook_received_at": now
+            }}
+        )
+        
+        # Process based on status
+        if status == "success":
+            await process_vip_card_payment_success(membership)
+            return {"success": True, "message": "Payment processed, membership activated"}
+        elif status in ["failed", "declined", "cancelled"]:
+            await db.vip_memberships.update_one(
+                {"id": membership["id"]},
+                {"$set": {
+                    "payment_status": "failed",
+                    "status": "payment_failed",
+                    "error_message": data.get("message", "Payment failed")
+                }}
+            )
+            return {"success": True, "message": "Payment marked as failed"}
+        
+        return {"success": True, "message": "Webhook received"}
+        
+    except Exception as e:
+        logging.error(f"VIP Card Payment webhook error: {e}")
+        return {"success": False, "error": str(e)}
+
+async def process_vip_card_payment_success(membership: dict):
+    """Process successful VIP card payment - activate membership and pay bonuses"""
+    from ledger import EntityType
+    
+    now = datetime.now(timezone.utc).isoformat()
+    user_id = membership["user_id"]
+    
+    # Get user
+    user = await db.sdm_users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        logging.error(f"User not found for membership: {membership['id']}")
+        return
+    
+    # Check if this was an upgrade
+    is_upgrade = membership.get("upgraded_from") is not None
+    is_first_purchase = membership.get("is_first_purchase", False)
+    
+    # Mark old membership as upgraded if upgrading
+    if is_upgrade:
+        await db.vip_memberships.update_many(
+            {"user_id": user_id, "status": "active", "id": {"$ne": membership["id"]}},
+            {"$set": {"status": "upgraded"}}
+        )
+    
+    # Get card type for details
+    card_type = await db.vip_card_types.find_one({"id": membership["card_type_id"]}, {"_id": 0})
+    
+    # Activate membership
+    await db.vip_memberships.update_one(
+        {"id": membership["id"]},
+        {"$set": {
+            "status": "active",
+            "payment_status": "completed",
+            "activated_at": now
+        }}
+    )
+    
+    # Update user record
     user_updates = {
-        "vip_tier": card_type["tier"],
-        "vip_membership_id": membership.id,
-        "monthly_withdrawal_limit": card_type["monthly_withdrawal_limit"],
+        "vip_tier": membership["tier"],
+        "vip_membership_id": membership["id"],
         "membership_status": "active",
         "membership_confirmed_at": now
     }
+    if card_type:
+        user_updates["monthly_withdrawal_limit"] = card_type.get("monthly_withdrawal_limit", 2500)
     
     await db.sdm_users.update_one(
-        {"id": user["id"]},
+        {"id": user_id},
         {"$set": user_updates}
     )
     
-    # Get or create wallet for the user
-    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user["id"])
+    # Get or create wallet
+    wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user_id)
     if not wallet:
-        wallet = await ledger_service.create_wallet(EntityType.CLIENT, user["id"])
+        wallet = await ledger_service.create_wallet(EntityType.CLIENT, user_id)
     
-    referral_bonuses_paid = {"welcome_bonus": 0, "referrer_bonus": 0}
-    
-    # Award referral bonuses if this is first purchase and user was referred
+    # Award referral bonuses if first purchase and user was referred
     if is_first_purchase and user.get("referred_by"):
         # Award welcome bonus to new user (1 GHS)
         await db.sdm_users.update_one(
-            {"id": user["id"]},
+            {"id": user_id},
             {"$inc": {
                 "wallet_available": REFERRAL_WELCOME_BONUS,
                 "total_earned": REFERRAL_WELCOME_BONUS
@@ -6676,18 +7007,16 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
         # Record welcome bonus
         welcome_bonus_record = ReferralBonus(
             referrer_id=user["referred_by"],
-            referred_id=user["id"],
+            referred_id=user_id,
             referred_phone=user["phone"],
             bonus_type="welcome_bonus",
             amount=REFERRAL_WELCOME_BONUS
         )
         await db.referral_bonuses.insert_one(welcome_bonus_record.model_dump())
-        referral_bonuses_paid["welcome_bonus"] = REFERRAL_WELCOME_BONUS
         
         # Award referrer bonus (3 GHS)
         referrer = await db.sdm_users.find_one({"id": user["referred_by"]})
         if referrer:
-            # Update referrer's wallet and stats
             await db.sdm_users.update_one(
                 {"id": referrer["id"]},
                 {"$inc": {
@@ -6708,30 +7037,43 @@ async def purchase_vip_card(request: PurchaseVIPCardRequest, user: dict = Depend
             # Record referrer bonus
             referrer_bonus_record = ReferralBonus(
                 referrer_id=referrer["id"],
-                referred_id=user["id"],
+                referred_id=user_id,
                 referred_phone=user["phone"],
                 bonus_type="referrer_bonus",
                 amount=REFERRAL_BONUS
             )
             await db.referral_bonuses.insert_one(referrer_bonus_record.model_dump())
-            referral_bonuses_paid["referrer_bonus"] = REFERRAL_BONUS
         
-        # Mark as processed
+        # Mark referral as processed
         await db.vip_memberships.update_one(
-            {"id": membership.id},
+            {"id": membership["id"]},
             {"$set": {"referrer_bonus_paid": True}}
         )
     
+    logging.info(f"VIP Card membership activated: {membership['id']} for user {user_id}")
+
+# ============== CHECK VIP PAYMENT STATUS ==============
+
+@sdm_router.get("/user/vip-cards/payment-status/{transaction_id}")
+async def check_vip_payment_status(transaction_id: str, user: dict = Depends(get_current_user)):
+    """Check the status of a VIP card payment"""
+    membership = await db.vip_memberships.find_one(
+        {"payment_reference": transaction_id, "user_id": user["id"]},
+        {"_id": 0}
+    )
+    
+    if not membership:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
     return {
-        "message": f"{'Upgraded to' if is_upgrade else 'Purchased'} {card_type['name']}! Your membership is now active.",
-        "membership": membership.model_dump(),
-        "price_paid": price_to_pay,
-        "payment_method": request.payment_method,
-        "payment_reference": payment_reference,
-        "is_upgrade": is_upgrade,
-        "is_first_purchase": is_first_purchase,
-        "membership_status": "active",
-        "referral_bonuses": referral_bonuses_paid
+        "transaction_id": transaction_id,
+        "status": membership.get("payment_status", "pending"),
+        "membership_status": membership.get("status"),
+        "card_name": membership.get("card_name"),
+        "price_paid": membership.get("price_paid"),
+        "is_active": membership.get("status") == "active",
+        "created_at": membership.get("created_at"),
+        "activated_at": membership.get("activated_at")
     }
 
 # ==================== REFERRAL HISTORY ENDPOINTS ====================

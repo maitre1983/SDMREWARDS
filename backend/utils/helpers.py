@@ -15,7 +15,7 @@ import phonenumbers
 from datetime import datetime, timezone, timedelta
 
 # JWT Secret from environment
-JWT_SECRET = os.environ.get("JWT_SECRET", "sdm-super-secret-key-change-in-production")
+JWT_SECRET = os.environ.get("JWT_SECRET", "smart-digital-solutions-secret-key-2024")
 
 
 def hash_password(password: str) -> str:
