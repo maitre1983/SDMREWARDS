@@ -63,10 +63,14 @@ export const sdmTranslations = {
     
     // Partners
     sdm_our_partners: "Our Partners",
+    sdm_partners: "Partners",
     sdm_merchants_accept: "merchants accept SDM",
     sdm_partner_list_soon: "Partner list coming soon",
     sdm_cashback: "Cashback",
     sdm_gold_exclusive: "Gold+ Exclusive",
+    sdm_earn_cashback_at: "Earn cashback at these locations",
+    sdm_no_partners: "No partners available yet",
+    sdm_partner_categories: "Categories",
     
     // Lottery
     sdm_vip_lottery: "VIP Lottery",
@@ -276,10 +280,14 @@ export const sdmTranslations = {
     
     // Partners
     sdm_our_partners: "Nos Partenaires",
+    sdm_partners: "Partenaires",
     sdm_merchants_accept: "commerces acceptent SDM",
     sdm_partner_list_soon: "Liste des partenaires bientôt disponible",
     sdm_cashback: "Cashback",
     sdm_gold_exclusive: "Exclusif Gold+",
+    sdm_earn_cashback_at: "Gagnez du cashback chez ces partenaires",
+    sdm_no_partners: "Aucun partenaire disponible pour le moment",
+    sdm_partner_categories: "Catégories",
     
     // Lottery
     sdm_vip_lottery: "Tirages VIP",

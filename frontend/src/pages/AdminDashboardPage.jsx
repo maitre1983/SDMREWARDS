@@ -4,7 +4,7 @@ import {
   Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
   ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet,
-  CreditCard, Wallet
+  CreditCard, Wallet, Users, Store
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import SDMConfigPanel from '../components/admin/SDMConfigPanel';
 import FintechDashboard from '../components/admin/FintechDashboard';
+import UsersAndMerchantsPanel from '../components/admin/UsersAndMerchantsPanel';
 import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -183,6 +184,13 @@ export default function AdminDashboardPage() {
           >
             <CreditCard size={18} />
             <span>SDM Platform</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('users-merchants')}
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'users-merchants' ? 'active' : ''}`}
+          >
+            <Users size={18} />
+            <span>Clients & Marchands</span>
           </button>
           <button
             onClick={() => setActiveTab('fintech')}
@@ -531,6 +539,10 @@ export default function AdminDashboardPage() {
 
           {activeTab === 'sdm' && (
             <SDMConfigPanel token={token} />
+          )}
+
+          {activeTab === 'users-merchants' && (
+            <UsersAndMerchantsPanel token={token} />
           )}
 
           {activeTab === 'fintech' && (

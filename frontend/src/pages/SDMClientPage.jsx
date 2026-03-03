@@ -76,9 +76,9 @@ export default function SDMClientPage() {
     }
   }, [token]);
 
-  // Load service data when services tab is active
+  // Load service data when services or partners tab is active
   useEffect(() => {
-    if (activeTab === 'services' && token) {
+    if ((activeTab === 'services' || activeTab === 'partners') && token) {
       fetchServiceData();
     }
   }, [activeTab, token]);
@@ -874,6 +874,7 @@ export default function SDMClientPage() {
           {[
             { id: 'wallet', icon: QrCode, label: t('sdm_my_qr') },
             { id: 'services', icon: Smartphone, label: t('sdm_services') },
+            { id: 'partners', icon: Store, label: t('sdm_partners') || 'Partners' },
             { id: 'membership', icon: CreditCard, label: t('sdm_cards') },
             { id: 'referral', icon: Gift, label: t('sdm_invite') },
             { id: 'history', icon: History, label: t('sdm_history') },
@@ -915,6 +916,77 @@ export default function SDMClientPage() {
               <Copy size={16} />
               Copy Code
             </Button>
+          </div>
+        )}
+
+        {/* PARTNERS TAB */}
+        {activeTab === 'partners' && (
+          <div className="space-y-4" data-testid="partners-tab">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-4 text-white">
+              <h3 className="font-bold text-lg">{t('sdm_our_partners') || 'Our Partner Merchants'}</h3>
+              <p className="text-sm opacity-80 mt-1">{t('sdm_earn_cashback_at') || 'Earn cashback at these locations'}</p>
+            </div>
+
+            {/* Partners List */}
+            {partners.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center">
+                <Store className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-500">{t('sdm_no_partners') || 'No partners available yet'}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {partners.map((partner) => (
+                  <div 
+                    key={partner.id} 
+                    className="bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-100 hover:border-blue-200 transition-colors"
+                    data-testid={`partner-${partner.id}`}
+                  >
+                    {/* Partner Logo/Icon */}
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      {partner.logo ? (
+                        <img src={partner.logo} alt={partner.name} className="w-10 h-10 rounded-lg object-cover" />
+                      ) : (
+                        <Store className="w-6 h-6 text-blue-600" />
+                      )}
+                    </div>
+
+                    {/* Partner Info */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-slate-900 truncate">{partner.name}</h4>
+                      <p className="text-sm text-slate-500">{partner.category}</p>
+                      {partner.city && (
+                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                          <MapPin size={12} />
+                          {partner.city}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Cashback Rate */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-lg font-bold text-emerald-600">
+                        {partner.cashback_rate || 5}%
+                      </p>
+                      <p className="text-xs text-slate-400">Cashback</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Partner Categories */}
+            {partners.length > 0 && (
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-slate-700 mb-2">{t('sdm_partner_categories') || 'Categories'}</h4>
+                <div className="flex flex-wrap gap-2">
+                  {[...new Set(partners.map(p => p.category).filter(Boolean))].map((cat) => (
+                    <span key={cat} className="px-3 py-1 bg-white text-xs text-slate-600 rounded-full border">
+                      {cat}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
