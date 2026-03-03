@@ -4,7 +4,7 @@ import {
   Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
   ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet,
-  CreditCard, Wallet, Users, Store, Shield, Gift, ArrowRightLeft
+  CreditCard, Wallet, Users, Store, Shield, Gift, ArrowRightLeft, DollarSign
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ import AdminManagementPanel from '../components/admin/AdminManagementPanel';
 import ReferralHistoryPanel from '../components/admin/ReferralHistoryPanel';
 import MessagesPanel from '../components/admin/MessagesPanel';
 import TransactionHistoryPanel from '../components/admin/TransactionHistoryPanel';
+import SDMCommissionsPanel from '../components/admin/SDMCommissionsPanel';
 import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;

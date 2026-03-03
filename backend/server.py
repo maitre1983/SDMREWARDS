@@ -2789,28 +2789,28 @@ async def process_successful_transaction(pending: dict, ext_transaction_id: str)
     })
     logging.info(f"SDM commission recorded: {sdm_commission} GHS")
     
-    # Step 4: Credit customer cashback
+    # Step 4: Credit customer cashback - AVAILABLE IMMEDIATELY (no pending)
     user_id = pending["user_id"]
     net_cashback = pending["net_cashback"]
     
-    # Update user wallet
+    # Update user wallet - cashback available immediately
     await db.sdm_users.update_one(
         {"id": user_id},
         {"$inc": {
-            "wallet_pending": net_cashback,
+            "wallet_available": net_cashback,
             "total_cashback_earned": net_cashback
         }}
     )
     
-    # Also update ledger wallet if exists
+    # Also update ledger wallet if exists - available balance
     user_wallet = await ledger_service.get_wallet_by_entity(EntityType.CLIENT, user_id)
     if user_wallet:
         await db.wallets.update_one(
             {"id": user_wallet.id},
-            {"$inc": {"pending_balance": net_cashback}}
+            {"$inc": {"available_balance": net_cashback, "balance": net_cashback}}
         )
     
-    logging.info(f"Customer cashback credited: {net_cashback} GHS (pending)")
+    logging.info(f"Customer cashback credited: {net_cashback} GHS (available immediately)")
     
     # Step 5: Mark transaction as completed
     await db.pending_payments.update_one(
@@ -4088,6 +4088,124 @@ async def admin_get_transaction_stats(admin: dict = Depends(get_current_admin)):
         "total_commission": total_commission,
         "total_cashback": total_cashback
     }
+
+# ============== SDM COMMISSIONS MANAGEMENT ==============
+
+@sdm_router.get("/admin/commissions")
+async def admin_get_commissions(admin: dict = Depends(get_current_admin)):
+    """Admin: Get SDM commission summary and history"""
+    # Get all commissions
+    commissions = await db.sdm_commissions.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    
+    # Calculate totals
+    total_earned = sum(c.get("amount", 0) for c in commissions)
+    
+    # Get withdrawn commissions
+    withdrawals = await db.sdm_commission_withdrawals.find({}, {"_id": 0}).to_list(100)
+    total_withdrawn = sum(w.get("amount", 0) for w in withdrawals if w.get("status") == "completed")
+    
+    available_balance = total_earned - total_withdrawn
+    
+    return {
+        "total_earned": round(total_earned, 2),
+        "total_withdrawn": round(total_withdrawn, 2),
+        "available_balance": round(available_balance, 2),
+        "recent_commissions": commissions[:50],
+        "withdrawal_history": withdrawals
+    }
+
+class SDMCommissionWithdrawRequest(BaseModel):
+    amount: float
+    momo_number: str
+    momo_provider: str  # MTN, TELECEL, AIRTELTIGO
+    account_name: Optional[str] = "SDM Admin"
+
+@sdm_router.post("/admin/commissions/withdraw")
+async def admin_withdraw_commission(request: SDMCommissionWithdrawRequest, admin: dict = Depends(get_current_admin)):
+    """Super Admin: Withdraw SDM commissions to MoMo"""
+    # Only super_admin can withdraw
+    if admin.get("role") != "super_admin":
+        raise HTTPException(status_code=403, detail="Only Super Admin can withdraw commissions")
+    
+    # Get available balance
+    commissions = await db.sdm_commissions.find({}, {"_id": 0}).to_list(10000)
+    total_earned = sum(c.get("amount", 0) for c in commissions)
+    
+    withdrawals = await db.sdm_commission_withdrawals.find({}, {"_id": 0}).to_list(100)
+    total_withdrawn = sum(w.get("amount", 0) for w in withdrawals if w.get("status") == "completed")
+    
+    available_balance = total_earned - total_withdrawn
+    
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    if request.amount > available_balance:
+        raise HTTPException(status_code=400, detail=f"Insufficient balance. Available: {available_balance:.2f} GHS")
+    
+    # Normalize provider
+    provider_map = {"MTN": "MTN", "VODAFONE": "TELECEL", "TELECEL": "TELECEL", "AIRTELTIGO": "AIRTELTIGO"}
+    normalized_provider = provider_map.get(request.momo_provider.upper(), request.momo_provider.upper())
+    
+    # Create withdrawal record
+    withdrawal_id = str(uuid.uuid4())
+    client_reference = f"SDMW_{uuid.uuid4().hex[:10].upper()}"
+    now = datetime.now(timezone.utc).isoformat()
+    
+    withdrawal_record = {
+        "id": withdrawal_id,
+        "admin_id": admin["id"],
+        "admin_username": admin.get("username"),
+        "amount": request.amount,
+        "momo_number": request.momo_number,
+        "momo_provider": normalized_provider,
+        "account_name": request.account_name,
+        "client_reference": client_reference,
+        "status": "processing",
+        "created_at": now
+    }
+    
+    await db.sdm_commission_withdrawals.insert_one(withdrawal_record)
+    
+    # Send MoMo transfer
+    transfer_result = await bulkclix_payment_service.transfer_momo(
+        amount=request.amount,
+        account_number=request.momo_number,
+        network=normalized_provider,
+        account_name=request.account_name or "SDM Admin",
+        client_reference=client_reference
+    )
+    
+    if transfer_result.get("success"):
+        await db.sdm_commission_withdrawals.update_one(
+            {"id": withdrawal_id},
+            {"$set": {
+                "status": "completed",
+                "completed_at": now,
+                "bulkclix_response": transfer_result.get("data")
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": f"Withdrawal of {request.amount} GHS sent to {request.momo_number}",
+            "withdrawal_id": withdrawal_id,
+            "client_reference": client_reference,
+            "new_balance": round(available_balance - request.amount, 2)
+        }
+    else:
+        await db.sdm_commission_withdrawals.update_one(
+            {"id": withdrawal_id},
+            {"$set": {
+                "status": "failed",
+                "error": transfer_result.get("error"),
+                "failed_at": now
+            }}
+        )
+        
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transfer failed: {transfer_result.get('error')}"
+        )
 
 @sdm_router.get("/admin/withdrawals")
 async def admin_get_withdrawals(admin: dict = Depends(get_current_admin), status: Optional[str] = None):

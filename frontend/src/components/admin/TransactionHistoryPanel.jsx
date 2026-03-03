@@ -36,19 +36,13 @@ export default function TransactionHistoryPanel({ token }) {
       if (searchTerm) params.append('search', searchTerm);
       
       const res = await axios.get(
-        `${API_URL}/api/admin/transactions?${params.toString()}`,
+        `${API_URL}/api/sdm/admin/transactions?${params.toString()}`,
         { headers }
       );
       setTransactions(res.data.transactions || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      // Try alternate endpoint
-      try {
-        const res = await axios.get(`${API_URL}/api/sdm/admin/all-transactions`, { headers });
-        setTransactions(res.data.transactions || []);
-      } catch (e) {
-        toast.error('Erreur de chargement des transactions');
-      }
+      toast.error('Erreur de chargement des transactions');
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +50,7 @@ export default function TransactionHistoryPanel({ token }) {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/admin/transactions/stats`, { headers });
+      const res = await axios.get(`${API_URL}/api/sdm/admin/transactions/stats`, { headers });
       setStats(res.data);
     } catch (error) {
       // Silently fail for stats
