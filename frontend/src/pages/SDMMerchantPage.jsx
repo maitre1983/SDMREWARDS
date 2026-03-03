@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   Store, ArrowLeft, Loader2, QrCode, Users, BarChart3,
   Settings, LogOut, DollarSign, TrendingUp, Plus, Trash2,
-  Check, X, Edit2, Camera, Calendar, Filter,
+  Check, X, Edit2, Camera, Calendar, Filter, CheckCircle,
   ChevronDown, ChevronUp, Clock, User, Search,
   Eye, EyeOff, Lock, MapPin, Send, Phone, Copy, 
   Code, Book, Key, Shield, Percent, ToggleLeft, ToggleRight, Save,
@@ -80,6 +80,18 @@ export default function SDMMerchantPage() {
   const [paymentSplit, setPaymentSplit] = useState(null);
   const [showMyQR, setShowMyQR] = useState(false);
 
+  // Security PIN for Settings
+  const [pinStatus, setPinStatus] = useState({ has_pin: false, is_locked: false });
+  const [settingsUnlocked, setSettingsUnlocked] = useState(false);
+  const [settingsToken, setSettingsToken] = useState(null);
+  const [pinInput, setPinInput] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinOtp, setPinOtp] = useState('');
+  const [pinOtpId, setPinOtpId] = useState('');
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [showPinReset, setShowPinReset] = useState(false);
+
   // Staff form
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffPhone, setNewStaffPhone] = useState('');
@@ -112,10 +124,124 @@ export default function SDMMerchantPage() {
       setReport(reportRes.data);
       if (qrRes.data) setMerchantQrData(qrRes.data);
       if (cashRes.data) setCashBalance(cashRes.data);
+      
+      // Fetch PIN status
+      try {
+        const pinRes = await axios.get(`${API_URL}/api/sdm/merchant/settings/pin-status`, { headers });
+        setPinStatus(pinRes.data);
+      } catch (e) {
+        console.log('PIN status not available');
+      }
     } catch (error) {
       if (error.response?.status === 401) {
         handleLogout();
       }
+    }
+  };
+
+  // PIN Security Functions
+  const handleVerifyPin = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post(
+        `${API_URL}/api/sdm/merchant/settings/verify-pin`,
+        { pin: pinInput },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setSettingsUnlocked(true);
+        setSettingsToken(response.data.settings_token);
+        setPinInput('');
+        toast.success('Settings unlocked');
+        
+        // Auto-lock after 10 minutes
+        setTimeout(() => {
+          setSettingsUnlocked(false);
+          setSettingsToken(null);
+          toast.info('Settings locked for security');
+        }, 600000);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid PIN');
+      setPinInput('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendPinOtp = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post(
+        `${API_URL}/api/sdm/merchant/send-otp`,
+        { phone: merchant?.phone }
+      );
+      setPinOtpId(response.data.request_id);
+      toast.success('OTP sent to your phone');
+    } catch (error) {
+      toast.error('Failed to send OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetPin = async () => {
+    if (newPin !== confirmPin) {
+      toast.error('PINs do not match');
+      return;
+    }
+    if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
+      toast.error('PIN must be 4-6 digits');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      await axios.post(
+        `${API_URL}/api/sdm/merchant/settings/set-pin`,
+        { pin: newPin, otp_code: pinOtp, request_id: pinOtpId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Settings PIN has been set');
+      setShowPinSetup(false);
+      setNewPin('');
+      setConfirmPin('');
+      setPinOtp('');
+      setPinStatus({ ...pinStatus, has_pin: true });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to set PIN');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPin = async () => {
+    if (newPin !== confirmPin) {
+      toast.error('PINs do not match');
+      return;
+    }
+    if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
+      toast.error('PIN must be 4-6 digits');
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      await axios.post(
+        `${API_URL}/api/sdm/merchant/settings/reset-pin`,
+        { new_pin: newPin, otp_code: pinOtp, request_id: pinOtpId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Settings PIN has been reset');
+      setShowPinReset(false);
+      setNewPin('');
+      setConfirmPin('');
+      setPinOtp('');
+      setSettingsUnlocked(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reset PIN');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1322,7 +1448,201 @@ export default function SDMMerchantPage() {
 
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            {/* Cashback Settings */}
+            {/* Security PIN Section */}
+            {pinStatus.has_pin && !settingsUnlocked ? (
+              <div className="bg-white rounded-2xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Lock className="text-amber-600" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Settings Locked</h3>
+                    <p className="text-sm text-slate-500">Enter your PIN to access settings</p>
+                  </div>
+                </div>
+                
+                {pinStatus.is_locked ? (
+                  <div className="bg-red-50 rounded-xl p-4 text-center">
+                    <AlertCircle className="mx-auto text-red-500 mb-2" size={32} />
+                    <p className="text-red-700 font-medium">Settings Temporarily Locked</p>
+                    <p className="text-sm text-red-600">Too many failed attempts. Try again later.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Enter PIN</label>
+                      <div className="flex gap-3">
+                        <Input
+                          type="password"
+                          value={pinInput}
+                          onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="Enter 4-6 digit PIN"
+                          className="flex-1 text-center text-2xl tracking-widest"
+                          maxLength={6}
+                        />
+                        <Button
+                          onClick={handleVerifyPin}
+                          disabled={isLoading || pinInput.length < 4}
+                          className="bg-amber-500 hover:bg-amber-600"
+                        >
+                          {isLoading ? <Loader2 className="animate-spin" /> : 'Unlock'}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => { setShowPinReset(true); handleSendPinOtp(); }}
+                      className="text-sm text-cyan-600 hover:underline"
+                    >
+                      Forgot PIN? Reset via OTP
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : !pinStatus.has_pin ? (
+              <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-amber-200 rounded-xl flex items-center justify-center">
+                    <Shield className="text-amber-700" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-amber-800">Secure Your Settings</h3>
+                    <p className="text-sm text-amber-600">Set a PIN to protect your business settings</p>
+                  </div>
+                </div>
+                
+                {!showPinSetup ? (
+                  <Button
+                    onClick={() => { setShowPinSetup(true); handleSendPinOtp(); }}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white"
+                  >
+                    <Lock size={16} className="mr-2" />
+                    Set Security PIN
+                  </Button>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-amber-800 mb-1">New PIN (4-6 digits)</label>
+                      <Input
+                        type="password"
+                        value={newPin}
+                        onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Enter PIN"
+                        className="text-center text-xl tracking-widest"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-amber-800 mb-1">Confirm PIN</label>
+                      <Input
+                        type="password"
+                        value={confirmPin}
+                        onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Confirm PIN"
+                        className="text-center text-xl tracking-widest"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-amber-800 mb-1">OTP Code (sent to your phone)</label>
+                      <Input
+                        value={pinOtp}
+                        onChange={(e) => setPinOtp(e.target.value)}
+                        placeholder="Enter OTP"
+                        className="text-center"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowPinSetup(false)}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSetPin}
+                        disabled={isLoading || newPin.length < 4 || !pinOtp}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600"
+                      >
+                        {isLoading ? <Loader2 className="animate-spin" /> : 'Set PIN'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-emerald-50 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="text-emerald-600" size={20} />
+                  <span className="text-emerald-700 font-medium">Settings Unlocked</span>
+                </div>
+                <button
+                  onClick={() => { setSettingsUnlocked(false); setSettingsToken(null); }}
+                  className="text-sm text-emerald-600 hover:underline"
+                >
+                  Lock Now
+                </button>
+              </div>
+            )}
+
+            {/* PIN Reset Modal */}
+            {showPinReset && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-md w-full p-6">
+                  <h3 className="text-lg font-semibold mb-4">Reset Settings PIN</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">New PIN (4-6 digits)</label>
+                      <Input
+                        type="password"
+                        value={newPin}
+                        onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Enter new PIN"
+                        className="text-center text-xl tracking-widest"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Confirm PIN</label>
+                      <Input
+                        type="password"
+                        value={confirmPin}
+                        onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Confirm PIN"
+                        className="text-center text-xl tracking-widest"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">OTP Code</label>
+                      <Input
+                        value={pinOtp}
+                        onChange={(e) => setPinOtp(e.target.value)}
+                        placeholder="Enter OTP sent to your phone"
+                        className="text-center"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => { setShowPinReset(false); setNewPin(''); setConfirmPin(''); setPinOtp(''); }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleResetPin}
+                        disabled={isLoading || newPin.length < 4 || !pinOtp}
+                        className="flex-1"
+                      >
+                        {isLoading ? <Loader2 className="animate-spin" /> : 'Reset PIN'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cashback Settings - Only show when unlocked or no PIN set */}
+            {(settingsUnlocked || !pinStatus.has_pin) && (
+            <>
             <div className="bg-white rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -1422,7 +1742,7 @@ export default function SDMMerchantPage() {
               </div>
             </div>
 
-            {/* API Credentials */}
+            {/* API Credentials - Also protected by PIN */}
             <div className="bg-white rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -1615,6 +1935,8 @@ export default function SDMMerchantPage() {
                 </div>
               </div>
             </div>
+            </>
+            )}
           </div>
         )}
       </div>

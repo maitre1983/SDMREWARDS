@@ -4,7 +4,7 @@ import {
   Mail, LogOut, Inbox, CheckCircle, MessageSquare, 
   Trash2, Send, RefreshCw, Clock, User, Building2, Phone,
   ChevronRight, X, BarChart3, Globe, Monitor, Smartphone, Tablet,
-  CreditCard, Wallet, Users, Store
+  CreditCard, Wallet, Users, Store, Shield
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import axios from 'axios';
 import SDMConfigPanel from '../components/admin/SDMConfigPanel';
 import FintechDashboard from '../components/admin/FintechDashboard';
 import UsersAndMerchantsPanel from '../components/admin/UsersAndMerchantsPanel';
+import AdminManagementPanel from '../components/admin/AdminManagementPanel';
 import LanguageSelector from '../components/LanguageSelector';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -33,6 +34,7 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [activeTab, setActiveTab] = useState('messages');
+  const [currentAdmin, setCurrentAdmin] = useState(null);
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -41,6 +43,16 @@ export default function AdminDashboardPage() {
       navigate('/admin');
     }
   }, [isAuthenticated, navigate]);
+
+  // Fetch current admin profile
+  const fetchAdminProfile = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/admin/profile`, { headers });
+      setCurrentAdmin(response.data);
+    } catch (error) {
+      console.error('Failed to fetch admin profile:', error);
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -53,6 +65,9 @@ export default function AdminDashboardPage() {
       setMessages(messagesRes.data);
       setStats(statsRes.data);
       setAnalytics(analyticsRes.data);
+      
+      // Also fetch admin profile
+      fetchAdminProfile();
     } catch (error) {
       console.error('Fetch error:', error);
       if (error.response?.status === 401) {
@@ -191,6 +206,13 @@ export default function AdminDashboardPage() {
           >
             <Users size={18} />
             <span>Clients & Marchands</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('admin-management')}
+            className={`w-full admin-sidebar-item rounded-lg ${activeTab === 'admin-management' ? 'active' : ''}`}
+          >
+            <Shield size={18} />
+            <span>Admin & Security</span>
           </button>
           <button
             onClick={() => setActiveTab('fintech')}
@@ -543,6 +565,10 @@ export default function AdminDashboardPage() {
 
           {activeTab === 'users-merchants' && (
             <UsersAndMerchantsPanel token={token} />
+          )}
+
+          {activeTab === 'admin-management' && (
+            <AdminManagementPanel token={token} currentAdmin={currentAdmin} />
           )}
 
           {activeTab === 'fintech' && (

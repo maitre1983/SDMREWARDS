@@ -180,11 +180,48 @@ class AdminUser(BaseModel):
     username: str
     password_hash: str
     email: Optional[str] = None
+    role: str = "admin"  # super_admin, admin, viewer
+    permissions: List[str] = Field(default_factory=lambda: ["view_users", "view_merchants", "view_logs"])
+    is_active: bool = True
+    created_by: Optional[str] = None
+    last_login: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# Admin Roles and Permissions
+ADMIN_ROLES = {
+    "super_admin": {
+        "name": "Super Admin",
+        "permissions": ["*"]  # All permissions
+    },
+    "admin": {
+        "name": "Admin",
+        "permissions": [
+            "view_users", "manage_users",
+            "view_merchants", "manage_merchants", 
+            "view_logs", "verify_merchants"
+        ]
+    },
+    "viewer": {
+        "name": "Viewer",
+        "permissions": ["view_users", "view_merchants", "view_logs"]
+    }
+}
 
 class AdminLogin(BaseModel):
     username: str
     password: str
+
+class CreateAdminRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: str = "admin"
+    permissions: Optional[List[str]] = None
+
+class ChangeAdminPasswordRequest(BaseModel):
+    current_password: Optional[str] = None  # Not required for super_admin changing others
+    new_password: str
+    target_admin_id: Optional[str] = None  # For super_admin changing other admin's password
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -475,6 +512,11 @@ class SDMMerchant(BaseModel):
     block_reason: Optional[str] = None
     blocked_at: Optional[str] = None
     blocked_by: Optional[str] = None
+    
+    # Security PIN for Settings access
+    settings_pin_hash: Optional[str] = None  # 4-6 digit PIN for settings access
+    settings_pin_attempts: int = 0  # Failed attempts counter
+    settings_locked_until: Optional[str] = None  # Lock time if too many attempts
     
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -840,6 +882,24 @@ class MerchantCashTopUpRequest(BaseModel):
     payment_method: str  # momo, bank_transfer
     reference: Optional[str] = None
 
+# ============ SECURITY PIN REQUESTS ============
+
+class SetSettingsPINRequest(BaseModel):
+    """Set or update the settings PIN"""
+    pin: str  # 4-6 digit PIN
+    otp_code: str  # OTP for verification
+    request_id: str  # OTP request ID
+
+class VerifySettingsPINRequest(BaseModel):
+    """Verify PIN to access settings"""
+    pin: str
+
+class ResetSettingsPINRequest(BaseModel):
+    """Reset PIN via OTP"""
+    otp_code: str
+    request_id: str
+    new_pin: str
+
 class PurchaseMembershipRequest(BaseModel):
     card_type_id: str  # The merchant's card type to purchase
     payment_method: str = "wallet"  # wallet, mobile_money
@@ -1143,10 +1203,14 @@ async def verify_otp_bulkclix(phone: str, code: str, request_id: str) -> dict:
 async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        username = payload.get("sub")
+        identifier = payload.get("sub")
         if payload.get("type") != "admin":
             raise HTTPException(status_code=401, detail="Invalid token type")
-        admin = await db.admins.find_one({"username": username}, {"_id": 0})
+        # Search by username or email (token contains email or username)
+        admin = await db.admins.find_one(
+            {"$or": [{"username": identifier}, {"email": identifier}]}, 
+            {"_id": 0}
+        )
         if not admin:
             raise HTTPException(status_code=401, detail="Admin not found")
         return admin
@@ -1287,8 +1351,219 @@ async def setup_admin():
     admin = AdminUser(username="emileparfait2003@gmail.com", password_hash=hash_password("Gerard0103@"))
     doc = admin.model_dump()
     doc["email"] = "emileparfait2003@gmail.com"
+    doc["role"] = "super_admin"
     await db.admins.insert_one(doc)
     return {"message": "Admin created", "email": "emileparfait2003@gmail.com"}
+
+# ============== ADMIN MANAGEMENT ROUTES ==============
+
+@api_router.get("/admin/profile")
+async def get_admin_profile(admin: dict = Depends(get_current_admin)):
+    """Get current admin profile"""
+    return {
+        "id": admin.get("id"),
+        "username": admin.get("username"),
+        "email": admin.get("email"),
+        "role": admin.get("role", "admin"),
+        "permissions": admin.get("permissions", ADMIN_ROLES.get(admin.get("role", "admin"), {}).get("permissions", [])),
+        "last_login": admin.get("last_login"),
+        "created_at": admin.get("created_at")
+    }
+
+@api_router.post("/admin/change-password")
+async def change_admin_password(request: ChangeAdminPasswordRequest, admin: dict = Depends(get_current_admin)):
+    """Change admin password (own or other admin if super_admin)"""
+    admin_role = admin.get("role", "admin")
+    
+    # If changing own password
+    if not request.target_admin_id or request.target_admin_id == admin.get("id"):
+        # Verify current password
+        if not request.current_password:
+            raise HTTPException(status_code=400, detail="Current password required")
+        if not verify_password(request.current_password, admin["password_hash"]):
+            raise HTTPException(status_code=401, detail="Current password is incorrect")
+        
+        # Update password
+        new_hash = hash_password(request.new_password)
+        await db.admins.update_one(
+            {"id": admin["id"]},
+            {"$set": {"password_hash": new_hash}}
+        )
+        return {"success": True, "message": "Password changed successfully"}
+    
+    # If changing another admin's password (super_admin only)
+    if admin_role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can change other admin's password")
+    
+    target_admin = await db.admins.find_one({"id": request.target_admin_id}, {"_id": 0})
+    if not target_admin:
+        raise HTTPException(status_code=404, detail="Target admin not found")
+    
+    # Super admin can reset without knowing current password
+    new_hash = hash_password(request.new_password)
+    await db.admins.update_one(
+        {"id": request.target_admin_id},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    # Log the action
+    action_log = AdminActionLog(
+        admin_id=admin["id"],
+        admin_email=admin.get("email", admin["username"]),
+        target_type="admin",
+        target_id=request.target_admin_id,
+        target_identifier=target_admin.get("email", target_admin["username"]),
+        action="reset_password",
+        reason="Password reset by super admin"
+    )
+    await db.admin_action_logs.insert_one(action_log.model_dump())
+    
+    return {"success": True, "message": f"Password reset for {target_admin.get('email', target_admin['username'])}"}
+
+@api_router.get("/admin/list")
+async def list_admins(admin: dict = Depends(get_current_admin)):
+    """List all admin accounts (super_admin only)"""
+    admin_role = admin.get("role", "admin")
+    if admin_role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can view admin list")
+    
+    admins = await db.admins.find({}, {"_id": 0, "password_hash": 0}).to_list(100)
+    return {"admins": admins}
+
+@api_router.post("/admin/create")
+async def create_admin(request: CreateAdminRequest, admin: dict = Depends(get_current_admin)):
+    """Create a new admin account (super_admin only)"""
+    admin_role = admin.get("role", "admin")
+    if admin_role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can create new admins")
+    
+    # Validate role
+    if request.role not in ADMIN_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {list(ADMIN_ROLES.keys())}")
+    
+    # Check if username/email already exists
+    existing = await db.admins.find_one(
+        {"$or": [{"username": request.username}, {"email": request.email}]},
+        {"_id": 0}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Admin with this username or email already exists")
+    
+    # Create new admin
+    new_admin = AdminUser(
+        username=request.username,
+        password_hash=hash_password(request.password),
+        email=request.email,
+        role=request.role,
+        permissions=request.permissions or ADMIN_ROLES[request.role]["permissions"],
+        created_by=admin["id"]
+    )
+    
+    await db.admins.insert_one(new_admin.model_dump())
+    
+    # Log the action
+    action_log = AdminActionLog(
+        admin_id=admin["id"],
+        admin_email=admin.get("email", admin["username"]),
+        target_type="admin",
+        target_id=new_admin.id,
+        target_identifier=request.email,
+        action="create_admin",
+        action_details={"role": request.role},
+        reason=f"New admin created with role: {request.role}"
+    )
+    await db.admin_action_logs.insert_one(action_log.model_dump())
+    
+    return {
+        "success": True,
+        "message": f"Admin {request.email} created successfully",
+        "admin": {
+            "id": new_admin.id,
+            "username": request.username,
+            "email": request.email,
+            "role": request.role
+        }
+    }
+
+@api_router.put("/admin/{admin_id}/role")
+async def update_admin_role(admin_id: str, body: dict, admin: dict = Depends(get_current_admin)):
+    """Update admin role (super_admin only)"""
+    admin_role = admin.get("role", "admin")
+    if admin_role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can change admin roles")
+    
+    if admin_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+    
+    new_role = body.get("role")
+    if new_role not in ADMIN_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {list(ADMIN_ROLES.keys())}")
+    
+    target_admin = await db.admins.find_one({"id": admin_id}, {"_id": 0})
+    if not target_admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    await db.admins.update_one(
+        {"id": admin_id},
+        {"$set": {
+            "role": new_role,
+            "permissions": ADMIN_ROLES[new_role]["permissions"]
+        }}
+    )
+    
+    # Log the action
+    action_log = AdminActionLog(
+        admin_id=admin["id"],
+        admin_email=admin.get("email", admin["username"]),
+        target_type="admin",
+        target_id=admin_id,
+        target_identifier=target_admin.get("email", target_admin["username"]),
+        action="change_role",
+        action_details={"old_role": target_admin.get("role"), "new_role": new_role},
+        previous_state={"role": target_admin.get("role")}
+    )
+    await db.admin_action_logs.insert_one(action_log.model_dump())
+    
+    return {"success": True, "message": f"Admin role updated to {new_role}"}
+
+@api_router.delete("/admin/{admin_id}")
+async def delete_admin(admin_id: str, admin: dict = Depends(get_current_admin)):
+    """Delete an admin account (super_admin only)"""
+    admin_role = admin.get("role", "admin")
+    if admin_role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only super admin can delete admins")
+    
+    if admin_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    target_admin = await db.admins.find_one({"id": admin_id}, {"_id": 0})
+    if not target_admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    # Prevent deleting other super_admins
+    if target_admin.get("role") == "super_admin":
+        raise HTTPException(status_code=400, detail="Cannot delete another super admin")
+    
+    await db.admins.delete_one({"id": admin_id})
+    
+    # Log the action
+    action_log = AdminActionLog(
+        admin_id=admin["id"],
+        admin_email=admin.get("email", admin["username"]),
+        target_type="admin",
+        target_id=admin_id,
+        target_identifier=target_admin.get("email", target_admin["username"]),
+        action="delete_admin",
+        previous_state=target_admin
+    )
+    await db.admin_action_logs.insert_one(action_log.model_dump())
+    
+    return {"success": True, "message": "Admin deleted"}
+
+@api_router.get("/admin/roles")
+async def get_admin_roles(admin: dict = Depends(get_current_admin)):
+    """Get available admin roles and permissions"""
+    return {"roles": ADMIN_ROLES}
 
 @api_router.get("/admin/messages", response_model=List[ContactMessage])
 async def get_all_messages(admin: dict = Depends(get_current_admin)):
@@ -1369,6 +1644,18 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
 # Test account credentials (for development/testing only)
 TEST_PHONE = "+233000000000"
 TEST_OTP = "0000"
+
+async def verify_otp_helper(phone: str, otp_code: str, request_id: str) -> bool:
+    """Helper function to verify OTP for internal use (PIN operations)"""
+    normalized_phone = normalize_phone(phone)
+    
+    # Test account - accept TEST_OTP
+    if normalized_phone == normalize_phone(TEST_PHONE):
+        return otp_code == TEST_OTP
+    
+    # Verify via BulkClix
+    result = await verify_otp_bulkclix(normalized_phone, otp_code, request_id)
+    return result.get("success", False)
 
 @sdm_router.post("/auth/send-otp")
 async def send_otp(request: SendOTPRequest):
@@ -2003,6 +2290,141 @@ async def remove_staff(staff_id: str, merchant: dict = Depends(get_current_merch
         {"$pull": {"staff": {"id": staff_id}}}
     )
     return {"message": "Staff removed"}
+
+# ============== MERCHANT SETTINGS PIN SECURITY ==============
+
+@sdm_router.get("/merchant/settings/pin-status")
+async def get_pin_status(merchant: dict = Depends(get_current_merchant)):
+    """Check if PIN is set and if settings are locked"""
+    has_pin = bool(merchant.get("settings_pin_hash"))
+    locked_until = merchant.get("settings_locked_until")
+    is_locked = False
+    
+    if locked_until:
+        lock_time = datetime.fromisoformat(locked_until.replace('Z', '+00:00'))
+        if datetime.now(timezone.utc) < lock_time:
+            is_locked = True
+        else:
+            # Clear lock if expired
+            await db.sdm_merchants.update_one(
+                {"id": merchant["id"]},
+                {"$set": {"settings_locked_until": None, "settings_pin_attempts": 0}}
+            )
+    
+    return {
+        "has_pin": has_pin,
+        "is_locked": is_locked,
+        "locked_until": locked_until if is_locked else None,
+        "attempts": merchant.get("settings_pin_attempts", 0)
+    }
+
+@sdm_router.post("/merchant/settings/set-pin")
+async def set_settings_pin(request: SetSettingsPINRequest, merchant: dict = Depends(get_current_merchant)):
+    """Set or update the settings PIN (requires OTP verification)"""
+    # Validate PIN format (4-6 digits)
+    if not request.pin.isdigit() or len(request.pin) < 4 or len(request.pin) > 6:
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
+    
+    # Verify OTP using helper function
+    phone = merchant["phone"]
+    if not await verify_otp_helper(phone, request.otp_code, request.request_id):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    
+    # Hash and store PIN
+    pin_hash = hash_password(request.pin)
+    await db.sdm_merchants.update_one(
+        {"id": merchant["id"]},
+        {"$set": {
+            "settings_pin_hash": pin_hash,
+            "settings_pin_attempts": 0,
+            "settings_locked_until": None
+        }}
+    )
+    
+    return {"success": True, "message": "Settings PIN has been set"}
+
+@sdm_router.post("/merchant/settings/verify-pin")
+async def verify_settings_pin(request: VerifySettingsPINRequest, merchant: dict = Depends(get_current_merchant)):
+    """Verify PIN to access settings"""
+    # Check if locked
+    locked_until = merchant.get("settings_locked_until")
+    if locked_until:
+        lock_time = datetime.fromisoformat(locked_until.replace('Z', '+00:00'))
+        if datetime.now(timezone.utc) < lock_time:
+            remaining = int((lock_time - datetime.now(timezone.utc)).total_seconds() / 60)
+            raise HTTPException(
+                status_code=423, 
+                detail=f"Settings locked. Try again in {remaining} minutes"
+            )
+    
+    # Check if PIN is set
+    if not merchant.get("settings_pin_hash"):
+        raise HTTPException(status_code=400, detail="PIN not set. Please set a PIN first")
+    
+    # Verify PIN
+    if not verify_password(request.pin, merchant["settings_pin_hash"]):
+        # Increment attempts
+        attempts = merchant.get("settings_pin_attempts", 0) + 1
+        updates = {"settings_pin_attempts": attempts}
+        
+        # Lock after 5 failed attempts for 30 minutes
+        if attempts >= 5:
+            lock_until = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+            updates["settings_locked_until"] = lock_until
+            await db.sdm_merchants.update_one({"id": merchant["id"]}, {"$set": updates})
+            raise HTTPException(
+                status_code=423, 
+                detail="Too many failed attempts. Settings locked for 30 minutes"
+            )
+        
+        await db.sdm_merchants.update_one({"id": merchant["id"]}, {"$set": updates})
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Invalid PIN. {5 - attempts} attempts remaining"
+        )
+    
+    # Reset attempts on success
+    await db.sdm_merchants.update_one(
+        {"id": merchant["id"]},
+        {"$set": {"settings_pin_attempts": 0, "settings_locked_until": None}}
+    )
+    
+    # Generate a temporary settings access token (valid for 10 minutes)
+    settings_token = create_token(
+        {"merchant_id": merchant["id"], "settings_access": True, "type": "settings"},
+        expires_hours=1  # Using 1 hour as minimum since function uses hours
+    )
+    
+    return {
+        "success": True,
+        "settings_token": settings_token,
+        "expires_in": 600  # 10 minutes in seconds
+    }
+
+@sdm_router.post("/merchant/settings/reset-pin")
+async def reset_settings_pin(request: ResetSettingsPINRequest, merchant: dict = Depends(get_current_merchant)):
+    """Reset PIN via OTP (for forgotten PIN)"""
+    # Validate new PIN format
+    if not request.new_pin.isdigit() or len(request.new_pin) < 4 or len(request.new_pin) > 6:
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
+    
+    # Verify OTP using helper function
+    phone = merchant["phone"]
+    if not await verify_otp_helper(phone, request.otp_code, request.request_id):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    
+    # Hash and store new PIN
+    pin_hash = hash_password(request.new_pin)
+    await db.sdm_merchants.update_one(
+        {"id": merchant["id"]},
+        {"$set": {
+            "settings_pin_hash": pin_hash,
+            "settings_pin_attempts": 0,
+            "settings_locked_until": None
+        }}
+    )
+    
+    return {"success": True, "message": "Settings PIN has been reset"}
 
 @sdm_router.post("/merchant/transaction")
 async def create_transaction(request: CreateTransactionRequest, merchant: dict = Depends(get_current_merchant)):
