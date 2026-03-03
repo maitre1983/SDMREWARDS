@@ -57,6 +57,45 @@ Amount: 1000 GHS @ 10% Cashback
 
 ---
 
+## ADMIN CONTROLS (Phase 2 - COMPLETE)
+
+### Client Controls
+| Action | Description | Status |
+|--------|-------------|--------|
+| Block | Immediately block account | ✅ |
+| Unblock | Restore account access | ✅ |
+| Suspend | Temporary suspension | ✅ |
+| Unsuspend | Lift suspension | ✅ |
+| Freeze Wallet | Prevent withdrawals | ✅ |
+| Unfreeze Wallet | Allow withdrawals | ✅ |
+| Adjust Balance | Add/Subtract/Set balance | ✅ |
+| Delete | Soft delete account | ✅ |
+
+### Merchant Controls
+| Action | Description | Status |
+|--------|-------------|--------|
+| Block | Immediately block merchant | ✅ |
+| Unblock | Restore merchant access | ✅ |
+| Suspend | Temporary suspension | ✅ |
+| Unsuspend | Lift suspension | ✅ |
+| Toggle Cash Mode | Enable/Disable cash payments | ✅ |
+| Update Cash Limit | Set max negative balance | ✅ |
+| Update Grace Period | Days before auto-block | ✅ |
+| Update Max Cash Rate | Max cashback % for cash | ✅ |
+
+### Action Logs
+- All admin actions logged with timestamp
+- Stores: admin_id, admin_email, target_type, target_id, action, reason
+- Previous state saved for rollback reference
+
+### Admin UI
+- **Clients Tab**: List with manage button for each
+- **Marchands Tab**: List with cash balance, limit, verify buttons
+- **Action Logs Tab**: Complete history of admin actions
+- **Stats Cards**: Total counts, blocked, deficit warnings
+
+---
+
 ## BACKEND ARCHITECTURE (Refactored)
 
 ### Directory Structure
