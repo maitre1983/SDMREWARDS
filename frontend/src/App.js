@@ -18,6 +18,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import MerchantTermsPage from "./pages/MerchantTermsPage";
+import FAQPage from "./pages/FAQPage";
 
 // Generate admin paths with date-based security (format: DDMMYY)
 const getAdminPaths = () => {
@@ -76,6 +77,7 @@ function App() {
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/merchant-terms" element={<MerchantTermsPage />} />
+            <Route path="/faq" element={<FAQPage />} />
             
             {/* Admin Routes - ONLY valid date paths (format: DDMMYY) */}
             {adminPaths.map(path => (

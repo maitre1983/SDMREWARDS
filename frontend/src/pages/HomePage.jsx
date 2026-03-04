@@ -767,6 +767,7 @@ export default function HomePage() {
                 <li><a href="/terms" className="text-slate-400 hover:text-white">{t('footer_terms')}</a></li>
                 <li><a href="/privacy" className="text-slate-400 hover:text-white">{t('footer_privacy')}</a></li>
                 <li><a href="/merchant-terms" className="text-slate-400 hover:text-white">{t('footer_merchant_terms')}</a></li>
+                <li><a href="/faq" className="text-slate-400 hover:text-white">{t('footer_faq')}</a></li>
                 <li><a href="mailto:support@sdmrewards.com" className="text-slate-400 hover:text-white">{t('footer_contact')}</a></li>
               </ul>
             </div>

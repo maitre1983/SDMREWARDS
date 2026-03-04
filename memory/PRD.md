@@ -13,6 +13,7 @@
 - `/terms` - Terms of Service (comprehensive, 16 sections)
 - `/privacy` - Privacy Policy (data protection, user rights)
 - `/merchant-terms` - Merchant Agreement + Anti-Fraud Policy
+- `/faq` - FAQ Page (7 categories, 25+ questions, EN/FR)
 
 **Key Legal Disclaimers Added:**
 - "SDM REWARDS is NOT a bank, financial institution, or investment company"
