@@ -9,85 +9,83 @@
 
 ## CHANGELOG
 
-### March 4, 2026 (Session 3) - MoMo Payment Integration ✅
+### March 4, 2026 - Phase 2 Complete ✅
 
-**VIP Card Purchase with Mobile Money:**
-- Implemented complete MoMo payment flow for card purchases
-- Payment modal with phone input and summary
-- Test mode with manual confirmation endpoint
-- Welcome bonus (GHS 1) credited on activation
-- Transaction history updated automatically
+**QR Scanner & Partner Directory:**
+- QR Scanner integration with html5-qrcode library
+- "Scan to Pay Merchant" button opens camera scanner
+- Partner Directory page with search and category filters
+- Merchant detail modal with "Pay This Merchant" action
 
-**Payment API Endpoints:**
-- `POST /api/payments/card/initiate` - Initiate card purchase
-- `POST /api/payments/merchant/initiate` - Pay at merchant (earn cashback)
-- `GET /api/payments/status/{id}` - Check payment status
-- `POST /api/payments/callback` - BulkClix webhook
-- `POST /api/payments/test/confirm/{id}` - Test mode confirmation
-- `POST /api/payments/test/fail/{id}` - Test mode failure
+**Referral Sharing:**
+- Share buttons: WhatsApp, Twitter, Facebook, Copy Link
+- Native share API integration for mobile devices
+- Deep link generation for referral codes
 
-**Testing Results (Iteration 23):**
-- Backend: 100% (11/11 tests passed)
-- Frontend: 100% - Full payment flow working
+**Testing Results (Iteration 24):**
+- Backend: 100% (20/20 tests)
+- Frontend: 95% (all core features working)
 
 ---
 
-### March 4, 2026 (Session 3) - Architecture Rebuild ✅
+### March 4, 2026 - MoMo Payment Integration ✅
 
-**Complete system rebuilt with modular architecture:**
+**VIP Card Purchase Flow:**
+- Payment modal with MoMo phone input
+- Test mode with manual confirmation
+- Welcome bonus (GHS 1) on activation
 
-```
-/app/backend/
-├── server.py           # Main FastAPI app with lifespan
-├── models/
-│   └── schemas.py      # Pydantic models
-├── routers/
-│   ├── auth.py         # Authentication
-│   ├── clients.py      # Client dashboard, cards, referrals
-│   ├── merchants.py    # Merchant dashboard, settings
-│   ├── transactions.py # Transaction history
-│   ├── admin.py        # Admin management
-│   └── payments.py     # MoMo payments (NEW)
-└── services/
-    ├── bulkclix_service.py     # Airtime, Data, Withdrawals
-    └── momo_payment_service.py # MoMo collection (NEW)
-```
+**Merchant Payment Flow:**
+- Scan QR → Enter amount → Cashback preview → Pay
+- Cashback calculation: merchant_rate - 5% commission
+- Net cashback credited instantly
 
 ---
 
 ## CORE FEATURES
 
 ### Membership Cards
-| Card | Price | Color | Benefits |
-|------|-------|-------|----------|
-| Silver | GHS 25 | #C0C0C0 | All partner access, cashback, referrals |
-| Gold | GHS 50 | #FFD700 | + Priority support, exclusive offers |
-| Platinum | GHS 100 | #E5E4E2 | + VIP access, birthday bonus |
+| Card | Price | Benefits |
+|------|-------|----------|
+| Silver | GHS 25 | All partner access, cashback, referrals |
+| Gold | GHS 50 | + Priority support, exclusive offers |
+| Platinum | GHS 100 | + VIP access, birthday bonus |
 
 ### Cashback System
-- Merchants set cashback rate: 1% - 20%
+- Merchants set rate: 1% - 20%
 - Platform commission: 5% of cashback
-- Instant cashback credit after payment
+- Instant credit after payment
 
-### Referral System
-| Who | Amount | When |
-|-----|--------|------|
-| Welcome Bonus | GHS 1 | New user buys card |
-| Referrer Bonus | GHS 3 | Referred user buys card |
+### Referral Bonuses
+- Welcome Bonus: GHS 1 (on card purchase)
+- Referrer Bonus: GHS 3 (per successful referral)
 
-### Payment Flow
-1. **Card Purchase:**
-   - Client clicks "Buy" on card
-   - Modal shows MoMo phone input
-   - Client clicks "Pay with MoMo"
-   - MoMo prompt sent (or test mode)
-   - Payment confirmed → Card activated → Welcome bonus credited
+---
 
-2. **Merchant Payment:**
-   - Client scans merchant QR (or enters code)
-   - Enter payment amount
-   - MoMo prompt sent
-   - Payment confirmed → Cashback credited (minus platform commission)
+## USER FLOWS
+
+### Client Card Purchase
+1. Login/Register with phone + OTP
+2. Select card tier (Silver/Gold/Platinum)
+3. Enter MoMo number
+4. Approve MoMo prompt
+5. Card activated + Welcome bonus credited
+
+### Client Payment at Merchant
+1. Open QR Code tab
+2. Tap "Scan to Pay Merchant"
+3. Scan merchant's QR code
+4. Enter payment amount (see cashback preview)
+5. Tap "Pay with MoMo"
+6. Approve MoMo prompt
+7. Payment complete + Cashback credited
+
+### Referral Sharing
+1. Open Referrals tab
+2. See referral code and stats
+3. Tap share button (WhatsApp/Twitter/Facebook/Copy)
+4. Friend registers with referral code
+5. Both receive bonuses when friend buys card
 
 ---
 
@@ -96,121 +94,106 @@
 ### Authentication (`/api/auth/`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/otp/send` | Send OTP to phone |
-| POST | `/client/register` | Register new client |
+| POST | `/otp/send` | Send OTP |
+| POST | `/client/register` | Register client |
 | POST | `/client/login` | Client login |
-| POST | `/merchant/register` | Register new merchant |
+| POST | `/merchant/register` | Register merchant |
 | POST | `/merchant/login` | Merchant login |
 | POST | `/admin/login` | Admin login |
-| GET | `/me` | Get current user |
 
 ### Payments (`/api/payments/`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/card/initiate` | Initiate card purchase payment |
-| POST | `/merchant/initiate` | Initiate merchant payment |
-| GET | `/status/{id}` | Check payment status |
-| POST | `/callback` | BulkClix webhook |
-| POST | `/test/confirm/{id}` | [TEST] Confirm payment |
-| POST | `/test/fail/{id}` | [TEST] Fail payment |
-
-### Clients (`/api/clients/`)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/me` | Client dashboard |
-| GET | `/cards/available` | List card options |
-| GET | `/transactions` | Transaction history |
-| GET | `/referrals` | Referral info |
+| POST | `/card/initiate` | Start card purchase |
+| POST | `/merchant/initiate` | Pay merchant |
+| GET | `/status/{id}` | Check payment |
+| POST | `/test/confirm/{id}` | [TEST] Confirm |
 
 ### Merchants (`/api/merchants/`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/partners` | List active partners |
+| GET | `/by-qr/{code}` | Lookup by QR |
 | GET | `/me` | Merchant dashboard |
-| PUT | `/settings/cashback` | Update cashback rate |
-| PUT | `/settings/payment` | Update MoMo/Bank info |
 
-### Admin (`/api/admin/`)
+### Clients (`/api/clients/`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/clients` | List all clients |
-| GET | `/merchants` | List all merchants |
-| PUT | `/clients/{id}/status` | Update client status |
-| PUT | `/merchants/{id}/status` | Update merchant status |
+| GET | `/me` | Dashboard |
+| GET | `/cards/available` | Card options |
+| GET | `/transactions` | History |
+| GET | `/referrals` | Referral info |
 
 ---
 
-## DATABASE SCHEMA
+## PAGES
 
-### Collections
-- **clients**: Customer accounts with card info and balance
-- **merchants**: Partner businesses with cashback settings
-- **admins**: Platform administrators
-- **transactions**: All financial operations
-- **membership_cards**: Active cards with card numbers
-- **momo_payments**: MoMo payment tracking (NEW)
-- **referrals**: Referral tracking
-- **platform_config**: Platform settings
+| Route | Page | Features |
+|-------|------|----------|
+| `/` | Landing | Hero, features, pricing |
+| `/client` | Client Auth | Login/Register |
+| `/client/dashboard` | Client Dashboard | Balance, QR, History, Referrals |
+| `/client/partners` | Partner Directory | Search, filters, merchant list |
+| `/merchant` | Merchant Auth | Login/Register |
+| `/merchant/dashboard` | Merchant Dashboard | Stats, QR codes, settings |
+| `/admin` | Admin Dashboard | Users, merchants, settings |
 
 ---
 
 ## TEST CREDENTIALS
 
-### Admin
-- URL: `/admin`
-- Email: `emileparfait2003@gmail.com`
-- Password: `Gerard0103@`
+| Role | Phone/Email | Password |
+|------|-------------|----------|
+| Admin | emileparfait2003@gmail.com | Gerard0103@ |
+| Client (Gold) | +233541234567 | TestPass123 |
+| Client (Platinum) | +233551234567 | TestPass123 |
+| Merchant | +233509876543 | MerchantPass123 |
 
-### Test Clients
-| Phone | Password | Status | Card |
-|-------|----------|--------|------|
-| +233541234567 | TestPass123 | Active | Gold |
-| +233551234567 | TestPass123 | Active | Platinum |
-| +23355950104 | TestPass123 | Active | Gold |
-
-### Test Merchant
-- Business: Test Shop
-- QR Code: `SDM-M-6D343A81`
-- Cashback Rate: 5%
-
-### Test Mode
-- OTP Code: `123456` (any phone)
+**Test Mode:**
+- OTP: Use code `123456`
 - MoMo: Use `/api/payments/test/confirm/{id}`
 
 ---
 
-## MOCKED INTEGRATIONS
-- **BulkClix OTP SMS** - Test mode (code: 123456)
-- **BulkClix MoMo Collection** - Test mode (manual confirm)
+## TECH STACK
 
-## ENVIRONMENT
-```
-PAYMENT_TEST_MODE=true  # Enable test mode
-BULKCLIX_API_KEY=...    # API key configured but test mode enabled
-```
+**Backend:**
+- FastAPI + Pydantic
+- MongoDB (motor)
+- JWT Authentication
+
+**Frontend:**
+- React + Tailwind CSS
+- Shadcn/UI components
+- html5-qrcode (scanner)
+- qrcode.react (generator)
+
+**Integrations:**
+- BulkClix (OTP SMS, MoMo) - TEST MODE
 
 ---
 
-## UPCOMING TASKS (P1)
+## UPCOMING TASKS
 
-### Phase 3 - Enhanced Features
-1. **QR Code Scanning** - Camera integration for scanning merchant QR
-2. **Partner Directory** - List of merchants with cashback rates
-3. **Referral Sharing** - Deep links and social sharing
-4. **Transaction Notifications** - SMS/Push alerts
+### P1 - Production Ready
+1. Disable test mode (`PAYMENT_TEST_MODE=false`)
+2. Configure BulkClix callback URL
+3. Real MoMo payment testing
+4. SMS notifications
 
-### Phase 4 - Production Ready
-1. **Disable Test Mode** - Set `PAYMENT_TEST_MODE=false`
-2. **Configure BulkClix Callback URL** - For real payment confirmations
-3. **Multi-language Support** - EN, FR, ZH, AR
+### P2 - Enhanced Features
+1. Transaction notifications (SMS/Push)
+2. Cashback withdrawal to MoMo
+3. Multi-language support (EN, FR)
+4. Analytics dashboard
 
-### Future Tasks
-- Real-time QR code generation (QR library)
-- Cashback withdrawal to MoMo
+### P3 - Future
 - VIP Lottery system
-- Super app services (Airtime, Data, Bills)
+- Super app services
+- Mobile app (React Native)
 
 ---
 
 *Last Updated: March 4, 2026*
-*Version: 2.1.0 (MoMo Payment Integration)*
-*Status: ✅ Card Purchase Flow Complete - Test Mode Active*
+*Version: 2.2.0 (Phase 2 Complete)*
+*Status: ✅ QR Scanner, Partner Directory, Referral Sharing - All Working*

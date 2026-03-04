@@ -78,13 +78,36 @@ export default function ClientDashboard() {
     }
     fetchDashboardData();
     
+    // Check if navigated from Partners page with merchant to pay
+    if (location.state?.payMerchant && location.state?.merchantQR) {
+      handleMerchantFromPartners(location.state);
+      // Clear the location state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    
     // Cleanup polling on unmount
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
       }
     };
-  }, [token]);
+  }, [token, location.state]);
+  
+  const handleMerchantFromPartners = async (state) => {
+    // Look up merchant and open payment modal
+    try {
+      const res = await axios.get(`${API_URL}/api/merchants/by-qr/${state.merchantQR}`);
+      if (res.data.merchant) {
+        setSelectedMerchant(res.data.merchant);
+        setShowMerchantPayModal(true);
+        setMerchantPayStatus(null);
+        setMerchantPayAmount('');
+        setActiveTab('qr');
+      }
+    } catch (error) {
+      console.error('Failed to load merchant:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
