@@ -3,7 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, X, FlipHorizontal, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 
-export default function QRScanner({ onScan, onClose }) {
+export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code", scanHint = "Position the QR code within the frame" }) {
   const scannerRef = useRef(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState(null);
@@ -86,7 +86,7 @@ export default function QRScanner({ onScan, onClose }) {
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <h2 className="text-white font-semibold flex items-center gap-2">
             <Camera size={20} />
-            Scan Customer QR Code
+            {scanTitle}
           </h2>
           <button
             onClick={handleClose}
@@ -149,7 +149,7 @@ export default function QRScanner({ onScan, onClose }) {
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
         <div className="max-w-lg mx-auto">
           <p className="text-center text-white/60 text-sm mb-4">
-            Position the customer's QR code within the frame
+            {scanHint}
           </p>
           <div className="flex justify-center gap-4">
             <Button

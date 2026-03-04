@@ -3114,6 +3114,165 @@ def calculate_payment_split(amount: float, cashback_rate: float, sdm_commission_
         "merchant_amount": round(merchant_amount, 2)
     }
 
+# ============== CLIENT QR PAYMENT ENDPOINTS ==============
+
+@sdm_router.get("/merchant/by-qr/{qr_code}")
+async def get_merchant_by_qr(qr_code: str, user: dict = Depends(get_current_user)):
+    """Get merchant information by QR code - for client scanning merchant QR"""
+    # Try to find merchant by QR code
+    merchant = await db.sdm_merchants.find_one(
+        {"qr_code": qr_code, "is_verified": True, "is_active": True},
+        {"_id": 0, "password_hash": 0}
+    )
+    
+    if not merchant:
+        # Also try with MERCHANT_ prefix
+        merchant = await db.sdm_merchants.find_one(
+            {"qr_code": f"MERCHANT_{qr_code}", "is_verified": True, "is_active": True},
+            {"_id": 0, "password_hash": 0}
+        )
+    
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Marchand non trouvé ou non vérifié")
+    
+    return {
+        "id": merchant["id"],
+        "business_name": merchant["business_name"],
+        "qr_code": merchant["qr_code"],
+        "cashback_rate": merchant.get("cashback_rate", 2.5),
+        "category": merchant.get("category", "General"),
+        "logo": merchant.get("logo"),
+        "address": merchant.get("address")
+    }
+
+class ClientPayMerchantRequest(BaseModel):
+    merchant_qr_code: str
+    amount: float
+    payer_phone: Optional[str] = None  # If not provided, use user's phone
+    payer_network: Optional[str] = None
+
+@sdm_router.post("/client/pay-merchant")
+async def client_pay_merchant(request: ClientPayMerchantRequest, user: dict = Depends(get_current_user)):
+    """
+    Client initiates payment to merchant by scanning merchant's QR code.
+    Flow:
+    1. Client scans merchant QR
+    2. Client enters amount
+    3. System sends MoMo prompt to client's phone
+    4. Client approves on their phone
+    5. Webhook receives confirmation
+    6. Merchant gets paid, client gets cashback
+    """
+    # Find merchant
+    merchant = await db.sdm_merchants.find_one(
+        {"qr_code": request.merchant_qr_code, "is_verified": True, "is_active": True},
+        {"_id": 0}
+    )
+    if not merchant:
+        # Try with prefix
+        merchant = await db.sdm_merchants.find_one(
+            {"qr_code": f"MERCHANT_{request.merchant_qr_code}", "is_verified": True, "is_active": True},
+            {"_id": 0}
+        )
+    
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Marchand non trouvé")
+    
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Montant invalide")
+    
+    # Get user's phone for MoMo prompt
+    payer_phone = request.payer_phone or user.get("phone")
+    if not payer_phone:
+        raise HTTPException(status_code=400, detail="Numéro de téléphone requis")
+    
+    # Normalize phone number
+    payer_phone = payer_phone.replace("+233", "0").replace(" ", "")
+    payer_network = request.payer_network or detect_network_from_phone(payer_phone)
+    
+    # Calculate cashback split
+    cashback_rate = merchant.get("cashback_rate", 2.5)
+    config = await get_sdm_config()
+    commission_rate = config.get("sdm_commission_rate", 0.02)
+    
+    total_cashback = request.amount * (cashback_rate / 100)
+    sdm_commission = total_cashback * commission_rate
+    net_cashback = total_cashback - sdm_commission
+    merchant_receives = request.amount - total_cashback
+    
+    # Create transaction ID
+    transaction_id = f"TXN_{secrets.token_hex(6).upper()}"
+    
+    # Create pending payment record
+    pending_payment = {
+        "transaction_id": transaction_id,
+        "type": "client_initiated",
+        "client_id": user["id"],
+        "client_phone": payer_phone,
+        "client_name": f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Client",
+        "merchant_id": merchant["id"],
+        "merchant_name": merchant["business_name"],
+        "amount": request.amount,
+        "cashback_rate": cashback_rate,
+        "total_cashback": total_cashback,
+        "sdm_commission": sdm_commission,
+        "net_cashback": net_cashback,
+        "merchant_receives": merchant_receives,
+        "payment_method": "momo",
+        "payment_status": "pending",
+        "webhook_received": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.pending_payments.insert_one(pending_payment)
+    
+    # Initiate MoMo collection from client
+    callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/transaction"
+    
+    collection_result = await bulkclix_payment_service.collect_momo_payment(
+        amount=request.amount,
+        phone_number=payer_phone,
+        network=payer_network,
+        transaction_id=transaction_id,
+        callback_url=callback_url,
+        reference=f"Pay {merchant['business_name'][:15]}"
+    )
+    
+    if not collection_result.get("success"):
+        # Mark as failed
+        await db.pending_payments.update_one(
+            {"transaction_id": transaction_id},
+            {"$set": {
+                "payment_status": "failed",
+                "error": collection_result.get("error")
+            }}
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Échec de l'envoi du prompt: {collection_result.get('error', 'Erreur inconnue')}"
+        )
+    
+    # Update with BulkClix response
+    await db.pending_payments.update_one(
+        {"transaction_id": transaction_id},
+        {"$set": {
+            "bulkclix_ref": collection_result.get("data", {}).get("ext_transaction_id"),
+            "bulkclix_response": collection_result.get("data"),
+            "payment_initiated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {
+        "success": True,
+        "transaction_id": transaction_id,
+        "status": "pending_customer_approval",
+        "message": "Prompt de paiement envoyé! Approuvez sur votre téléphone.",
+        "amount": request.amount,
+        "merchant_name": merchant["business_name"],
+        "cashback_amount": net_cashback,
+        "instructions": f"Un prompt MoMo a été envoyé au {payer_phone}. Approuvez le paiement de GHS {request.amount}."
+    }
+
 @sdm_router.post("/payments/initiate")
 async def initiate_payment(request: InitiatePaymentRequest, user: dict = Depends(get_current_user)):
     """

@@ -5,7 +5,7 @@ import {
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2, CheckCircle,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
   Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket,
-  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X, Clock
+  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X, Clock, Camera, ScanLine
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,6 +15,7 @@ import axios from 'axios';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
 import { QRCodeSVG } from 'qrcode.react';
+import QRScanner from '../components/QRScanner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const LOGO_URL = "/sdm-logo.png";
@@ -71,6 +72,13 @@ export default function SDMClientPage() {
   // Pending payments state
   const [pendingPayments, setPendingPayments] = useState([]);
   const [showPendingPayments, setShowPendingPayments] = useState(false);
+  
+  // QR Scanner state for client-initiated payments
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannedMerchant, setScannedMerchant] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStep, setPaymentStep] = useState('scan'); // scan, amount, processing, success
   
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
@@ -156,6 +164,76 @@ export default function SDMClientPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // ==================== QR SCANNER FUNCTIONS ====================
+  
+  // Handle QR code scan from merchant
+  const handleMerchantQRScan = async (qrCode) => {
+    setShowScanner(false);
+    setIsProcessingPayment(true);
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      // Verify the merchant QR code
+      const response = await axios.get(
+        `${API_URL}/api/sdm/merchant/by-qr/${qrCode}`,
+        { headers }
+      );
+      
+      if (response.data) {
+        setScannedMerchant(response.data);
+        setPaymentStep('amount');
+        toast.success(`Marchand trouvé: ${response.data.business_name}`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'QR Code invalide ou marchand non trouvé');
+      setPaymentStep('scan');
+      setScannedMerchant(null);
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Handle payment initiation after entering amount
+  const handleInitiatePayment = async () => {
+    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+      toast.error('Veuillez entrer un montant valide');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setPaymentStep('processing');
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(
+        `${API_URL}/api/sdm/client/pay-merchant`,
+        {
+          merchant_qr_code: scannedMerchant.qr_code,
+          amount: parseFloat(paymentAmount)
+        },
+        { headers }
+      );
+      
+      if (response.data.success) {
+        setPaymentStep('success');
+        toast.success(response.data.message || 'Prompt de paiement envoyé! Approuvez sur votre téléphone.');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Échec de l\'initiation du paiement');
+      setPaymentStep('amount');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Reset payment flow
+  const resetPaymentFlow = () => {
+    setScannedMerchant(null);
+    setPaymentAmount('');
+    setPaymentStep('scan');
+    setShowScanner(false);
   };
   
   // Poll for pending payments every 30 seconds when logged in
@@ -1058,14 +1136,124 @@ export default function SDMClientPage() {
               )}
               <p className="text-2xl font-mono font-bold text-blue-600 mb-2">{user.qr_code}</p>
               <p className="text-sm text-slate-500 mb-4">{t('sdm_show_merchant')}</p>
-              <Button
-                onClick={copyQRCode}
-                variant="outline"
-                className="gap-2"
-              >
-                <Copy size={16} />
-                Copy Code
-              </Button>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  onClick={copyQRCode}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Copy size={16} />
+                  Copy Code
+                </Button>
+              </div>
+            </div>
+
+            {/* SCAN TO PAY Section - NEW */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-lg">Scanner pour Payer</h3>
+                  <p className="text-sm opacity-80">Scannez le QR code du marchand</p>
+                </div>
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <ScanLine size={24} />
+                </div>
+              </div>
+              
+              {paymentStep === 'scan' && (
+                <Button
+                  onClick={() => setShowScanner(true)}
+                  className="w-full bg-white text-emerald-600 hover:bg-emerald-50 font-semibold"
+                  data-testid="scan-merchant-qr-btn"
+                >
+                  <Camera size={20} className="mr-2" />
+                  Scanner le QR Marchand
+                </Button>
+              )}
+
+              {/* Amount Entry Step */}
+              {paymentStep === 'amount' && scannedMerchant && (
+                <div className="space-y-4">
+                  <div className="bg-white/10 rounded-xl p-4">
+                    <p className="text-sm opacity-80">Marchand</p>
+                    <p className="font-bold text-lg">{scannedMerchant.business_name}</p>
+                    <p className="text-sm opacity-80">Cashback: {scannedMerchant.cashback_rate}%</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Montant à payer (GHS)</label>
+                    <Input
+                      type="number"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="bg-white text-slate-900 text-lg font-bold h-14"
+                      min="1"
+                      step="0.01"
+                      data-testid="payment-amount-input"
+                    />
+                  </div>
+                  
+                  {paymentAmount && parseFloat(paymentAmount) > 0 && (
+                    <div className="bg-white/10 rounded-lg p-3 space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Montant:</span>
+                        <span className="font-medium">GHS {parseFloat(paymentAmount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-200">
+                        <span>Cashback ({scannedMerchant.cashback_rate}%):</span>
+                        <span className="font-medium">+GHS {(parseFloat(paymentAmount) * scannedMerchant.cashback_rate / 100).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={resetPaymentFlow}
+                      variant="outline"
+                      className="flex-1 bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={handleInitiatePayment}
+                      disabled={!paymentAmount || parseFloat(paymentAmount) <= 0 || isProcessingPayment}
+                      className="flex-1 bg-white text-emerald-600 hover:bg-emerald-50 font-semibold"
+                      data-testid="confirm-payment-btn"
+                    >
+                      {isProcessingPayment ? <Loader2 className="animate-spin" size={18} /> : 'Payer'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Processing Step */}
+              {paymentStep === 'processing' && (
+                <div className="text-center py-6">
+                  <Loader2 className="animate-spin mx-auto mb-4" size={40} />
+                  <p className="font-medium">Envoi du prompt de paiement...</p>
+                  <p className="text-sm opacity-80">Veuillez patienter</p>
+                </div>
+              )}
+
+              {/* Success Step */}
+              {paymentStep === 'success' && (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle size={32} />
+                  </div>
+                  <p className="font-bold text-lg mb-2">Prompt envoyé!</p>
+                  <p className="text-sm opacity-80 mb-4">
+                    Approuvez le paiement de GHS {paymentAmount} sur votre téléphone MoMo.
+                  </p>
+                  <Button
+                    onClick={resetPaymentFlow}
+                    className="bg-white text-emerald-600 hover:bg-emerald-50"
+                  >
+                    Nouveau paiement
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2335,6 +2523,16 @@ export default function SDMClientPage() {
           </div>
         )}
       </div>
+
+      {/* QR Scanner Modal */}
+      {showScanner && (
+        <QRScanner 
+          onScan={handleMerchantQRScan}
+          onClose={() => setShowScanner(false)}
+          scanTitle="Scanner le QR Marchand"
+          scanHint="Positionnez le QR code du marchand dans le cadre"
+        />
+      )}
     </div>
   );
 }

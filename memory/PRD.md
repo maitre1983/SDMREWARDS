@@ -45,20 +45,27 @@ New panel in Admin Dashboard showing:
 ### Payment Flow (CORRECTED - March 3, 2026)
 **Le cashback n'est crédité qu'APRÈS l'approbation du paiement par le client.**
 
-1. **Client/Merchant initie le paiement**
-2. **Système envoie le prompt MoMo au client** (via BulkClix API)
-3. **Client reçoit le prompt sur son téléphone et approuve**
-4. **BulkClix envoie un webhook** avec `status: success`
-5. **Webhook traite le paiement:**
-   - Transfert MoMo au marchand
-   - Commission SDM enregistrée
-   - Cashback crédité au client (IMMÉDIATEMENT disponible)
-6. **Transaction marquée comme "completed"**
+**Deux modes de paiement:**
 
-### ⚠️ BUG CRITIQUE CORRIGÉ (Mars 3, 2026)
-L'ancien flux créditait le cashback SANS attendre l'approbation du client.
-**CORRIGÉ:** Les deux endpoints `/payments/initiate` et `/payments/merchant-initiate` 
-utilisent maintenant le vrai flux BulkClix et retournent `pending_customer_approval`.
+#### Mode 1: Client scanne QR Marchand (NEW - March 4, 2026)
+1. **Client ouvre l'app** → Onglet Wallet → "Scanner le QR Marchand"
+2. **Client scanne le QR code du marchand**
+3. **Système affiche les infos du marchand** (nom, taux cashback)
+4. **Client entre le montant** et voit le cashback prévu
+5. **Client clique "Payer"** → Prompt MoMo envoyé
+6. **Client approuve sur son téléphone**
+7. Webhook reçu → Marchand payé → Commission SDM → Cashback crédité
+
+#### Mode 2: Marchand scanne QR Client
+1. **Marchand scanne le QR code du client**
+2. **Marchand entre le montant**
+3. **Système envoie prompt MoMo au client**
+4. **Client approuve sur son téléphone**
+5. Webhook reçu → Marchand payé → Commission SDM → Cashback crédité
+
+### API Endpoints pour paiements client
+- `GET /api/sdm/merchant/by-qr/{qr_code}` - Récupère les infos du marchand par QR code
+- `POST /api/sdm/client/pay-merchant` - Client initie un paiement vers marchand
 
 ### Webhooks
 - `/api/sdm/payments/webhook/transaction` - Pour le flux `/merchant/transaction`
