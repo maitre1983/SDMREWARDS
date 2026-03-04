@@ -575,3 +575,59 @@ Le système de carte VIP est maintenant entièrement implémenté. Les nouveaux 
 - **sdm_card_sales**: Historique des ventes de cartes
 - **sdm_platform_revenue**: Revenus de la plateforme (commissions + ventes)
 - **vip_memberships**: Adhésions VIP actives
+- **kyc_documents**: Documents KYC soumis par les utilisateurs
+
+---
+
+## KYC SYSTEM (NEW - March 4, 2026)
+
+### Overview
+Système de vérification KYC complet avec approbation manuelle par admin.
+
+### Niveaux KYC
+| Level | Statut | Daily Limit | Monthly Limit | Withdrawal |
+|-------|--------|-------------|---------------|------------|
+| 0 | Non vérifié | GHS 100 | GHS 500 | GHS 50 |
+| 1 | Téléphone vérifié | GHS 500 | GHS 2,500 | GHS 200 |
+| 2 | Documents soumis | GHS 2,000 | GHS 10,000 | GHS 1,000 |
+| 3 | Entièrement vérifié | GHS 10,000 | GHS 50,000 | GHS 5,000 |
+
+### Documents acceptés
+- Ghana Card
+- Voter ID
+- Passport
+- Driver's License
+
+### Flux de vérification
+1. L'utilisateur remplit le formulaire (type de document, numéro, nom complet)
+2. Upload des images (document front, back si applicable, selfie)
+3. Soumission → `kyc_status: pending`, `kyc_level: 2`
+4. Admin review dans Fintech Ledger → KYC tab
+5. Approbation → `kyc_status: approved`, `kyc_level: 3` + SMS de confirmation
+6. Rejet → `kyc_status: rejected`, `kyc_level: 1` + SMS avec raison
+
+### API Endpoints
+- `GET /api/sdm/user/kyc/status`: Statut KYC et limites
+- `POST /api/sdm/user/kyc/submit`: Soumettre les infos KYC
+- `POST /api/sdm/user/kyc/upload/{kyc_id}`: Upload des documents
+- `GET /api/sdm/admin/kyc/all`: Liste toutes les soumissions (admin)
+- `POST /api/sdm/admin/kyc/{id}/approve`: Approuver (admin)
+- `POST /api/sdm/admin/kyc/{id}/reject`: Rejeter avec raison (admin)
+
+---
+
+## CONTACT SYNC SYSTEM (NEW - March 4, 2026)
+
+### Overview
+Synchronisation des contacts pour trouver les amis sur SDM et paiements rapides.
+
+### Fonctionnalités
+- Sync des numéros de téléphone (numéros uniquement pour la confidentialité)
+- Identification des contacts qui sont sur SDM
+- Paiement rapide à un contact SDM via bouton "Pay"
+- Invitation des contacts non-inscrits via SMS avec code parrainage
+
+### API Endpoints
+- `POST /api/sdm/user/contacts/sync`: Synchroniser les numéros
+- `GET /api/sdm/user/contacts`: Récupérer les contacts SDM synchronisés
+- `POST /api/sdm/user/contacts/invite`: Envoyer une invitation SMS

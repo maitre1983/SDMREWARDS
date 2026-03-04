@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -250,6 +250,18 @@ class SDMUser(BaseModel):
     blocked_at: Optional[str] = None
     blocked_by: Optional[str] = None
     
+    # KYC Fields
+    kyc_level: int = 0  # 0=None, 1=Phone Verified, 2=Documents Submitted, 3=Fully Verified
+    kyc_status: str = "none"  # none, pending, approved, rejected
+    kyc_submitted_at: Optional[str] = None
+    kyc_reviewed_at: Optional[str] = None
+    kyc_reviewed_by: Optional[str] = None
+    kyc_rejection_reason: Optional[str] = None
+    
+    # Synced Contacts
+    synced_contacts: List[str] = Field(default_factory=list)  # List of phone numbers
+    contacts_synced_at: Optional[str] = None
+    
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -367,6 +379,57 @@ class SDMPartner(BaseModel):
     is_gold_exclusive: bool = False  # Only for Gold/Platinum members
     is_active: bool = True
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+# ==================== KYC SYSTEM ====================
+
+class KYCDocumentType(str, Enum):
+    GHANA_CARD = "GHANA_CARD"
+    VOTER_ID = "VOTER_ID"
+    PASSPORT = "PASSPORT"
+    DRIVER_LICENSE = "DRIVER_LICENSE"
+
+class KYCDocument(BaseModel):
+    """KYC Document submission"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_phone: str
+    document_type: str  # GHANA_CARD, VOTER_ID, PASSPORT, DRIVER_LICENSE
+    document_number: str
+    document_front_url: str  # URL to uploaded front image
+    document_back_url: Optional[str] = None  # URL to uploaded back image (if applicable)
+    selfie_url: str  # URL to selfie for face verification
+    
+    # Personal Info from document
+    full_name: str
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    nationality: str = "Ghanaian"
+    address: Optional[str] = None
+    
+    # Verification status
+    status: str = "pending"  # pending, approved, rejected
+    rejection_reason: Optional[str] = None
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    
+    # Metadata
+    submitted_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+
+class KYCSubmitRequest(BaseModel):
+    """Request to submit KYC documents"""
+    document_type: str  # GHANA_CARD, VOTER_ID, PASSPORT, DRIVER_LICENSE
+    document_number: str
+    full_name: str
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    address: Optional[str] = None
+
+class ContactSyncRequest(BaseModel):
+    """Request to sync phone contacts"""
+    phone_numbers: List[str]  # List of phone numbers from user's contact book
 
 # ==================== LOTTERY SYSTEM ====================
 
@@ -1966,6 +2029,264 @@ async def get_user_transactions(user: dict = Depends(get_current_user), limit: i
         {"_id": 0}
     ).sort("created_at", -1).to_list(limit)
     return transactions
+
+# ============== KYC ENDPOINTS ==============
+
+@sdm_router.get("/user/kyc/status")
+async def get_kyc_status(user: dict = Depends(get_current_user)):
+    """Get user's KYC verification status"""
+    # Get existing KYC document if any
+    kyc_doc = await db.kyc_documents.find_one(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    )
+    
+    return {
+        "kyc_level": user.get("kyc_level", 0),
+        "kyc_status": user.get("kyc_status", "none"),
+        "kyc_submitted_at": user.get("kyc_submitted_at"),
+        "kyc_reviewed_at": user.get("kyc_reviewed_at"),
+        "kyc_rejection_reason": user.get("kyc_rejection_reason"),
+        "document": {
+            "id": kyc_doc["id"] if kyc_doc else None,
+            "document_type": kyc_doc["document_type"] if kyc_doc else None,
+            "status": kyc_doc["status"] if kyc_doc else None,
+            "submitted_at": kyc_doc["submitted_at"] if kyc_doc else None
+        } if kyc_doc else None,
+        "limits": get_kyc_limits(user.get("kyc_level", 0))
+    }
+
+def get_kyc_limits(kyc_level: int) -> dict:
+    """Get transaction limits based on KYC level"""
+    limits = {
+        0: {"daily_transaction": 100, "monthly_transaction": 500, "withdrawal": 50},
+        1: {"daily_transaction": 500, "monthly_transaction": 2500, "withdrawal": 200},
+        2: {"daily_transaction": 2000, "monthly_transaction": 10000, "withdrawal": 1000},
+        3: {"daily_transaction": 10000, "monthly_transaction": 50000, "withdrawal": 5000}
+    }
+    return limits.get(kyc_level, limits[0])
+
+@sdm_router.post("/user/kyc/submit")
+async def submit_kyc(request: KYCSubmitRequest, user: dict = Depends(get_current_user)):
+    """Submit KYC documents for verification"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Check if already has pending or approved KYC
+    existing_kyc = await db.kyc_documents.find_one({
+        "user_id": user["id"],
+        "status": {"$in": ["pending", "approved"]}
+    })
+    
+    if existing_kyc:
+        if existing_kyc["status"] == "approved":
+            raise HTTPException(status_code=400, detail="KYC already approved")
+        raise HTTPException(status_code=400, detail="KYC submission already pending review")
+    
+    # Validate document type
+    valid_types = ["GHANA_CARD", "VOTER_ID", "PASSPORT", "DRIVER_LICENSE"]
+    if request.document_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid document type. Must be one of: {valid_types}")
+    
+    # Create KYC document record
+    kyc_doc = KYCDocument(
+        user_id=user["id"],
+        user_phone=user["phone"],
+        document_type=request.document_type,
+        document_number=request.document_number,
+        document_front_url="pending_upload",  # Will be updated after file upload
+        selfie_url="pending_upload",
+        full_name=request.full_name,
+        date_of_birth=request.date_of_birth,
+        gender=request.gender,
+        address=request.address
+    )
+    
+    await db.kyc_documents.insert_one(kyc_doc.model_dump())
+    
+    # Update user KYC status
+    await db.sdm_users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "kyc_status": "pending",
+            "kyc_level": 2,  # Documents submitted
+            "kyc_submitted_at": now,
+            "kyc_rejection_reason": None,
+            "updated_at": now
+        }}
+    )
+    
+    return {
+        "success": True,
+        "message": "KYC documents submitted successfully. Awaiting review.",
+        "kyc_id": kyc_doc.id,
+        "status": "pending"
+    }
+
+@sdm_router.post("/user/kyc/upload/{kyc_id}")
+async def upload_kyc_document(
+    kyc_id: str,
+    document_type: str,  # front, back, selfie
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    """Upload KYC document image"""
+    import base64
+    
+    # Verify KYC belongs to user
+    kyc_doc = await db.kyc_documents.find_one({"id": kyc_id, "user_id": user["id"]})
+    if not kyc_doc:
+        raise HTTPException(status_code=404, detail="KYC document not found")
+    
+    if kyc_doc["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Cannot upload to non-pending KYC")
+    
+    # Read and validate file
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=400, detail="File too large. Max 5MB")
+    
+    # Store as base64 data URL (in production, use cloud storage)
+    content_type = file.content_type or "image/jpeg"
+    data_url = f"data:{content_type};base64,{base64.b64encode(content).decode()}"
+    
+    # Update appropriate field
+    update_field = {
+        "front": "document_front_url",
+        "back": "document_back_url",
+        "selfie": "selfie_url"
+    }.get(document_type)
+    
+    if not update_field:
+        raise HTTPException(status_code=400, detail="Invalid document_type. Use: front, back, or selfie")
+    
+    await db.kyc_documents.update_one(
+        {"id": kyc_id},
+        {"$set": {update_field: data_url}}
+    )
+    
+    return {"success": True, "message": f"{document_type} uploaded successfully"}
+
+@sdm_router.get("/user/kyc/document-types")
+async def get_kyc_document_types():
+    """Get available KYC document types"""
+    return {
+        "document_types": [
+            {"id": "GHANA_CARD", "name": "Ghana Card", "requires_back": True},
+            {"id": "VOTER_ID", "name": "Voter ID", "requires_back": True},
+            {"id": "PASSPORT", "name": "Passport", "requires_back": False},
+            {"id": "DRIVER_LICENSE", "name": "Driver's License", "requires_back": True}
+        ]
+    }
+
+# ============== CONTACTS SYNC ENDPOINTS ==============
+
+@sdm_router.post("/user/contacts/sync")
+async def sync_contacts(request: ContactSyncRequest, user: dict = Depends(get_current_user)):
+    """Sync user's phone contacts to find SDM members"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if not request.phone_numbers or len(request.phone_numbers) == 0:
+        raise HTTPException(status_code=400, detail="No phone numbers provided")
+    
+    if len(request.phone_numbers) > 1000:
+        raise HTTPException(status_code=400, detail="Too many contacts. Max 1000 per sync")
+    
+    # Normalize all phone numbers
+    normalized_numbers = []
+    for phone in request.phone_numbers:
+        try:
+            normalized = normalize_phone(phone)
+            if normalized and normalized != user["phone"]:  # Exclude self
+                normalized_numbers.append(normalized)
+        except:
+            continue
+    
+    # Find SDM users matching these numbers
+    sdm_contacts = await db.sdm_users.find(
+        {"phone": {"$in": normalized_numbers}},
+        {"_id": 0, "id": 1, "phone": 1, "full_name": 1, "first_name": 1, "qr_code": 1, "vip_tier": 1}
+    ).to_list(500)
+    
+    # Store synced contacts for user
+    await db.sdm_users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "synced_contacts": normalized_numbers,
+            "contacts_synced_at": now,
+            "updated_at": now
+        }}
+    )
+    
+    # Format response
+    sdm_contact_phones = [c["phone"] for c in sdm_contacts]
+    non_sdm_count = len(normalized_numbers) - len(sdm_contacts)
+    
+    return {
+        "success": True,
+        "total_synced": len(normalized_numbers),
+        "sdm_contacts": [{
+            "id": c["id"],
+            "phone": c["phone"],
+            "name": c.get("full_name") or c.get("first_name") or "SDM User",
+            "qr_code": c.get("qr_code"),
+            "vip_tier": c.get("vip_tier")
+        } for c in sdm_contacts],
+        "sdm_contacts_count": len(sdm_contacts),
+        "non_sdm_count": non_sdm_count,
+        "can_invite": non_sdm_count  # Number of contacts that can be invited
+    }
+
+@sdm_router.get("/user/contacts")
+async def get_synced_contacts(user: dict = Depends(get_current_user)):
+    """Get user's synced SDM contacts"""
+    synced_numbers = user.get("synced_contacts", [])
+    
+    if not synced_numbers:
+        return {
+            "contacts": [],
+            "total": 0,
+            "last_synced": None
+        }
+    
+    # Find SDM users
+    sdm_contacts = await db.sdm_users.find(
+        {"phone": {"$in": synced_numbers}},
+        {"_id": 0, "id": 1, "phone": 1, "full_name": 1, "first_name": 1, "qr_code": 1, "vip_tier": 1}
+    ).to_list(500)
+    
+    return {
+        "contacts": [{
+            "id": c["id"],
+            "phone": c["phone"],
+            "name": c.get("full_name") or c.get("first_name") or "SDM User",
+            "qr_code": c.get("qr_code"),
+            "vip_tier": c.get("vip_tier")
+        } for c in sdm_contacts],
+        "total": len(sdm_contacts),
+        "total_synced": len(synced_numbers),
+        "last_synced": user.get("contacts_synced_at")
+    }
+
+@sdm_router.post("/user/contacts/invite")
+async def invite_contact(phone: str, user: dict = Depends(get_current_user)):
+    """Send SMS invitation to a contact"""
+    normalized = normalize_phone(phone)
+    
+    # Check if already an SDM user
+    existing = await db.sdm_users.find_one({"phone": normalized})
+    if existing:
+        raise HTTPException(status_code=400, detail="This contact is already an SDM member")
+    
+    # Send invitation SMS with referral code
+    referral_code = user.get("referral_code", "SDM")
+    invite_message = f"Hey! Join SDM Rewards and get cashback on every purchase. Use my code {referral_code} to sign up and we both get bonuses! Download: https://sdm.rewards.app"
+    
+    try:
+        await send_sms_bulkclix(normalized, invite_message)
+        return {"success": True, "message": "Invitation sent successfully"}
+    except Exception as e:
+        logging.error(f"Failed to send invite SMS: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send invitation")
 
 @sdm_router.post("/user/withdraw")
 async def request_withdrawal(request: WithdrawalRequest, user: dict = Depends(get_current_user)):
@@ -5205,6 +5526,171 @@ class CreateWithdrawalRequest(BaseModel):
     provider: str  # MTN, VODAFONE, AIRTELTIGO
     phone_number: str
     account_name: Optional[str] = None
+
+# ----- Admin KYC Management -----
+
+@sdm_router.get("/admin/kyc/pending")
+async def admin_get_pending_kyc(admin: dict = Depends(get_current_admin)):
+    """Admin: Get all pending KYC submissions"""
+    pending = await db.kyc_documents.find(
+        {"status": "pending"},
+        {"_id": 0}
+    ).sort("submitted_at", -1).to_list(100)
+    
+    # Get user details for each submission
+    for doc in pending:
+        user = await db.sdm_users.find_one({"id": doc["user_id"]}, {"_id": 0, "phone": 1, "full_name": 1, "first_name": 1, "created_at": 1})
+        doc["user_name"] = user.get("full_name") or user.get("first_name") if user else "Unknown"
+        doc["user_created_at"] = user.get("created_at") if user else None
+    
+    return {"pending": pending, "count": len(pending)}
+
+@sdm_router.get("/admin/kyc/all")
+async def admin_get_all_kyc(
+    admin: dict = Depends(get_current_admin),
+    status: Optional[str] = None,
+    limit: int = 50
+):
+    """Admin: Get all KYC submissions with optional status filter"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    submissions = await db.kyc_documents.find(query, {"_id": 0}).sort("submitted_at", -1).to_list(limit)
+    
+    # Get stats
+    total = await db.kyc_documents.count_documents({})
+    pending_count = await db.kyc_documents.count_documents({"status": "pending"})
+    approved_count = await db.kyc_documents.count_documents({"status": "approved"})
+    rejected_count = await db.kyc_documents.count_documents({"status": "rejected"})
+    
+    return {
+        "submissions": submissions,
+        "stats": {
+            "total": total,
+            "pending": pending_count,
+            "approved": approved_count,
+            "rejected": rejected_count
+        }
+    }
+
+@sdm_router.get("/admin/kyc/{kyc_id}")
+async def admin_get_kyc_detail(kyc_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Get detailed KYC submission"""
+    kyc_doc = await db.kyc_documents.find_one({"id": kyc_id}, {"_id": 0})
+    if not kyc_doc:
+        raise HTTPException(status_code=404, detail="KYC document not found")
+    
+    # Get user details
+    user = await db.sdm_users.find_one({"id": kyc_doc["user_id"]}, {"_id": 0})
+    
+    return {
+        "kyc": kyc_doc,
+        "user": {
+            "id": user["id"] if user else None,
+            "phone": user["phone"] if user else None,
+            "name": user.get("full_name") or user.get("first_name") if user else None,
+            "created_at": user.get("created_at") if user else None,
+            "total_transactions": await db.sdm_transactions.count_documents({"user_id": kyc_doc["user_id"]}) if user else 0
+        }
+    }
+
+@sdm_router.post("/admin/kyc/{kyc_id}/approve")
+async def admin_approve_kyc(kyc_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin: Approve KYC submission"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    kyc_doc = await db.kyc_documents.find_one({"id": kyc_id})
+    if not kyc_doc:
+        raise HTTPException(status_code=404, detail="KYC document not found")
+    
+    if kyc_doc["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"KYC is already {kyc_doc['status']}")
+    
+    # Update KYC document
+    await db.kyc_documents.update_one(
+        {"id": kyc_id},
+        {"$set": {
+            "status": "approved",
+            "reviewed_by": admin.get("username", admin.get("email")),
+            "reviewed_at": now
+        }}
+    )
+    
+    # Update user KYC level to fully verified (Level 3)
+    await db.sdm_users.update_one(
+        {"id": kyc_doc["user_id"]},
+        {"$set": {
+            "kyc_level": 3,
+            "kyc_status": "approved",
+            "kyc_reviewed_at": now,
+            "kyc_reviewed_by": admin.get("username", admin.get("email")),
+            "kyc_rejection_reason": None,
+            "updated_at": now
+        }}
+    )
+    
+    # Send approval SMS
+    try:
+        await send_sms_bulkclix(
+            kyc_doc["user_phone"],
+            "Congratulations! Your SDM KYC verification has been approved. You now have access to higher transaction limits. Thank you for verifying your identity."
+        )
+    except:
+        pass
+    
+    return {"success": True, "message": "KYC approved successfully"}
+
+@sdm_router.post("/admin/kyc/{kyc_id}/reject")
+async def admin_reject_kyc(
+    kyc_id: str,
+    reason: str,
+    admin: dict = Depends(get_current_admin)
+):
+    """Admin: Reject KYC submission"""
+    now = datetime.now(timezone.utc).isoformat()
+    
+    kyc_doc = await db.kyc_documents.find_one({"id": kyc_id})
+    if not kyc_doc:
+        raise HTTPException(status_code=404, detail="KYC document not found")
+    
+    if kyc_doc["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"KYC is already {kyc_doc['status']}")
+    
+    # Update KYC document
+    await db.kyc_documents.update_one(
+        {"id": kyc_id},
+        {"$set": {
+            "status": "rejected",
+            "rejection_reason": reason,
+            "reviewed_by": admin.get("username", admin.get("email")),
+            "reviewed_at": now
+        }}
+    )
+    
+    # Update user KYC status
+    await db.sdm_users.update_one(
+        {"id": kyc_doc["user_id"]},
+        {"$set": {
+            "kyc_level": 1,  # Back to phone verified only
+            "kyc_status": "rejected",
+            "kyc_reviewed_at": now,
+            "kyc_reviewed_by": admin.get("username", admin.get("email")),
+            "kyc_rejection_reason": reason,
+            "updated_at": now
+        }}
+    )
+    
+    # Send rejection SMS
+    try:
+        await send_sms_bulkclix(
+            kyc_doc["user_phone"],
+            f"Your SDM KYC verification was not approved. Reason: {reason}. Please resubmit with valid documents."
+        )
+    except:
+        pass
+    
+    return {"success": True, "message": "KYC rejected"}
 
 # ----- Admin Fintech Endpoints -----
 

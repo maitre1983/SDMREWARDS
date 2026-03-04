@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, Search, Filter, AlertTriangle,
   Download, BarChart3, PieChart, Activity, Zap, AlertCircle,
   Bell, Send, Trash2, Eye, Plus, Smartphone, Trophy, Gift, Megaphone,
-  Percent, Calendar, Crown, MapPin, Edit, Ticket, Play, Award
+  Percent, Calendar, Crown, MapPin, Edit, Ticket, Play, Award, UserCheck, Image
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -94,6 +94,11 @@ export default function FintechDashboard({ token }) {
   
   // Card Sales state
   const [cardSales, setCardSales] = useState(null);
+  
+  // KYC state
+  const [kycData, setKycData] = useState({ submissions: [], stats: {} });
+  const [selectedKyc, setSelectedKyc] = useState(null);
+  const [kycRejectReason, setKycRejectReason] = useState('');
   
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -433,6 +438,44 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  // Fetch KYC data
+  const fetchKycData = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/sdm/admin/kyc/all`, { headers });
+      setKycData(response.data);
+    } catch (error) {
+      console.error('KYC fetch error:', error);
+    }
+  };
+
+  const handleApproveKyc = async (kycId) => {
+    if (!window.confirm('Approve this KYC submission?')) return;
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/kyc/${kycId}/approve`, {}, { headers });
+      toast.success('KYC approved successfully');
+      fetchKycData();
+      setSelectedKyc(null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to approve KYC');
+    }
+  };
+
+  const handleRejectKyc = async (kycId) => {
+    if (!kycRejectReason.trim()) {
+      toast.error('Please provide a rejection reason');
+      return;
+    }
+    try {
+      await axios.post(`${API_URL}/api/sdm/admin/kyc/${kycId}/reject?reason=${encodeURIComponent(kycRejectReason)}`, {}, { headers });
+      toast.success('KYC rejected');
+      fetchKycData();
+      setSelectedKyc(null);
+      setKycRejectReason('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reject KYC');
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -453,6 +496,8 @@ export default function FintechDashboard({ token }) {
       fetchVipCards();
     } else if (activeSubTab === 'card-sales') {
       fetchCardSales();
+    } else if (activeSubTab === 'kyc') {
+      fetchKycData();
     } else if (activeSubTab === 'partners') {
       fetchPartners();
     } else if (activeSubTab === 'lottery') {
@@ -695,6 +740,7 @@ export default function FintechDashboard({ token }) {
           { id: 'leaderboard', label: 'Top Clients', icon: Trophy },
           { id: 'vip-cards', label: 'VIP Cards', icon: Crown },
           { id: 'card-sales', label: 'Card Sales', icon: DollarSign },
+          { id: 'kyc', label: 'KYC', icon: UserCheck },
           { id: 'lottery', label: 'Lottery', icon: Ticket },
           { id: 'partners', label: 'Partners', icon: MapPin },
           { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
@@ -1566,6 +1612,224 @@ export default function FintechDashboard({ token }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* KYC Management */}
+      {activeSubTab === 'kyc' && (
+        <div className="space-y-6">
+          {/* KYC Stats */}
+          <div className="grid grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Total Submissions</p>
+              <p className="text-2xl font-bold">{kycData.stats?.total || 0}</p>
+            </div>
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Pending Review</p>
+              <p className="text-2xl font-bold">{kycData.stats?.pending || 0}</p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Approved</p>
+              <p className="text-2xl font-bold">{kycData.stats?.approved || 0}</p>
+            </div>
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Rejected</p>
+              <p className="text-2xl font-bold">{kycData.stats?.rejected || 0}</p>
+            </div>
+          </div>
+
+          {/* KYC Submissions List */}
+          <div className="bg-white rounded-xl border border-slate-200">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                <UserCheck size={18} className="text-blue-500" />
+                KYC Submissions
+              </h4>
+              <Button onClick={fetchKycData} variant="outline" size="sm" className="gap-2">
+                <RefreshCw size={14} />
+                Refresh
+              </Button>
+            </div>
+
+            {kycData.submissions?.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {kycData.submissions.map((kyc) => (
+                  <div key={kyc.id} className="p-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                          kyc.status === 'approved' ? 'bg-emerald-100' :
+                          kyc.status === 'rejected' ? 'bg-red-100' :
+                          'bg-amber-100'
+                        }`}>
+                          {kyc.status === 'approved' ? <CheckCircle className="text-emerald-600" size={20} /> :
+                           kyc.status === 'rejected' ? <XCircle className="text-red-600" size={20} /> :
+                           <Clock className="text-amber-600" size={20} />}
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900">{kyc.full_name}</p>
+                          <p className="text-sm text-slate-500">{kyc.user_phone}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{kyc.document_type}</span>
+                            <span className="text-xs text-slate-400">{kyc.document_number}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                          kyc.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                          kyc.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {kyc.status}
+                        </span>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {new Date(kyc.submitted_at).toLocaleDateString()}
+                        </p>
+                        {kyc.status === 'pending' && (
+                          <Button
+                            onClick={() => setSelectedKyc(kyc)}
+                            size="sm"
+                            className="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Eye size={14} className="mr-1" />
+                            Review
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-500">
+                <UserCheck size={40} className="mx-auto mb-3 opacity-30" />
+                <p>No KYC submissions yet</p>
+              </div>
+            )}
+          </div>
+
+          {/* KYC Review Modal */}
+          {selectedKyc && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                  <h3 className="font-bold text-lg">Review KYC Submission</h3>
+                  <button onClick={() => setSelectedKyc(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                    <XCircle size={20} />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* User Info */}
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-slate-900 mb-3">Personal Information</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-500">Full Name</p>
+                        <p className="font-medium">{selectedKyc.full_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Phone</p>
+                        <p className="font-medium">{selectedKyc.user_phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Document Type</p>
+                        <p className="font-medium">{selectedKyc.document_type}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Document Number</p>
+                        <p className="font-medium">{selectedKyc.document_number}</p>
+                      </div>
+                      {selectedKyc.date_of_birth && (
+                        <div>
+                          <p className="text-slate-500">Date of Birth</p>
+                          <p className="font-medium">{selectedKyc.date_of_birth}</p>
+                        </div>
+                      )}
+                      {selectedKyc.address && (
+                        <div className="col-span-2">
+                          <p className="text-slate-500">Address</p>
+                          <p className="font-medium">{selectedKyc.address}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Document Images */}
+                  <div>
+                    <h4 className="font-semibold text-slate-900 mb-3">Uploaded Documents</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      {selectedKyc.document_front_url && selectedKyc.document_front_url !== 'pending_upload' && (
+                        <div>
+                          <p className="text-sm text-slate-500 mb-2">Document Front</p>
+                          <img
+                            src={selectedKyc.document_front_url}
+                            alt="Document Front"
+                            className="rounded-lg border border-slate-200 w-full h-40 object-cover cursor-pointer"
+                            onClick={() => window.open(selectedKyc.document_front_url, '_blank')}
+                          />
+                        </div>
+                      )}
+                      {selectedKyc.document_back_url && selectedKyc.document_back_url !== 'pending_upload' && (
+                        <div>
+                          <p className="text-sm text-slate-500 mb-2">Document Back</p>
+                          <img
+                            src={selectedKyc.document_back_url}
+                            alt="Document Back"
+                            className="rounded-lg border border-slate-200 w-full h-40 object-cover cursor-pointer"
+                            onClick={() => window.open(selectedKyc.document_back_url, '_blank')}
+                          />
+                        </div>
+                      )}
+                      {selectedKyc.selfie_url && selectedKyc.selfie_url !== 'pending_upload' && (
+                        <div>
+                          <p className="text-sm text-slate-500 mb-2">Selfie</p>
+                          <img
+                            src={selectedKyc.selfie_url}
+                            alt="Selfie"
+                            className="rounded-lg border border-slate-200 w-full h-40 object-cover cursor-pointer"
+                            onClick={() => window.open(selectedKyc.selfie_url, '_blank')}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Rejection Reason */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Rejection Reason (if rejecting)
+                    </label>
+                    <Input
+                      value={kycRejectReason}
+                      onChange={(e) => setKycRejectReason(e.target.value)}
+                      placeholder="Enter reason for rejection..."
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleApproveKyc(selectedKyc.id)}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <CheckCircle size={16} className="mr-2" />
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={() => handleRejectKyc(selectedKyc.id)}
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      <XCircle size={16} className="mr-2" />
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -5,7 +5,8 @@ import {
   Send, History, DollarSign, ArrowDownToLine, CheckCircle2, CheckCircle,
   Copy, RefreshCw, Gift, Users, Share2, CreditCard, Award, Store,
   Smartphone, Wifi, Zap, Banknote, ChevronRight, AlertCircle, Crown, MapPin, Ticket,
-  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X, Clock, Camera, ScanLine
+  Eye, EyeOff, User, Lock, Calendar, Cake, Check, X, Clock, Camera, ScanLine,
+  Shield, FileText, Upload, UserCheck, Contact, MessageSquare
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -83,6 +84,30 @@ export default function SDMClientPage() {
   // Partner details modal state
   const [selectedPartner, setSelectedPartner] = useState(null);
   const [showPartnerDetails, setShowPartnerDetails] = useState(false);
+  
+  // KYC state
+  const [kycStatus, setKycStatus] = useState(null);
+  const [showKycForm, setShowKycForm] = useState(false);
+  const [kycForm, setKycForm] = useState({
+    documentType: 'GHANA_CARD',
+    documentNumber: '',
+    fullName: '',
+    dateOfBirth: '',
+    gender: '',
+    address: ''
+  });
+  const [kycUploads, setKycUploads] = useState({
+    front: null,
+    back: null,
+    selfie: null
+  });
+  const [isSubmittingKyc, setIsSubmittingKyc] = useState(false);
+  
+  // Contacts state
+  const [syncedContacts, setSyncedContacts] = useState([]);
+  const [isSyncingContacts, setIsSyncingContacts] = useState(false);
+  const [showContactPayment, setShowContactPayment] = useState(null);
+  const [contactPaymentAmount, setContactPaymentAmount] = useState('');
   
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
@@ -294,6 +319,165 @@ export default function SDMClientPage() {
       console.error('Service data fetch error:', error);
     }
   };
+
+  // ============== KYC FUNCTIONS ==============
+  const fetchKycStatus = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API_URL}/api/sdm/user/kyc/status`, { headers });
+      setKycStatus(response.data);
+    } catch (error) {
+      console.error('KYC status fetch error:', error);
+    }
+  };
+
+  const handleSubmitKyc = async (e) => {
+    e.preventDefault();
+    setIsSubmittingKyc(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      // First submit KYC info
+      const submitRes = await axios.post(`${API_URL}/api/sdm/user/kyc/submit`, {
+        document_type: kycForm.documentType,
+        document_number: kycForm.documentNumber,
+        full_name: kycForm.fullName,
+        date_of_birth: kycForm.dateOfBirth || null,
+        gender: kycForm.gender || null,
+        address: kycForm.address || null
+      }, { headers });
+      
+      const kycId = submitRes.data.kyc_id;
+      
+      // Then upload documents
+      if (kycUploads.front) {
+        const frontData = new FormData();
+        frontData.append('file', kycUploads.front);
+        await axios.post(`${API_URL}/api/sdm/user/kyc/upload/${kycId}?document_type=front`, frontData, {
+          headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+        });
+      }
+      
+      if (kycUploads.back) {
+        const backData = new FormData();
+        backData.append('file', kycUploads.back);
+        await axios.post(`${API_URL}/api/sdm/user/kyc/upload/${kycId}?document_type=back`, backData, {
+          headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+        });
+      }
+      
+      if (kycUploads.selfie) {
+        const selfieData = new FormData();
+        selfieData.append('file', kycUploads.selfie);
+        await axios.post(`${API_URL}/api/sdm/user/kyc/upload/${kycId}?document_type=selfie`, selfieData, {
+          headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+        });
+      }
+      
+      toast.success('KYC submitted successfully! Awaiting review.');
+      setShowKycForm(false);
+      setKycForm({ documentType: 'GHANA_CARD', documentNumber: '', fullName: '', dateOfBirth: '', gender: '', address: '' });
+      setKycUploads({ front: null, back: null, selfie: null });
+      fetchKycStatus();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'KYC submission failed');
+    } finally {
+      setIsSubmittingKyc(false);
+    }
+  };
+
+  // ============== CONTACTS FUNCTIONS ==============
+  const fetchSyncedContacts = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API_URL}/api/sdm/user/contacts`, { headers });
+      setSyncedContacts(response.data.contacts || []);
+    } catch (error) {
+      console.error('Contacts fetch error:', error);
+    }
+  };
+
+  const handleSyncContacts = async () => {
+    setIsSyncingContacts(true);
+    try {
+      // Request contact access (simulated - in real app, use native API)
+      // For web, we'll use a manual input method
+      const input = prompt('Enter phone numbers to sync (comma separated):\nExample: 0241234567, 0551234567, 0201234567');
+      
+      if (!input) {
+        setIsSyncingContacts(false);
+        return;
+      }
+      
+      const phoneNumbers = input.split(',').map(p => p.trim()).filter(p => p.length >= 9);
+      
+      if (phoneNumbers.length === 0) {
+        toast.error('No valid phone numbers entered');
+        setIsSyncingContacts(false);
+        return;
+      }
+      
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.post(`${API_URL}/api/sdm/user/contacts/sync`, {
+        phone_numbers: phoneNumbers
+      }, { headers });
+      
+      setSyncedContacts(response.data.sdm_contacts || []);
+      toast.success(`Synced ${response.data.total_synced} contacts. Found ${response.data.sdm_contacts_count} SDM members!`);
+      
+      if (response.data.non_sdm_count > 0) {
+        toast.info(`${response.data.non_sdm_count} contacts are not on SDM yet. Invite them!`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Contact sync failed');
+    } finally {
+      setIsSyncingContacts(false);
+    }
+  };
+
+  const handleInviteContact = async (phone) => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API_URL}/api/sdm/user/contacts/invite?phone=${encodeURIComponent(phone)}`, {}, { headers });
+      toast.success('Invitation sent!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send invitation');
+    }
+  };
+
+  const handlePayContact = async (contact) => {
+    if (!contactPaymentAmount || parseFloat(contactPaymentAmount) <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      // Use the existing merchant payment endpoint if contact has qr_code
+      if (contact.qr_code) {
+        await axios.post(`${API_URL}/api/sdm/client/pay-merchant`, {
+          merchant_qr: contact.qr_code,
+          amount: parseFloat(contactPaymentAmount)
+        }, { headers });
+        toast.success(`Sent GHS ${contactPaymentAmount} to ${contact.name}!`);
+      } else {
+        toast.error('Contact does not have a QR code for receiving payments');
+      }
+      setShowContactPayment(null);
+      setContactPaymentAmount('');
+      fetchUserData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Payment failed');
+    }
+  };
+
+  // Load KYC and contacts when membership tab is active
+  useEffect(() => {
+    if (activeTab === 'membership' && token) {
+      fetchKycStatus();
+      fetchSyncedContacts();
+    }
+  }, [activeTab, token]);
 
   // Helper to check if a service has active promo
   const getServicePromo = (serviceType) => {
@@ -2339,6 +2523,372 @@ export default function SDMClientPage() {
 
         {activeTab === 'membership' && (
           <div className="space-y-4">
+            {/* KYC Verification Section */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    kycStatus?.kyc_level >= 3 ? 'bg-emerald-100' :
+                    kycStatus?.kyc_status === 'pending' ? 'bg-amber-100' :
+                    kycStatus?.kyc_status === 'rejected' ? 'bg-red-100' :
+                    'bg-slate-100'
+                  }`}>
+                    <Shield className={`${
+                      kycStatus?.kyc_level >= 3 ? 'text-emerald-600' :
+                      kycStatus?.kyc_status === 'pending' ? 'text-amber-600' :
+                      kycStatus?.kyc_status === 'rejected' ? 'text-red-600' :
+                      'text-slate-400'
+                    }`} size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">KYC Verification</h3>
+                    <p className="text-sm text-slate-500">
+                      {kycStatus?.kyc_level >= 3 ? 'Fully Verified' :
+                       kycStatus?.kyc_status === 'pending' ? 'Awaiting Review' :
+                       kycStatus?.kyc_status === 'rejected' ? 'Rejected - Please Resubmit' :
+                       'Verify your identity'}
+                    </p>
+                  </div>
+                </div>
+                <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                  kycStatus?.kyc_level >= 3 ? 'bg-emerald-100 text-emerald-700' :
+                  kycStatus?.kyc_status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                  kycStatus?.kyc_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  Level {kycStatus?.kyc_level || 0}
+                </span>
+              </div>
+              
+              {/* KYC Limits Info */}
+              {kycStatus?.limits && (
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="bg-slate-50 rounded-lg p-2 text-center">
+                    <p className="text-xs text-slate-500">Daily Limit</p>
+                    <p className="font-semibold text-slate-900">GHS {kycStatus.limits.daily_transaction}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-2 text-center">
+                    <p className="text-xs text-slate-500">Monthly Limit</p>
+                    <p className="font-semibold text-slate-900">GHS {kycStatus.limits.monthly_transaction}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-2 text-center">
+                    <p className="text-xs text-slate-500">Withdrawal</p>
+                    <p className="font-semibold text-slate-900">GHS {kycStatus.limits.withdrawal}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Rejection reason */}
+              {kycStatus?.kyc_status === 'rejected' && kycStatus?.kyc_rejection_reason && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-red-700">
+                    <strong>Reason:</strong> {kycStatus.kyc_rejection_reason}
+                  </p>
+                </div>
+              )}
+              
+              {/* Action Button */}
+              {kycStatus?.kyc_level < 3 && kycStatus?.kyc_status !== 'pending' && (
+                <Button
+                  onClick={() => setShowKycForm(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <UserCheck size={16} className="mr-2" />
+                  {kycStatus?.kyc_status === 'rejected' ? 'Resubmit Documents' : 'Start Verification'}
+                </Button>
+              )}
+              
+              {kycStatus?.kyc_status === 'pending' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                  <Clock className="mx-auto mb-2 text-amber-600" size={24} />
+                  <p className="text-sm text-amber-700">Your documents are being reviewed. This usually takes 24-48 hours.</p>
+                </div>
+              )}
+              
+              {kycStatus?.kyc_level >= 3 && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
+                  <CheckCircle className="mx-auto mb-2 text-emerald-600" size={24} />
+                  <p className="text-sm text-emerald-700">Your identity is verified! You have access to higher limits.</p>
+                </div>
+              )}
+            </div>
+
+            {/* KYC Form Modal */}
+            {showKycForm && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                  <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                    <h3 className="font-bold text-lg">KYC Verification</h3>
+                    <button onClick={() => setShowKycForm(false)} className="p-2 hover:bg-slate-100 rounded-full">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  
+                  <form onSubmit={handleSubmitKyc} className="p-4 space-y-4">
+                    {/* Document Type */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Document Type</label>
+                      <select
+                        value={kycForm.documentType}
+                        onChange={(e) => setKycForm({...kycForm, documentType: e.target.value})}
+                        className="w-full p-3 border border-slate-200 rounded-lg"
+                        required
+                      >
+                        <option value="GHANA_CARD">Ghana Card</option>
+                        <option value="VOTER_ID">Voter ID</option>
+                        <option value="PASSPORT">Passport</option>
+                        <option value="DRIVER_LICENSE">Driver's License</option>
+                      </select>
+                    </div>
+                    
+                    {/* Document Number */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Document Number</label>
+                      <Input
+                        value={kycForm.documentNumber}
+                        onChange={(e) => setKycForm({...kycForm, documentNumber: e.target.value})}
+                        placeholder="GHA-XXXXXXXXX-X"
+                        required
+                      />
+                    </div>
+                    
+                    {/* Full Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Full Name (as on document)</label>
+                      <Input
+                        value={kycForm.fullName}
+                        onChange={(e) => setKycForm({...kycForm, fullName: e.target.value})}
+                        placeholder="John Doe"
+                        required
+                      />
+                    </div>
+                    
+                    {/* Date of Birth */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Date of Birth</label>
+                      <Input
+                        type="date"
+                        value={kycForm.dateOfBirth}
+                        onChange={(e) => setKycForm({...kycForm, dateOfBirth: e.target.value})}
+                      />
+                    </div>
+                    
+                    {/* Upload Document Front */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Document Front</label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setKycUploads({...kycUploads, front: e.target.files[0]})}
+                          className="hidden"
+                          id="doc-front"
+                        />
+                        <label htmlFor="doc-front" className="cursor-pointer">
+                          {kycUploads.front ? (
+                            <div className="flex items-center justify-center gap-2 text-emerald-600">
+                              <CheckCircle size={20} />
+                              <span>{kycUploads.front.name}</span>
+                            </div>
+                          ) : (
+                            <div className="text-slate-500">
+                              <Upload className="mx-auto mb-2" size={24} />
+                              <p className="text-sm">Click to upload front of document</p>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                    
+                    {/* Upload Document Back (if needed) */}
+                    {kycForm.documentType !== 'PASSPORT' && (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Document Back</label>
+                        <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => setKycUploads({...kycUploads, back: e.target.files[0]})}
+                            className="hidden"
+                            id="doc-back"
+                          />
+                          <label htmlFor="doc-back" className="cursor-pointer">
+                            {kycUploads.back ? (
+                              <div className="flex items-center justify-center gap-2 text-emerald-600">
+                                <CheckCircle size={20} />
+                                <span>{kycUploads.back.name}</span>
+                              </div>
+                            ) : (
+                              <div className="text-slate-500">
+                                <Upload className="mx-auto mb-2" size={24} />
+                                <p className="text-sm">Click to upload back of document</p>
+                              </div>
+                            )}
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Selfie Upload */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Selfie (Face Verification)</label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="user"
+                          onChange={(e) => setKycUploads({...kycUploads, selfie: e.target.files[0]})}
+                          className="hidden"
+                          id="selfie"
+                        />
+                        <label htmlFor="selfie" className="cursor-pointer">
+                          {kycUploads.selfie ? (
+                            <div className="flex items-center justify-center gap-2 text-emerald-600">
+                              <CheckCircle size={20} />
+                              <span>{kycUploads.selfie.name}</span>
+                            </div>
+                          ) : (
+                            <div className="text-slate-500">
+                              <Camera className="mx-auto mb-2" size={24} />
+                              <p className="text-sm">Take a selfie or upload photo</p>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      type="submit"
+                      disabled={isSubmittingKyc || !kycUploads.front || !kycUploads.selfie}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {isSubmittingKyc ? (
+                        <Loader2 className="animate-spin mr-2" size={16} />
+                      ) : (
+                        <Shield className="mr-2" size={16} />
+                      )}
+                      Submit for Verification
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Contacts Section */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Contact className="text-blue-600" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">SDM Contacts</h3>
+                    <p className="text-sm text-slate-500">
+                      {syncedContacts.length > 0 
+                        ? `${syncedContacts.length} contacts on SDM`
+                        : 'Find friends on SDM'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSyncContacts}
+                  disabled={isSyncingContacts}
+                  variant="outline"
+                  size="sm"
+                >
+                  {isSyncingContacts ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <>
+                      <RefreshCw size={14} className="mr-1" />
+                      Sync
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {/* Synced Contacts List */}
+              {syncedContacts.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {syncedContacts.map((contact) => (
+                    <div key={contact.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="text-blue-600" size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900">{contact.name}</p>
+                          <p className="text-xs text-slate-500">{contact.phone}</p>
+                        </div>
+                        {contact.vip_tier && (
+                          <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
+                            {contact.vip_tier}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => setShowContactPayment(contact)}
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        <Send size={14} className="mr-1" />
+                        Pay
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-500">
+                  <Users className="mx-auto mb-2 opacity-30" size={32} />
+                  <p className="text-sm">No contacts synced yet</p>
+                  <p className="text-xs mt-1">Click "Sync" to find friends on SDM</p>
+                </div>
+              )}
+            </div>
+
+            {/* Contact Payment Modal */}
+            {showContactPayment && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-sm w-full p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg">Send to {showContactPayment.name}</h3>
+                    <button onClick={() => setShowContactPayment(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  
+                  <div className="text-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-2">
+                      <User className="text-blue-600" size={28} />
+                    </div>
+                    <p className="text-slate-500">{showContactPayment.phone}</p>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Amount (GHS)</label>
+                    <Input
+                      type="number"
+                      value={contactPaymentAmount}
+                      onChange={(e) => setContactPaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                      min="1"
+                      step="0.01"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Available: GHS {wallet?.wallet_available?.toFixed(2) || '0.00'}</p>
+                  </div>
+                  
+                  <Button
+                    onClick={() => handlePayContact(showContactPayment)}
+                    disabled={!contactPaymentAmount || parseFloat(contactPaymentAmount) > (wallet?.wallet_available || 0)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Send size={16} className="mr-2" />
+                    Send GHS {contactPaymentAmount || '0.00'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* My Memberships */}
             {userMemberships.length > 0 && (
               <div className="space-y-3">
