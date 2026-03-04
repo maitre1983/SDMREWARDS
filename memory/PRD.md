@@ -7,6 +7,49 @@
 
 ## CHANGELOG
 
+### March 4, 2026 - Phase 6: UI/UX Premium Redesign & Security ✅
+
+**New Fintech Premium Design (Auth Pages):**
+- Split-screen layout with AI-generated hero images
+- African/Ghanaian professionals in images
+- SDM logo prominently displayed
+- Dark elegant background (#0A0E17)
+- Gradient accent colors (Gold/Orange for Client, Emerald/Teal for Merchant)
+- Modern rounded inputs and buttons
+- Feature highlights with icons
+
+**Password Visibility Toggle:**
+- Eye icon on all password fields
+- Toggle between hidden and visible text
+- Works on login and registration forms
+
+**Dynamic Admin URL Security:**
+- Format: `/adminDDMMYY` (e.g., `/admin040326`)
+- Changes daily automatically
+- `/admin` returns 404 error
+
+**OTP Verification Mandatory:**
+- Client registration requires verified OTP
+- Merchant registration requires verified OTP
+- No bypass allowed (removed TEST_ mode bypass)
+
+**Client Profile Page:**
+- Route: `/client/profile`
+- Edit personal info (name, email, birthday, MoMo number)
+- Withdrawal history tab
+- Back navigation to dashboard
+
+**AI-Generated Images:**
+- `client_auth_bg` - Young woman using phone for payment
+- `client_dashboard_hero` - Friends celebrating cashback
+- `merchant_auth_bg` - Professional in modern shop with tablet
+- `merchant_dashboard_hero` - Business owner receiving payment
+
+**Test Results (Iteration 28):**
+- Frontend: 100% (9/9 features passing)
+
+---
+
 ### March 4, 2026 - Phase 5: Social Share, Withdrawal & Admin Logos ✅
 
 **Social Share Buttons (Landing Page):**
