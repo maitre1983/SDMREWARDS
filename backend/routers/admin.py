@@ -43,11 +43,24 @@ class UpdateClientRequest(BaseModel):
     status: Optional[str] = None
 
 
+class UpdateClientLimitsRequest(BaseModel):
+    withdrawal_limit: Optional[float] = None
+    transaction_limit: Optional[float] = None
+    daily_limit: Optional[float] = None
+
+
+class SendSMSRequest(BaseModel):
+    message: str
+
+
 class UpdateMerchantRequest(BaseModel):
     business_name: Optional[str] = None
     owner_name: Optional[str] = None
     status: Optional[str] = None
     cashback_rate: Optional[float] = None
+    address: Optional[str] = None
+    google_maps_url: Optional[str] = None
+    city: Optional[str] = None
 
 
 class UpdateCommissionRequest(BaseModel):
@@ -496,6 +509,139 @@ async def delete_client(client_id: str, current_admin: dict = Depends(get_curren
     return {"success": True, "message": "Client deleted"}
 
 
+# ============== ENHANCED CLIENT MANAGEMENT ==============
+
+@router.get("/clients/{client_id}/transactions")
+async def get_client_transactions(
+    client_id: str,
+    limit: int = 100,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get detailed transaction history for a client"""
+    client_doc = await db.clients.find_one({"id": client_id}, {"_id": 0, "password_hash": 0})
+    if not client_doc:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Get all transactions
+    transactions = await db.transactions.find(
+        {"client_id": client_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Calculate summaries
+    cashback_received = sum(t.get("cashback_amount", 0) for t in transactions if t.get("type") == "payment")
+    cashback_received += sum(t.get("amount", 0) for t in transactions if t.get("type") in ["referral_bonus", "welcome_bonus"])
+    cashback_spent = sum(t.get("amount", 0) for t in transactions if t.get("type") in ["airtime", "data", "withdrawal"])
+    payments_made = sum(t.get("amount", 0) for t in transactions if t.get("type") == "payment")
+    
+    # Get referrals
+    referrals = await db.referrals.find(
+        {"referrer_id": client_id},
+        {"_id": 0}
+    ).to_list(100)
+    
+    return {
+        "client": client_doc,
+        "transactions": transactions,
+        "summary": {
+            "cashback_received": cashback_received,
+            "cashback_spent": cashback_spent,
+            "payments_made": payments_made,
+            "total_transactions": len(transactions),
+            "referrals_count": len(referrals)
+        },
+        "referrals": referrals
+    }
+
+
+@router.post("/clients/{client_id}/block")
+async def block_client(client_id: str, current_admin: dict = Depends(get_current_admin)):
+    """Block client account"""
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"status": "blocked", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "block_client",
+        "target_id": client_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Client blocked"}
+
+
+@router.put("/clients/{client_id}/limits")
+async def update_client_limits(
+    client_id: str,
+    request: UpdateClientLimitsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update client account limits"""
+    client_doc = await db.clients.find_one({"id": client_id})
+    if not client_doc:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.withdrawal_limit is not None:
+        updates["withdrawal_limit"] = request.withdrawal_limit
+    if request.transaction_limit is not None:
+        updates["transaction_limit"] = request.transaction_limit
+    if request.daily_limit is not None:
+        updates["daily_limit"] = request.daily_limit
+    
+    await db.clients.update_one({"id": client_id}, {"$set": updates})
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "update_client_limits",
+        "target_id": client_id,
+        "changes": updates,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Client limits updated"}
+
+
+@router.post("/clients/{client_id}/send-sms")
+async def send_sms_to_client(
+    client_id: str,
+    request: SendSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Send SMS to client"""
+    client_doc = await db.clients.find_one({"id": client_id})
+    if not client_doc:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    phone = client_doc.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Client has no phone number")
+    
+    # Import SMS service
+    from services.bulkclix_service import send_sms
+    
+    result = await send_sms(phone, request.message)
+    
+    # Log the SMS
+    await db.sms_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "recipient_type": "client",
+        "recipient_id": client_id,
+        "phone": phone,
+        "message": request.message,
+        "status": "sent" if result.get("success") else "failed",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": result.get("success", False), "message": "SMS sent" if result.get("success") else "SMS failed"}
+
+
 # ============== MERCHANTS MANAGEMENT ==============
 
 @router.get("/merchants")
@@ -655,6 +801,159 @@ async def delete_merchant(merchant_id: str, current_admin: dict = Depends(get_cu
     )
     
     return {"success": True, "message": "Merchant deleted"}
+
+
+# ============== ENHANCED MERCHANT MANAGEMENT ==============
+
+@router.get("/merchants/{merchant_id}/transactions")
+async def get_merchant_transactions(
+    merchant_id: str,
+    limit: int = 100,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get detailed transaction history for a merchant"""
+    merchant_doc = await db.merchants.find_one({"id": merchant_id}, {"_id": 0, "password_hash": 0})
+    if not merchant_doc:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    # Get all transactions
+    transactions = await db.transactions.find(
+        {"merchant_id": merchant_id, "type": "payment"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Get unique clients served
+    unique_clients = set()
+    for t in transactions:
+        if t.get("client_id"):
+            unique_clients.add(t["client_id"])
+    
+    # Calculate summaries
+    total_volume = sum(t.get("amount", 0) for t in transactions)
+    total_cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+    
+    # Enrich transactions with client info
+    for t in transactions:
+        client_id = t.get("client_id")
+        if client_id:
+            client_doc = await db.clients.find_one({"id": client_id}, {"_id": 0, "full_name": 1, "username": 1})
+            if client_doc:
+                t["client_name"] = client_doc.get("full_name", "Unknown")
+                t["client_username"] = client_doc.get("username", "")
+    
+    return {
+        "merchant": merchant_doc,
+        "transactions": transactions,
+        "summary": {
+            "total_transactions": len(transactions),
+            "total_volume": total_volume,
+            "total_cashback": total_cashback,
+            "unique_clients": len(unique_clients)
+        }
+    }
+
+
+@router.post("/merchants/{merchant_id}/reject")
+async def reject_merchant(merchant_id: str, current_admin: dict = Depends(get_current_admin)):
+    """Reject pending merchant"""
+    await db.merchants.update_one(
+        {"id": merchant_id},
+        {"$set": {"status": "rejected", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "reject_merchant",
+        "target_id": merchant_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Merchant rejected"}
+
+
+@router.post("/merchants/{merchant_id}/block")
+async def block_merchant(merchant_id: str, current_admin: dict = Depends(get_current_admin)):
+    """Block merchant account"""
+    await db.merchants.update_one(
+        {"id": merchant_id},
+        {"$set": {"status": "blocked", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "block_merchant",
+        "target_id": merchant_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Merchant blocked"}
+
+
+@router.put("/merchants/{merchant_id}/location")
+async def update_merchant_location(
+    merchant_id: str,
+    request: UpdateMerchantRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update merchant location details"""
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.address:
+        updates["address"] = request.address
+    if request.google_maps_url:
+        updates["google_maps_url"] = request.google_maps_url
+    if request.city:
+        updates["city"] = request.city
+    
+    await db.merchants.update_one({"id": merchant_id}, {"$set": updates})
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "update_merchant_location",
+        "target_id": merchant_id,
+        "changes": updates,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Merchant location updated"}
+
+
+@router.post("/merchants/{merchant_id}/send-sms")
+async def send_sms_to_merchant(
+    merchant_id: str,
+    request: SendSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Send SMS to merchant"""
+    merchant_doc = await db.merchants.find_one({"id": merchant_id})
+    if not merchant_doc:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    phone = merchant_doc.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Merchant has no phone number")
+    
+    # Import SMS service
+    from services.bulkclix_service import send_sms
+    
+    result = await send_sms(phone, request.message)
+    
+    # Log the SMS
+    await db.sms_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "recipient_type": "merchant",
+        "recipient_id": merchant_id,
+        "phone": phone,
+        "message": request.message,
+        "status": "sent" if result.get("success") else "failed",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": result.get("success", False), "message": "SMS sent" if result.get("success") else "SMS failed"}
 
 
 # ============== TRANSACTIONS ==============

@@ -7,6 +7,36 @@
 
 ## CHANGELOG
 
+### March 4, 2026 - Phase 9: Enhanced Admin Control Panel ✅
+
+**Clients Sub-menu Enhancements:**
+- Complete account management: Delete, Suspend, Block, Reactivate
+- Transaction history modal with detailed summaries
+- Send SMS functionality to clients
+- Account limits management (withdrawal, transaction, daily limits)
+- Transaction summary: Cashback received/spent, payments, referrals
+
+**Merchants Sub-menu Enhancements:**
+- Merchant validation system: Approve, Reject, Suspend, Block
+- Complete account management with all status actions
+- Transaction history modal with performance metrics
+- Location management: City, Full Address, Google Maps URL
+- Send SMS functionality to merchants
+- Performance summary: Total transactions, volume, cashback, clients served
+
+**Backend API Endpoints Added:**
+- `GET /api/admin/clients/{id}/transactions` - Full client transaction history
+- `POST /api/admin/clients/{id}/block` - Block client account
+- `PUT /api/admin/clients/{id}/limits` - Update client limits
+- `POST /api/admin/clients/{id}/send-sms` - Send SMS to client
+- `GET /api/admin/merchants/{id}/transactions` - Full merchant transaction history
+- `POST /api/admin/merchants/{id}/reject` - Reject merchant
+- `POST /api/admin/merchants/{id}/block` - Block merchant
+- `PUT /api/admin/merchants/{id}/location` - Update merchant location
+- `POST /api/admin/merchants/{id}/send-sms` - Send SMS to merchant
+
+---
+
 ### March 4, 2026 - Phase 8: Admin Dashboard Advanced Overview ✅
 
 **New Overview Statistics:**

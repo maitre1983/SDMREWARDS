@@ -37,7 +37,12 @@ import {
   Star,
   ArrowUpRight,
   ArrowDownRight,
-  UserPlus
+  UserPlus,
+  MessageSquare,
+  MapPin,
+  Sliders,
+  History,
+  Phone
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -65,6 +70,23 @@ export default function AdminDashboard() {
   const [merchants, setMerchants] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [config, setConfig] = useState(null);
+  
+  // Modal states
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedMerchant, setSelectedMerchant] = useState(null);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showMerchantModal, setShowMerchantModal] = useState(false);
+  const [showSMSModal, setShowSMSModal] = useState(false);
+  const [showLimitsModal, setShowLimitsModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [smsMessage, setSmsMessage] = useState('');
+  const [smsRecipientType, setSmsRecipientType] = useState('client');
+  const [clientTransactions, setClientTransactions] = useState([]);
+  const [merchantTransactions, setMerchantTransactions] = useState([]);
+  const [transactionSummary, setTransactionSummary] = useState(null);
+  const [limitsForm, setLimitsForm] = useState({ withdrawal_limit: 500, transaction_limit: 1000, daily_limit: 2000 });
+  const [locationForm, setLocationForm] = useState({ address: '', google_maps_url: '', city: '' });
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -184,6 +206,7 @@ export default function AdminDashboard() {
 
   const handleUpdateClientStatus = async (clientId, action) => {
     try {
+      setActionLoading(true);
       const headers = getHeaders();
       await axios.put(`${API_URL}/api/admin/clients/${clientId}/status`, {
         action
@@ -191,13 +214,17 @@ export default function AdminDashboard() {
       
       toast.success(`Client ${action} successfully`);
       fetchDashboardData();
+      setShowClientModal(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Action failed');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleUpdateMerchantStatus = async (merchantId, action) => {
     try {
+      setActionLoading(true);
       const headers = getHeaders();
       await axios.put(`${API_URL}/api/admin/merchants/${merchantId}/status`, {
         action
@@ -205,8 +232,187 @@ export default function AdminDashboard() {
       
       toast.success(`Merchant ${action} successfully`);
       fetchDashboardData();
+      setShowMerchantModal(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Action failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Fetch client transactions
+  const handleViewClientTransactions = async (client) => {
+    try {
+      setSelectedClient(client);
+      setShowClientModal(true);
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/clients/${client.id}/transactions`, { headers });
+      setClientTransactions(res.data.transactions || []);
+      setTransactionSummary(res.data.summary || {});
+      setLimitsForm({
+        withdrawal_limit: client.withdrawal_limit || 500,
+        transaction_limit: client.transaction_limit || 1000,
+        daily_limit: client.daily_limit || 2000
+      });
+    } catch (error) {
+      console.error('Error fetching client transactions:', error);
+      toast.error('Failed to load transactions');
+    }
+  };
+
+  // Fetch merchant transactions
+  const handleViewMerchantTransactions = async (merchant) => {
+    try {
+      setSelectedMerchant(merchant);
+      setShowMerchantModal(true);
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/merchants/${merchant.id}/transactions`, { headers });
+      setMerchantTransactions(res.data.transactions || []);
+      setTransactionSummary(res.data.summary || {});
+      setLocationForm({
+        address: merchant.address || '',
+        google_maps_url: merchant.google_maps_url || '',
+        city: merchant.city || ''
+      });
+    } catch (error) {
+      console.error('Error fetching merchant transactions:', error);
+      toast.error('Failed to load transactions');
+    }
+  };
+
+  // Send SMS
+  const handleSendSMS = async () => {
+    if (!smsMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      const endpoint = smsRecipientType === 'client' 
+        ? `/api/admin/clients/${selectedClient.id}/send-sms`
+        : `/api/admin/merchants/${selectedMerchant.id}/send-sms`;
+      
+      await axios.post(`${API_URL}${endpoint}`, { message: smsMessage }, { headers });
+      toast.success('SMS sent successfully');
+      setShowSMSModal(false);
+      setSmsMessage('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send SMS');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Update client limits
+  const handleUpdateLimits = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/clients/${selectedClient.id}/limits`, limitsForm, { headers });
+      toast.success('Client limits updated');
+      setShowLimitsModal(false);
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update limits');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Update merchant location
+  const handleUpdateLocation = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/merchants/${selectedMerchant.id}/location`, locationForm, { headers });
+      toast.success('Merchant location updated');
+      setShowLocationModal(false);
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update location');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Block client
+  const handleBlockClient = async (clientId) => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/clients/${clientId}/block`, {}, { headers });
+      toast.success('Client blocked');
+      fetchDashboardData();
+      setShowClientModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to block client');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Block/Reject merchant
+  const handleBlockMerchant = async (merchantId) => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/merchants/${merchantId}/block`, {}, { headers });
+      toast.success('Merchant blocked');
+      fetchDashboardData();
+      setShowMerchantModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to block merchant');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectMerchant = async (merchantId) => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/merchants/${merchantId}/reject`, {}, { headers });
+      toast.success('Merchant rejected');
+      fetchDashboardData();
+      setShowMerchantModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reject merchant');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete client/merchant
+  const handleDeleteClient = async (clientId) => {
+    if (!window.confirm('Are you sure you want to delete this client?')) return;
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.delete(`${API_URL}/api/admin/clients/${clientId}`, { headers });
+      toast.success('Client deleted');
+      fetchDashboardData();
+      setShowClientModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete client');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteMerchant = async (merchantId) => {
+    if (!window.confirm('Are you sure you want to delete this merchant?')) return;
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.delete(`${API_URL}/api/admin/merchants/${merchantId}`, { headers });
+      toast.success('Merchant deleted');
+      fetchDashboardData();
+      setShowMerchantModal(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete merchant');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -215,6 +421,8 @@ export default function AdminDashboard() {
       active: { icon: CheckCircle, color: 'text-emerald-400 bg-emerald-500/10' },
       pending: { icon: Clock, color: 'text-amber-400 bg-amber-500/10' },
       suspended: { icon: Ban, color: 'text-red-400 bg-red-500/10' },
+      blocked: { icon: XCircle, color: 'text-red-600 bg-red-500/20' },
+      rejected: { icon: XCircle, color: 'text-orange-400 bg-orange-500/10' },
       deleted: { icon: Trash2, color: 'text-slate-400 bg-slate-500/10' }
     };
     const badge = badges[status] || badges.pending;
@@ -748,27 +956,67 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-4">{getStatusBadge(client.status)}</td>
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewClientTransactions(client)}
+                              className="text-blue-400 hover:bg-blue-500/10"
+                              title="View Transactions"
+                            >
+                              <Eye size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setSelectedClient(client); setSmsRecipientType('client'); setShowSMSModal(true); }}
+                              className="text-purple-400 hover:bg-purple-500/10"
+                              title="Send SMS"
+                            >
+                              <MessageSquare size={14} />
+                            </Button>
                             {client.status === 'active' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUpdateClientStatus(client.id, 'suspend')}
-                                className="text-amber-400 hover:bg-amber-500/10"
-                              >
-                                <Ban size={14} />
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateClientStatus(client.id, 'suspend')}
+                                  className="text-amber-400 hover:bg-amber-500/10"
+                                  title="Suspend"
+                                >
+                                  <Ban size={14} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleBlockClient(client.id)}
+                                  className="text-red-400 hover:bg-red-500/10"
+                                  title="Block"
+                                >
+                                  <XCircle size={14} />
+                                </Button>
+                              </>
                             )}
-                            {client.status === 'suspended' && (
+                            {(client.status === 'suspended' || client.status === 'blocked') && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleUpdateClientStatus(client.id, 'activate')}
                                 className="text-emerald-400 hover:bg-emerald-500/10"
+                                title="Reactivate"
                               >
                                 <UserCheck size={14} />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClient(client.id)}
+                              className="text-slate-400 hover:bg-slate-500/10"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -806,8 +1054,8 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="text-left p-4">Business</th>
                       <th className="text-left p-4">Phone</th>
+                      <th className="text-left p-4">Location</th>
                       <th className="text-left p-4">Cashback</th>
-                      <th className="text-left p-4">Transactions</th>
                       <th className="text-left p-4">Status</th>
                       <th className="text-left p-4">Actions</th>
                     </tr>
@@ -820,41 +1068,108 @@ export default function AdminDashboard() {
                           <p className="text-slate-500 text-sm">{merchant.owner_name}</p>
                         </td>
                         <td className="p-4 text-slate-300">{merchant.phone}</td>
+                        <td className="p-4">
+                          {merchant.city ? (
+                            <span className="text-slate-300 text-sm">{merchant.city}</span>
+                          ) : (
+                            <span className="text-slate-500 text-sm">Not set</span>
+                          )}
+                        </td>
                         <td className="p-4 text-amber-400">{merchant.cashback_rate}%</td>
-                        <td className="p-4 text-slate-300">{merchant.total_transactions || 0}</td>
                         <td className="p-4">{getStatusBadge(merchant.status)}</td>
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewMerchantTransactions(merchant)}
+                              className="text-blue-400 hover:bg-blue-500/10"
+                              title="View Transactions"
+                            >
+                              <Eye size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setSelectedMerchant(merchant); setSmsRecipientType('merchant'); setShowSMSModal(true); }}
+                              className="text-purple-400 hover:bg-purple-500/10"
+                              title="Send SMS"
+                            >
+                              <MessageSquare size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setSelectedMerchant(merchant); setLocationForm({ address: merchant.address || '', google_maps_url: merchant.google_maps_url || '', city: merchant.city || '' }); setShowLocationModal(true); }}
+                              className="text-cyan-400 hover:bg-cyan-500/10"
+                              title="Edit Location"
+                            >
+                              <MapPin size={14} />
+                            </Button>
                             {merchant.status === 'pending' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUpdateMerchantStatus(merchant.id, 'activate')}
-                                className="text-emerald-400 hover:bg-emerald-500/10"
-                              >
-                                <CheckCircle size={14} />
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateMerchantStatus(merchant.id, 'approve')}
+                                  className="text-emerald-400 hover:bg-emerald-500/10"
+                                  title="Approve"
+                                >
+                                  <CheckCircle size={14} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRejectMerchant(merchant.id)}
+                                  className="text-orange-400 hover:bg-orange-500/10"
+                                  title="Reject"
+                                >
+                                  <XCircle size={14} />
+                                </Button>
+                              </>
                             )}
                             {merchant.status === 'active' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUpdateMerchantStatus(merchant.id, 'suspend')}
-                                className="text-amber-400 hover:bg-amber-500/10"
-                              >
-                                <Ban size={14} />
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateMerchantStatus(merchant.id, 'suspend')}
+                                  className="text-amber-400 hover:bg-amber-500/10"
+                                  title="Suspend"
+                                >
+                                  <Ban size={14} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleBlockMerchant(merchant.id)}
+                                  className="text-red-400 hover:bg-red-500/10"
+                                  title="Block"
+                                >
+                                  <XCircle size={14} />
+                                </Button>
+                              </>
                             )}
-                            {merchant.status === 'suspended' && (
+                            {(merchant.status === 'suspended' || merchant.status === 'blocked' || merchant.status === 'rejected') && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleUpdateMerchantStatus(merchant.id, 'activate')}
                                 className="text-emerald-400 hover:bg-emerald-500/10"
+                                title="Reactivate"
                               >
                                 <UserCheck size={14} />
                               </Button>
                             )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteMerchant(merchant.id)}
+                              className="text-slate-400 hover:bg-slate-500/10"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -976,6 +1291,495 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* CLIENT DETAILS MODAL */}
+      {showClientModal && selectedClient && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <Users className="text-blue-400" size={24} />
+                <div>
+                  <h2 className="text-white font-semibold">{selectedClient.full_name}</h2>
+                  <p className="text-slate-400 text-sm">@{selectedClient.username}</p>
+                </div>
+              </div>
+              <Button variant="ghost" onClick={() => setShowClientModal(false)} className="text-slate-400">
+                <XCircle size={24} />
+              </Button>
+            </div>
+
+            {/* Client Info */}
+            <div className="p-4 border-b border-slate-700">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Phone</p>
+                  <p className="text-white">{selectedClient.phone}</p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Card Type</p>
+                  <p className="text-amber-400 uppercase">{selectedClient.card_type || 'None'}</p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Balance</p>
+                  <p className="text-emerald-400">GHS {(selectedClient.cashback_balance || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Status</p>
+                  {getStatusBadge(selectedClient.status)}
+                </div>
+              </div>
+            </div>
+
+            {/* Transaction Summary */}
+            {transactionSummary && (
+              <div className="p-4 border-b border-slate-700">
+                <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <BarChart3 size={18} /> Transaction Summary
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-emerald-500/10 rounded-lg p-3 text-center">
+                    <p className="text-emerald-400 text-xl font-bold">GHS {(transactionSummary.cashback_received || 0).toFixed(2)}</p>
+                    <p className="text-slate-400 text-xs">Cashback Received</p>
+                  </div>
+                  <div className="bg-red-500/10 rounded-lg p-3 text-center">
+                    <p className="text-red-400 text-xl font-bold">GHS {(transactionSummary.cashback_spent || 0).toFixed(2)}</p>
+                    <p className="text-slate-400 text-xs">Cashback Spent</p>
+                  </div>
+                  <div className="bg-blue-500/10 rounded-lg p-3 text-center">
+                    <p className="text-blue-400 text-xl font-bold">GHS {(transactionSummary.payments_made || 0).toFixed(2)}</p>
+                    <p className="text-slate-400 text-xs">Payments Made</p>
+                  </div>
+                  <div className="bg-purple-500/10 rounded-lg p-3 text-center">
+                    <p className="text-purple-400 text-xl font-bold">{transactionSummary.total_transactions || 0}</p>
+                    <p className="text-slate-400 text-xs">Transactions</p>
+                  </div>
+                  <div className="bg-amber-500/10 rounded-lg p-3 text-center">
+                    <p className="text-amber-400 text-xl font-bold">{transactionSummary.referrals_count || 0}</p>
+                    <p className="text-slate-400 text-xs">Referrals</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transaction History */}
+            <div className="p-4 border-b border-slate-700">
+              <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                <History size={18} /> Transaction History
+              </h3>
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-slate-400 bg-slate-900 sticky top-0">
+                    <tr>
+                      <th className="text-left p-2">Date</th>
+                      <th className="text-left p-2">Type</th>
+                      <th className="text-right p-2">Amount</th>
+                      <th className="text-left p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {clientTransactions.map((tx, idx) => (
+                      <tr key={idx} className="hover:bg-slate-900/50">
+                        <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString()}</td>
+                        <td className="p-2 text-slate-300 capitalize">{tx.type?.replace('_', ' ')}</td>
+                        <td className="p-2 text-right text-emerald-400">GHS {tx.amount?.toFixed(2)}</td>
+                        <td className="p-2">{getStatusBadge(tx.status || 'completed')}</td>
+                      </tr>
+                    ))}
+                    {clientTransactions.length === 0 && (
+                      <tr><td colSpan="4" className="text-center text-slate-500 py-8">No transactions found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4">
+              <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                <Settings size={18} /> Account Actions
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={() => { setShowClientModal(false); setSmsRecipientType('client'); setShowSMSModal(true); }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <MessageSquare size={16} className="mr-2" /> Send SMS
+                </Button>
+                <Button 
+                  onClick={() => { setShowClientModal(false); setShowLimitsModal(true); }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Sliders size={16} className="mr-2" /> Manage Limits
+                </Button>
+                {selectedClient.status === 'active' && (
+                  <>
+                    <Button 
+                      onClick={() => handleUpdateClientStatus(selectedClient.id, 'suspend')}
+                      className="bg-amber-600 hover:bg-amber-700"
+                      disabled={actionLoading}
+                    >
+                      <Ban size={16} className="mr-2" /> Suspend
+                    </Button>
+                    <Button 
+                      onClick={() => handleBlockClient(selectedClient.id)}
+                      className="bg-red-600 hover:bg-red-700"
+                      disabled={actionLoading}
+                    >
+                      <XCircle size={16} className="mr-2" /> Block
+                    </Button>
+                  </>
+                )}
+                {(selectedClient.status === 'suspended' || selectedClient.status === 'blocked') && (
+                  <Button 
+                    onClick={() => handleUpdateClientStatus(selectedClient.id, 'activate')}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={actionLoading}
+                  >
+                    <UserCheck size={16} className="mr-2" /> Reactivate
+                  </Button>
+                )}
+                <Button 
+                  onClick={() => handleDeleteClient(selectedClient.id)}
+                  variant="outline"
+                  className="border-red-500 text-red-400 hover:bg-red-500/10"
+                  disabled={actionLoading}
+                >
+                  <Trash2 size={16} className="mr-2" /> Delete Account
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MERCHANT DETAILS MODAL */}
+      {showMerchantModal && selectedMerchant && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <Store className="text-emerald-400" size={24} />
+                <div>
+                  <h2 className="text-white font-semibold">{selectedMerchant.business_name}</h2>
+                  <p className="text-slate-400 text-sm">{selectedMerchant.owner_name}</p>
+                </div>
+              </div>
+              <Button variant="ghost" onClick={() => setShowMerchantModal(false)} className="text-slate-400">
+                <XCircle size={24} />
+              </Button>
+            </div>
+
+            {/* Merchant Info */}
+            <div className="p-4 border-b border-slate-700">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Phone</p>
+                  <p className="text-white">{selectedMerchant.phone}</p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Cashback Rate</p>
+                  <p className="text-amber-400">{selectedMerchant.cashback_rate}%</p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Location</p>
+                  <p className="text-white">{selectedMerchant.city || 'Not set'}</p>
+                </div>
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Status</p>
+                  {getStatusBadge(selectedMerchant.status)}
+                </div>
+              </div>
+              {selectedMerchant.address && (
+                <div className="mt-4 bg-slate-900 rounded-lg p-3">
+                  <p className="text-slate-400 text-xs">Full Address</p>
+                  <p className="text-white">{selectedMerchant.address}</p>
+                  {selectedMerchant.google_maps_url && (
+                    <a href={selectedMerchant.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm hover:underline">
+                      View on Google Maps
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Transaction Summary */}
+            {transactionSummary && (
+              <div className="p-4 border-b border-slate-700">
+                <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <BarChart3 size={18} /> Performance Summary
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-blue-500/10 rounded-lg p-3 text-center">
+                    <p className="text-blue-400 text-xl font-bold">{transactionSummary.total_transactions || 0}</p>
+                    <p className="text-slate-400 text-xs">Total Transactions</p>
+                  </div>
+                  <div className="bg-emerald-500/10 rounded-lg p-3 text-center">
+                    <p className="text-emerald-400 text-xl font-bold">GHS {(transactionSummary.total_volume || 0).toLocaleString()}</p>
+                    <p className="text-slate-400 text-xs">Total Volume</p>
+                  </div>
+                  <div className="bg-purple-500/10 rounded-lg p-3 text-center">
+                    <p className="text-purple-400 text-xl font-bold">GHS {(transactionSummary.total_cashback || 0).toLocaleString()}</p>
+                    <p className="text-slate-400 text-xs">Cashback Distributed</p>
+                  </div>
+                  <div className="bg-amber-500/10 rounded-lg p-3 text-center">
+                    <p className="text-amber-400 text-xl font-bold">{transactionSummary.unique_clients || 0}</p>
+                    <p className="text-slate-400 text-xs">Clients Served</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transaction History */}
+            <div className="p-4 border-b border-slate-700">
+              <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                <History size={18} /> Transaction History
+              </h3>
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-slate-400 bg-slate-900 sticky top-0">
+                    <tr>
+                      <th className="text-left p-2">Date</th>
+                      <th className="text-left p-2">Client</th>
+                      <th className="text-right p-2">Amount</th>
+                      <th className="text-right p-2">Cashback</th>
+                      <th className="text-left p-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {merchantTransactions.map((tx, idx) => (
+                      <tr key={idx} className="hover:bg-slate-900/50">
+                        <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString()}</td>
+                        <td className="p-2 text-slate-300">{tx.client_name || 'Unknown'}</td>
+                        <td className="p-2 text-right text-white">GHS {tx.amount?.toFixed(2)}</td>
+                        <td className="p-2 text-right text-purple-400">GHS {tx.cashback_amount?.toFixed(2)}</td>
+                        <td className="p-2">{getStatusBadge(tx.status || 'completed')}</td>
+                      </tr>
+                    ))}
+                    {merchantTransactions.length === 0 && (
+                      <tr><td colSpan="5" className="text-center text-slate-500 py-8">No transactions found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-4">
+              <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                <Settings size={18} /> Account Actions
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={() => { setShowMerchantModal(false); setSmsRecipientType('merchant'); setShowSMSModal(true); }}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <MessageSquare size={16} className="mr-2" /> Send SMS
+                </Button>
+                <Button 
+                  onClick={() => { setShowMerchantModal(false); setShowLocationModal(true); }}
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                >
+                  <MapPin size={16} className="mr-2" /> Edit Location
+                </Button>
+                {selectedMerchant.status === 'pending' && (
+                  <>
+                    <Button 
+                      onClick={() => handleUpdateMerchantStatus(selectedMerchant.id, 'approve')}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                      disabled={actionLoading}
+                    >
+                      <CheckCircle size={16} className="mr-2" /> Approve
+                    </Button>
+                    <Button 
+                      onClick={() => handleRejectMerchant(selectedMerchant.id)}
+                      className="bg-orange-600 hover:bg-orange-700"
+                      disabled={actionLoading}
+                    >
+                      <XCircle size={16} className="mr-2" /> Reject
+                    </Button>
+                  </>
+                )}
+                {selectedMerchant.status === 'active' && (
+                  <>
+                    <Button 
+                      onClick={() => handleUpdateMerchantStatus(selectedMerchant.id, 'suspend')}
+                      className="bg-amber-600 hover:bg-amber-700"
+                      disabled={actionLoading}
+                    >
+                      <Ban size={16} className="mr-2" /> Suspend
+                    </Button>
+                    <Button 
+                      onClick={() => handleBlockMerchant(selectedMerchant.id)}
+                      className="bg-red-600 hover:bg-red-700"
+                      disabled={actionLoading}
+                    >
+                      <XCircle size={16} className="mr-2" /> Block
+                    </Button>
+                  </>
+                )}
+                {(selectedMerchant.status === 'suspended' || selectedMerchant.status === 'blocked' || selectedMerchant.status === 'rejected') && (
+                  <Button 
+                    onClick={() => handleUpdateMerchantStatus(selectedMerchant.id, 'activate')}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    disabled={actionLoading}
+                  >
+                    <UserCheck size={16} className="mr-2" /> Reactivate
+                  </Button>
+                )}
+                <Button 
+                  onClick={() => handleDeleteMerchant(selectedMerchant.id)}
+                  variant="outline"
+                  className="border-red-500 text-red-400 hover:bg-red-500/10"
+                  disabled={actionLoading}
+                >
+                  <Trash2 size={16} className="mr-2" /> Delete Account
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SMS MODAL */}
+      {showSMSModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <MessageSquare className="text-purple-400" size={20} />
+              Send SMS to {smsRecipientType === 'client' ? selectedClient?.full_name : selectedMerchant?.business_name}
+            </h3>
+            <div className="mb-4">
+              <Label className="text-slate-300 mb-2 block">Phone</Label>
+              <p className="text-white bg-slate-900 rounded-lg p-3">
+                {smsRecipientType === 'client' ? selectedClient?.phone : selectedMerchant?.phone}
+              </p>
+            </div>
+            <div className="mb-4">
+              <Label className="text-slate-300 mb-2 block">Message</Label>
+              <textarea
+                value={smsMessage}
+                onChange={(e) => setSmsMessage(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white min-h-[100px]"
+                placeholder="Type your message here..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={() => { setShowSMSModal(false); setSmsMessage(''); }} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleSendSMS} className="flex-1 bg-purple-600 hover:bg-purple-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <MessageSquare size={16} className="mr-2" />}
+                Send SMS
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIMITS MODAL */}
+      {showLimitsModal && selectedClient && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Sliders className="text-blue-400" size={20} />
+              Manage Limits for {selectedClient.full_name}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Withdrawal Limit (GHS)</Label>
+                <Input
+                  type="number"
+                  value={limitsForm.withdrawal_limit}
+                  onChange={(e) => setLimitsForm({...limitsForm, withdrawal_limit: parseFloat(e.target.value)})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Transaction Limit (GHS)</Label>
+                <Input
+                  type="number"
+                  value={limitsForm.transaction_limit}
+                  onChange={(e) => setLimitsForm({...limitsForm, transaction_limit: parseFloat(e.target.value)})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Daily Limit (GHS)</Label>
+                <Input
+                  type="number"
+                  value={limitsForm.daily_limit}
+                  onChange={(e) => setLimitsForm({...limitsForm, daily_limit: parseFloat(e.target.value)})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => setShowLimitsModal(false)} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateLimits} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                Save Limits
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LOCATION MODAL */}
+      {showLocationModal && selectedMerchant && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <MapPin className="text-cyan-400" size={20} />
+              Edit Location for {selectedMerchant.business_name}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">City</Label>
+                <Input
+                  type="text"
+                  value={locationForm.city}
+                  onChange={(e) => setLocationForm({...locationForm, city: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Accra, Kumasi, Takoradi..."
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Full Address</Label>
+                <textarea
+                  value={locationForm.address}
+                  onChange={(e) => setLocationForm({...locationForm, address: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white min-h-[80px]"
+                  placeholder="Spintex Road, Accra, Ghana"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Google Maps URL (optional)</Label>
+                <Input
+                  type="url"
+                  value={locationForm.google_maps_url}
+                  onChange={(e) => setLocationForm({...locationForm, google_maps_url: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="https://maps.google.com/..."
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => setShowLocationModal(false)} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateLocation} className="flex-1 bg-cyan-600 hover:bg-cyan-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                Save Location
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
