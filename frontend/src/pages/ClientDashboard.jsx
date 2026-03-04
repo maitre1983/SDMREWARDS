@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -460,9 +461,7 @@ export default function ClientDashboard() {
       <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="text-white" size={16} />
-            </div>
+            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-9 h-9 object-contain rounded-lg" />
             <span className="font-bold text-white">SDM</span>
           </div>
           <button onClick={handleLogout} className="text-slate-400 hover:text-white">

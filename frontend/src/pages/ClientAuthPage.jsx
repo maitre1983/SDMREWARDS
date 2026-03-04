@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
 export default function ClientAuthPage() {
   const navigate = useNavigate();
@@ -179,9 +180,7 @@ export default function ClientAuthPage() {
             <span>Back</span>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="text-white" size={16} />
-            </div>
+            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-9 h-9 object-contain rounded-lg" />
             <span className="font-bold text-white">SDM</span>
           </div>
         </div>

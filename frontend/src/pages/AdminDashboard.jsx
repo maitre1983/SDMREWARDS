@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
+const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -227,9 +228,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Shield className="text-white" size={32} />
-            </div>
+            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-20 h-20 object-contain rounded-2xl mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-white">Admin Portal</h1>
             <p className="text-slate-400 mt-2">SDM Rewards Platform Administration</p>
           </div>
@@ -289,9 +288,7 @@ export default function AdminDashboard() {
       <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <Shield className="text-white" size={20} />
-            </div>
+            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-10 h-10 object-contain rounded-xl" />
             <div>
               <span className="font-bold text-white block">SDM Admin</span>
               <span className="text-slate-400 text-sm">{admin?.email}</span>
