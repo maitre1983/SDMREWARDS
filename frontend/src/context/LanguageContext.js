@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { translations, getDirection, languageInfo } from '../translations';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import { translations, getLanguageFromStorage, setLanguageInStorage } from '../translations';
 
 const LanguageContext = createContext();
 
@@ -12,37 +12,48 @@ export const useLanguage = () => {
 };
 
 export const LanguageProvider = ({ children }) => {
-  const [language, setLanguage] = useState(() => {
-    const saved = localStorage.getItem('sds_language');
-    return saved || 'en';
-  });
+  const [language, setLanguageState] = useState(getLanguageFromStorage());
+
+  useEffect(() => {
+    // Set HTML lang attribute
+    document.documentElement.lang = language;
+  }, [language]);
+
+  const setLanguage = (lang) => {
+    if (translations[lang]) {
+      setLanguageState(lang);
+      setLanguageInStorage(lang);
+      document.documentElement.lang = lang;
+    }
+  };
 
   const t = (key) => {
     return translations[language]?.[key] || translations['en']?.[key] || key;
   };
 
-  const changeLanguage = (lang) => {
-    setLanguage(lang);
-    localStorage.setItem('sds_language', lang);
+  const toggleLanguage = () => {
+    const newLang = language === 'en' ? 'fr' : 'en';
+    setLanguage(newLang);
   };
 
-  useEffect(() => {
-    const direction = getDirection(language);
-    document.documentElement.dir = direction;
-    document.documentElement.lang = language;
-  }, [language]);
+  const availableLanguages = [
+    { code: 'en', name: 'English', flag: '🇬🇧' },
+    { code: 'fr', name: 'Français', flag: '🇫🇷' }
+  ];
 
   return (
     <LanguageContext.Provider value={{ 
       language, 
-      setLanguage: changeLanguage, 
+      setLanguage, 
       t, 
-      direction: getDirection(language),
-      isRTL: getDirection(language) === 'rtl',
-      languageInfo,
-      languages: ['en', 'fr', 'ar', 'zh']
+      toggleLanguage,
+      availableLanguages,
+      isEnglish: language === 'en',
+      isFrench: language === 'fr'
     }}>
       {children}
     </LanguageContext.Provider>
   );
 };
+
+export default LanguageContext;
