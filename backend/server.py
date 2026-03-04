@@ -2015,10 +2015,10 @@ async def get_user_wallet(user: dict = Depends(get_current_user)):
     updated_user = await db.sdm_users.find_one({"id": user["id"]}, {"_id": 0})
     
     return {
-        "wallet_pending": updated_user["wallet_pending"],
-        "wallet_available": updated_user["wallet_available"],
-        "total_earned": updated_user["total_earned"],
-        "total_withdrawn": updated_user["total_withdrawn"]
+        "wallet_pending": updated_user.get("wallet_pending", 0),
+        "wallet_available": updated_user.get("wallet_available", 0),
+        "total_earned": updated_user.get("total_earned", 0),
+        "total_withdrawn": updated_user.get("total_withdrawn", 0)
     }
 
 @sdm_router.get("/user/transactions")

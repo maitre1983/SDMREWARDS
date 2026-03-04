@@ -7,6 +7,28 @@
 
 ---
 
+## CHANGELOG - March 4, 2026
+
+### Bug Fix: VIP Card Purchase Button Not Working
+**Issue**: The "Buy" button for VIP cards was showing "Not available" for all cards, preventing users from purchasing VIP memberships.
+
+**Root Cause**: Data mismatch between two different VIP card data sources:
+1. Frontend was fetching from `/api/sdm/user/vip-cards` (database-based cards with UUID IDs and `tier` field)
+2. But the rendering logic was using `card.id` (expecting "silver", "gold", "platinum") instead of `card.tier.toLowerCase()`
+
+**Fix Applied** (SDMClientPage.jsx):
+- Changed `tierOrder[card.id]` to `tierOrder[card.tier?.toLowerCase()]`
+- Changed filter from `card.id !== 'bronze'` to `card.tier?.toLowerCase() !== 'bronze'`
+- Changed button onClick from `handlePurchaseVIP(card.id)` to `handlePurchaseVIP(card.tier?.toLowerCase())`
+- Changed `card.color` to `card.badge_color` for styling
+- Changed `card.benefits` to `card.benefits_list` for benefits display
+
+**Additional Fix**: Backend `get_user_wallet` endpoint was throwing `KeyError: 'total_withdrawn'` - fixed by using `.get()` with default values.
+
+**Status**: ✅ VERIFIED - VIP card purchase flow now working correctly with MoMo payment prompt
+
+---
+
 ## REFERRAL SYSTEM (Updated March 3, 2026)
 
 ### Referral Bonus Rules

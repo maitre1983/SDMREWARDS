@@ -2247,15 +2247,15 @@ export default function SDMClientPage() {
 
                 {/* VIP Cards List */}
                 <div className="space-y-4">
-                  {vipCards.filter(card => card.id !== 'bronze').map((card) => {
+                  {vipCards.filter(card => card.tier?.toLowerCase() !== 'bronze').map((card) => {
                     const tierOrder = { silver: 1, gold: 2, platinum: 3 };
                     const currentTierName = myVipMembership?.tier?.toLowerCase();
                     const currentTierLevel = tierOrder[currentTierName] || 0;
-                    const cardTierLevel = tierOrder[card.id] || 0;
+                    const cardTierLevel = tierOrder[card.tier?.toLowerCase()] || 0;
                     const canPurchase = cardTierLevel > currentTierLevel;
-                    const isCurrentTier = currentTierName === card.id;
+                    const isCurrentTier = currentTierName === card.tier?.toLowerCase();
                     const priceToShow = canPurchase && myVipMembership 
-                      ? card.price - (vipCards.find(c => c.id === currentTierName)?.price || 0)
+                      ? card.price - (vipCards.find(c => c.tier?.toLowerCase() === currentTierName)?.price || 0)
                       : card.price;
 
                     return (
@@ -2322,9 +2322,10 @@ export default function SDMClientPage() {
                             </div>
                           ) : canPurchase ? (
                             <Button
-                              onClick={() => handlePurchaseVIP(card.id)}
+                              onClick={() => handlePurchaseVIP(card.tier?.toLowerCase())}
                               disabled={isServiceLoading}
                               className="w-full"
+                              data-testid={`buy-vip-${card.tier?.toLowerCase()}-btn`}
                               style={{ backgroundColor: card.badge_color === '#C0C0C0' ? '#6B7280' : card.badge_color }}
                             >
                               {isServiceLoading ? <Loader2 className="animate-spin" /> : (
