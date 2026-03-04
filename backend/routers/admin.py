@@ -242,6 +242,44 @@ async def activate_client(client_id: str, current_admin: dict = Depends(get_curr
     return {"success": True, "message": "Client activated"}
 
 
+class StatusActionRequest(BaseModel):
+    action: str  # "activate", "suspend", "delete"
+
+
+@router.put("/clients/{client_id}/status")
+async def update_client_status(
+    client_id: str,
+    request: StatusActionRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update client status via action"""
+    action_map = {
+        "activate": "active",
+        "suspend": "suspended",
+        "delete": "deleted"
+    }
+    
+    if request.action not in action_map:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    new_status = action_map[request.action]
+    
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": f"{request.action}_client",
+        "target_id": client_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": f"Client {request.action}d"}
+
+
 @router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_admin: dict = Depends(get_current_admin)):
     """Soft delete client"""
@@ -374,6 +412,41 @@ async def suspend_merchant(merchant_id: str, current_admin: dict = Depends(get_c
     )
     
     return {"success": True, "message": "Merchant suspended"}
+
+
+@router.put("/merchants/{merchant_id}/status")
+async def update_merchant_status(
+    merchant_id: str,
+    request: StatusActionRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update merchant status via action"""
+    action_map = {
+        "activate": "active",
+        "approve": "active",
+        "suspend": "suspended",
+        "delete": "deleted"
+    }
+    
+    if request.action not in action_map:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    new_status = action_map[request.action]
+    
+    await db.merchants.update_one(
+        {"id": merchant_id},
+        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": f"{request.action}_merchant",
+        "target_id": merchant_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": f"Merchant {request.action}d"}
 
 
 @router.delete("/merchants/{merchant_id}")

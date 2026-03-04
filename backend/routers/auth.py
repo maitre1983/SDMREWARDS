@@ -358,8 +358,18 @@ async def register_client(request: ClientRegisterRequest):
             )
             await db.referrals.insert_one(referral.model_dump())
     
+    # Prepare client doc - exclude None email to avoid duplicate key issues
+    client_doc = client_data.model_dump()
+    if client_doc.get("email") is None:
+        del client_doc["email"]
+    
     # Save client
-    await db.clients.insert_one(client_data.model_dump())
+    try:
+        await db.clients.insert_one(client_doc)
+    except Exception as e:
+        if "duplicate key error" in str(e):
+            raise HTTPException(status_code=400, detail="Registration failed. Please check your details.")
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
     
     # Create token
     token = create_token(client_data.id, "client")
@@ -441,6 +451,12 @@ async def register_merchant(request: MerchantRegisterRequest):
     if existing:
         raise HTTPException(status_code=400, detail="Phone number already registered as merchant")
     
+    # Check for duplicate email if provided
+    if request.email:
+        existing_email = await db.merchants.find_one({"email": request.email.lower()})
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already registered")
+    
     # Create merchant
     merchant_data = Merchant(
         business_name=request.business_name,
@@ -452,8 +468,18 @@ async def register_merchant(request: MerchantRegisterRequest):
         business_address=request.business_address
     )
     
-    # Save merchant
-    await db.merchants.insert_one(merchant_data.model_dump())
+    # Prepare merchant doc - exclude None email to avoid duplicate key issues
+    merchant_doc = merchant_data.model_dump()
+    if merchant_doc.get("email") is None:
+        del merchant_doc["email"]
+    
+    # Save merchant with error handling
+    try:
+        await db.merchants.insert_one(merchant_doc)
+    except Exception as e:
+        if "duplicate key error" in str(e):
+            raise HTTPException(status_code=400, detail="Registration failed. Please try again or contact support.")
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
     
     # Create token
     token = create_token(merchant_data.id, "merchant")

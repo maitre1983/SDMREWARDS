@@ -79,11 +79,16 @@ async def create_indexes():
         await db.clients.create_index("username", unique=True)
         await db.clients.create_index("referral_code", unique=True)
         
-        # Merchants collection
+        # Merchants collection - drop and recreate email index with sparse=True
+        try:
+            await db.merchants.drop_index("email_1")
+        except Exception:
+            pass  # Index may not exist
+        
         await db.merchants.create_index("phone", unique=True)
         await db.merchants.create_index("email", unique=True, sparse=True)
         await db.merchants.create_index("business_name")
-        await db.merchants.create_index("qr_code", unique=True)
+        await db.merchants.create_index("payment_qr_code", unique=True)
         
         # Transactions collection
         await db.transactions.create_index("client_id")
@@ -172,13 +177,18 @@ app.include_router(transactions_router, prefix="/api/transactions", tags=["Trans
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 
 # ============== ERROR HANDLERS ==============
+from fastapi.responses import JSONResponse
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    return {
-        "error": True,
-        "status_code": exc.status_code,
-        "detail": exc.detail
-    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": True,
+            "status_code": exc.status_code,
+            "detail": exc.detail
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn
