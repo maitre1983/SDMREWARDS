@@ -7,6 +7,32 @@
 
 ## CHANGELOG
 
+### March 4, 2026 - Phase 10: Enhanced Settings Menu (Phase 1) ✅
+
+**Settings Sub-tabs Implemented:**
+1. **Card Prices** - Edit Silver/Gold/Platinum prices and benefits
+2. **Commissions** - Platform commission on cashback (1-10% slider with live calculation)
+3. **Service Fees** - Configure fees for Airtime, Data, ECG, Merchant payments (% or fixed)
+4. **Referrals** - Welcome bonus and Referrer bonus amounts
+5. **Add Users** - Manually create Clients and Merchants with temp passwords
+6. **Bulk SMS** - Send mass SMS to Clients or Merchants with filters
+7. **Admin Info** - Display admin account information
+
+**Backend API Endpoints Added:**
+- `PUT /api/admin/settings/card-prices` - Update card prices & benefits
+- `PUT /api/admin/settings/service-commissions` - Update service fees
+- `PUT /api/admin/settings/referral-bonuses` - Update referral amounts
+- `POST /api/admin/clients/create-manual` - Create client manually
+- `POST /api/admin/merchants/create-manual` - Create merchant manually
+- `POST /api/admin/bulk-sms/clients` - Bulk SMS to clients
+- `POST /api/admin/bulk-sms/merchants` - Bulk SMS to merchants
+
+**Bulk SMS Filters:**
+- Clients: All, Active (with card), Inactive, Silver, Gold, Platinum, Top 10
+- Merchants: All, Active, Pending, Inactive, Top 10
+
+---
+
 ### March 4, 2026 - Phase 9: Enhanced Admin Control Panel ✅
 
 **Clients Sub-menu Enhancements:**

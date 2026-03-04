@@ -64,9 +64,58 @@ class UpdateMerchantRequest(BaseModel):
 
 
 class UpdateCommissionRequest(BaseModel):
-    platform_commission_rate: Optional[float] = None  # 1-5%
+    platform_commission_rate: Optional[float] = None  # 1-10%
     usage_commission_type: Optional[str] = None  # "percentage" or "fixed"
     usage_commission_rate: Optional[float] = None
+
+
+class UpdateCardPricesRequest(BaseModel):
+    silver_price: Optional[float] = None
+    gold_price: Optional[float] = None
+    platinum_price: Optional[float] = None
+    silver_benefits: Optional[str] = None
+    gold_benefits: Optional[str] = None
+    platinum_benefits: Optional[str] = None
+
+
+class UpdateServiceCommissionsRequest(BaseModel):
+    airtime_commission_type: Optional[str] = None  # "percentage" or "fixed"
+    airtime_commission_rate: Optional[float] = None
+    data_commission_type: Optional[str] = None
+    data_commission_rate: Optional[float] = None
+    ecg_commission_type: Optional[str] = None
+    ecg_commission_rate: Optional[float] = None
+    merchant_payment_commission_type: Optional[str] = None
+    merchant_payment_commission_rate: Optional[float] = None
+
+
+class UpdateReferralBonusesRequest(BaseModel):
+    welcome_bonus: Optional[float] = None
+    referrer_bonus: Optional[float] = None
+
+
+class CreateClientManualRequest(BaseModel):
+    full_name: str
+    phone: str
+    username: str
+    email: Optional[str] = None
+    card_type: Optional[str] = None
+
+
+class CreateMerchantManualRequest(BaseModel):
+    business_name: str
+    owner_name: str
+    phone: str
+    email: Optional[str] = None
+    cashback_rate: float = 5.0
+    city: Optional[str] = None
+    address: Optional[str] = None
+
+
+class BulkSMSRequest(BaseModel):
+    message: str
+    recipient_filter: str  # "all", "active", "inactive", "silver", "gold", "platinum", "pending", "top"
+    recipient_ids: Optional[List[str]] = None  # For custom selection
 
 
 # ============== DASHBOARD ==============
@@ -1031,6 +1080,348 @@ async def update_commissions(
     await db.platform_config.update_one({"key": "main"}, {"$set": updates})
     
     return {"success": True, "message": "Commission settings updated"}
+
+
+# ============== DYNAMIC PLATFORM SETTINGS ==============
+
+@router.put("/settings/card-prices")
+async def update_card_prices(
+    request: UpdateCardPricesRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update membership card prices and benefits"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.silver_price is not None:
+        updates["card_prices.silver"] = request.silver_price
+    if request.gold_price is not None:
+        updates["card_prices.gold"] = request.gold_price
+    if request.platinum_price is not None:
+        updates["card_prices.platinum"] = request.platinum_price
+    if request.silver_benefits is not None:
+        updates["card_benefits.silver"] = request.silver_benefits
+    if request.gold_benefits is not None:
+        updates["card_benefits.gold"] = request.gold_benefits
+    if request.platinum_benefits is not None:
+        updates["card_benefits.platinum"] = request.platinum_benefits
+    
+    await db.platform_config.update_one({"key": "main"}, {"$set": updates})
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "update_card_prices",
+        "changes": updates,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Card prices updated"}
+
+
+@router.put("/settings/service-commissions")
+async def update_service_commissions(
+    request: UpdateServiceCommissionsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update service commissions (airtime, data, ECG, etc.)"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.airtime_commission_type is not None:
+        updates["service_commissions.airtime.type"] = request.airtime_commission_type
+    if request.airtime_commission_rate is not None:
+        updates["service_commissions.airtime.rate"] = request.airtime_commission_rate
+    if request.data_commission_type is not None:
+        updates["service_commissions.data.type"] = request.data_commission_type
+    if request.data_commission_rate is not None:
+        updates["service_commissions.data.rate"] = request.data_commission_rate
+    if request.ecg_commission_type is not None:
+        updates["service_commissions.ecg.type"] = request.ecg_commission_type
+    if request.ecg_commission_rate is not None:
+        updates["service_commissions.ecg.rate"] = request.ecg_commission_rate
+    if request.merchant_payment_commission_type is not None:
+        updates["service_commissions.merchant_payment.type"] = request.merchant_payment_commission_type
+    if request.merchant_payment_commission_rate is not None:
+        updates["service_commissions.merchant_payment.rate"] = request.merchant_payment_commission_rate
+    
+    await db.platform_config.update_one({"key": "main"}, {"$set": updates})
+    
+    return {"success": True, "message": "Service commissions updated"}
+
+
+@router.put("/settings/referral-bonuses")
+async def update_referral_bonuses(
+    request: UpdateReferralBonusesRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update referral bonus amounts"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.welcome_bonus is not None:
+        updates["referral_bonuses.welcome"] = request.welcome_bonus
+    if request.referrer_bonus is not None:
+        updates["referral_bonuses.referrer"] = request.referrer_bonus
+    
+    await db.platform_config.update_one({"key": "main"}, {"$set": updates})
+    
+    return {"success": True, "message": "Referral bonuses updated"}
+
+
+# ============== MANUAL CLIENT/MERCHANT CREATION ==============
+
+@router.post("/clients/create-manual")
+async def create_client_manual(
+    request: CreateClientManualRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Manually create a client account"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Check for duplicate phone
+    existing = await db.clients.find_one({"phone": request.phone})
+    if existing:
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+    
+    # Check for duplicate username
+    existing_username = await db.clients.find_one({"username": request.username.lower()})
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    # Generate temporary password
+    temp_password = f"SDM{request.phone[-4:]}"
+    password_hash = bcrypt.hashpw(temp_password.encode(), bcrypt.gensalt()).decode()
+    
+    client_id = str(uuid.uuid4())[:8]
+    client_data = {
+        "id": client_id,
+        "full_name": request.full_name,
+        "phone": request.phone,
+        "username": request.username.lower(),
+        "email": request.email.lower() if request.email else None,
+        "password_hash": password_hash,
+        "status": "active",
+        "card_type": request.card_type,
+        "cashback_balance": 0.0,
+        "referral_code": f"SDM{client_id.upper()}",
+        "created_by_admin": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.clients.insert_one(client_data)
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "create_client_manual",
+        "target_id": client_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "message": "Client created successfully",
+        "client_id": client_id,
+        "temp_password": temp_password
+    }
+
+
+@router.post("/merchants/create-manual")
+async def create_merchant_manual(
+    request: CreateMerchantManualRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Manually create a merchant account"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Check for duplicate phone
+    existing = await db.merchants.find_one({"phone": request.phone})
+    if existing:
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+    
+    # Generate temporary password
+    temp_password = f"SDMM{request.phone[-4:]}"
+    password_hash = bcrypt.hashpw(temp_password.encode(), bcrypt.gensalt()).decode()
+    
+    merchant_id = str(uuid.uuid4())[:8]
+    merchant_data = {
+        "id": merchant_id,
+        "business_name": request.business_name,
+        "owner_name": request.owner_name,
+        "phone": request.phone,
+        "email": request.email.lower() if request.email else None,
+        "password_hash": password_hash,
+        "status": "active",  # Pre-approved by admin
+        "cashback_rate": request.cashback_rate,
+        "city": request.city,
+        "address": request.address,
+        "qr_code": f"SDM-MERCHANT-{merchant_id.upper()}",
+        "total_transactions": 0,
+        "total_revenue": 0,
+        "created_by_admin": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.merchants.insert_one(merchant_data)
+    
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "create_merchant_manual",
+        "target_id": merchant_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "message": "Merchant created successfully",
+        "merchant_id": merchant_id,
+        "temp_password": temp_password
+    }
+
+
+# ============== BULK SMS ==============
+
+@router.post("/bulk-sms/clients")
+async def send_bulk_sms_clients(
+    request: BulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Send bulk SMS to clients with filters"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    from services.bulkclix_service import send_sms
+    
+    # Build query based on filter
+    query = {"status": {"$ne": "deleted"}}
+    
+    if request.recipient_filter == "active":
+        query["card_type"] = {"$ne": None}
+    elif request.recipient_filter == "inactive":
+        query["card_type"] = None
+    elif request.recipient_filter == "silver":
+        query["card_type"] = "silver"
+    elif request.recipient_filter == "gold":
+        query["card_type"] = "gold"
+    elif request.recipient_filter == "platinum":
+        query["card_type"] = "platinum"
+    elif request.recipient_filter == "top":
+        # Get top 10 clients by cashback balance
+        query = {"status": "active"}
+    
+    if request.recipient_ids:
+        query["id"] = {"$in": request.recipient_ids}
+    
+    # Get recipients
+    if request.recipient_filter == "top":
+        clients = await db.clients.find(query, {"_id": 0, "phone": 1, "id": 1, "full_name": 1}).sort("cashback_balance", -1).limit(10).to_list(10)
+    else:
+        clients = await db.clients.find(query, {"_id": 0, "phone": 1, "id": 1, "full_name": 1}).to_list(10000)
+    
+    sent_count = 0
+    failed_count = 0
+    
+    for client in clients:
+        if client.get("phone"):
+            result = await send_sms(client["phone"], request.message)
+            if result.get("success"):
+                sent_count += 1
+            else:
+                failed_count += 1
+    
+    # Log bulk SMS
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "bulk_sms_clients",
+        "filter": request.recipient_filter,
+        "total_recipients": len(clients),
+        "sent": sent_count,
+        "failed": failed_count,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "total_recipients": len(clients),
+        "sent": sent_count,
+        "failed": failed_count
+    }
+
+
+@router.post("/bulk-sms/merchants")
+async def send_bulk_sms_merchants(
+    request: BulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Send bulk SMS to merchants with filters"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    from services.bulkclix_service import send_sms
+    
+    # Build query based on filter
+    query = {"status": {"$ne": "deleted"}}
+    
+    if request.recipient_filter == "active":
+        query["status"] = "active"
+    elif request.recipient_filter == "pending":
+        query["status"] = "pending"
+    elif request.recipient_filter == "inactive":
+        query["total_transactions"] = 0
+    elif request.recipient_filter == "top":
+        query["status"] = "active"
+    
+    if request.recipient_ids:
+        query["id"] = {"$in": request.recipient_ids}
+    
+    # Get recipients
+    if request.recipient_filter == "top":
+        merchants = await db.merchants.find(query, {"_id": 0, "phone": 1, "id": 1, "business_name": 1}).sort("total_transactions", -1).limit(10).to_list(10)
+    else:
+        merchants = await db.merchants.find(query, {"_id": 0, "phone": 1, "id": 1, "business_name": 1}).to_list(10000)
+    
+    sent_count = 0
+    failed_count = 0
+    
+    for merchant in merchants:
+        if merchant.get("phone"):
+            result = await send_sms(merchant["phone"], request.message)
+            if result.get("success"):
+                sent_count += 1
+            else:
+                failed_count += 1
+    
+    # Log bulk SMS
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "bulk_sms_merchants",
+        "filter": request.recipient_filter,
+        "total_recipients": len(merchants),
+        "sent": sent_count,
+        "failed": failed_count,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "total_recipients": len(merchants),
+        "sent": sent_count,
+        "failed": failed_count
+    }
 
 
 # ============== ADMIN MANAGEMENT ==============

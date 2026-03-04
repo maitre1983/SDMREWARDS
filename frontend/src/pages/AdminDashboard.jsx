@@ -87,6 +87,36 @@ export default function AdminDashboard() {
   const [limitsForm, setLimitsForm] = useState({ withdrawal_limit: 500, transaction_limit: 1000, daily_limit: 2000 });
   const [locationForm, setLocationForm] = useState({ address: '', google_maps_url: '', city: '' });
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // Settings states
+  const [platformConfig, setPlatformConfig] = useState(null);
+  const [settingsTab, setSettingsTab] = useState('cards');
+  const [showCreateClientModal, setShowCreateClientModal] = useState(false);
+  const [showCreateMerchantModal, setShowCreateMerchantModal] = useState(false);
+  const [showBulkSMSModal, setShowBulkSMSModal] = useState(false);
+  const [bulkSMSType, setBulkSMSType] = useState('clients');
+  const [bulkSMSFilter, setBulkSMSFilter] = useState('all');
+  const [bulkSMSMessage, setBulkSMSMessage] = useState('');
+  
+  // Settings forms
+  const [cardPricesForm, setCardPricesForm] = useState({
+    silver_price: 25, gold_price: 50, platinum_price: 100,
+    silver_benefits: '3% cashback on all purchases', 
+    gold_benefits: '5% cashback + Priority support',
+    platinum_benefits: '7% cashback + VIP benefits + Exclusive offers'
+  });
+  const [commissionsForm, setCommissionsForm] = useState({
+    platform_commission_rate: 5, min_cashback: 1, max_cashback: 20
+  });
+  const [serviceCommissionsForm, setServiceCommissionsForm] = useState({
+    airtime_type: 'percentage', airtime_rate: 2,
+    data_type: 'percentage', data_rate: 2,
+    ecg_type: 'fixed', ecg_rate: 1,
+    merchant_type: 'percentage', merchant_rate: 1
+  });
+  const [referralForm, setReferralForm] = useState({ welcome_bonus: 1, referrer_bonus: 3 });
+  const [newClientForm, setNewClientForm] = useState({ full_name: '', phone: '', username: '', email: '', card_type: '' });
+  const [newMerchantForm, setNewMerchantForm] = useState({ business_name: '', owner_name: '', phone: '', email: '', cashback_rate: 5, city: '', address: '' });
 
   useEffect(() => {
     if (token) {
@@ -192,6 +222,45 @@ export default function AdminDashboard() {
         setAdvancedStats(advancedRes.data);
       } catch (advErr) {
         console.error('Advanced stats fetch error:', advErr);
+      }
+      
+      // Fetch platform config for Settings
+      try {
+        const configRes = await axios.get(`${API_URL}/api/admin/settings`, { headers });
+        if (configRes.data.config) {
+          setPlatformConfig(configRes.data.config);
+          // Update forms with current config
+          if (configRes.data.config.card_prices) {
+            setCardPricesForm(prev => ({
+              ...prev,
+              silver_price: configRes.data.config.card_prices.silver || 25,
+              gold_price: configRes.data.config.card_prices.gold || 50,
+              platinum_price: configRes.data.config.card_prices.platinum || 100
+            }));
+          }
+          if (configRes.data.config.card_benefits) {
+            setCardPricesForm(prev => ({
+              ...prev,
+              silver_benefits: configRes.data.config.card_benefits.silver || prev.silver_benefits,
+              gold_benefits: configRes.data.config.card_benefits.gold || prev.gold_benefits,
+              platinum_benefits: configRes.data.config.card_benefits.platinum || prev.platinum_benefits
+            }));
+          }
+          if (configRes.data.config.platform_commission_rate) {
+            setCommissionsForm(prev => ({
+              ...prev,
+              platform_commission_rate: configRes.data.config.platform_commission_rate || 5
+            }));
+          }
+          if (configRes.data.config.referral_bonuses) {
+            setReferralForm({
+              welcome_bonus: configRes.data.config.referral_bonuses.welcome || 1,
+              referrer_bonus: configRes.data.config.referral_bonuses.referrer || 3
+            });
+          }
+        }
+      } catch (configErr) {
+        console.error('Config fetch error:', configErr);
       }
       
     } catch (error) {
@@ -411,6 +480,145 @@ export default function AdminDashboard() {
       setShowMerchantModal(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to delete merchant');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ============== SETTINGS FUNCTIONS ==============
+  
+  // Save card prices
+  const handleSaveCardPrices = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/settings/card-prices`, cardPricesForm, { headers });
+      toast.success('Card prices updated successfully');
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update card prices');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Save commissions
+  const handleSaveCommissions = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/settings/commissions`, {
+        platform_commission_rate: commissionsForm.platform_commission_rate
+      }, { headers });
+      toast.success('Commission settings updated');
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update commissions');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Save service commissions
+  const handleSaveServiceCommissions = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/settings/service-commissions`, {
+        airtime_commission_type: serviceCommissionsForm.airtime_type,
+        airtime_commission_rate: serviceCommissionsForm.airtime_rate,
+        data_commission_type: serviceCommissionsForm.data_type,
+        data_commission_rate: serviceCommissionsForm.data_rate,
+        ecg_commission_type: serviceCommissionsForm.ecg_type,
+        ecg_commission_rate: serviceCommissionsForm.ecg_rate,
+        merchant_payment_commission_type: serviceCommissionsForm.merchant_type,
+        merchant_payment_commission_rate: serviceCommissionsForm.merchant_rate
+      }, { headers });
+      toast.success('Service commissions updated');
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update service commissions');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Save referral bonuses
+  const handleSaveReferralBonuses = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/settings/referral-bonuses`, referralForm, { headers });
+      toast.success('Referral bonuses updated');
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update referral bonuses');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Create client manually
+  const handleCreateClient = async () => {
+    if (!newClientForm.full_name || !newClientForm.phone || !newClientForm.username) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      const res = await axios.post(`${API_URL}/api/admin/clients/create-manual`, newClientForm, { headers });
+      toast.success(`Client created! Temp password: ${res.data.temp_password}`);
+      setShowCreateClientModal(false);
+      setNewClientForm({ full_name: '', phone: '', username: '', email: '', card_type: '' });
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create client');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Create merchant manually
+  const handleCreateMerchant = async () => {
+    if (!newMerchantForm.business_name || !newMerchantForm.owner_name || !newMerchantForm.phone) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      const res = await axios.post(`${API_URL}/api/admin/merchants/create-manual`, newMerchantForm, { headers });
+      toast.success(`Merchant created! Temp password: ${res.data.temp_password}`);
+      setShowCreateMerchantModal(false);
+      setNewMerchantForm({ business_name: '', owner_name: '', phone: '', email: '', cashback_rate: 5, city: '', address: '' });
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create merchant');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Send bulk SMS
+  const handleSendBulkSMS = async () => {
+    if (!bulkSMSMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      const endpoint = bulkSMSType === 'clients' ? '/api/admin/bulk-sms/clients' : '/api/admin/bulk-sms/merchants';
+      const res = await axios.post(`${API_URL}${endpoint}`, {
+        message: bulkSMSMessage,
+        recipient_filter: bulkSMSFilter
+      }, { headers });
+      toast.success(`SMS sent to ${res.data.sent} recipients (${res.data.failed} failed)`);
+      setShowBulkSMSModal(false);
+      setBulkSMSMessage('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send bulk SMS');
     } finally {
       setActionLoading(false);
     }
@@ -1187,107 +1395,455 @@ export default function AdminDashboard() {
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            {/* Platform Config */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-                <Settings size={20} /> Platform Configuration
-              </h3>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Card Prices */}
-                <div className="space-y-4">
-                  <h4 className="text-slate-300 font-medium flex items-center gap-2">
-                    <CreditCard size={16} /> Membership Card Prices
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Silver Card</span>
-                      <span className="text-white font-medium">GHS 25</span>
+            {/* Settings Sub-tabs */}
+            <div className="flex flex-wrap gap-2 bg-slate-800 p-2 rounded-xl">
+              {[
+                { id: 'cards', label: 'Card Prices', icon: CreditCard },
+                { id: 'commissions', label: 'Commissions', icon: Percent },
+                { id: 'services', label: 'Service Fees', icon: Sliders },
+                { id: 'referrals', label: 'Referrals', icon: Gift },
+                { id: 'users', label: 'Add Users', icon: UserPlus },
+                { id: 'sms', label: 'Bulk SMS', icon: MessageSquare },
+                { id: 'admin', label: 'Admin Info', icon: Shield }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSettingsTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
+                    settingsTab === tab.id 
+                      ? 'bg-blue-600 text-white' 
+                      : 'text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  <tab.icon size={16} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Card Prices Settings */}
+            {settingsTab === 'cards' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                  <CreditCard size={20} className="text-amber-400" /> Membership Card Configuration
+                </h3>
+                <div className="grid md:grid-cols-3 gap-6">
+                  {/* Silver Card */}
+                  <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Medal className="text-slate-400" size={24} />
+                      <h4 className="text-white font-medium">Silver Card</h4>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Gold Card</span>
-                      <span className="text-amber-400 font-medium">GHS 50</span>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-slate-400 text-sm">Price (GHS)</Label>
+                        <Input
+                          type="number"
+                          value={cardPricesForm.silver_price}
+                          onChange={(e) => setCardPricesForm({...cardPricesForm, silver_price: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-slate-700 text-white mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-sm">Benefits</Label>
+                        <textarea
+                          value={cardPricesForm.silver_benefits}
+                          onChange={(e) => setCardPricesForm({...cardPricesForm, silver_benefits: e.target.value})}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Platinum Card</span>
-                      <span className="text-slate-300 font-medium">GHS 100</span>
+                  </div>
+
+                  {/* Gold Card */}
+                  <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 rounded-xl p-4 border border-amber-700/50">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Award className="text-amber-400" size={24} />
+                      <h4 className="text-amber-400 font-medium">Gold Card</h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-slate-400 text-sm">Price (GHS)</Label>
+                        <Input
+                          type="number"
+                          value={cardPricesForm.gold_price}
+                          onChange={(e) => setCardPricesForm({...cardPricesForm, gold_price: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-amber-700/50 text-white mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-sm">Benefits</Label>
+                        <textarea
+                          value={cardPricesForm.gold_benefits}
+                          onChange={(e) => setCardPricesForm({...cardPricesForm, gold_benefits: e.target.value})}
+                          className="w-full bg-slate-800 border border-amber-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Platinum Card */}
+                  <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 rounded-xl p-4 border border-purple-700/50">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Crown className="text-purple-400" size={24} />
+                      <h4 className="text-purple-400 font-medium">Platinum Card</h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-slate-400 text-sm">Price (GHS)</Label>
+                        <Input
+                          type="number"
+                          value={cardPricesForm.platinum_price}
+                          onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_price: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-purple-700/50 text-white mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-sm">Benefits</Label>
+                        <textarea
+                          value={cardPricesForm.platinum_benefits}
+                          onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_benefits: e.target.value})}
+                          className="w-full bg-slate-800 border border-purple-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-
-                {/* Commission Settings */}
-                <div className="space-y-4">
-                  <h4 className="text-slate-300 font-medium flex items-center gap-2">
-                    <Percent size={16} /> Commission Settings
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Platform Commission</span>
-                      <span className="text-white font-medium">5%</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Min Cashback Rate</span>
-                      <span className="text-white font-medium">1%</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Max Cashback Rate</span>
-                      <span className="text-white font-medium">20%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Referral Bonuses */}
-                <div className="space-y-4">
-                  <h4 className="text-slate-300 font-medium flex items-center gap-2">
-                    <Gift size={16} /> Referral Bonuses
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Welcome Bonus</span>
-                      <span className="text-emerald-400 font-medium">GHS 1</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <span className="text-slate-400">Referrer Bonus</span>
-                      <span className="text-emerald-400 font-medium">GHS 3</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Languages */}
-                <div className="space-y-4">
-                  <h4 className="text-slate-300 font-medium">Supported Languages</h4>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm">English</span>
-                    <span className="px-3 py-1 bg-slate-700 text-slate-400 rounded-full text-sm">French</span>
-                    <span className="px-3 py-1 bg-slate-700 text-slate-400 rounded-full text-sm">Chinese</span>
-                    <span className="px-3 py-1 bg-slate-700 text-slate-400 rounded-full text-sm">Arabic</span>
-                  </div>
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={handleSaveCardPrices} className="bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
+                    {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                    Save Card Prices
+                  </Button>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Commission Settings */}
+            {settingsTab === 'commissions' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                  <Percent size={20} className="text-emerald-400" /> Platform Commission on Cashback
+                </h3>
+                <div className="bg-slate-900 rounded-xl p-6 max-w-md">
+                  <p className="text-slate-400 text-sm mb-4">
+                    SDM takes a percentage of each cashback distributed to clients. This is deducted from the merchant's cashback allocation.
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-slate-300">Platform Commission Rate (%)</Label>
+                      <div className="flex items-center gap-4 mt-2">
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={commissionsForm.platform_commission_rate}
+                          onChange={(e) => setCommissionsForm({...commissionsForm, platform_commission_rate: parseFloat(e.target.value)})}
+                          className="flex-1"
+                        />
+                        <span className="text-emerald-400 text-2xl font-bold w-16 text-center">
+                          {commissionsForm.platform_commission_rate}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg p-4 mt-4">
+                      <p className="text-slate-400 text-sm mb-2">Example Calculation:</p>
+                      <div className="text-sm space-y-1">
+                        <p className="text-white">Client Purchase: <span className="text-emerald-400">GHS 1,000</span></p>
+                        <p className="text-white">Merchant Cashback (10%): <span className="text-amber-400">GHS 100</span></p>
+                        <p className="text-white">Client Receives: <span className="text-emerald-400">GHS {(100 - 100 * commissionsForm.platform_commission_rate / 100).toFixed(0)}</span></p>
+                        <p className="text-white">SDM Commission: <span className="text-purple-400">GHS {(100 * commissionsForm.platform_commission_rate / 100).toFixed(0)}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={handleSaveCommissions} className="bg-emerald-600 hover:bg-emerald-700" disabled={actionLoading}>
+                    {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                    Save Commission Settings
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Service Commissions */}
+            {settingsTab === 'services' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                  <Sliders size={20} className="text-cyan-400" /> Service Fee Configuration
+                </h3>
+                <p className="text-slate-400 text-sm mb-6">
+                  Configure commissions when clients use their cashback balance for services.
+                </p>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Airtime */}
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                      <Phone size={16} className="text-blue-400" /> Airtime Purchase
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-slate-400 text-xs">Type</Label>
+                        <select
+                          value={serviceCommissionsForm.airtime_type}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, airtime_type: e.target.value})}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1"
+                        >
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="fixed">Fixed (GHS)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-xs">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={serviceCommissionsForm.airtime_rate}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, airtime_rate: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-slate-700 text-white mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Data */}
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                      <Activity size={16} className="text-purple-400" /> Data Purchase
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-slate-400 text-xs">Type</Label>
+                        <select
+                          value={serviceCommissionsForm.data_type}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, data_type: e.target.value})}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1"
+                        >
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="fixed">Fixed (GHS)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-xs">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={serviceCommissionsForm.data_rate}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, data_rate: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-slate-700 text-white mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ECG */}
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                      <DollarSign size={16} className="text-amber-400" /> ECG / Utilities
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-slate-400 text-xs">Type</Label>
+                        <select
+                          value={serviceCommissionsForm.ecg_type}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, ecg_type: e.target.value})}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1"
+                        >
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="fixed">Fixed (GHS)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-xs">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={serviceCommissionsForm.ecg_rate}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, ecg_rate: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-slate-700 text-white mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Merchant Payment */}
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                      <Store size={16} className="text-emerald-400" /> Merchant Payments
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-slate-400 text-xs">Type</Label>
+                        <select
+                          value={serviceCommissionsForm.merchant_type}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, merchant_type: e.target.value})}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1"
+                        >
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="fixed">Fixed (GHS)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-xs">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={serviceCommissionsForm.merchant_rate}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, merchant_rate: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-slate-700 text-white mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={handleSaveServiceCommissions} className="bg-cyan-600 hover:bg-cyan-700" disabled={actionLoading}>
+                    {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                    Save Service Fees
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Referral Settings */}
+            {settingsTab === 'referrals' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                  <Gift size={20} className="text-pink-400" /> Referral Bonus Configuration
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6 max-w-2xl">
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3">Welcome Bonus</h4>
+                    <p className="text-slate-400 text-sm mb-3">Amount given to new users who sign up using a referral code.</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">GHS</span>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={referralForm.welcome_bonus}
+                        onChange={(e) => setReferralForm({...referralForm, welcome_bonus: parseFloat(e.target.value)})}
+                        className="bg-slate-800 border-slate-700 text-white w-24"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3">Referrer Bonus</h4>
+                    <p className="text-slate-400 text-sm mb-3">Amount given to users who refer new members.</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">GHS</span>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={referralForm.referrer_bonus}
+                        onChange={(e) => setReferralForm({...referralForm, referrer_bonus: parseFloat(e.target.value)})}
+                        className="bg-slate-800 border-slate-700 text-white w-24"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={handleSaveReferralBonuses} className="bg-pink-600 hover:bg-pink-700" disabled={actionLoading}>
+                    {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                    Save Referral Settings
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Add Users */}
+            {settingsTab === 'users' && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Add Client */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Users size={20} className="text-blue-400" /> Add Client Manually
+                  </h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Create a new client account. A temporary password will be generated.
+                  </p>
+                  <Button onClick={() => setShowCreateClientModal(true)} className="w-full bg-blue-600 hover:bg-blue-700">
+                    <UserPlus size={16} className="mr-2" /> Create New Client
+                  </Button>
+                </div>
+
+                {/* Add Merchant */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Store size={20} className="text-emerald-400" /> Add Merchant Manually
+                  </h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Create a new merchant account. Account will be pre-approved.
+                  </p>
+                  <Button onClick={() => setShowCreateMerchantModal(true)} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                    <UserPlus size={16} className="mr-2" /> Create New Merchant
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Bulk SMS */}
+            {settingsTab === 'sms' && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* SMS to Clients */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <MessageSquare size={20} className="text-purple-400" /> Bulk SMS to Clients
+                  </h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Send mass notifications to clients with filters.
+                  </p>
+                  <Button 
+                    onClick={() => { setBulkSMSType('clients'); setShowBulkSMSModal(true); }} 
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    <MessageSquare size={16} className="mr-2" /> Send to Clients
+                  </Button>
+                </div>
+
+                {/* SMS to Merchants */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <MessageSquare size={20} className="text-amber-400" /> Bulk SMS to Merchants
+                  </h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Send mass notifications to merchants with filters.
+                  </p>
+                  <Button 
+                    onClick={() => { setBulkSMSType('merchants'); setShowBulkSMSModal(true); }} 
+                    className="w-full bg-amber-600 hover:bg-amber-700"
+                  >
+                    <MessageSquare size={16} className="mr-2" /> Send to Merchants
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Admin Info */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Shield size={20} /> Admin Account
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Email</span>
-                  <span className="text-white">{admin?.email}</span>
+            {settingsTab === 'admin' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Shield size={20} className="text-purple-400" /> Admin Account
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
+                    <span className="text-slate-400">Email</span>
+                    <span className="text-white">{admin?.email}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
+                    <span className="text-slate-400">Name</span>
+                    <span className="text-white">{admin?.name || 'Admin'}</span>
+                  </div>
+                  <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
+                    <span className="text-slate-400">Role</span>
+                    <span className="text-purple-400 font-medium">
+                      {admin?.is_super_admin ? 'Super Admin' : 'Admin'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Name</span>
-                  <span className="text-white">{admin?.name || 'Admin'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Role</span>
-                  <span className="text-purple-400">
-                    {admin?.is_super_admin ? 'Super Admin' : 'Admin'}
-                  </span>
-                </div>
+                <p className="text-slate-500 text-xs mt-4">
+                  Password change and PIN security features coming in Phase 3.
+                </p>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -1775,6 +2331,238 @@ export default function AdminDashboard() {
               <Button onClick={handleUpdateLocation} className="flex-1 bg-cyan-600 hover:bg-cyan-700" disabled={actionLoading}>
                 {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
                 Save Location
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE CLIENT MODAL */}
+      {showCreateClientModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <UserPlus className="text-blue-400" size={20} />
+              Create New Client
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Full Name *</Label>
+                <Input
+                  type="text"
+                  value={newClientForm.full_name}
+                  onChange={(e) => setNewClientForm({...newClientForm, full_name: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Phone Number *</Label>
+                <Input
+                  type="tel"
+                  value={newClientForm.phone}
+                  onChange={(e) => setNewClientForm({...newClientForm, phone: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="0241234567"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Username *</Label>
+                <Input
+                  type="text"
+                  value={newClientForm.username}
+                  onChange={(e) => setNewClientForm({...newClientForm, username: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="johndoe"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Email (optional)</Label>
+                <Input
+                  type="email"
+                  value={newClientForm.email}
+                  onChange={(e) => setNewClientForm({...newClientForm, email: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Card Type (optional)</Label>
+                <select
+                  value={newClientForm.card_type}
+                  onChange={(e) => setNewClientForm({...newClientForm, card_type: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="">No Card</option>
+                  <option value="silver">Silver</option>
+                  <option value="gold">Gold</option>
+                  <option value="platinum">Platinum</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => setShowCreateClientModal(false)} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleCreateClient} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <UserPlus size={16} className="mr-2" />}
+                Create Client
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE MERCHANT MODAL */}
+      {showCreateMerchantModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Store className="text-emerald-400" size={20} />
+              Create New Merchant
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Business Name *</Label>
+                <Input
+                  type="text"
+                  value={newMerchantForm.business_name}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, business_name: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="ABC Store"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Owner Name *</Label>
+                <Input
+                  type="text"
+                  value={newMerchantForm.owner_name}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, owner_name: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="John Owner"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Phone Number *</Label>
+                <Input
+                  type="tel"
+                  value={newMerchantForm.phone}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, phone: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="0241234567"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Email (optional)</Label>
+                <Input
+                  type="email"
+                  value={newMerchantForm.email}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, email: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="business@example.com"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Cashback Rate (%)</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="20"
+                  value={newMerchantForm.cashback_rate}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, cashback_rate: parseFloat(e.target.value)})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">City (optional)</Label>
+                <Input
+                  type="text"
+                  value={newMerchantForm.city}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, city: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Accra"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => setShowCreateMerchantModal(false)} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleCreateMerchant} className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Store size={16} className="mr-2" />}
+                Create Merchant
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK SMS MODAL */}
+      {showBulkSMSModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-lg p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <MessageSquare className={bulkSMSType === 'clients' ? 'text-purple-400' : 'text-amber-400'} size={20} />
+              Bulk SMS to {bulkSMSType === 'clients' ? 'Clients' : 'Merchants'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Recipient Filter</Label>
+                <select
+                  value={bulkSMSFilter}
+                  onChange={(e) => setBulkSMSFilter(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="all">All {bulkSMSType}</option>
+                  {bulkSMSType === 'clients' ? (
+                    <>
+                      <option value="active">Active (with card)</option>
+                      <option value="inactive">Inactive (no card)</option>
+                      <option value="silver">Silver card holders</option>
+                      <option value="gold">Gold card holders</option>
+                      <option value="platinum">Platinum card holders</option>
+                      <option value="top">Top 10 clients</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="active">Active merchants</option>
+                      <option value="pending">Pending approval</option>
+                      <option value="inactive">Inactive (no transactions)</option>
+                      <option value="top">Top 10 merchants</option>
+                    </>
+                  )}
+                </select>
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Message</Label>
+                <textarea
+                  value={bulkSMSMessage}
+                  onChange={(e) => setBulkSMSMessage(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white min-h-[120px]"
+                  placeholder="Type your message here..."
+                  maxLength={160}
+                />
+                <p className="text-slate-500 text-xs mt-1">{bulkSMSMessage.length}/160 characters</p>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <p className="text-amber-400 text-sm flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  SMS will be sent to all matching recipients. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => { setShowBulkSMSModal(false); setBulkSMSMessage(''); }} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSendBulkSMS} 
+                className={`flex-1 ${bulkSMSType === 'clients' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-amber-600 hover:bg-amber-700'}`} 
+                disabled={actionLoading}
+              >
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <MessageSquare size={16} className="mr-2" />}
+                Send Bulk SMS
               </Button>
             </div>
           </div>
