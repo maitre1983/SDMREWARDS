@@ -2247,14 +2247,15 @@ export default function SDMClientPage() {
 
                 {/* VIP Cards List */}
                 <div className="space-y-4">
-                  {vipCards.map((card) => {
-                    const tierOrder = { SILVER: 1, GOLD: 2, PLATINUM: 3 };
-                    const currentTier = tierOrder[myVipMembership?.tier] || 0;
-                    const cardTier = tierOrder[card.tier] || 0;
-                    const canPurchase = cardTier > currentTier;
-                    const isCurrentTier = myVipMembership?.tier === card.tier;
+                  {vipCards.filter(card => card.id !== 'bronze').map((card) => {
+                    const tierOrder = { silver: 1, gold: 2, platinum: 3 };
+                    const currentTierName = myVipMembership?.tier?.toLowerCase();
+                    const currentTierLevel = tierOrder[currentTierName] || 0;
+                    const cardTierLevel = tierOrder[card.id] || 0;
+                    const canPurchase = cardTierLevel > currentTierLevel;
+                    const isCurrentTier = currentTierName === card.id;
                     const priceToShow = canPurchase && myVipMembership 
-                      ? card.price - vipCards.find(c => c.tier === myVipMembership.tier)?.price 
+                      ? card.price - (vipCards.find(c => c.id === currentTierName)?.price || 0)
                       : card.price;
 
                     return (
