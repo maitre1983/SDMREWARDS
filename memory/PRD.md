@@ -7,6 +7,38 @@
 
 ## CHANGELOG
 
+### March 4, 2026 - Phase 5: Social Share, Withdrawal & Admin Logos ✅
+
+**Social Share Buttons (Landing Page):**
+- WhatsApp, Facebook, Twitter, Telegram share buttons
+- Localized share text (EN/FR)
+- Opens native share dialogs
+
+**Cashback Withdrawal to MoMo:**
+- POST `/api/payments/withdrawal/initiate` - Start withdrawal
+- POST `/api/payments/withdrawal/test/confirm/{id}` - Test mode confirm
+- GET `/api/payments/withdrawal/status/{id}` - Check status
+- POST `/api/payments/withdrawal/callback` - BulkClix callback
+- Min: GHS 5, Max: GHS 1000
+- Network auto-detection (MTN/Vodafone/AirtelTigo)
+- Frontend modal with quick amount buttons
+
+**Admin Payment Logos Management:**
+- GET `/api/admin/payment-logos` - List all (admin)
+- GET `/api/admin/payment-logos/public` - Public active logos
+- POST `/api/admin/payment-logos` - Add new logo
+- PUT `/api/admin/payment-logos/{id}` - Update logo
+- DELETE `/api/admin/payment-logos/{id}` - Delete logo
+
+**Bug Fixed:**
+- JWT payload key mismatch (payload['id'] → payload['sub'])
+
+**Test Results (Iteration 27):**
+- Backend: 100% (16/16 tests)
+- Frontend: 100%
+
+---
+
 ### March 4, 2026 - Phase 4: Landing Page Redesign & Multi-Language ✅
 
 **Landing Page Complete Redesign:**
@@ -164,9 +196,11 @@ CALLBACK_BASE_URL=https://web-boost-seo.preview.emergentagent.com
 | merchants | Partner businesses |
 | transactions | Financial records |
 | momo_payments | Payment tracking |
+| withdrawals | Cashback withdrawals |
 | sms_logs | SMS notifications log |
 | membership_cards | Active cards |
 | referrals | Referral tracking |
+| payment_logos | Payment provider logos |
 
 ---
 
@@ -192,14 +226,15 @@ CALLBACK_BASE_URL=https://web-boost-seo.preview.emergentagent.com
 - [ ] User needs to provide correct endpoint or API documentation
 
 ### P1 - Next Features
-- [ ] Cashback withdrawal to Mobile Money
-- [ ] Referral bonus implementation (GHS 3 referrer / GHS 1 referred)
-- [ ] Admin feature to manage payment provider logos
+- [x] ~~Cashback withdrawal to Mobile Money~~ ✅
+- [x] ~~Referral bonus implementation (GHS 3 referrer / GHS 1 referred)~~ ✅ (was already implemented)
+- [x] ~~Admin feature to manage payment provider logos~~ ✅
 
 ### P2 - Enhanced Features
 - [ ] Push notifications (OneSignal/Firebase)
 - [ ] Advanced SEO (sitemap.xml, robots.txt, structured data)
 - [ ] Production deployment guide
+- [ ] Admin UI for payment logos management
 
 ### P3 - Future
 - [ ] Mobile app (React Native)
@@ -209,5 +244,5 @@ CALLBACK_BASE_URL=https://web-boost-seo.preview.emergentagent.com
 ---
 
 *Last Updated: March 4, 2026*
-*Version: 2.4.0 (Landing Page Redesign & Multi-Language)*
+*Version: 2.5.0 (Social Share + Withdrawal + Admin Logos)*
 *Status: ✅ All Core Features Complete - Test Mode Active*
