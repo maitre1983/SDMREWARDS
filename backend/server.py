@@ -3049,45 +3049,156 @@ async def get_transaction_status(transaction_id: str, merchant: dict = Depends(g
 
 @sdm_router.get("/merchant/transactions")
 async def get_merchant_transactions(merchant: dict = Depends(get_current_merchant), limit: int = 100):
-    """Get merchant transaction history"""
-    transactions = await db.sdm_transactions.find(
-        {"merchant_id": merchant["id"]},
+    """Get merchant transaction history from all sources"""
+    merchant_id = merchant["id"]
+    
+    # Get from sdm_transactions
+    sdm_txns = await db.sdm_transactions.find(
+        {"merchant_id": merchant_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(limit)
-    return transactions
+    
+    # Get from pending_payments (completed transactions)
+    pending_txns = await db.pending_payments.find(
+        {"merchant_id": merchant_id, "payment_status": "completed"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(limit)
+    
+    # Get from sdm_payments (legacy)
+    sdm_payments = await db.sdm_payments.find(
+        {"merchant_id": merchant_id, "status": {"$in": ["confirmed", "split_completed"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(limit)
+    
+    # Combine and format all transactions
+    all_transactions = []
+    seen_ids = set()
+    
+    for t in sdm_txns:
+        txn_id = t.get("transaction_id") or t.get("id")
+        if txn_id not in seen_ids:
+            seen_ids.add(txn_id)
+            all_transactions.append({
+                "transaction_id": txn_id,
+                "client_id": t.get("user_id"),
+                "client_name": t.get("client_name", "Client"),
+                "amount": t.get("amount", 0),
+                "cashback_amount": t.get("net_cashback", 0),
+                "cashback_rate": t.get("cashback_rate", 0),
+                "status": "completed",
+                "payment_method": t.get("payment_method", "momo"),
+                "created_at": t.get("created_at"),
+                "source": "sdm_transactions"
+            })
+    
+    for t in pending_txns:
+        txn_id = t.get("transaction_id")
+        if txn_id and txn_id not in seen_ids:
+            seen_ids.add(txn_id)
+            all_transactions.append({
+                "transaction_id": txn_id,
+                "client_id": t.get("user_id") or t.get("client_id"),
+                "client_name": t.get("client_name", "Client"),
+                "amount": t.get("amount", 0),
+                "cashback_amount": t.get("net_cashback", 0),
+                "cashback_rate": t.get("cashback_rate", 0),
+                "status": "completed",
+                "payment_method": t.get("payment_method", "momo"),
+                "created_at": t.get("created_at"),
+                "source": "pending_payments"
+            })
+    
+    for t in sdm_payments:
+        txn_id = t.get("id") or t.get("payment_ref")
+        if txn_id and txn_id not in seen_ids:
+            seen_ids.add(txn_id)
+            all_transactions.append({
+                "transaction_id": txn_id,
+                "client_id": t.get("client_id"),
+                "client_name": t.get("client_name", "Client"),
+                "amount": t.get("amount", 0),
+                "cashback_amount": t.get("cashback_amount", 0),
+                "cashback_rate": t.get("cashback_rate", 0),
+                "status": "completed",
+                "payment_method": t.get("payment_method", "momo"),
+                "created_at": t.get("created_at"),
+                "source": "sdm_payments"
+            })
+    
+    # Sort by date descending
+    all_transactions.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    return {"transactions": all_transactions[:limit], "total": len(all_transactions)}
 
 @sdm_router.get("/merchant/report")
-async def get_merchant_report(merchant: dict = Depends(get_current_merchant), days: int = 30):
-    """Get merchant report/analytics"""
-    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+async def get_merchant_report(merchant: dict = Depends(get_current_merchant)):
+    """Get merchant report/analytics with daily, weekly, monthly stats"""
+    merchant_id = merchant["id"]
+    now = datetime.now(timezone.utc)
     
-    # Get transactions in period
-    transactions = await db.sdm_transactions.find(
-        {"merchant_id": merchant["id"], "created_at": {"$gte": start_date}},
-        {"_id": 0}
-    ).to_list(1000)
+    # Define time periods
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
     
-    total_amount = sum(t["amount"] for t in transactions)
-    total_cashback = sum(t["net_cashback"] for t in transactions)
-    transaction_count = len(transactions)
+    # Helper to get transactions from all collections
+    async def get_all_merchant_transactions(start_date=None):
+        query = {"merchant_id": merchant_id}
+        if start_date:
+            query["created_at"] = {"$gte": start_date}
+        
+        # From sdm_transactions
+        sdm_txns = await db.sdm_transactions.find(
+            query, {"_id": 0, "amount": 1, "net_cashback": 1, "created_at": 1}
+        ).to_list(10000)
+        
+        # From pending_payments (completed)
+        pending_query = {**query, "payment_status": "completed"}
+        pending_txns = await db.pending_payments.find(
+            pending_query, {"_id": 0, "amount": 1, "net_cashback": 1, "created_at": 1}
+        ).to_list(10000)
+        
+        # From sdm_payments (confirmed)
+        payment_query = {"merchant_id": merchant_id, "status": {"$in": ["confirmed", "split_completed"]}}
+        if start_date:
+            payment_query["created_at"] = {"$gte": start_date}
+        sdm_payments = await db.sdm_payments.find(
+            payment_query, {"_id": 0, "amount": 1, "cashback_amount": 1, "created_at": 1}
+        ).to_list(10000)
+        
+        # Combine
+        all_txns = []
+        for t in sdm_txns:
+            all_txns.append({"amount": t.get("amount", 0), "cashback": t.get("net_cashback", 0), "created_at": t.get("created_at")})
+        for t in pending_txns:
+            all_txns.append({"amount": t.get("amount", 0), "cashback": t.get("net_cashback", 0), "created_at": t.get("created_at")})
+        for t in sdm_payments:
+            all_txns.append({"amount": t.get("amount", 0), "cashback": t.get("cashback_amount", 0), "created_at": t.get("created_at")})
+        
+        return all_txns
     
-    # Daily breakdown
-    daily_stats = {}
-    for t in transactions:
-        date = t["created_at"][:10]
-        if date not in daily_stats:
-            daily_stats[date] = {"amount": 0, "cashback": 0, "count": 0}
-        daily_stats[date]["amount"] += t["amount"]
-        daily_stats[date]["cashback"] += t["net_cashback"]
-        daily_stats[date]["count"] += 1
+    # Calculate stats for each period
+    def calc_stats(txns):
+        total_sales = sum(t["amount"] for t in txns)
+        total_cashback = sum(t["cashback"] for t in txns)
+        return {
+            "total_sales": round(total_sales, 2),
+            "total_cashback": round(total_cashback, 2),
+            "transaction_count": len(txns)
+        }
+    
+    # Get transactions for each period
+    today_txns = [t for t in await get_all_merchant_transactions() if t.get("created_at", "") >= today_start]
+    week_txns = [t for t in await get_all_merchant_transactions() if t.get("created_at", "") >= week_start]
+    month_txns = [t for t in await get_all_merchant_transactions() if t.get("created_at", "") >= month_start]
+    all_time_txns = await get_all_merchant_transactions()
     
     return {
-        "period_days": days,
-        "total_transactions": transaction_count,
-        "total_amount": round(total_amount, 2),
-        "total_cashback": round(total_cashback, 2),
-        "average_transaction": round(total_amount / transaction_count, 2) if transaction_count > 0 else 0,
-        "daily_breakdown": [{"date": k, **v} for k, v in sorted(daily_stats.items())]
+        "today": calc_stats(today_txns),
+        "this_week": calc_stats(week_txns),
+        "this_month": calc_stats(month_txns),
+        "all_time": calc_stats(all_time_txns),
+        "generated_at": now.isoformat()
     }
 
 # ============== PAYMENT SYSTEM ROUTES ==============

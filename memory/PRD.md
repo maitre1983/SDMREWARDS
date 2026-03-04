@@ -109,10 +109,28 @@ Configuration via:
 4. Frais enregistrés dans `sdm_commissions` comme revenu SDM
 5. Client débité du montant + frais
 
-### Cashback Policy (Updated March 4, 2026)
-- **Cashback disponible IMMÉDIATEMENT** (plus de période d'attente)
-- Crédité dans `wallet_available` au lieu de `wallet_pending`
-- Utilisable le même jour, à la même heure
+### Merchant Dashboard (Updated March 4, 2026)
+**Historique des transactions complet:**
+- Toutes les transactions sont visibles (de toutes les collections: sdm_transactions, pending_payments, sdm_payments)
+- Affichage: Date, heure, montant, Client ID, cashback, statut
+- Détails étendus au clic: taux cashback, méthode de paiement
+
+**Statistiques (jour/semaine/mois/total):**
+- Ventes Aujourd'hui
+- Ventes Cette Semaine
+- Ventes Ce Mois
+- Total Cashback distribué
+- Nombre de transactions par période
+
+**API Endpoints:**
+- `GET /api/sdm/merchant/transactions` - Liste complète des transactions
+- `GET /api/sdm/merchant/report` - Statistiques jour/semaine/mois/total
+
+### Cashback Instantané (Updated March 4, 2026)
+- **PLUS DE STATUT "PENDING"** - Tout est instantané
+- Cashback crédité immédiatement dans `wallet_available`
+- Commissions SDM enregistrées immédiatement
+- Transactions marquées comme "completed" dès le webhook reçu
 
 ### Partner Directory (Updated March 4, 2026)
 - Liste cliquable des partenaires dans l'onglet "Our Partners"

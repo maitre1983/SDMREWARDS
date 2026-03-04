@@ -115,12 +115,14 @@ export default function SDMMerchantPage() {
       const [profileRes, txnRes, reportRes, qrRes, cashRes] = await Promise.all([
         axios.get(`${API_URL}/api/sdm/merchant/profile`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/transactions?limit=${txnLimit}`, { headers }),
-        axios.get(`${API_URL}/api/sdm/merchant/report?days=30`, { headers }),
+        axios.get(`${API_URL}/api/sdm/merchant/report`, { headers }),
         axios.get(`${API_URL}/api/sdm/merchant/qr-code`, { headers }).catch(() => ({ data: null })),
         axios.get(`${API_URL}/api/sdm/merchant/cash-balance`, { headers }).catch(() => ({ data: null }))
       ]);
       setMerchant(profileRes.data);
-      setTransactions(txnRes.data);
+      // Handle new transaction format
+      const txnData = txnRes.data.transactions || txnRes.data || [];
+      setTransactions(txnData);
       setReport(reportRes.data);
       if (qrRes.data) setMerchantQrData(qrRes.data);
       if (cashRes.data) setCashBalance(cashRes.data);
@@ -955,18 +957,18 @@ export default function SDMMerchantPage() {
         <div className="max-w-4xl mx-auto grid grid-cols-3 gap-4">
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-white">
             <DollarSign size={20} className="mb-2 opacity-70" />
-            <p className="text-2xl font-bold">GHS {report?.total_amount?.toFixed(0) || 0}</p>
-            <p className="text-xs opacity-70">Total Sales (30d)</p>
+            <p className="text-2xl font-bold">GHS {report?.today?.total_sales?.toFixed(0) || 0}</p>
+            <p className="text-xs opacity-70">Ventes Aujourd'hui</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-white">
             <TrendingUp size={20} className="mb-2 opacity-70" />
-            <p className="text-2xl font-bold">{report?.total_transactions || 0}</p>
-            <p className="text-xs opacity-70">Transactions</p>
+            <p className="text-2xl font-bold">{report?.this_month?.transaction_count || 0}</p>
+            <p className="text-xs opacity-70">Transactions (Mois)</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-white">
             <Users size={20} className="mb-2 opacity-70" />
             <p className="text-2xl font-bold">{merchant?.cashback_rate?.toFixed(0) || 5}%</p>
-            <p className="text-xs opacity-70">Cashback Rate</p>
+            <p className="text-xs opacity-70">Taux Cashback</p>
           </div>
         </div>
       </div>
@@ -1254,22 +1256,30 @@ export default function SDMMerchantPage() {
 
             {/* Summary Stats */}
             {report && (
-              <div className="grid grid-cols-4 gap-3">
-                <div className="bg-white rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-900">{report.total_transactions}</p>
-                  <p className="text-xs text-slate-500">Total Transactions</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Today */}
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-700">GHS {report.today?.total_sales?.toFixed(0) || 0}</p>
+                  <p className="text-xs text-emerald-600">Ventes Aujourd'hui</p>
+                  <p className="text-xs text-emerald-500 mt-1">{report.today?.transaction_count || 0} txn</p>
                 </div>
-                <div className="bg-white rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-900">GHS {report.total_amount?.toFixed(0)}</p>
-                  <p className="text-xs text-slate-500">Total Sales</p>
+                {/* This Week */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700">GHS {report.this_week?.total_sales?.toFixed(0) || 0}</p>
+                  <p className="text-xs text-blue-600">Cette Semaine</p>
+                  <p className="text-xs text-blue-500 mt-1">{report.this_week?.transaction_count || 0} txn</p>
                 </div>
-                <div className="bg-white rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-600">GHS {report.total_cashback?.toFixed(2)}</p>
-                  <p className="text-xs text-slate-500">Cashback Given</p>
+                {/* This Month */}
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-700">GHS {report.this_month?.total_sales?.toFixed(0) || 0}</p>
+                  <p className="text-xs text-purple-600">Ce Mois</p>
+                  <p className="text-xs text-purple-500 mt-1">{report.this_month?.transaction_count || 0} txn</p>
                 </div>
-                <div className="bg-white rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-900">GHS {report.average_transaction?.toFixed(2)}</p>
-                  <p className="text-xs text-slate-500">Avg Transaction</p>
+                {/* Total Cashback */}
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-orange-700">GHS {report.all_time?.total_cashback?.toFixed(2) || 0}</p>
+                  <p className="text-xs text-orange-600">Cashback Distribué</p>
+                  <p className="text-xs text-orange-500 mt-1">Total</p>
                 </div>
               </div>
             )}
@@ -1316,56 +1326,61 @@ export default function SDMMerchantPage() {
                     })
                     .map((txn) => (
                       <div 
-                        key={txn.id} 
+                        key={txn.transaction_id || txn.id} 
                         className="p-4 hover:bg-slate-50 cursor-pointer transition-colors"
-                        onClick={() => setShowTxnDetails(showTxnDetails === txn.id ? null : txn.id)}
+                        onClick={() => setShowTxnDetails(showTxnDetails === (txn.transaction_id || txn.id) ? null : (txn.transaction_id || txn.id))}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              txn.status === 'available' ? 'bg-emerald-100' : 'bg-amber-100'
+                              txn.status === 'completed' ? 'bg-emerald-100' : 'bg-amber-100'
                             }`}>
                               <DollarSign size={18} className={
-                                txn.status === 'available' ? 'text-emerald-600' : 'text-amber-600'
+                                txn.status === 'completed' ? 'text-emerald-600' : 'text-amber-600'
                               } />
                             </div>
                             <div>
-                              <p className="font-semibold text-slate-900">GHS {txn.amount.toFixed(2)}</p>
+                              <p className="font-semibold text-slate-900">GHS {(txn.amount || 0).toFixed(2)}</p>
                               <p className="text-xs text-slate-500 font-mono">{txn.transaction_id}</p>
+                              {txn.client_name && (
+                                <p className="text-xs text-blue-600">Client: {txn.client_name}</p>
+                              )}
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-emerald-600">-GHS {txn.net_cashback.toFixed(2)}</p>
+                            <p className="text-sm font-semibold text-emerald-600">
+                              Cashback: GHS {(txn.cashback_amount || txn.net_cashback || 0).toFixed(2)}
+                            </p>
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              txn.status === 'available' ? 'bg-emerald-100 text-emerald-700' : 
+                              txn.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
                               txn.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                               'bg-slate-100 text-slate-600'
                             }`}>
-                              {txn.status}
+                              {txn.status === 'completed' ? 'Complété' : txn.status}
                             </span>
                           </div>
                         </div>
                         
                         {/* Expanded Details */}
-                        {showTxnDetails === txn.id && (
+                        {showTxnDetails === (txn.transaction_id || txn.id) && (
                           <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-sm">
                             <div>
-                              <p className="text-slate-500">Date & Time</p>
+                              <p className="text-slate-500">Date & Heure</p>
                               <p className="font-medium text-slate-900">
-                                {new Date(txn.created_at).toLocaleString()}
+                                {new Date(txn.created_at).toLocaleString('fr-FR')}
                               </p>
                             </div>
                             <div>
-                              <p className="text-slate-500">Cashback Rate</p>
-                              <p className="font-medium text-slate-900">{txn.cashback_rate?.toFixed(1)}%</p>
+                              <p className="text-slate-500">Taux Cashback</p>
+                              <p className="font-medium text-slate-900">{(txn.cashback_rate || 0).toFixed(1)}%</p>
                             </div>
                             <div>
-                              <p className="text-slate-500">Gross Cashback</p>
-                              <p className="font-medium text-slate-900">GHS {txn.cashback_amount.toFixed(2)}</p>
+                              <p className="text-slate-500">Client ID</p>
+                              <p className="font-medium text-slate-900 text-xs">{txn.client_id || 'N/A'}</p>
                             </div>
                             <div>
-                              <p className="text-slate-500">SDM Commission</p>
-                              <p className="font-medium text-slate-900">GHS {txn.sdm_commission.toFixed(2)}</p>
+                              <p className="text-slate-500">Méthode</p>
+                              <p className="font-medium text-slate-900">{txn.payment_method || 'MoMo'}</p>
                             </div>
                             <div>
                               <p className="text-slate-500">Available Date</p>
