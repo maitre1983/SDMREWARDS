@@ -1,675 +1,249 @@
-# SDM FINTECH PLATFORM - PRD
+# SDM REWARDS - Product Requirements Document
 
 ## Project Overview
-**SDM (Smart Development Membership)** - Network of loyal consumers in Ghana
+**SDM (Smart Development Membership)** - Digital loyalty and cashback platform for Ghana
 
-> **IMPORTANT**: SDM is not a bank or financial service. It is a network of friends and loyal consumers.
-
----
-
-## CHANGELOG - March 4, 2026 (Session 2)
-
-### Major Fix: Complete VIP Card Purchase System Rebuild
-
-**Issues Fixed:**
-1. VIP cards showing "Not available" - Fixed by using `card.tier` instead of `card.id`
-2. Webhook not finding membership - Fixed by searching both `transaction_id` AND `payment_reference`
-3. User badge showing "Bronze" instead of VIP tier - Fixed by adding fallback to `user.vip_tier`
-4. Admin dashboard not showing card sales - Fixed by creating entries in `membership_cards` collection
-5. Welcome bonus not credited - Fixed by crediting bonus for ALL first purchases (not just referred users)
-
-**New Features Added:**
-1. **Payment Progress Modal**: Visual indicator during MoMo payment with timer and instructions
-2. **SMS Confirmation**: Automatic SMS sent to user after VIP card activation
-3. **Webhook Logging**: Store unmatched webhooks in `webhook_logs` for debugging
-
-**Backend Changes (server.py):**
-- Unified webhook search to check both `transaction_id` and `payment_reference`
-- Added `is_first_purchase` field to membership creation
-- Added entry creation in `membership_cards` for admin dashboard compatibility
-- Added welcome bonus credit to `sdm_transactions` for user history visibility
-
-**Frontend Changes (SDMClientPage.jsx):**
-- Added `vipPaymentProgress` state for payment modal
-- Added timer and progress bar during payment wait
-- Fixed VIP badge to use `user.vip_tier` as fallback
-- Normalized tier display to uppercase
-
-**Status**: ✅ VERIFIED - Complete VIP purchase flow working:
-- Buy button visible and clickable
-- MoMo payment prompt sent
-- Payment progress modal shown
-- Webhook processed correctly
-- User VIP tier updated
-- Welcome bonus credited
-- SMS confirmation sent
-- Admin dashboard shows sales
+> **IMPORTANT**: SDM is not a bank. It is a network of loyal consumers earning cashback rewards.
 
 ---
 
-## CHANGELOG - March 4, 2026 (Session 1)
+## CHANGELOG - March 4, 2026 (Session 3) - ARCHITECTURE REBUILD
 
-## REFERRAL SYSTEM (Updated March 3, 2026)
+### Complete System Rebuild
+Following user request, the entire application was rebuilt from scratch with a new modular architecture:
 
-### Referral Bonus Rules
-| Who | Amount | When Paid |
-|-----|--------|-----------|
-| Referrer (Parrain) | GHS 3 | When referred user purchases membership card |
-| New User (Filleul) | GHS 1 | When they purchase their membership card |
-
-### Key Changes
-- **Bonuses are ONLY paid when the referred user purchases a membership card**
-- **Inscription is "pending" until card purchase** (`membership_status: pending → active`)
-- **Card payment must be via Mobile Money or Card** (no cash)
-
-### APIs
-- `GET /api/sdm/user/referrals?period=all|day|week|month|year` - User's referral history with filters
-- `GET /api/sdm/admin/referrals?period=all|day|week|month|year` - Admin: Complete referral history
-
-### Admin Referral Dashboard
-New panel in Admin Dashboard showing:
-- Completed referrals (who referred who)
-- Pending referrals (registered but no card yet)
-- Total bonus paid
-- Filters by period (day/week/month/year)
-
----
-
-## PAYMENT SYSTEM (Phase 1 - COMPLETE)
-
-### Payment Methods
-| Method | Status | Notes |
-|--------|--------|-------|
-| Mobile Money | ✅ REAL | BulkClix API - Real payments with webhook confirmation |
-| Card Payment | ❌ Disabled | Not yet implemented - returns error |
-| Cash | ✅ COMPLETE | Client confirmation required |
-
-### Payment Flow (CORRECTED - March 3, 2026)
-**Le cashback n'est crédité qu'APRÈS l'approbation du paiement par le client.**
-
-**Deux modes de paiement:**
-
-#### Mode 1: Client scanne QR Marchand (NEW - March 4, 2026)
-1. **Client ouvre l'app** → Onglet Wallet → "Scanner le QR Marchand"
-2. **Client scanne le QR code du marchand**
-3. **Système affiche les infos du marchand** (nom, taux cashback)
-4. **Client entre le montant** et voit le cashback prévu
-5. **Client clique "Payer"** → Prompt MoMo envoyé
-6. **Client approuve sur son téléphone**
-7. Webhook reçu → Marchand payé → Commission SDM → Cashback crédité
-
-#### Mode 2: Marchand scanne QR Client
-1. **Marchand scanne le QR code du client**
-2. **Marchand entre le montant**
-3. **Système envoie prompt MoMo au client**
-4. **Client approuve sur son téléphone**
-5. Webhook reçu → Marchand payé → Commission SDM → Cashback crédité
-
-### API Endpoints pour paiements client
-- `GET /api/sdm/merchant/by-qr/{qr_code}` - Récupère les infos du marchand par QR code
-- `POST /api/sdm/client/pay-merchant` - Client initie un paiement vers marchand
-
-### Webhooks
-- `/api/sdm/payments/webhook/transaction` - Pour le flux `/merchant/transaction`
-- `/api/sdm/payments/webhook/legacy` - Pour le flux `/payments/initiate` et `/payments/merchant-initiate`
-
-### Split Formula
-```
-Amount: 1000 GHS @ 10% Cashback
-- Total Cashback: 100 GHS (10% of amount)
-- SDM Commission: 2-20 GHS (configurable 2-20% of cashback)
-- Client Receives: 80-98 GHS (immediately available AFTER approval)
-- Merchant Receives: 900 GHS (via MoMo transfer)
-```
-
-### Commission Configuration (Updated March 3, 2026)
-- **Taux de commission SDM**: Paramétrable entre 0.5% et 20%
-- Modifiable par le super_admin dans l'onglet "Commissions SDM"
-- API: `GET/PUT /api/sdm/admin/commission-rate`
-
-### Service Fees Configuration (NEW - March 3, 2026)
-Tous les frais de services sont maintenant dynamiques et configurables depuis l'admin:
-- **Airtime Fee**: 2% par défaut (configurable)
-- **Data Fee**: 2% par défaut (configurable)
-- **Bill Pay Fee**: 2% par défaut (configurable)
-- **MoMo Withdraw Fee**: 1% + 1 GHS flat (configurables)
-
-Configuration via:
-- **Admin Panel**: Fintech Ledger → Config
-- **API**: `PUT /api/sdm/admin/config` avec les champs:
-  - `airtime_fee_percent`
-  - `data_fee_percent`
-  - `bill_fee_percent`
-  - `momo_withdraw_fee_percent`
-  - `momo_withdraw_fee_flat`
-- **Client API**: `GET /api/sdm/user/services/fees` (public)
-
-### Flow des frais:
-1. Client initie un service (Airtime, Data, Bill, MoMo Withdraw)
-2. Système récupère les frais dynamiques de la config
-3. Frais SDM calculés et affichés au client AVANT validation
-4. Frais enregistrés dans `sdm_commissions` comme revenu SDM
-5. Client débité du montant + frais
-
-### Merchant Dashboard (Updated March 4, 2026)
-**Historique des transactions complet:**
-- Toutes les transactions sont visibles (de toutes les collections: sdm_transactions, pending_payments, sdm_payments)
-- Affichage: Date, heure, montant, Client ID, cashback, statut
-- Détails étendus au clic: taux cashback, méthode de paiement
-
-**Statistiques (jour/semaine/mois/total):**
-- Ventes Aujourd'hui
-- Ventes Cette Semaine
-- Ventes Ce Mois
-- Total Cashback distribué
-- Nombre de transactions par période
-
-**API Endpoints:**
-- `GET /api/sdm/merchant/transactions` - Liste complète des transactions
-- `GET /api/sdm/merchant/report` - Statistiques jour/semaine/mois/total
-
-### Cashback Instantané (Updated March 4, 2026)
-- **PLUS DE STATUT "PENDING"** - Tout est instantané
-- Cashback crédité immédiatement dans `wallet_available`
-- Commissions SDM enregistrées immédiatement
-- Transactions marquées comme "completed" dès le webhook reçu
-
-### Partner Directory (Updated March 4, 2026)
-- Liste cliquable des partenaires dans l'onglet "Our Partners"
-- Au clic, affichage d'un modal avec:
-  - Nom et logo du partenaire
-  - Taux de cashback
-  - **Numéro de téléphone** (cliquable pour appeler)
-  - **Adresse et localisation** (lien vers Google Maps si GPS disponible)
-  - Horaires d'ouverture
-  - Bouton "Payer chez ce marchand"
-- API `/api/sdm/partners` inclut: phone, address, city, gps_location, qr_code, business_hours
-
-### SDM Commission Management (NEW - March 3, 2026)
-- Onglet "Commissions SDM" dans le tableau de bord admin (super_admin seulement)
-- Affiche: Total gagné, Total retiré, Solde disponible
-- **Retrait via MoMo**: Le super admin peut retirer les commissions vers son compte MoMo
-- API: `GET /api/sdm/admin/commissions`, `POST /api/sdm/admin/commissions/withdraw`
-
-### Merchant Settlement Configuration
-- **Mobile Money**: Network (MTN/Vodafone/AirtelTigo) + Phone
-- **Bank Account**: Bank Name + Account Number + Account Name
-- **Settlement Mode**: Instant or Daily batch
-
-### Cash Debit System
-- Merchants have a "Cash Debit Balance" (can go negative)
-- Default limit: 5000 GHS
-- Grace period before blocking: 3 days
-- Daily job at 00:00 UTC checks balances
-
-### APIs Implemented
-- `POST /api/sdm/payments/initiate` - Client initiates payment
-- `POST /api/sdm/payments/merchant-initiate` - Merchant initiates payment
-- `POST /api/sdm/payments/confirm-cash` - Client confirms cash payment
-- `GET /api/sdm/payments/pending` - Client pending payments
-- `GET /api/sdm/payments/history` - Client payment history
-- `GET /api/sdm/merchant/payments` - Merchant payment history
-- `GET /api/sdm/merchant/qr-code` - Merchant QR code
-- `GET /api/sdm/merchant/cash-balance` - Merchant cash balance
-- `POST /api/sdm/payments/webhook/bulkclix` - Webhook endpoint
-
----
-
-### Referral QR Code (NEW - March 3, 2026)
-- Each user has a scannable QR code containing their referral link
-- QR code visible via "Show QR Code" button in the Invite tab
-- When scanned, opens the SDM registration page with the referral code pre-filled
-- Uses `qrcode.react` library with SDM logo embedded
-
----
-
-## BACKEND REFACTORING (P0 - Planned)
-
-### Current State
-- `server.py`: **7600+ lines** (monolithic)
-- Existing router files: `/app/backend/routers/` (mostly placeholders)
-
-### Target Architecture
+**Backend Architecture:**
 ```
 /app/backend/
-├── server.py           # Main app, imports routers
-├── models/             # Pydantic models
-├── routers/
-│   ├── auth.py         # OTP, login, register
-│   ├── users.py        # User profile, wallet, transactions
-│   ├── merchants.py    # Merchant dashboard, settings
-│   ├── payments.py     # MoMo, Card, Cash payments
-│   ├── admin.py        # Admin controls
-│   ├── vip.py          # VIP cards, lottery
-│   └── services.py     # Airtime, data, bills
-└── services/
-    ├── bulkclix.py     # OTP & Payment service
-    └── ledger.py       # Financial ledger
+├── server.py           # Main FastAPI app with lifespan
+├── models/
+│   └── schemas.py      # Pydantic models (Client, Merchant, Transaction, etc.)
+└── routers/
+    ├── auth.py         # Authentication (OTP, login, register for client/merchant/admin)
+    ├── clients.py      # Client dashboard, cards, transactions, referrals
+    ├── merchants.py    # Merchant dashboard, settings, QR codes
+    ├── transactions.py # Payment processing (placeholder)
+    └── admin.py        # Admin dashboard, user management, settings
 ```
 
-### Migration Strategy
-1. ✅ **Phase 1**: Extract utility functions to `utils/helpers.py`
-2. ✅ **Phase 2**: Extract configuration constants to `config.py`
-3. **Phase 3** (Next): Extract auth routes to `routers/auth.py`
-4. **Phase 4**: Extract user routes to `routers/users.py`
-5. **Phase 5**: Extract merchant routes to `routers/merchants.py`
-
-### Progress
-- `server.py`: 7658 → 7565 lines (-93 lines, ~1.2% reduction)
-- New files created:
-  - `/app/backend/utils/helpers.py` - Utility functions
-  - `/app/backend/config.py` - Configuration constants
-- Frontend:
-  - `/app/frontend/src/components/admin/MessagesPanel.jsx` - Messages with Promos & Notifications
-  - `/app/frontend/src/App.js` - Fixed admin routing
-
-### Dashboard Reorganization (March 3, 2026)
-- **Moved to Messages Panel**:
-  - Inbox (messages)
-  - Promotions 
-  - Notifications
-- **Fintech Ledger** now focuses on financial features only
-
----
-
-## ADMIN CONTROLS (Phase 2 - COMPLETE)
-
-### Client Controls
-| Action | Description | Status |
-|--------|-------------|--------|
-| Block | Immediately block account | ✅ |
-| Unblock | Restore account access | ✅ |
-| Suspend | Temporary suspension | ✅ |
-| Unsuspend | Lift suspension | ✅ |
-| Freeze Wallet | Prevent withdrawals | ✅ |
-| Unfreeze Wallet | Allow withdrawals | ✅ |
-| Adjust Balance | Add/Subtract/Set balance | ✅ |
-| Delete | Soft delete account | ✅ |
-
-### Merchant Controls
-| Action | Description | Status |
-|--------|-------------|--------|
-| Block | Immediately block merchant | ✅ |
-| Unblock | Restore merchant access | ✅ |
-| Suspend | Temporary suspension | ✅ |
-| Unsuspend | Lift suspension | ✅ |
-| Toggle Cash Mode | Enable/Disable cash payments | ✅ |
-| Update Cash Limit | Set max negative balance | ✅ |
-| Update Grace Period | Days before auto-block | ✅ |
-| Update Max Cash Rate | Max cashback % for cash | ✅ |
-| **Delete** | **Soft delete merchant (Super Admin only)** | ✅ |
-
-### Partners Visibility Rules
-- Blocked, suspended, or deleted merchants are **automatically hidden** from the public partners list
-- Clients will no longer see these merchants in their Partners tab
-- This filter applies to `/api/sdm/partners` endpoint
-
-### Action Logs
-- All admin actions logged with timestamp
-- Stores: admin_id, admin_email, target_type, target_id, action, reason
-- Previous state saved for rollback reference
-
-### Admin UI
-- **Clients Tab**: List with manage button for each
-- **Marchands Tab**: List with cash balance, limit, verify buttons
-- **Action Logs Tab**: Complete history of admin actions
-- **Stats Cards**: Total counts, blocked, deficit warnings
-
----
-
-## BACKEND ARCHITECTURE (Refactored)
-
-### Directory Structure
+**Frontend Architecture:**
 ```
-/app/backend/
-├── server.py          # Main entry point (5200+ lines - to be split)
-├── core/              # ✅ NEW - Shared utilities
-│   ├── config.py      # Database, JWT, API keys
-│   ├── dependencies.py # Auth dependencies
-│   └── utils.py       # Helper functions
-├── models/            # ✅ NEW - Extracted Pydantic models
-│   ├── base.py        # Core models (Contact, Admin, Visit)
-│   ├── users.py       # SDMUser model
-│   ├── merchants.py   # Merchant models
-│   ├── vip.py         # VIP membership models
-│   ├── partners.py    # Partner models
-│   ├── lottery.py     # Lottery models
-│   └── services.py    # Service transaction models
-├── routers/           # ✅ NEW - Route separation
-│   ├── auth.py        # Auth routes (template ready)
-│   └── lottery.py     # Lottery routes (template)
-├── ledger/            # Double-entry accounting
-├── services/          # External services
-│   └── bulkclix_service.py
-├── tests/             # Test files
-├── ARCHITECTURE.md    # ✅ NEW - Architecture documentation
-└── CHANGELOG.md       # ✅ NEW - Version changelog
+/app/frontend/src/pages/
+├── HomePage.jsx          # Landing page with cards display
+├── ClientAuthPage.jsx    # Client login/register with OTP
+├── ClientDashboard.jsx   # Client wallet, cards, transactions
+├── MerchantAuthPage.jsx  # Merchant login/register with OTP
+├── MerchantDashboard.jsx # Merchant stats, QR codes, settings
+└── AdminDashboard.jsx    # Admin overview, client/merchant management
 ```
 
-### Refactoring Status
-| Component | Status | Lines |
-|-----------|--------|-------|
-| Models | ✅ Extracted | ~300 |
-| Auth Routes | 🔄 In server.py | ~75 |
-| User Routes | 🔄 In server.py | ~287 |
-| Merchant Routes | 🔄 In server.py | ~245 |
-| Service Routes | 🔄 In server.py | ~350 |
-| VIP Routes | 🔄 In server.py | ~200 |
-| Lottery Routes | 🔄 In server.py | ~400 |
-| Fintech Routes | 🔄 In server.py | ~350 |
+### Features Implemented
+1. **Landing Page** - Hero section, features grid, card pricing, how it works
+2. **Client Authentication** - Phone + password login, OTP verification for registration
+3. **Client Dashboard** - Balance display, card purchase, transaction history, referrals
+4. **Merchant Authentication** - Business registration with OTP
+5. **Merchant Dashboard** - Revenue stats, QR codes for payment/recruitment, settings
+6. **Admin Dashboard** - Platform overview, client/merchant management, settings
+
+### Testing Results (Iteration 22)
+- **Backend**: 18/18 tests passed (100%)
+- **Frontend**: All pages load, all flows work (100%)
+
+### Bug Fixes During Testing
+1. **HTTPException handler** - Fixed to return JSONResponse instead of dict
+2. **MongoDB email index** - Fixed sparse index for nullable email fields
+3. **QR code field name** - Corrected `qr_code` to `payment_qr_code` in merchant index
 
 ---
 
-## MULTILINGUAL SUPPORT ✅
-| Language | Code | Direction |
-|----------|------|-----------|
-| English | EN | LTR ✅ Default |
-| French | FR | LTR ✅ |
-| Arabic | AR | RTL ✅ |
-| Chinese | ZH | LTR ✅ |
+## CORE FEATURES
+
+### Membership Cards
+| Card | Price | Color | Benefits |
+|------|-------|-------|----------|
+| Silver | GHS 25 | #C0C0C0 | All partner access, cashback, referrals |
+| Gold | GHS 50 | #FFD700 | + Priority support, exclusive offers |
+| Platinum | GHS 100 | #E5E4E2 | + VIP access, birthday bonus |
+
+### Cashback System
+- Merchants set cashback rate: 1% - 20%
+- Platform commission: 1% - 5% of cashback
+- Instant cashback credit after payment
+
+### Referral System
+| Who | Amount | When |
+|-----|--------|------|
+| Welcome Bonus | GHS 1 | New user buys card |
+| Referrer Bonus | GHS 3 | Referred user buys card |
+
+### QR Code System
+- **Payment QR** - Customers scan to pay merchant
+- **Recruitment QR** - New users scan to register with referral
 
 ---
 
-## AUTO LOTTERY SCHEDULER ✅
-- **Schedule**: 1st of each month @ 00:05 UTC
-- **Default Prize**: 500 GHS (configurable)
-- **Auto-Activate**: Enrolls VIP members automatically
+## API ENDPOINTS
+
+### Authentication (`/api/auth/`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/otp/send` | Send OTP to phone (test mode: code 123456) |
+| POST | `/otp/verify` | Verify OTP code |
+| POST | `/client/register` | Register new client |
+| POST | `/client/login` | Client login |
+| POST | `/merchant/register` | Register new merchant |
+| POST | `/merchant/login` | Merchant login |
+| POST | `/admin/login` | Admin login |
+| GET | `/me` | Get current user info |
+
+### Clients (`/api/clients/`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/me` | Client dashboard data |
+| GET | `/cards/available` | List available cards |
+| POST | `/cards/purchase` | Purchase membership card |
+| GET | `/cards/my-card` | Get client's card |
+| GET | `/transactions` | Transaction history |
+| GET | `/referrals` | Referral info & list |
+| GET | `/qr-code` | Get QR code |
+| PUT | `/profile` | Update profile |
+
+### Merchants (`/api/merchants/`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/me` | Merchant dashboard data |
+| GET | `/settings` | Get merchant settings |
+| PUT | `/settings/cashback` | Update cashback rate |
+| PUT | `/settings/payment` | Update MoMo/Bank info |
+| PUT | `/settings/business` | Update business info |
+| GET | `/qr-codes` | Get QR codes |
+| POST | `/qr-codes/regenerate` | Regenerate QR code |
+| GET | `/transactions` | Transaction history |
+| POST | `/api/enable` | Enable API access |
+
+### Admin (`/api/admin/`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/dashboard` | Platform statistics |
+| GET | `/clients` | List all clients |
+| GET | `/clients/{id}` | Get client details |
+| PUT | `/clients/{id}` | Update client |
+| PUT | `/clients/{id}/status` | Update client status |
+| POST | `/clients/{id}/suspend` | Suspend client |
+| POST | `/clients/{id}/activate` | Activate client |
+| GET | `/merchants` | List all merchants |
+| PUT | `/merchants/{id}/status` | Update merchant status |
+| POST | `/merchants/{id}/approve` | Approve merchant |
+| GET | `/settings` | Platform configuration |
+| PUT | `/settings/commissions` | Update commission rates |
+| GET | `/revenue` | Revenue report |
 
 ---
 
-## VIP MEMBERSHIP CARDS
-| Tier | Price | Boost | Limit | Lottery |
-|------|-------|-------|-------|---------|
-| SILVER | 25 | +0% | 2,500 | x1 |
-| GOLD | 50 | +0.2% | 2,500 | x2 |
-| PLATINUM | 100 | +0.5% | 5,000 | x3 |
+## DATABASE SCHEMA
+
+### Collections
+- **clients** - Customer accounts
+- **merchants** - Partner businesses
+- **admins** - Platform administrators
+- **transactions** - All financial operations
+- **membership_cards** - Active cards
+- **referrals** - Referral tracking
+- **platform_config** - Platform settings
+- **admin_logs** - Admin action logs
+
+### Key Fields
+**Client**: id, full_name, username, phone, email, password_hash, status, card_type, cashback_balance, referral_code, qr_code
+
+**Merchant**: id, business_name, owner_name, phone, email, password_hash, status, cashback_rate, payment_qr_code, recruitment_qr_code, momo_number, bank_account
+
+**Transaction**: id, type, status, client_id, merchant_id, amount, cashback_amount, commission_amount, payment_method
 
 ---
 
-## IMPLEMENTED FEATURES
-- ✅ Central Ledger (Double-Entry)
-- ✅ Super App Services (SIMULATED)
-- ✅ VIP Card System (3 tiers) - **Dynamic from Admin Dashboard**
-- ✅ Partner Directory - **Synced with verified merchants**
-- ✅ Promotions Engine
-- ✅ Leaderboards
-- ✅ VIP Lottery (5 winners)
-- ✅ Multilingual (4 languages - EN default)
-- ✅ Auto Lottery Scheduler (1st of each month)
-- ✅ **Birthday Bonus Scheduler** (Daily @ 8 UTC)
-- ✅ Models Package Extraction
-- ✅ SDM Rewards Landing Page - **Dynamic VIP Cards**
-- ✅ Core Package (config, utils, dependencies)
-- ✅ Merchant Card Management Removed
-- ✅ BulkClix OTP SMS Integration (Real)
-- ✅ **BulkClix Notification SMS** (for merchants)
-- ✅ Client: Phone + Password + Full Name + **Birth Date** Registration
-- ✅ Merchant: Phone + Password + GPS Address Registration
-- ✅ **Merchant Dashboard: Cashback Rate Management** (Settings tab)
-- ✅ **Merchant Dashboard: API Credentials Display** (ID, Key, Secret)
-- ✅ Favicon & Title (www.sdmrewards.com)
-- ✅ "Made with Emergent" Badge Removed
-- ✅ English Priority Language (all pages translated)
-- ✅ Password Reset via OTP
-- ✅ Dynamic Admin URL (/admin<DDMMYY>) - Security enhancement
-- ✅ Session Persistence (localStorage tokens for admin, client, merchant)
-- ✅ Web OTP API Integration (auto-fill OTP from SMS on Chrome Android)
-- ✅ **Admin Panel: Clients & Merchants Management**
-- ✅ **Client Portal: Partners Tab** with cashback rates
-- ✅ **Landing Page: Lazy Loading** for performance
-- ✅ **Login Button** in Navbar
+## TEST CREDENTIALS
+
+### Admin
+- URL: `/admin` (redirects to `/admin<DDMMYYYY>`)
+- Email: `emileparfait2003@gmail.com`
+- Password: `Gerard0103@`
+
+### Test Client
+- Phone: `0541234567`
+- Password: `TestPass123`
+
+### Test Merchant
+- Phone: `0509876543`
+- Password: `MerchantPass123`
+
+### OTP Test Mode
+- Use code: `123456` for any phone number
+
+---
+
+## MOCKED INTEGRATIONS
+- **BulkClix OTP SMS** - In test mode, returns TEST_ request_id
+- **BulkClix MoMo Payments** - Not yet integrated
+
+## ACTIVE INTEGRATIONS
+- None yet (awaiting configuration)
 
 ---
 
 ## UPCOMING TASKS (P1)
 
-### Complete Backend Refactoring
-- Extract routes from server.py to routers/
-- Import models from models package
-- Test all endpoints after each extraction
+### Phase 3 - Core Functionality
+1. **QR Code Payment Flow**
+   - Client scans merchant QR → Enter amount → MoMo prompt
+   - Merchant scans client QR → Enter amount → MoMo prompt to client
+   
+2. **BulkClix MoMo Integration**
+   - Reuse existing `/app/backend/services/bulkclix_service.py`
+   - Card purchase via MoMo
+   - Merchant payment collection
 
-### SEO & Public Pages
-- Public partner directory
-- Landing optimization
+3. **Cashback Calculation**
+   - Calculate cashback based on merchant rate
+   - Deduct platform commission
+   - Credit client wallet
 
-### Birthday Bonus ✅ COMPLETE
-- Auto bonus job runs daily @ 8 UTC
-- Checks for VIP members with birthday today
-- Credits configurable bonus amount (default: 5 GHS)
-- Sends birthday SMS notification
-- Prevents duplicate bonuses per year
-- **Birth date field added to client registration form**
+### Phase 4 - Enhanced Features
+1. **Partner Directory** - List of active merchants with cashback rates
+2. **Transaction Notifications** - SMS/Push for payments and cashback
+3. **Multi-language Support** - EN (priority), FR, ZH, AR
 
-### Merchant Notifications ✅ IMPLEMENTED
-- SMS sent when merchant registers (pending verification)
-- SMS sent when merchant is verified by admin
-- Admin notification created for new registrations
-
-### Auto-read OTP (Web OTP API) ✅ IMPLEMENTED
-- OTPInput component with Web OTP API support
-- Auto-fills OTP code when SMS arrives (Chrome Android)
-- Shows "Waiting for SMS..." indicator when listening
-- Fallback to manual input on unsupported browsers
-- Auto-submits form when OTP is received
-
-### Contact Sync
-- Requires native mobile capabilities (not possible in web app)
-- Consider PWA or native app implementation
+### Future Tasks
+- Real-time QR code generation
+- VIP Lottery system
+- Super app services (Airtime, Data, Bills)
+- Mobile Money withdrawal
+- KYC verification
 
 ---
 
-## TEST CREDENTIALS
-- **Admin**: `/admin` -> redirects to `/admin<DDMMYY>` (e.g., `/admin020326`)
-  - Username: `admin`
-  - Password: `Gerard0103@`
-- **Client**: `/sdm/client`
-  - Phone: `0000000000`
-  - Password: `TestPass123`
-  - OTP (for registration): `0000`
-- **Merchant**: `/sdm/merchant`
-  - Phone: `0000000000`
-  - OTP (for registration): `0000`
+## TECHNICAL NOTES
 
----
+### Environment Variables
+```
+# Backend (.env)
+MONGO_URL=mongodb://...
+DB_NAME=sdm_rewards
+JWT_SECRET=...
+BULKCLIX_API_KEY=...
+BULKCLIX_OTP_USER=...
+BULKCLIX_OTP_PASS=...
 
-## MOCKED INTEGRATIONS
-- BulkClix API (services - airtime, data, bills)
-- OneSignal (PENDING)
+# Frontend (.env)
+REACT_APP_BACKEND_URL=https://...
+```
 
-## ACTIVE INTEGRATIONS
-- BulkClix API (OTP SMS - Real)
-
----
-
-## RECENT FIXES (March 3, 2026)
-
-### Admin Login Playwright Test Fix
-- **Issue**: Le test automatisé Playwright pour la connexion admin échouait à cause d'une race condition
-- **Root Cause**: 
-  1. Les inputs React utilisaient `value` + `onChange` (controlled components) incompatibles avec Playwright `fill()`
-  2. Après le login, le dashboard faisait des requêtes API avant que le token soit disponible dans le contexte
-  3. Les erreurs 401 déclenchaient un logout automatique qui supprimait le token
-- **Solution**:
-  1. Modifié `AdminPage.jsx` pour utiliser `useRef` au lieu de `useState` pour les inputs (compatible Playwright)
-  2. Stockage du token directement dans localStorage AVANT d'appeler le contexte auth
-  3. Ajout d'un état `loginSuccess` pour forcer le re-render vers le dashboard
-  4. Modifié `AdminDashboardPage.jsx`:
-     - `getHeaders()` lit le token depuis le contexte OU localStorage comme fallback
-     - Le logout sur erreur 401 ne se déclenche que si aucun token n'existe dans localStorage
-- **Files Modified**:
-  - `/app/frontend/src/pages/AdminPage.jsx`
-  - `/app/frontend/src/pages/AdminDashboardPage.jsx`
-
-### BulkClix Payment Integration (March 3, 2026)
-- **New Feature**: Real MoMo payment integration via BulkClix API
-- **Implemented**:
-  1. **MoMo Collection** (`/api/sdm/user/vip-cards/purchase`): Initiates payment collection from customer
-  2. **Payment Webhook** (`/api/sdm/payments/webhook/vip-card`): Receives payment confirmation and activates membership
-  3. **Payment Status Check** (`/api/sdm/user/vip-cards/payment-status/{transaction_id}`): Check payment/membership status
-  4. **MoMo Transfer** (`/api/admin/withdrawals/{id}/send-momo`): Admin can send withdrawals via MoMo
-  5. **KYC Verification** (`/api/sdm/merchant/verify-momo`): Verify MoMo account name before settlement config
-  6. **Merchant Settlement Config** (`/api/sdm/merchant/settlement`): Configure settlement with KYC verification
-- **Test Mode**: Disabled - Real payments working with whitelisted IP
-- **Files Created**:
-  - `/app/backend/services/bulkclix_payment.py`: Payment service with collection, transfer, and KYC
-- **Files Modified**:
-  - `/app/backend/server.py`: Added payment endpoints and webhook
-  - `/app/backend/services/__init__.py`: Export new payment service
-
-### Customer-to-Merchant Payment Flow (March 3, 2026)
-- **Critical Fix**: Implemented correct payment flow where customer pays FIRST
-- **Flow**:
-  1. Customer scans merchant QR → System collects from customer's MoMo
-  2. Customer approves payment on phone
-  3. Webhook confirms → Merchant receives funds instantly
-  4. SDM receives commission
-  5. Customer receives cashback
-- **New Endpoints**:
-  - `POST /api/sdm/merchant/transaction`: Initiates MoMo collection from customer
-  - `POST /api/sdm/payments/webhook/transaction`: Processes payment confirmation
-  - `GET /api/sdm/merchant/transaction/{id}/status`: Check transaction status
-- **Tested**: Real payment of 15 GHS completed in ~8 seconds
-
-### Admin Transaction History Panel (March 3, 2026)
-- **New Feature**: Full transaction history for Super Admin
-- **Components**:
-  - `/app/frontend/src/components/admin/TransactionHistoryPanel.jsx`: New panel
-  - Added "Transactions" tab in Admin Dashboard sidebar
-- **Endpoints**:
-  - `GET /api/sdm/admin/transactions`: Get all transactions with filters
-  - `GET /api/sdm/admin/transactions/stats`: Get transaction statistics
-
-### Merchant Settlement Configuration UI (March 3, 2026)
-- **New Feature**: Settlement configuration in merchant Settings
-- **Includes**:
-  - Settlement mode selection (Instant / Daily)
-  - Settlement type (MoMo / Bank)
-  - MoMo configuration with KYC verification
-  - Bank account configuration
-- **Backend**: KYC verification via BulkClix when saving MoMo number
+### MongoDB Indexes
+- clients: phone (unique), email (unique, sparse), username (unique), referral_code (unique)
+- merchants: phone (unique), email (unique, sparse), payment_qr_code (unique)
+- transactions: client_id, merchant_id, created_at, type
 
 ---
 
 *Last Updated: March 4, 2026*
-*BulkClix Payment Integration: FULLY WORKING - Real payments enabled*
-*Customer Payment Flow: Customer pays first, then merchant receives*
-*Admin Transaction History: Complete visibility for Super Admin*
-*Merchant Settlement Config: MoMo/Bank with KYC verification*
-*VIP Card System: COMPLETE - Services require active VIP membership*
-
----
-
-## VIP CARD SYSTEM (NEW - March 4, 2026)
-
-### Overview
-Le système de carte VIP est maintenant entièrement implémenté. Les nouveaux utilisateurs sont **inactifs (Bronze)** et ne peuvent accéder à aucun service tant qu'ils n'ont pas acheté une carte VIP.
-
-### Flux d'Activation
-1. **Inscription**: Utilisateur crée un compte → statut `membership_status: pending`
-2. **Services Bloqués**: Tous les services (Airtime, Data, Bill Pay, Withdraw) sont inaccessibles
-3. **Achat VIP**: Utilisateur va dans Services → SDM VIP CARD → Choisit une carte
-4. **Paiement MoMo**: Prompt MoMo envoyé pour le paiement
-5. **Activation**: Après confirmation webhook:
-   - `membership_status: active`
-   - `vip_tier: SILVER/GOLD/PLATINUM`
-   - Bonus parrain crédité (3 GHS) si parrain existe
-   - Bonus filleul crédité (1 GHS)
-   - Revenu SDM enregistré
-
-### Cartes VIP Disponibles
-| Carte | Prix | Bonus Parrain | Bonus Filleul |
-|-------|------|---------------|---------------|
-| Bronze (Inactif) | Gratuit | - | - |
-| Silver | GHS 25 | GHS 3 | GHS 1 |
-| Gold | GHS 50 | GHS 3 | GHS 1 |
-| Platinum | GHS 95 | GHS 3 | GHS 1 |
-
-### Protection des Services (Backend)
-- Les 4 endpoints de services utilisent `get_active_vip_user`
-- Retourne erreur 403 si `membership_status != 'active'` ou pas de `vip_tier`
-- Message: "Vous devez acheter une carte VIP pour accéder à ce service"
-
-### Interface Client (Frontend)
-- **Bannière "Compte Inactif"** (orange) pour les utilisateurs sans VIP
-- **Services verrouillés** avec icônes de cadenas et opacité réduite
-- **Bouton VIP** mis en évidence avec badge "REQUIS" et animation
-- **Toast d'erreur** si clic sur service bloqué
-
-### Interface Admin (Fintech Ledger → Card Sales)
-- **Dashboard de ventes**:
-  - Total Balance (revenus plateforme)
-  - Total Cards Sold
-  - Today's Revenue
-  - This Month Revenue
-- **Statistiques par période**: Today, This Week, This Month
-- **Ventes par tier**: Bronze, Silver, Gold, Platinum
-- **Liste des ventes récentes**: User, Card, Revenue, Date
-
-### API Endpoints
-- `GET /api/sdm/user/sdm-vip-cards`: Liste des cartes disponibles
-- `POST /api/sdm/user/sdm-vip-cards/buy`: Initie l'achat d'une carte VIP via MoMo
-- `GET /api/sdm/user/vip-cards/payment-status/{transaction_id}`: Vérifie le statut du paiement
-- `POST /api/sdm/payments/webhook/vip_card`: Webhook de confirmation de paiement VIP
-- `GET /api/sdm/admin/platform/card-sales`: Dashboard des ventes de cartes (admin)
-
-### Collections MongoDB
-- **sdm_users**: `membership_status`, `vip_tier` ajoutés
-- **sdm_card_sales**: Historique des ventes de cartes
-- **sdm_platform_revenue**: Revenus de la plateforme (commissions + ventes)
-- **vip_memberships**: Adhésions VIP actives
-- **kyc_documents**: Documents KYC soumis par les utilisateurs
-
----
-
-## KYC SYSTEM (NEW - March 4, 2026)
-
-### Overview
-Système de vérification KYC complet avec approbation manuelle par admin.
-
-### Niveaux KYC
-| Level | Statut | Daily Limit | Monthly Limit | Withdrawal |
-|-------|--------|-------------|---------------|------------|
-| 0 | Non vérifié | GHS 100 | GHS 500 | GHS 50 |
-| 1 | Téléphone vérifié | GHS 500 | GHS 2,500 | GHS 200 |
-| 2 | Documents soumis | GHS 2,000 | GHS 10,000 | GHS 1,000 |
-| 3 | Entièrement vérifié | GHS 10,000 | GHS 50,000 | GHS 5,000 |
-
-### Documents acceptés
-- Ghana Card
-- Voter ID
-- Passport
-- Driver's License
-
-### Flux de vérification
-1. L'utilisateur remplit le formulaire (type de document, numéro, nom complet)
-2. Upload des images (document front, back si applicable, selfie)
-3. Soumission → `kyc_status: pending`, `kyc_level: 2`
-4. Admin review dans Fintech Ledger → KYC tab
-5. Approbation → `kyc_status: approved`, `kyc_level: 3` + SMS de confirmation
-6. Rejet → `kyc_status: rejected`, `kyc_level: 1` + SMS avec raison
-
-### API Endpoints
-- `GET /api/sdm/user/kyc/status`: Statut KYC et limites
-- `POST /api/sdm/user/kyc/submit`: Soumettre les infos KYC
-- `POST /api/sdm/user/kyc/upload/{kyc_id}`: Upload des documents
-- `GET /api/sdm/admin/kyc/all`: Liste toutes les soumissions (admin)
-- `POST /api/sdm/admin/kyc/{id}/approve`: Approuver (admin)
-- `POST /api/sdm/admin/kyc/{id}/reject`: Rejeter avec raison (admin)
-
----
-
-## CONTACT SYNC SYSTEM (NEW - March 4, 2026)
-
-### Overview
-Synchronisation des contacts pour trouver les amis sur SDM et paiements rapides.
-
-### Fonctionnalités
-- Sync des numéros de téléphone (numéros uniquement pour la confidentialité)
-- Identification des contacts qui sont sur SDM
-- Paiement rapide à un contact SDM via bouton "Pay"
-- Invitation des contacts non-inscrits via SMS avec code parrainage
-
-### API Endpoints
-- `POST /api/sdm/user/contacts/sync`: Synchroniser les numéros
-- `GET /api/sdm/user/contacts`: Récupérer les contacts SDM synchronisés
-- `POST /api/sdm/user/contacts/invite`: Envoyer une invitation SMS
+*Version: 2.0.0 (Architecture Rebuild)*
+*Status: ✅ MVP Complete - All auth flows, dashboards functional*
