@@ -8600,6 +8600,9 @@ async def buy_sdm_vip_card(request: BuySDMVIPCardRequest, user: dict = Depends(g
     payer_phone = payer_phone.replace("+233", "0").replace(" ", "")
     payer_network = request.payer_network or detect_network_from_phone(payer_phone)
     
+    # Check if this is user's first purchase (no previous active membership)
+    is_first_purchase = user.get("membership_status") != "active"
+    
     now = datetime.now(timezone.utc)
     transaction_id = f"VIPCARD_{uuid.uuid4().hex[:10].upper()}"
     
@@ -8614,12 +8617,16 @@ async def buy_sdm_vip_card(request: BuySDMVIPCardRequest, user: dict = Depends(g
         "transaction_id": transaction_id,
         "status": "pending_payment",
         "is_upgrade": is_upgrade,
+        "is_first_purchase": is_first_purchase,
         "referrer_id": user.get("referred_by"),
         "referrer_bonus_paid": False,
         "created_at": now.isoformat(),
         "expires_at": (now + timedelta(days=card["validity_days"])).isoformat()
     }
-    await db.vip_memberships.insert_one(membership)
+    
+    # Insert membership into database
+    insert_result = await db.vip_memberships.insert_one(membership)
+    logging.info(f"VIP Membership created: {membership['id']} - insert_id: {insert_result.inserted_id}")
     
     # Initiate MoMo payment
     callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/vip-card"
@@ -8837,14 +8844,25 @@ async def vip_card_payment_webhook(request: Request):
             logging.warning("VIP Card webhook: Missing transaction_id")
             return {"success": False, "error": "Missing transaction_id"}
         
-        # Find pending membership by transaction ID
+        # Find pending membership by transaction ID OR payment_reference
         membership = await db.vip_memberships.find_one(
-            {"transaction_id": transaction_id},
+            {"$or": [
+                {"transaction_id": transaction_id},
+                {"payment_reference": transaction_id}
+            ]},
             {"_id": 0}
         )
         
         if not membership:
             logging.warning(f"VIP Card webhook: Membership not found for transaction: {transaction_id}")
+            # Store the webhook for later debugging
+            await db.webhook_logs.insert_one({
+                "type": "vip_card_payment",
+                "transaction_id": transaction_id,
+                "data": data,
+                "status": "membership_not_found",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
             return {"success": False, "error": "Membership not found"}
         
         # Update with webhook data
@@ -8878,6 +8896,8 @@ async def vip_card_payment_webhook(request: Request):
         
     except Exception as e:
         logging.error(f"VIP Card Payment webhook error: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
 async def process_vip_card_payment_success(membership: dict):
@@ -8937,9 +8957,8 @@ async def process_vip_card_payment_success(membership: dict):
     if not wallet:
         wallet = await ledger_service.create_wallet(EntityType.CLIENT, user_id)
     
-    # Award referral bonuses if first purchase and user was referred
-    if is_first_purchase and user.get("referred_by"):
-        # Award welcome bonus to new user (1 GHS)
+    # Award welcome bonus for first purchase (1 GHS) - regardless of referral
+    if is_first_purchase:
         await db.sdm_users.update_one(
             {"id": user_id},
             {"$inc": {
@@ -8953,7 +8972,24 @@ async def process_vip_card_payment_success(membership: dict):
                 {"$inc": {"available_balance": REFERRAL_WELCOME_BONUS, "balance": REFERRAL_WELCOME_BONUS}}
             )
         
-        # Record welcome bonus
+        # Record welcome bonus transaction
+        welcome_txn = {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "type": "welcome_bonus",
+            "description": "Welcome bonus for VIP card purchase",
+            "amount": REFERRAL_WELCOME_BONUS,
+            "net_cashback": REFERRAL_WELCOME_BONUS,
+            "status": "completed",
+            "created_at": now
+        }
+        await db.sdm_transactions.insert_one(welcome_txn)
+        
+        logging.info(f"Welcome bonus of {REFERRAL_WELCOME_BONUS} GHS credited to user {user_id}")
+    
+    # Award referrer bonus if user was referred (3 GHS to the referrer)
+    if is_first_purchase and user.get("referred_by"):
+        # Record welcome bonus in referral_bonuses collection
         welcome_bonus_record = ReferralBonus(
             referrer_id=user["referred_by"],
             referred_id=user_id,
@@ -9003,12 +9039,14 @@ async def process_vip_card_payment_success(membership: dict):
     # Calculate SDM Platform revenue (card price minus bonuses)
     card_price = membership["price_paid"]
     bonuses_paid = 0
-    if is_first_purchase and user.get("referred_by"):
-        bonuses_paid = REFERRAL_BONUS + REFERRAL_WELCOME_BONUS  # 3 + 1 = 4 GHS
+    if is_first_purchase:
+        bonuses_paid = REFERRAL_WELCOME_BONUS  # 1 GHS welcome bonus
+        if user.get("referred_by"):
+            bonuses_paid += REFERRAL_BONUS  # 3 + 1 = 4 GHS if referred
     
     sdm_revenue = card_price - bonuses_paid
     
-    # Record card sale in sdm_card_sales collection
+    # Record card sale in sdm_card_sales collection (for admin dashboard tracking)
     card_sale_record = {
         "id": str(uuid.uuid4()),
         "membership_id": membership["id"],
@@ -9029,6 +9067,24 @@ async def process_vip_card_payment_success(membership: dict):
     }
     await db.sdm_card_sales.insert_one(card_sale_record)
     
+    # Also create entry in membership_cards for admin dashboard compatibility
+    membership_card_record = {
+        "id": str(uuid.uuid4()),
+        "card_number": f"SDM_{uuid.uuid4().hex[:8].upper()}",
+        "user_id": user_id,
+        "user_phone": user.get("phone"),
+        "user_name": user.get("name") or user.get("full_name"),
+        "card_type": membership["tier"].upper(),
+        "card_name": membership.get("card_name"),
+        "price": card_price,
+        "status": "active",
+        "purchased_at": now,
+        "expires_at": membership.get("expires_at"),
+        "transaction_id": membership.get("transaction_id"),
+        "vip_membership_id": membership["id"]
+    }
+    await db.membership_cards.insert_one(membership_card_record)
+    
     # Update SDM Platform balance
     await db.sdm_platform_account.update_one(
         {"account_type": "card_sales"},
@@ -9041,6 +9097,21 @@ async def process_vip_card_payment_success(membership: dict):
     
     logging.info(f"VIP Card sale recorded: {card_sale_record['id']} - Revenue: {sdm_revenue} GHS")
     logging.info(f"VIP Card membership activated: {membership['id']} for user {user_id}")
+    
+    # ============== SEND SMS CONFIRMATION ==============
+    try:
+        user_phone = user.get("phone", "").replace("+233", "0")
+        card_name = membership.get("card_name", membership.get("tier", "VIP"))
+        welcome_msg = ""
+        if is_first_purchase and user.get("referred_by"):
+            welcome_msg = f" Welcome bonus: GHS {REFERRAL_WELCOME_BONUS} credited!"
+        
+        sms_message = f"SDM: Your {card_name} card is now ACTIVE! All services unlocked.{welcome_msg} Thank you for joining SDM Rewards!"
+        
+        await send_sms_bulkclix(user_phone, sms_message)
+        logging.info(f"VIP activation SMS sent to {user_phone}")
+    except Exception as sms_error:
+        logging.error(f"Failed to send VIP activation SMS: {sms_error}")
 
 # ============== CHECK VIP PAYMENT STATUS ==============
 
@@ -9048,22 +9119,42 @@ async def process_vip_card_payment_success(membership: dict):
 async def check_vip_payment_status(transaction_id: str, user: dict = Depends(get_current_user)):
     """Check the status of a VIP card payment"""
     membership = await db.vip_memberships.find_one(
-        {"payment_reference": transaction_id, "user_id": user["id"]},
+        {"$or": [
+            {"payment_reference": transaction_id, "user_id": user["id"]},
+            {"transaction_id": transaction_id, "user_id": user["id"]}
+        ]},
         {"_id": 0}
     )
     
     if not membership:
         raise HTTPException(status_code=404, detail="Payment not found")
     
+    # Also check for referral and welcome bonuses
+    referral_bonus = 0
+    welcome_bonus = 0
+    
+    if membership.get("status") == "active":
+        # Get bonuses for this user
+        bonuses = await db.referral_bonuses.find({
+            "referred_id": user["id"],
+            "bonus_type": {"$in": ["welcome_bonus", "referrer_bonus"]}
+        }, {"_id": 0}).to_list(10)
+        
+        for bonus in bonuses:
+            if bonus.get("bonus_type") == "welcome_bonus":
+                welcome_bonus = bonus.get("amount", 0)
+    
     return {
         "transaction_id": transaction_id,
-        "status": membership.get("payment_status", "pending"),
-        "membership_status": membership.get("status"),
+        "status": membership.get("status"),
+        "payment_status": membership.get("payment_status", "pending"),
         "card_name": membership.get("card_name"),
         "price_paid": membership.get("price_paid"),
         "is_active": membership.get("status") == "active",
         "created_at": membership.get("created_at"),
-        "activated_at": membership.get("activated_at")
+        "activated_at": membership.get("activated_at"),
+        "referral_bonus": referral_bonus,
+        "welcome_bonus": welcome_bonus
     }
 
 # ==================== REFERRAL HISTORY ENDPOINTS ====================

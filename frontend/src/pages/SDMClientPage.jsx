@@ -74,6 +74,9 @@ export default function SDMClientPage() {
   const [pendingPayments, setPendingPayments] = useState([]);
   const [showPendingPayments, setShowPendingPayments] = useState(false);
   
+  // VIP Payment Progress state
+  const [vipPaymentProgress, setVipPaymentProgress] = useState(null); // {show, status, cardName, price, elapsed, transactionId}
+  
   // QR Scanner state for client-initiated payments
   const [showScanner, setShowScanner] = useState(false);
   const [scannedMerchant, setScannedMerchant] = useState(null);
@@ -589,28 +592,50 @@ export default function SDMClientPage() {
         card_tier: cardTier
       }, { headers });
       
+      const cardInfo = vipCards.find(c => c.tier?.toLowerCase() === cardTier);
+      const cardName = cardInfo?.name || `VIP ${cardTier.charAt(0).toUpperCase() + cardTier.slice(1)}`;
+      const price = cardInfo?.price || 0;
+      
+      // Show payment progress modal
+      setVipPaymentProgress({
+        show: true,
+        status: 'waiting', // waiting, success, failed
+        cardName,
+        price,
+        elapsed: 0,
+        transactionId: response.data.transaction_id,
+        message: 'Waiting for MoMo payment approval...'
+      });
+      
       toast.success(response.data.message || 'Payment prompt sent!');
-      toast.info('Approve the payment on your MoMo phone to activate your card.');
       
       // Store transaction ID for status polling
       setVipPurchaseTxnId(response.data.transaction_id);
       
-      // Start polling for payment status
-      pollVipPaymentStatus(response.data.transaction_id);
+      // Start polling for payment status with progress updates
+      pollVipPaymentStatusWithProgress(response.data.transaction_id);
       
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Purchase failed');
+      setVipPaymentProgress(null);
     } finally {
       setIsServiceLoading(false);
     }
   };
 
-  // Poll VIP payment status
+  // Poll VIP payment status with visual progress
   const [vipPurchaseTxnId, setVipPurchaseTxnId] = useState(null);
   
-  const pollVipPaymentStatus = async (transactionId) => {
+  const pollVipPaymentStatusWithProgress = async (transactionId) => {
     let attempts = 0;
     const maxAttempts = 60; // 5 minutes max
+    let elapsedSeconds = 0;
+    
+    // Update elapsed time every second
+    const timerInterval = setInterval(() => {
+      elapsedSeconds++;
+      setVipPaymentProgress(prev => prev ? { ...prev, elapsed: elapsedSeconds } : null);
+    }, 1000);
     
     const checkStatus = async () => {
       try {
@@ -621,21 +646,40 @@ export default function SDMClientPage() {
         );
         
         if (response.data.status === 'active') {
+          clearInterval(timerInterval);
+          setVipPaymentProgress(prev => prev ? { 
+            ...prev, 
+            status: 'success',
+            message: 'Payment successful! Your card is now active.'
+          } : null);
+          
           toast.success('🎉 VIP Card activated successfully!');
-          if (response.data.referral_bonus > 0) {
-            toast.success(`Referral bonus: +GHS ${response.data.referral_bonus}`);
-          }
           if (response.data.welcome_bonus > 0) {
             toast.success(`Welcome bonus: +GHS ${response.data.welcome_bonus}`);
           }
-          setVipPurchaseTxnId(null);
-          setActiveService(null);
-          fetchUserData();
-          fetchServiceData();
+          
+          // Auto-close after 3 seconds
+          setTimeout(() => {
+            setVipPaymentProgress(null);
+            setVipPurchaseTxnId(null);
+            setActiveService(null);
+            fetchUserData();
+            fetchServiceData();
+          }, 3000);
           return;
-        } else if (response.data.status === 'payment_failed') {
+        } else if (response.data.status === 'payment_failed' || response.data.payment_status === 'failed') {
+          clearInterval(timerInterval);
+          setVipPaymentProgress(prev => prev ? { 
+            ...prev, 
+            status: 'failed',
+            message: 'Payment failed. Please try again.'
+          } : null);
+          
           toast.error('Payment failed. Please try again.');
-          setVipPurchaseTxnId(null);
+          setTimeout(() => {
+            setVipPaymentProgress(null);
+            setVipPurchaseTxnId(null);
+          }, 3000);
           return;
         }
         
@@ -643,11 +687,25 @@ export default function SDMClientPage() {
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 5000); // Check every 5 seconds
         } else {
+          clearInterval(timerInterval);
+          setVipPaymentProgress(prev => prev ? { 
+            ...prev, 
+            status: 'timeout',
+            message: 'Payment check timed out. Please check your account.'
+          } : null);
           toast.info('Status check expired. Reload the page to see your card.');
-          setVipPurchaseTxnId(null);
+          setTimeout(() => {
+            setVipPaymentProgress(null);
+            setVipPurchaseTxnId(null);
+          }, 3000);
         }
       } catch (error) {
         console.error('Status check error:', error);
+        // Continue polling even on error
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 5000);
+        }
       }
     };
     
@@ -1244,14 +1302,14 @@ export default function SDMClientPage() {
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm opacity-80">{t('sdm_my_cashback')}</p>
               {/* Show VIP tier if member, otherwise show referral level */}
-              {myVipMembership?.tier ? (
+              {(myVipMembership?.tier || user?.vip_tier) ? (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full border ${
-                  myVipMembership.tier === 'PLATINUM' ? 'bg-gradient-to-r from-slate-700 to-slate-500 text-white border-slate-400' :
-                  myVipMembership.tier === 'GOLD' ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-amber-900 border-amber-300' :
+                  (myVipMembership?.tier || user?.vip_tier)?.toUpperCase() === 'PLATINUM' ? 'bg-gradient-to-r from-slate-700 to-slate-500 text-white border-slate-400' :
+                  (myVipMembership?.tier || user?.vip_tier)?.toUpperCase() === 'GOLD' ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-amber-900 border-amber-300' :
                   'bg-gradient-to-r from-slate-300 to-slate-200 text-slate-700 border-slate-400'
                 }`}>
                   <Crown size={12} className="inline mr-1" />
-                  VIP {myVipMembership.tier}
+                  VIP {(myVipMembership?.tier || user?.vip_tier)?.toUpperCase()}
                 </span>
               ) : user?.referral_level && (
                 <span className={`px-2 py-1 text-xs font-medium rounded-full border capitalize ${getReferralLevelColor(user.referral_level)}`}>
@@ -1646,7 +1704,7 @@ export default function SDMClientPage() {
                           <p className="font-bold">{hasActiveVip ? 'SDM VIP Card' : 'Activate My Account'}</p>
                           <p className="text-sm opacity-80">
                             {hasActiveVip 
-                              ? (myVipMembership ? `Upgrade vers ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold ou Platinum')
+                              ? (myVipMembership ? `Upgrade to ${myVipMembership.tier?.toUpperCase() === 'SILVER' ? 'Gold' : myVipMembership.tier?.toUpperCase() === 'GOLD' ? 'Platinum' : 'Max Level'}` : 'Silver, Gold or Platinum')
                               : 'Purchase a card to unlock services'
                             }
                           </p>
@@ -2433,7 +2491,7 @@ export default function SDMClientPage() {
                   <div>
                     <h3 className="font-bold text-slate-900">VIP Lottery</h3>
                     <p className="text-sm text-slate-500">
-                      Your chances: x{myVipMembership?.tier === 'PLATINUM' ? 3 : myVipMembership?.tier === 'GOLD' ? 2 : 1}
+                      Your chances: x{myVipMembership?.tier?.toUpperCase() === 'PLATINUM' ? 3 : myVipMembership?.tier?.toUpperCase() === 'GOLD' ? 2 : 1}
                     </p>
                   </div>
                 </div>
@@ -3344,6 +3402,101 @@ export default function SDMClientPage() {
                 <DollarSign size={20} className="mr-2" />
                 Pay at this merchant
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIP Payment Progress Modal */}
+      {vipPaymentProgress?.show && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-testid="vip-payment-progress-modal">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="text-center">
+              {/* Status Icon */}
+              <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                vipPaymentProgress.status === 'success' 
+                  ? 'bg-emerald-100' 
+                  : vipPaymentProgress.status === 'failed' 
+                    ? 'bg-red-100'
+                    : 'bg-amber-100'
+              }`}>
+                {vipPaymentProgress.status === 'success' ? (
+                  <CheckCircle className="text-emerald-600" size={40} />
+                ) : vipPaymentProgress.status === 'failed' ? (
+                  <X className="text-red-600" size={40} />
+                ) : (
+                  <div className="relative">
+                    <Smartphone className="text-amber-600" size={36} />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full animate-ping"></div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Card Info */}
+              <h3 className="text-xl font-bold text-slate-900 mb-1">
+                {vipPaymentProgress.cardName}
+              </h3>
+              <p className="text-2xl font-bold text-emerald-600 mb-4">
+                GHS {vipPaymentProgress.price}
+              </p>
+              
+              {/* Status Message */}
+              <p className={`text-sm mb-4 ${
+                vipPaymentProgress.status === 'success' 
+                  ? 'text-emerald-600' 
+                  : vipPaymentProgress.status === 'failed'
+                    ? 'text-red-600'
+                    : 'text-slate-600'
+              }`}>
+                {vipPaymentProgress.message}
+              </p>
+              
+              {/* Progress Bar (only when waiting) */}
+              {vipPaymentProgress.status === 'waiting' && (
+                <>
+                  <div className="w-full bg-slate-200 rounded-full h-2 mb-2">
+                    <div 
+                      className="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-1000 animate-pulse"
+                      style={{ width: `${Math.min((vipPaymentProgress.elapsed / 300) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                  
+                  {/* Timer */}
+                  <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
+                    <Clock size={14} />
+                    <span>
+                      {Math.floor(vipPaymentProgress.elapsed / 60)}:{String(vipPaymentProgress.elapsed % 60).padStart(2, '0')} / 5:00
+                    </span>
+                  </div>
+                  
+                  {/* Instructions */}
+                  <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <p className="text-xs text-amber-800">
+                      📱 Check your phone for the MoMo payment prompt and approve it to activate your card.
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              {/* Success Animation */}
+              {vipPaymentProgress.status === 'success' && (
+                <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <p className="text-sm text-emerald-800">
+                    🎉 Welcome to SDM VIP! All services are now unlocked.
+                  </p>
+                </div>
+              )}
+              
+              {/* Close button for failed/timeout */}
+              {(vipPaymentProgress.status === 'failed' || vipPaymentProgress.status === 'timeout') && (
+                <Button
+                  onClick={() => setVipPaymentProgress(null)}
+                  variant="outline"
+                  className="mt-4"
+                >
+                  Close
+                </Button>
+              )}
             </div>
           </div>
         </div>

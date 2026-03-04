@@ -7,27 +7,47 @@
 
 ---
 
-## CHANGELOG - March 4, 2026
+## CHANGELOG - March 4, 2026 (Session 2)
 
-### Bug Fix: VIP Card Purchase Button Not Working
-**Issue**: The "Buy" button for VIP cards was showing "Not available" for all cards, preventing users from purchasing VIP memberships.
+### Major Fix: Complete VIP Card Purchase System Rebuild
 
-**Root Cause**: Data mismatch between two different VIP card data sources:
-1. Frontend was fetching from `/api/sdm/user/vip-cards` (database-based cards with UUID IDs and `tier` field)
-2. But the rendering logic was using `card.id` (expecting "silver", "gold", "platinum") instead of `card.tier.toLowerCase()`
+**Issues Fixed:**
+1. VIP cards showing "Not available" - Fixed by using `card.tier` instead of `card.id`
+2. Webhook not finding membership - Fixed by searching both `transaction_id` AND `payment_reference`
+3. User badge showing "Bronze" instead of VIP tier - Fixed by adding fallback to `user.vip_tier`
+4. Admin dashboard not showing card sales - Fixed by creating entries in `membership_cards` collection
+5. Welcome bonus not credited - Fixed by crediting bonus for ALL first purchases (not just referred users)
 
-**Fix Applied** (SDMClientPage.jsx):
-- Changed `tierOrder[card.id]` to `tierOrder[card.tier?.toLowerCase()]`
-- Changed filter from `card.id !== 'bronze'` to `card.tier?.toLowerCase() !== 'bronze'`
-- Changed button onClick from `handlePurchaseVIP(card.id)` to `handlePurchaseVIP(card.tier?.toLowerCase())`
-- Changed `card.color` to `card.badge_color` for styling
-- Changed `card.benefits` to `card.benefits_list` for benefits display
+**New Features Added:**
+1. **Payment Progress Modal**: Visual indicator during MoMo payment with timer and instructions
+2. **SMS Confirmation**: Automatic SMS sent to user after VIP card activation
+3. **Webhook Logging**: Store unmatched webhooks in `webhook_logs` for debugging
 
-**Additional Fix**: Backend `get_user_wallet` endpoint was throwing `KeyError: 'total_withdrawn'` - fixed by using `.get()` with default values.
+**Backend Changes (server.py):**
+- Unified webhook search to check both `transaction_id` and `payment_reference`
+- Added `is_first_purchase` field to membership creation
+- Added entry creation in `membership_cards` for admin dashboard compatibility
+- Added welcome bonus credit to `sdm_transactions` for user history visibility
 
-**Status**: ✅ VERIFIED - VIP card purchase flow now working correctly with MoMo payment prompt
+**Frontend Changes (SDMClientPage.jsx):**
+- Added `vipPaymentProgress` state for payment modal
+- Added timer and progress bar during payment wait
+- Fixed VIP badge to use `user.vip_tier` as fallback
+- Normalized tier display to uppercase
+
+**Status**: ✅ VERIFIED - Complete VIP purchase flow working:
+- Buy button visible and clickable
+- MoMo payment prompt sent
+- Payment progress modal shown
+- Webhook processed correctly
+- User VIP tier updated
+- Welcome bonus credited
+- SMS confirmation sent
+- Admin dashboard shows sales
 
 ---
+
+## CHANGELOG - March 4, 2026 (Session 1)
 
 ## REFERRAL SYSTEM (Updated March 3, 2026)
 
