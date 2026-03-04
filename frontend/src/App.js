@@ -19,6 +19,9 @@ import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import MerchantTermsPage from "./pages/MerchantTermsPage";
 import FAQPage from "./pages/FAQPage";
+import ReferralTermsPage from "./pages/ReferralTermsPage";
+import CashbackRulesPage from "./pages/CashbackRulesPage";
+import AbusePolicyPage from "./pages/AbusePolicyPage";
 
 // Generate admin paths with date-based security (format: DDMMYY)
 const getAdminPaths = () => {
@@ -78,6 +81,9 @@ function App() {
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/merchant-terms" element={<MerchantTermsPage />} />
             <Route path="/faq" element={<FAQPage />} />
+            <Route path="/referral-terms" element={<ReferralTermsPage />} />
+            <Route path="/cashback-rules" element={<CashbackRulesPage />} />
+            <Route path="/abuse-policy" element={<AbusePolicyPage />} />
             
             {/* Admin Routes - ONLY valid date paths (format: DDMMYY) */}
             {adminPaths.map(path => (

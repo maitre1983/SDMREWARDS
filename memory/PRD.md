@@ -14,6 +14,9 @@
 - `/privacy` - Privacy Policy (data protection, user rights)
 - `/merchant-terms` - Merchant Agreement + Anti-Fraud Policy
 - `/faq` - FAQ Page (7 categories, 25+ questions, EN/FR)
+- `/referral-terms` - Referral Program Legal Terms (13 sections)
+- `/cashback-rules` - Cashback Program Legal Rules (13 sections)
+- `/abuse-policy` - Platform Abuse & User Conduct Policy (15 sections)
 
 **Key Legal Disclaimers Added:**
 - "SDM REWARDS is NOT a bank, financial institution, or investment company"
@@ -25,10 +28,15 @@
 - Client: "By creating an account, you agree to Terms of Service and Privacy Policy"
 - Merchant: "By registering, you agree to Merchant Terms and Privacy Policy"
 
-**Footer Updates:**
-- Legal section with all policy links
-- Legal disclaimer banner
-- Contact Support link
+**Footer Legal Links (Complete):**
+- Terms of Service
+- Privacy Policy
+- Merchant Terms
+- Referral Program Terms
+- Cashback Rules
+- Abuse Policy
+- FAQ
+- Contact Support
 
 **Compliance with Ghana regulations:**
 - Clear distinction from banking/financial services
