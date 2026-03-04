@@ -43,7 +43,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
       setCommissions(res.data);
     } catch (error) {
       console.error('Error fetching commissions:', error);
-      toast.error('Erreur de chargement des commissions');
+      toast.error('Failed to load commissions');
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +73,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
       setCommissionRate(rate);
       setShowRateForm(false);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur de mise à jour');
+      toast.error(error.response?.data?.detail || 'Update failed');
     } finally {
       setIsUpdatingRate(false);
     }
@@ -103,7 +103,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
       setWithdrawForm({ amount: '', momo_number: '', momo_provider: 'MTN', account_name: '' });
       fetchCommissions();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur de retrait');
+      toast.error(error.response?.data?.detail || 'Withdrawal failed');
     } finally {
       setIsWithdrawing(false);
     }
@@ -163,7 +163,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
         </div>
         <Button onClick={fetchCommissions} variant="outline" className="gap-2">
           <RefreshCw size={16} />
-          Actualiser
+          Refresh
         </Button>
       </div>
 
@@ -384,7 +384,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
             ))}
           </div>
         ) : (
-          <p className="text-slate-500 text-center py-4">Aucune commission enregistrée</p>
+          <p className="text-slate-500 text-center py-4">No commissions recorded</p>
         )}
       </div>
     </div>

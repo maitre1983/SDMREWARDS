@@ -191,7 +191,7 @@ export default function SDMClientPage() {
         toast.success(`Marchand trouvé: ${response.data.business_name}`);
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'QR Code invalide ou marchand non trouvé');
+      toast.error(error.response?.data?.detail || 'Invalid QR Code or merchant not found');
       setPaymentStep('scan');
       setScannedMerchant(null);
     } finally {
@@ -1079,11 +1079,8 @@ export default function SDMClientPage() {
             <p className="text-4xl font-bold mb-4">
               GHS {wallet?.wallet_available?.toFixed(2) || '0.00'}
             </p>
-            <div className="flex gap-6 text-sm">
-              <div>
-                <p className="opacity-60">Pending</p>
-                <p className="font-semibold">GHS {wallet?.wallet_pending?.toFixed(2) || '0.00'}</p>
-              </div>
+            <p className="text-sm opacity-70">Available Cashback Balance</p>
+            <div className="flex gap-6 text-sm mt-2">
               <div>
                 <p className="opacity-60">Total Earned</p>
                 <p className="font-semibold">GHS {wallet?.total_earned?.toFixed(2) || '0.00'}</p>
@@ -1208,8 +1205,8 @@ export default function SDMClientPage() {
             <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-6 text-white">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="font-bold text-lg">Scanner pour Payer</h3>
-                  <p className="text-sm opacity-80">Scannez le QR code du marchand</p>
+                  <h3 className="font-bold text-lg">Scan to Pay</h3>
+                  <p className="text-sm opacity-80">Scan the merchant's QR code</p>
                 </div>
                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                   <ScanLine size={24} />
@@ -1223,7 +1220,7 @@ export default function SDMClientPage() {
                   data-testid="scan-merchant-qr-btn"
                 >
                   <Camera size={20} className="mr-2" />
-                  Scanner le QR Marchand
+                  Scan Merchant QR
                 </Button>
               )}
 
@@ -1406,9 +1403,9 @@ export default function SDMClientPage() {
                           <Lock size={20} />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-bold text-lg">Compte Inactif</h3>
+                          <h3 className="font-bold text-lg">Inactive Account</h3>
                           <p className="text-sm opacity-90 mt-1">
-                            Achetez une carte VIP SDM pour débloquer tous les services: Airtime, Data, Bill Pay, et Retraits MoMo.
+                            Purchase an SDM VIP Card to unlock all services: Airtime, Data, Bill Pay, and MoMo Withdrawals.
                           </p>
                           <Button
                             onClick={() => setActiveService('vip')}
@@ -1416,7 +1413,7 @@ export default function SDMClientPage() {
                             size="sm"
                           >
                             <Crown size={16} className="mr-2" />
-                            Acheter ma Carte VIP
+                            Get My VIP Card
                           </Button>
                         </div>
                       </div>
@@ -1455,18 +1452,18 @@ export default function SDMClientPage() {
                         )}
                         {!hasActiveVip && (
                           <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                            REQUIS
+                            REQUIRED
                           </div>
                         )}
                         <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
                           <Crown className="text-white" size={24} />
                         </div>
                         <div className="flex-1 text-left">
-                          <p className="font-bold">{hasActiveVip ? 'SDM VIP Card' : 'Activer Mon Compte'}</p>
+                          <p className="font-bold">{hasActiveVip ? 'SDM VIP Card' : 'Activate My Account'}</p>
                           <p className="text-sm opacity-80">
                             {hasActiveVip 
                               ? (myVipMembership ? `Upgrade vers ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold ou Platinum')
-                              : 'Achetez une carte pour débloquer les services'
+                              : 'Purchase a card to unlock services'
                             }
                           </p>
                         </div>
@@ -1474,12 +1471,12 @@ export default function SDMClientPage() {
                       </button>
 
                       <h3 className="font-semibold text-slate-900 mt-4">
-                        {hasActiveVip ? 'Utiliser Mon Cashback' : 'Services (VIP Requis)'}
+                        {hasActiveVip ? 'Use My Cashback' : 'Services (VIP Required)'}
                       </h3>
                       
                       {/* Airtime - Locked for non-VIP */}
                       <button
-                        onClick={() => hasActiveVip ? setActiveService('airtime') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        onClick={() => hasActiveVip ? setActiveService('airtime') : toast.error('Purchase a VIP card to access this service')}
                         className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
                           hasActiveVip 
                             ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
@@ -1509,7 +1506,7 @@ export default function SDMClientPage() {
 
                       {/* Data Bundle - Locked for non-VIP */}
                       <button
-                        onClick={() => hasActiveVip ? setActiveService('data') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        onClick={() => hasActiveVip ? setActiveService('data') : toast.error('Purchase a VIP card to access this service')}
                         className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
                           hasActiveVip 
                             ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
@@ -1539,7 +1536,7 @@ export default function SDMClientPage() {
 
                       {/* Bill Payment - Locked for non-VIP */}
                       <button
-                        onClick={() => hasActiveVip ? setActiveService('bill') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        onClick={() => hasActiveVip ? setActiveService('bill') : toast.error('Purchase a VIP card to access this service')}
                         className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
                           hasActiveVip 
                             ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
@@ -1569,7 +1566,7 @@ export default function SDMClientPage() {
 
                       {/* MoMo Withdrawal - Locked for non-VIP */}
                       <button
-                        onClick={() => hasActiveVip ? setActiveService('momo') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        onClick={() => hasActiveVip ? setActiveService('momo') : toast.error('Purchase a VIP card to access this service')}
                         className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
                           hasActiveVip 
                             ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
@@ -2793,7 +2790,7 @@ export default function SDMClientPage() {
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white h-14 text-lg font-semibold"
               >
                 <DollarSign size={20} className="mr-2" />
-                Payer chez ce marchand
+                Pay at this merchant
               </Button>
             </div>
           </div>
@@ -2805,8 +2802,8 @@ export default function SDMClientPage() {
         <QRScanner 
           onScan={handleMerchantQRScan}
           onClose={() => setShowScanner(false)}
-          scanTitle="Scanner le QR Marchand"
-          scanHint="Positionnez le QR code du marchand dans le cadre"
+          scanTitle="Scan Merchant QR"
+          scanHint="Position the merchant's QR code in the frame"
         />
       )}
     </div>

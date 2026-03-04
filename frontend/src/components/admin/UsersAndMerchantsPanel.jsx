@@ -841,7 +841,7 @@ export default function UsersAndMerchantsPanel({ token }) {
                   }}
                   data-testid="delete-merchant-btn"
                 >
-                  <Trash2 size={16} /> Supprimer le Marchand
+                  <Trash2 size={16} /> Delete Merchant
                 </Button>
                 <p className="text-xs text-slate-500 mt-2 text-center">
                   (Réservé aux Super Admins)

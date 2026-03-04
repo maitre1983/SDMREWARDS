@@ -327,7 +327,7 @@ export default function FintechDashboard({ token }) {
       });
       fetchLotteries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur');
+      toast.error(error.response?.data?.detail || 'Error');
     }
   };
 
@@ -337,7 +337,7 @@ export default function FintechDashboard({ token }) {
       toast.success(res.data.message);
       fetchLotteries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur');
+      toast.error(error.response?.data?.detail || 'Error');
     }
   };
 
@@ -348,7 +348,7 @@ export default function FintechDashboard({ token }) {
       toast.success(res.data.message);
       fetchLotteries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur');
+      toast.error(error.response?.data?.detail || 'Error');
     }
   };
 
@@ -358,7 +358,7 @@ export default function FintechDashboard({ token }) {
       toast.success('Results announced!');
       fetchLotteries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur');
+      toast.error(error.response?.data?.detail || 'Error');
     }
   };
 
@@ -369,7 +369,7 @@ export default function FintechDashboard({ token }) {
       toast.success('Draw deleted');
       fetchLotteries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur');
+      toast.error(error.response?.data?.detail || 'Error');
     }
   };
 
@@ -519,16 +519,6 @@ export default function FintechDashboard({ token }) {
       toast.error(error.response?.data?.detail || 'Failed to confirm');
     } finally {
       setProcessingId(null);
-    }
-  };
-
-  const handleProcessPending = async () => {
-    try {
-      const res = await axios.post(`${API_URL}/api/sdm/admin/fintech/process-pending`, {}, { headers });
-      toast.success(`Processed ${res.data.converted_count} pending cashbacks (GHS ${res.data.total_converted})`);
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to process pending cashback');
     }
   };
 
@@ -869,7 +859,7 @@ export default function FintechDashboard({ token }) {
               <div className="bg-slate-50 rounded-lg p-4">
                 <p className="text-xs text-slate-500">Client Wallets ({investorData.wallets.client.count})</p>
                 <p className="text-lg font-bold text-blue-600">GHS {(investorData.wallets.client.total_available || 0).toLocaleString()}</p>
-                <p className="text-xs text-amber-600">Pending: GHS {(investorData.wallets.client.total_pending || 0).toLocaleString()}</p>
+                <p className="text-xs text-emerald-600">Available Balance</p>
               </div>
               <div className="bg-slate-50 rounded-lg p-4">
                 <p className="text-xs text-slate-500">Merchant Wallets ({investorData.wallets.merchant.count})</p>
@@ -894,10 +884,6 @@ export default function FintechDashboard({ token }) {
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-slate-900">Financial Overview</h3>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleProcessPending} className="gap-2">
-                <Clock size={16} />
-                Process Pending Cashback
-              </Button>
               <Button variant="outline" size="sm" onClick={fetchData} className="gap-2">
                 <RefreshCw size={16} />
                 Refresh
@@ -925,7 +911,7 @@ export default function FintechDashboard({ token }) {
           </div>
           
           {/* Stats Grid */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <StatCard 
               icon={Users} 
               label="Client Wallets" 
@@ -941,18 +927,11 @@ export default function FintechDashboard({ token }) {
               color="emerald" 
             />
             <StatCard 
-              icon={Clock} 
-              label="Pending Cashback" 
-              value={formatCurrency(summary.client_wallets.total_pending)}
-              subValue="Awaiting clearance"
-              color="amber" 
-            />
-            <StatCard 
-              icon={AlertTriangle} 
-              label="Pending Withdrawals" 
-              value={summary.pending_withdrawals}
-              subValue="Require approval"
-              color="red" 
+              icon={TrendingUp} 
+              label="Total Cashback Given" 
+              value={formatCurrency(summary.client_wallets.total_available + (summary.client_wallets.total_pending || 0))}
+              subValue="Instant availability"
+              color="green" 
             />
           </div>
 
@@ -1194,7 +1173,7 @@ export default function FintechDashboard({ token }) {
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Promotion</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Service</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Réduction</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Jours</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Days</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Usage</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Status</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Actions</th>
@@ -2049,7 +2028,7 @@ export default function FintechDashboard({ token }) {
                 {partners.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
-                      Aucun partenaire. Ajoutez-en un!
+                      No partners. Add one!
                     </td>
                   </tr>
                 ) : (
@@ -2359,9 +2338,7 @@ export default function FintechDashboard({ token }) {
                 <tr>
                   <th className="px-4 py-3 text-left text-slate-600 font-medium">Type</th>
                   <th className="px-4 py-3 text-left text-slate-600 font-medium">Entity</th>
-                  <th className="px-4 py-3 text-right text-slate-600 font-medium">Available</th>
-                  <th className="px-4 py-3 text-right text-slate-600 font-medium">Pending</th>
-                  <th className="px-4 py-3 text-right text-slate-600 font-medium">Reserved</th>
+                  <th className="px-4 py-3 text-right text-slate-600 font-medium">Available Balance</th>
                   <th className="px-4 py-3 text-left text-slate-600 font-medium">Status</th>
                   <th className="px-4 py-3 text-left text-slate-600 font-medium">Created</th>
                 </tr>
@@ -2384,12 +2361,6 @@ export default function FintechDashboard({ token }) {
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-emerald-600">
                       {formatCurrency(w.available_balance)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-amber-600">
-                      {formatCurrency(w.pending_balance)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-500">
-                      {formatCurrency(w.reserved_balance)}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={w.status} />
@@ -2900,7 +2871,6 @@ function StatusBadge({ status }) {
 function FintechConfigPanel({ config, onSave, isSaving }) {
   const [formData, setFormData] = useState({
     sdm_commission_rate: config.sdm_commission_rate || 0.02,
-    cashback_pending_days: config.cashback_pending_days || 0,
     withdrawal_fee: config.withdrawal_fee || 1.0,
     float_low_threshold: config.float_low_threshold || 5000,
     float_critical_threshold: config.float_critical_threshold || 1000,
@@ -2920,7 +2890,6 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
     e.preventDefault();
     onSave({
       sdm_commission_rate: parseFloat(formData.sdm_commission_rate),
-      cashback_pending_days: parseInt(formData.cashback_pending_days),
       withdrawal_fee: parseFloat(formData.withdrawal_fee),
       float_low_threshold: parseFloat(formData.float_low_threshold),
       float_critical_threshold: parseFloat(formData.float_critical_threshold),
@@ -2944,10 +2913,10 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <Percent size={18} className="text-purple-600" />
-            Frais de Services SDM
+            SDM Service Fees
           </h4>
           <p className="text-sm text-slate-500 mb-4">
-            Ces frais sont prélevés sur chaque transaction et reversés à SDM.
+            These fees are deducted from each transaction and transferred to SDM.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -2964,7 +2933,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Frais achat crédit téléphone
+                Fee for airtime purchases
               </p>
             </div>
             <div>
@@ -2981,7 +2950,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Frais achat data/internet
+                Fee for data bundle purchases
               </p>
             </div>
             <div>
@@ -2998,7 +2967,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Frais paiement factures
+                Fee for bill payments
               </p>
             </div>
             <div>
@@ -3015,7 +2984,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Frais % retrait MoMo
+                Percentage fee for MoMo withdrawals
               </p>
             </div>
           </div>
@@ -3033,7 +3002,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
               className="w-32"
             />
             <p className="text-xs text-slate-500 mt-1">
-              Frais fixe additionnel pour retrait MoMo
+              Additional flat fee for MoMo withdrawals
             </p>
           </div>
         </div>
@@ -3059,7 +3028,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                Commission SDM prélevée sur le cashback (ex: 2 = 2%)
+                SDM Commission taken from cashback (e.g.: 2 = 2%)
               </p>
             </div>
             <div>
@@ -3075,23 +3044,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
                 className="w-full"
               />
               <p className="text-xs text-slate-500 mt-1">
-                (Ancien) Utilisez MoMo Withdraw Fee
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Cashback Pending Days
-              </label>
-              <Input
-                type="number"
-                min="0"
-                max="30"
-                value={formData.cashback_pending_days}
-                onChange={(e) => handleChange('cashback_pending_days', e.target.value)}
-                className="w-full"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                Jours avant disponibilité (0 = immédiat)
+                (Legacy) Use MoMo Withdraw Fee instead
               </p>
             </div>
           </div>
@@ -3142,7 +3095,7 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
           <h4 className="font-semibold text-slate-700 mb-4">Configuration Active</h4>
           
           {/* Service Fees Row */}
-          <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Frais de Services</p>
+          <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Service Fees</p>
           <div className="grid grid-cols-5 gap-4 text-sm mb-4">
             <div className="bg-white rounded-lg p-3 text-center">
               <p className="text-slate-500">Airtime</p>
@@ -3167,15 +3120,11 @@ function FintechConfigPanel({ config, onSave, isSaving }) {
           </div>
           
           {/* Other Config Row */}
-          <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Autres Paramètres</p>
-          <div className="grid grid-cols-4 gap-4 text-sm">
+          <p className="text-xs text-slate-500 mb-2 uppercase tracking-wide">Other Settings</p>
+          <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-slate-500">Commission Cashback</p>
+              <p className="text-slate-500">Cashback Commission</p>
               <p className="text-lg font-bold text-emerald-600">{(config.sdm_commission_rate * 100).toFixed(1)}%</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-slate-500">Pending Days</p>
-              <p className="text-lg font-bold text-slate-600">{config.cashback_pending_days} jours</p>
             </div>
             <div className="bg-white rounded-lg p-3 text-center">
               <p className="text-slate-500">Float Low</p>

@@ -1171,7 +1171,7 @@ async def get_active_vip_user(credentials: HTTPAuthorizationCredentials = Depend
     if not membership and not has_vip:
         raise HTTPException(
             status_code=403, 
-            detail="Vous devez acheter une carte VIP pour accéder à ce service. Allez dans Services → SDM VIP CARD"
+            detail="You must purchase a VIP card to access this service. Go to Services → SDM VIP CARD"
         )
     
     user["active_membership"] = membership
