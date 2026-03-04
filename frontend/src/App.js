@@ -7,6 +7,7 @@ import { LanguageProvider } from "./context/LanguageContext";
 import HomePage from "./pages/HomePage";
 import ClientAuthPage from "./pages/ClientAuthPage";
 import ClientDashboard from "./pages/ClientDashboard";
+import PartnersPage from "./pages/PartnersPage";
 import MerchantAuthPage from "./pages/MerchantAuthPage";
 import MerchantDashboard from "./pages/MerchantDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -58,6 +59,7 @@ function App() {
             {/* Client Routes */}
             <Route path="/client" element={<ClientAuthPage />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />
+            <Route path="/client/partners" element={<PartnersPage />} />
             
             {/* Merchant Routes */}
             <Route path="/merchant" element={<MerchantAuthPage />} />

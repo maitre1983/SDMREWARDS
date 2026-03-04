@@ -49,6 +49,82 @@ class UpdateBusinessInfoRequest(BaseModel):
     logo_url: Optional[str] = None
 
 
+# ============== PUBLIC ENDPOINTS ==============
+
+@router.get("/partners")
+async def get_partner_merchants():
+    """
+    Public endpoint to list active partner merchants
+    Used by clients to browse merchants and their cashback rates
+    """
+    merchants = await db.merchants.find(
+        {"status": "active"},
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "business_type": 1,
+            "business_address": 1,
+            "business_description": 1,
+            "cashback_rate": 1,
+            "payment_qr_code": 1,
+            "logo_url": 1
+        }
+    ).to_list(500)
+    
+    return {
+        "merchants": merchants,
+        "total": len(merchants)
+    }
+
+
+@router.get("/by-qr/{qr_code}")
+async def get_merchant_by_qr(qr_code: str):
+    """
+    Get merchant details by QR code
+    Used when client scans merchant QR
+    """
+    # Try payment QR code first
+    merchant = await db.merchants.find_one(
+        {"payment_qr_code": qr_code},
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "business_type": 1,
+            "business_address": 1,
+            "cashback_rate": 1,
+            "payment_qr_code": 1,
+            "status": 1
+        }
+    )
+    
+    # Try recruitment QR code if not found
+    if not merchant:
+        merchant = await db.merchants.find_one(
+            {"recruitment_qr_code": qr_code},
+            {
+                "_id": 0,
+                "id": 1,
+                "business_name": 1,
+                "business_type": 1,
+                "business_address": 1,
+                "cashback_rate": 1,
+                "payment_qr_code": 1,
+                "recruitment_qr_code": 1,
+                "status": 1
+            }
+        )
+    
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    if merchant.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Merchant is not active")
+    
+    return {"merchant": merchant}
+
+
 # ============== DASHBOARD ==============
 
 @router.get("/me")
