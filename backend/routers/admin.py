@@ -114,6 +114,203 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
     }
 
 
+# ============== ADVANCED DASHBOARD STATISTICS ==============
+
+@router.get("/dashboard/advanced-stats")
+async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current_admin)):
+    """Get advanced dashboard statistics for Overview page"""
+    
+    # ============== 1. MEMBERSHIP CARD STATISTICS ==============
+    card_sales = await db.transactions.find(
+        {"type": "card_purchase"},
+        {"_id": 0}
+    ).to_list(100000)
+    
+    # Count by card type
+    silver_cards = sum(1 for c in card_sales if c.get("metadata", {}).get("card_type") == "silver")
+    gold_cards = sum(1 for c in card_sales if c.get("metadata", {}).get("card_type") == "gold")
+    platinum_cards = sum(1 for c in card_sales if c.get("metadata", {}).get("card_type") == "platinum")
+    total_cards = len(card_sales)
+    
+    # ============== 2. REVENUE FROM MEMBERSHIP CARDS ==============
+    card_revenue = sum(t.get("amount", 0) for t in card_sales)
+    
+    # ============== 3. TOTAL TRANSACTION VOLUME (GMV) ==============
+    all_payments = await db.transactions.find(
+        {"type": "payment"},
+        {"_id": 0, "amount": 1, "cashback_amount": 1, "merchant_id": 1, "client_id": 1, "created_at": 1}
+    ).to_list(100000)
+    
+    total_gmv = sum(t.get("amount", 0) for t in all_payments)
+    
+    # ============== 4. TOTAL CASHBACK DISTRIBUTED ==============
+    total_cashback_distributed = sum(t.get("cashback_amount", 0) for t in all_payments)
+    
+    # Also include referral bonuses as cashback
+    referral_transactions = await db.transactions.find(
+        {"type": {"$in": ["referral_bonus", "welcome_bonus"]}},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    total_referral_bonuses = sum(t.get("amount", 0) for t in referral_transactions)
+    
+    total_cashback_all = total_cashback_distributed + total_referral_bonuses
+    
+    # ============== 5. TOP PERFORMING MERCHANTS ==============
+    merchant_stats = {}
+    for payment in all_payments:
+        merchant_id = payment.get("merchant_id")
+        if merchant_id:
+            if merchant_id not in merchant_stats:
+                merchant_stats[merchant_id] = {
+                    "transactions": 0,
+                    "revenue": 0,
+                    "cashback_given": 0
+                }
+            merchant_stats[merchant_id]["transactions"] += 1
+            merchant_stats[merchant_id]["revenue"] += payment.get("amount", 0)
+            merchant_stats[merchant_id]["cashback_given"] += payment.get("cashback_amount", 0)
+    
+    # Get merchant details and sort by revenue
+    top_merchants = []
+    for merchant_id, stats in sorted(merchant_stats.items(), key=lambda x: x[1]["revenue"], reverse=True)[:10]:
+        merchant_doc = await db.merchants.find_one({"id": merchant_id}, {"_id": 0, "business_name": 1, "owner_name": 1})
+        if merchant_doc:
+            top_merchants.append({
+                "id": merchant_id,
+                "business_name": merchant_doc.get("business_name", "Unknown"),
+                "owner_name": merchant_doc.get("owner_name", ""),
+                "transactions": stats["transactions"],
+                "revenue": stats["revenue"],
+                "cashback_given": stats["cashback_given"]
+            })
+    
+    # ============== 6. TOP ACTIVE CLIENTS ==============
+    client_stats = {}
+    for payment in all_payments:
+        client_id = payment.get("client_id")
+        if client_id:
+            if client_id not in client_stats:
+                client_stats[client_id] = {
+                    "transactions": 0,
+                    "total_spent": 0,
+                    "cashback_earned": 0
+                }
+            client_stats[client_id]["transactions"] += 1
+            client_stats[client_id]["total_spent"] += payment.get("amount", 0)
+            client_stats[client_id]["cashback_earned"] += payment.get("cashback_amount", 0)
+    
+    # Add referral bonuses to client cashback
+    for ref_tx in referral_transactions:
+        client_id = ref_tx.get("client_id")
+        if client_id and client_id in client_stats:
+            client_stats[client_id]["cashback_earned"] += ref_tx.get("amount", 0)
+    
+    # Get client details and sort by total spent
+    top_clients = []
+    for client_id, stats in sorted(client_stats.items(), key=lambda x: x[1]["total_spent"], reverse=True)[:10]:
+        client_doc = await db.clients.find_one({"id": client_id}, {"_id": 0, "full_name": 1, "username": 1, "phone": 1})
+        if client_doc:
+            top_clients.append({
+                "id": client_id,
+                "full_name": client_doc.get("full_name", "Unknown"),
+                "username": client_doc.get("username", ""),
+                "phone": client_doc.get("phone", ""),
+                "transactions": stats["transactions"],
+                "total_spent": stats["total_spent"],
+                "cashback_earned": stats["cashback_earned"]
+            })
+    
+    # ============== 7. REFERRAL PERFORMANCE ==============
+    total_referrals = await db.referrals.count_documents({})
+    successful_referrals = await db.referrals.count_documents({"status": "completed"})
+    
+    # Top referrers
+    referral_docs = await db.referrals.find(
+        {"status": "completed"},
+        {"_id": 0, "referrer_id": 1}
+    ).to_list(100000)
+    
+    referrer_counts = {}
+    for ref in referral_docs:
+        referrer_id = ref.get("referrer_id")
+        if referrer_id:
+            referrer_counts[referrer_id] = referrer_counts.get(referrer_id, 0) + 1
+    
+    top_referrers = []
+    for referrer_id, count in sorted(referrer_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
+        client_doc = await db.clients.find_one({"id": referrer_id}, {"_id": 0, "full_name": 1, "username": 1})
+        if client_doc:
+            top_referrers.append({
+                "id": referrer_id,
+                "full_name": client_doc.get("full_name", "Unknown"),
+                "username": client_doc.get("username", ""),
+                "referrals": count,
+                "bonus_earned": count * 3  # 3 GHS per referral
+            })
+    
+    # ============== 8. MONTHLY GROWTH DATA (Last 6 months) ==============
+    monthly_data = []
+    now = datetime.now(timezone.utc)
+    
+    for i in range(5, -1, -1):
+        # Calculate month start/end
+        month_start = (now.replace(day=1) - timedelta(days=i*30)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if i > 0:
+            next_month = (month_start + timedelta(days=32)).replace(day=1)
+        else:
+            next_month = now + timedelta(days=1)
+        
+        # Transactions this month
+        month_transactions = [t for t in all_payments 
+                             if t.get("created_at") and 
+                             month_start.isoformat() <= t.get("created_at", "") < next_month.isoformat()]
+        
+        month_volume = sum(t.get("amount", 0) for t in month_transactions)
+        month_cashback = sum(t.get("cashback_amount", 0) for t in month_transactions)
+        
+        # New clients this month
+        new_clients = await db.clients.count_documents({
+            "created_at": {
+                "$gte": month_start.isoformat(),
+                "$lt": next_month.isoformat()
+            }
+        })
+        
+        monthly_data.append({
+            "month": month_start.strftime("%b %Y"),
+            "month_short": month_start.strftime("%b"),
+            "transactions": len(month_transactions),
+            "volume": month_volume,
+            "cashback": month_cashback,
+            "new_clients": new_clients
+        })
+    
+    return {
+        "card_stats": {
+            "silver": silver_cards,
+            "gold": gold_cards,
+            "platinum": platinum_cards,
+            "total": total_cards,
+            "revenue": card_revenue
+        },
+        "financial_stats": {
+            "total_gmv": total_gmv,
+            "total_cashback_distributed": total_cashback_all,
+            "total_card_revenue": card_revenue,
+            "total_referral_bonuses": total_referral_bonuses
+        },
+        "top_merchants": top_merchants[:5],
+        "top_clients": top_clients[:5],
+        "referral_stats": {
+            "total_referrals": total_referrals,
+            "successful_referrals": successful_referrals,
+            "conversion_rate": round((successful_referrals / total_referrals * 100) if total_referrals > 0 else 0, 1),
+            "top_referrers": top_referrers
+        },
+        "monthly_data": monthly_data
+    }
+
+
 # ============== CLIENTS MANAGEMENT ==============
 
 @router.get("/clients")

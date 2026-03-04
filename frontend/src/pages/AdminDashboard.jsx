@@ -29,7 +29,15 @@ import {
   Activity,
   Percent,
   Gift,
-  RefreshCw
+  RefreshCw,
+  Wallet,
+  Award,
+  Crown,
+  Medal,
+  Star,
+  ArrowUpRight,
+  ArrowDownRight,
+  UserPlus
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -52,6 +60,7 @@ export default function AdminDashboard() {
   
   // Data states
   const [stats, setStats] = useState(null);
+  const [advancedStats, setAdvancedStats] = useState(null);
   const [clients, setClients] = useState([]);
   const [merchants, setMerchants] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -154,6 +163,14 @@ export default function AdminDashboard() {
         active_merchants: activeMerchants,
         pending_merchants: merchantsRes.data.merchants?.filter(m => m.status === 'pending').length || 0
       });
+      
+      // Fetch advanced stats for Overview
+      try {
+        const advancedRes = await axios.get(`${API_URL}/api/admin/dashboard/advanced-stats`, { headers });
+        setAdvancedStats(advancedRes.data);
+      } catch (advErr) {
+        console.error('Advanced stats fetch error:', advErr);
+      }
       
     } catch (error) {
       console.error('Dashboard fetch error:', error);
@@ -332,7 +349,7 @@ export default function AdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Stats Grid */}
+            {/* Main Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
                 <Users className="text-blue-400 mb-2" size={24} />
@@ -361,6 +378,273 @@ export default function AdminDashboard() {
                 <p className="text-white text-2xl font-bold">{stats?.active_merchants || 0}</p>
               </div>
             </div>
+
+            {/* Membership Card Statistics */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <CreditCard size={20} className="text-amber-400" />
+                Membership Card Statistics
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-4 text-center">
+                  <Medal className="text-slate-300 mx-auto mb-2" size={28} />
+                  <p className="text-slate-300 text-sm">Silver Cards</p>
+                  <p className="text-white text-2xl font-bold">{advancedStats?.card_stats?.silver || 0}</p>
+                </div>
+                <div className="bg-gradient-to-br from-amber-700 to-amber-800 rounded-xl p-4 text-center">
+                  <Award className="text-amber-300 mx-auto mb-2" size={28} />
+                  <p className="text-amber-200 text-sm">Gold Cards</p>
+                  <p className="text-white text-2xl font-bold">{advancedStats?.card_stats?.gold || 0}</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-700 to-purple-800 rounded-xl p-4 text-center">
+                  <Crown className="text-purple-300 mx-auto mb-2" size={28} />
+                  <p className="text-purple-200 text-sm">Platinum Cards</p>
+                  <p className="text-white text-2xl font-bold">{advancedStats?.card_stats?.platinum || 0}</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-700 to-blue-800 rounded-xl p-4 text-center">
+                  <CreditCard className="text-blue-300 mx-auto mb-2" size={28} />
+                  <p className="text-blue-200 text-sm">Total Cards</p>
+                  <p className="text-white text-2xl font-bold">{advancedStats?.card_stats?.total || 0}</p>
+                </div>
+                <div className="bg-gradient-to-br from-emerald-700 to-emerald-800 rounded-xl p-4 text-center">
+                  <DollarSign className="text-emerald-300 mx-auto mb-2" size={28} />
+                  <p className="text-emerald-200 text-sm">Card Revenue</p>
+                  <p className="text-white text-2xl font-bold">GHS {(advancedStats?.card_stats?.revenue || 0).toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Statistics */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-emerald-900/50 to-emerald-800/30 border border-emerald-700/50 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <TrendingUp className="text-emerald-400" size={32} />
+                  <span className="text-emerald-400 text-sm bg-emerald-500/20 px-2 py-1 rounded-full">GMV</span>
+                </div>
+                <p className="text-slate-400 text-sm">Total Transaction Volume</p>
+                <p className="text-white text-3xl font-bold mt-1">GHS {(advancedStats?.financial_stats?.total_gmv || 0).toLocaleString()}</p>
+                <p className="text-emerald-400 text-xs mt-2">Gross Merchandise Volume</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 border border-purple-700/50 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <Gift className="text-purple-400" size={32} />
+                  <span className="text-purple-400 text-sm bg-purple-500/20 px-2 py-1 rounded-full">Rewards</span>
+                </div>
+                <p className="text-slate-400 text-sm">Total Cashback Distributed</p>
+                <p className="text-white text-3xl font-bold mt-1">GHS {(advancedStats?.financial_stats?.total_cashback_distributed || 0).toLocaleString()}</p>
+                <p className="text-purple-400 text-xs mt-2">To all clients</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-amber-900/50 to-amber-800/30 border border-amber-700/50 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <UserPlus className="text-amber-400" size={32} />
+                  <span className="text-amber-400 text-sm bg-amber-500/20 px-2 py-1 rounded-full">Referrals</span>
+                </div>
+                <p className="text-slate-400 text-sm">Referral Bonuses Paid</p>
+                <p className="text-white text-3xl font-bold mt-1">GHS {(advancedStats?.financial_stats?.total_referral_bonuses || 0).toLocaleString()}</p>
+                <p className="text-amber-400 text-xs mt-2">{advancedStats?.referral_stats?.successful_referrals || 0} successful referrals</p>
+              </div>
+            </div>
+
+            {/* Top Performers Section */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Top Performing Merchants */}
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Star className="text-amber-400" size={20} />
+                  Top Performing Merchants
+                </h3>
+                {advancedStats?.top_merchants?.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-slate-400 border-b border-slate-700">
+                        <tr>
+                          <th className="text-left py-2 px-2">Merchant</th>
+                          <th className="text-right py-2 px-2">Txns</th>
+                          <th className="text-right py-2 px-2">Revenue</th>
+                          <th className="text-right py-2 px-2">Cashback</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {advancedStats.top_merchants.map((merchant, idx) => (
+                          <tr key={merchant.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                            <td className="py-3 px-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  idx === 0 ? 'bg-amber-500 text-white' : 
+                                  idx === 1 ? 'bg-slate-400 text-white' : 
+                                  idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-600 text-slate-300'
+                                }`}>{idx + 1}</span>
+                                <span className="text-white">{merchant.business_name}</span>
+                              </div>
+                            </td>
+                            <td className="text-right py-3 px-2 text-slate-300">{merchant.transactions}</td>
+                            <td className="text-right py-3 px-2 text-emerald-400">GHS {merchant.revenue.toLocaleString()}</td>
+                            <td className="text-right py-3 px-2 text-purple-400">GHS {merchant.cashback_given.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-center py-8">No merchant transactions yet</p>
+                )}
+              </div>
+
+              {/* Top Active Clients */}
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Award className="text-purple-400" size={20} />
+                  Top Active Clients
+                </h3>
+                {advancedStats?.top_clients?.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-slate-400 border-b border-slate-700">
+                        <tr>
+                          <th className="text-left py-2 px-2">Client</th>
+                          <th className="text-right py-2 px-2">Txns</th>
+                          <th className="text-right py-2 px-2">Spent</th>
+                          <th className="text-right py-2 px-2">Earned</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {advancedStats.top_clients.map((client, idx) => (
+                          <tr key={client.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                            <td className="py-3 px-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  idx === 0 ? 'bg-amber-500 text-white' : 
+                                  idx === 1 ? 'bg-slate-400 text-white' : 
+                                  idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-600 text-slate-300'
+                                }`}>{idx + 1}</span>
+                                <div>
+                                  <span className="text-white block">{client.full_name}</span>
+                                  <span className="text-slate-500 text-xs">@{client.username}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="text-right py-3 px-2 text-slate-300">{client.transactions}</td>
+                            <td className="text-right py-3 px-2 text-emerald-400">GHS {client.total_spent.toLocaleString()}</td>
+                            <td className="text-right py-3 px-2 text-purple-400">GHS {client.cashback_earned.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-center py-8">No client transactions yet</p>
+                )}
+              </div>
+            </div>
+
+            {/* Referral Performance */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <UserPlus className="text-pink-400" size={20} />
+                Referral Program Performance
+              </h3>
+              <div className="grid md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-slate-900 rounded-xl p-4 text-center">
+                  <p className="text-slate-400 text-sm">Total Referrals</p>
+                  <p className="text-white text-2xl font-bold">{advancedStats?.referral_stats?.total_referrals || 0}</p>
+                </div>
+                <div className="bg-slate-900 rounded-xl p-4 text-center">
+                  <p className="text-slate-400 text-sm">Successful</p>
+                  <p className="text-emerald-400 text-2xl font-bold">{advancedStats?.referral_stats?.successful_referrals || 0}</p>
+                </div>
+                <div className="bg-slate-900 rounded-xl p-4 text-center">
+                  <p className="text-slate-400 text-sm">Conversion Rate</p>
+                  <p className="text-amber-400 text-2xl font-bold">{advancedStats?.referral_stats?.conversion_rate || 0}%</p>
+                </div>
+                <div className="bg-slate-900 rounded-xl p-4 text-center">
+                  <p className="text-slate-400 text-sm">Bonuses Paid</p>
+                  <p className="text-purple-400 text-2xl font-bold">GHS {(advancedStats?.financial_stats?.total_referral_bonuses || 0).toLocaleString()}</p>
+                </div>
+              </div>
+              
+              {/* Top Referrers */}
+              {advancedStats?.referral_stats?.top_referrers?.length > 0 && (
+                <div>
+                  <h4 className="text-slate-400 text-sm font-medium mb-3">Top Referrers</h4>
+                  <div className="grid md:grid-cols-5 gap-3">
+                    {advancedStats.referral_stats.top_referrers.map((referrer, idx) => (
+                      <div key={referrer.id} className="bg-slate-900 rounded-xl p-3 text-center">
+                        <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center text-sm font-bold ${
+                          idx === 0 ? 'bg-amber-500 text-white' : 'bg-slate-700 text-slate-300'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <p className="text-white text-sm font-medium truncate">{referrer.full_name}</p>
+                        <p className="text-pink-400 text-lg font-bold">{referrer.referrals}</p>
+                        <p className="text-slate-500 text-xs">referrals</p>
+                        <p className="text-emerald-400 text-xs mt-1">+GHS {referrer.bonus_earned}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Monthly Growth Chart */}
+            {advancedStats?.monthly_data?.length > 0 && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <BarChart3 className="text-blue-400" size={20} />
+                  Monthly Growth (Last 6 Months)
+                </h3>
+                <div className="grid md:grid-cols-6 gap-3">
+                  {advancedStats.monthly_data.map((month, idx) => (
+                    <div key={idx} className="bg-slate-900 rounded-xl p-4">
+                      <p className="text-slate-400 text-xs text-center mb-3">{month.month_short}</p>
+                      
+                      {/* Simple bar visualization */}
+                      <div className="space-y-2">
+                        <div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-slate-500">Txns</span>
+                            <span className="text-slate-300">{month.transactions}</span>
+                          </div>
+                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{ width: `${Math.min((month.transactions / Math.max(...advancedStats.monthly_data.map(m => m.transactions || 1))) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-slate-500">Volume</span>
+                            <span className="text-emerald-400">{month.volume > 1000 ? `${(month.volume/1000).toFixed(1)}K` : month.volume}</span>
+                          </div>
+                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-500 rounded-full transition-all"
+                              style={{ width: `${Math.min((month.volume / Math.max(...advancedStats.monthly_data.map(m => m.volume || 1))) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-slate-500">New Users</span>
+                            <span className="text-purple-400">{month.new_clients}</span>
+                          </div>
+                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-purple-500 rounded-full transition-all"
+                              style={{ width: `${Math.min((month.new_clients / Math.max(...advancedStats.monthly_data.map(m => m.new_clients || 1))) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Recent Activity */}
             <div className="grid md:grid-cols-2 gap-6">

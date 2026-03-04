@@ -7,6 +7,25 @@
 
 ## CHANGELOG
 
+### March 4, 2026 - Phase 8: Admin Dashboard Advanced Overview ✅
+
+**New Overview Statistics:**
+- Membership Card Statistics (Silver/Gold/Platinum/Total + Revenue)
+- Financial Statistics (GMV, Total Cashback Distributed, Referral Bonuses)
+- Top Performing Merchants table (Transactions, Revenue, Cashback)
+- Top Active Clients table (Transactions, Spent, Earned)
+- Referral Program Performance (Total, Successful, Conversion Rate)
+- Top Referrers section with bonus earned
+- Monthly Growth Charts (Last 6 months)
+  - Transactions per month
+  - Volume per month
+  - New Users per month
+
+**Backend API Added:**
+- `GET /api/admin/dashboard/advanced-stats` - Comprehensive statistics endpoint
+
+---
+
 ### March 4, 2026 - Phase 7: Legal Pages & Compliance ✅
 
 **Legal Pages Created:**
