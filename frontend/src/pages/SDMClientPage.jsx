@@ -396,26 +396,78 @@ export default function SDMClientPage() {
   };
 
   // Purchase VIP Card
-  const handlePurchaseVIP = async (cardTypeId) => {
+  const handlePurchaseVIP = async (cardTier) => {
     setIsServiceLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.post(`${API_URL}/api/sdm/user/vip-cards/purchase`, {
-        card_type_id: cardTypeId
+      // Use new endpoint with MoMo payment
+      const response = await axios.post(`${API_URL}/api/sdm/user/sdm-vip-cards/buy`, {
+        card_tier: cardTier
       }, { headers });
       
-      toast.success(response.data.message);
-      if (response.data.referral_bonus_received > 0) {
-        toast.success(`Welcome bonus: +GHS ${response.data.referral_bonus_received}`);
-      }
-      setActiveService(null);
-      fetchUserData();
-      fetchServiceData();
+      toast.success(response.data.message || 'Prompt de paiement envoyé!');
+      toast.info('Approuvez le paiement sur votre téléphone MoMo pour activer votre carte.');
+      
+      // Store transaction ID for status polling
+      setVipPurchaseTxnId(response.data.transaction_id);
+      
+      // Start polling for payment status
+      pollVipPaymentStatus(response.data.transaction_id);
+      
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Purchase failed');
+      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
     } finally {
       setIsServiceLoading(false);
     }
+  };
+
+  // Poll VIP payment status
+  const [vipPurchaseTxnId, setVipPurchaseTxnId] = useState(null);
+  
+  const pollVipPaymentStatus = async (transactionId) => {
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutes max
+    
+    const checkStatus = async () => {
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+        const response = await axios.get(
+          `${API_URL}/api/sdm/user/vip-cards/payment-status/${transactionId}`,
+          { headers }
+        );
+        
+        if (response.data.status === 'active') {
+          toast.success('🎉 Carte VIP activée avec succès!');
+          if (response.data.referral_bonus > 0) {
+            toast.success(`Bonus parrain: +GHS ${response.data.referral_bonus}`);
+          }
+          if (response.data.welcome_bonus > 0) {
+            toast.success(`Bonus bienvenue: +GHS ${response.data.welcome_bonus}`);
+          }
+          setVipPurchaseTxnId(null);
+          setActiveService(null);
+          fetchUserData();
+          fetchServiceData();
+          return;
+        } else if (response.data.status === 'payment_failed') {
+          toast.error('Paiement échoué. Veuillez réessayer.');
+          setVipPurchaseTxnId(null);
+          return;
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(checkStatus, 5000); // Check every 5 seconds
+        } else {
+          toast.info('Vérification du statut expirée. Rechargez la page pour voir votre carte.');
+          setVipPurchaseTxnId(null);
+        }
+      } catch (error) {
+        console.error('Status check error:', error);
+      }
+    };
+    
+    setTimeout(checkStatus, 5000); // Start checking after 5 seconds
   };
 
   const handleSendOTP = async (e) => {

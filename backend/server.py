@@ -70,7 +70,8 @@ from config import (
     TEST_OTP,
     ADMIN_ROLES,
     DEFAULT_VIP_CARDS,
-    DEFAULT_SDM_CONFIG
+    DEFAULT_SDM_CONFIG,
+    VIP_CARDS
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -1151,6 +1152,30 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+async def get_active_vip_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user and verify they have an active VIP card"""
+    user = await get_current_user(credentials)
+    
+    # Check for active VIP membership
+    has_vip = user.get("has_vip_card", False)
+    vip_tier = user.get("vip_tier")
+    
+    # Also check in vip_memberships collection for active membership
+    membership = await db.vip_memberships.find_one({
+        "user_id": user["id"],
+        "status": "active",
+        "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()}
+    }, {"_id": 0})
+    
+    if not membership and not has_vip:
+        raise HTTPException(
+            status_code=403, 
+            detail="Vous devez acheter une carte VIP pour accéder à ce service. Allez dans Services → SDM VIP CARD"
+        )
+    
+    user["active_membership"] = membership
+    return user
 
 async def get_current_merchant(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
@@ -4799,6 +4824,115 @@ async def admin_process_withdrawal(withdrawal_id: str, status: str, reference: O
     
     return {"message": f"Withdrawal {status}"}
 
+# ============== SDM PLATFORM - CARD SALES ==============
+
+@sdm_router.get("/admin/platform/card-sales")
+async def admin_get_card_sales(admin: dict = Depends(get_current_admin)):
+    """Admin: Get SDM Platform card sales summary"""
+    # Get platform account
+    platform_account = await db.sdm_platform_account.find_one(
+        {"account_type": "card_sales"},
+        {"_id": 0}
+    )
+    
+    if not platform_account:
+        platform_account = {
+            "total_balance": 0,
+            "total_cards_sold": 0
+        }
+    
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = now - timedelta(days=now.weekday())
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get sales by period
+    async def get_sales_stats(start_date):
+        pipeline = [
+            {"$match": {"created_at": {"$gte": start_date.isoformat()}}},
+            {"$group": {
+                "_id": None,
+                "total_revenue": {"$sum": "$sdm_revenue"},
+                "total_sales": {"$sum": 1},
+                "total_bonuses": {"$sum": "$bonuses_paid"}
+            }}
+        ]
+        result = await db.sdm_card_sales.aggregate(pipeline).to_list(1)
+        return result[0] if result else {"total_revenue": 0, "total_sales": 0, "total_bonuses": 0}
+    
+    today_stats = await get_sales_stats(today_start)
+    week_stats = await get_sales_stats(week_start)
+    month_stats = await get_sales_stats(month_start)
+    
+    # Recent sales
+    recent_sales = await db.sdm_card_sales.find(
+        {}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    
+    # Sales by tier
+    tier_pipeline = [
+        {"$group": {
+            "_id": "$card_tier",
+            "count": {"$sum": 1},
+            "revenue": {"$sum": "$sdm_revenue"}
+        }}
+    ]
+    tier_stats = await db.sdm_card_sales.aggregate(tier_pipeline).to_list(10)
+    
+    return {
+        "platform_balance": platform_account.get("total_balance", 0),
+        "total_cards_sold": platform_account.get("total_cards_sold", 0),
+        "today": {
+            "revenue": today_stats.get("total_revenue", 0),
+            "cards_sold": today_stats.get("total_sales", 0),
+            "bonuses_paid": today_stats.get("total_bonuses", 0)
+        },
+        "this_week": {
+            "revenue": week_stats.get("total_revenue", 0),
+            "cards_sold": week_stats.get("total_sales", 0),
+            "bonuses_paid": week_stats.get("total_bonuses", 0)
+        },
+        "this_month": {
+            "revenue": month_stats.get("total_revenue", 0),
+            "cards_sold": month_stats.get("total_sales", 0),
+            "bonuses_paid": month_stats.get("total_bonuses", 0)
+        },
+        "by_tier": {t["_id"]: {"count": t["count"], "revenue": t["revenue"]} for t in tier_stats},
+        "recent_sales": recent_sales
+    }
+
+@sdm_router.get("/admin/platform/card-sales/history")
+async def admin_get_card_sales_history(
+    admin: dict = Depends(get_current_admin),
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    day: Optional[int] = None,
+    tier: Optional[str] = None,
+    limit: int = 100
+):
+    """Admin: Get detailed card sales history with filters"""
+    query = {}
+    if year:
+        query["year"] = year
+    if month:
+        query["month"] = month
+    if day:
+        query["day"] = day
+    if tier:
+        query["card_tier"] = tier
+    
+    sales = await db.sdm_card_sales.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    
+    total_revenue = sum(s.get("sdm_revenue", 0) for s in sales)
+    total_bonuses = sum(s.get("bonuses_paid", 0) for s in sales)
+    
+    return {
+        "sales": sales,
+        "total_count": len(sales),
+        "total_revenue": round(total_revenue, 2),
+        "total_bonuses": round(total_bonuses, 2)
+    }
+
 @sdm_router.post("/admin/withdrawals/{withdrawal_id}/send-momo")
 async def admin_send_momo_withdrawal(withdrawal_id: str, admin: dict = Depends(get_current_admin)):
     """Admin: Send MoMo transfer for withdrawal using BulkClix API"""
@@ -7926,6 +8060,121 @@ async def get_scheduler_status(admin: dict = Depends(get_current_admin)):
 
 # ==================== USER VIP CARD ENDPOINTS ====================
 
+@sdm_router.get("/user/sdm-vip-cards")
+async def get_sdm_vip_cards():
+    """Get available SDM VIP cards with prices and benefits"""
+    return {
+        "cards": list(VIP_CARDS.values()),
+        "referral_bonus": REFERRAL_BONUS,
+        "welcome_bonus": REFERRAL_WELCOME_BONUS
+    }
+
+class BuySDMVIPCardRequest(BaseModel):
+    card_tier: str  # bronze, silver, gold, platinum
+    payer_phone: Optional[str] = None
+    payer_network: Optional[str] = None
+
+@sdm_router.post("/user/sdm-vip-cards/buy")
+async def buy_sdm_vip_card(request: BuySDMVIPCardRequest, user: dict = Depends(get_current_user)):
+    """Buy SDM VIP Card with MoMo payment"""
+    
+    # Validate card tier
+    if request.card_tier not in VIP_CARDS:
+        raise HTTPException(status_code=400, detail="Invalid card tier")
+    
+    card = VIP_CARDS[request.card_tier]
+    price = card["price"]
+    
+    # Check if user already has an active membership of this or higher tier
+    existing = await db.vip_memberships.find_one({
+        "user_id": user["id"],
+        "status": "active",
+        "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()}
+    }, {"_id": 0})
+    
+    tier_order = ["bronze", "silver", "gold", "platinum"]
+    is_upgrade = False
+    
+    if existing:
+        existing_tier_idx = tier_order.index(existing.get("tier", "bronze"))
+        new_tier_idx = tier_order.index(request.card_tier)
+        
+        if new_tier_idx <= existing_tier_idx:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Vous avez déjà une carte {existing.get('tier', 'active').title()}. Choisissez une carte supérieure pour upgrader."
+            )
+        is_upgrade = True
+    
+    # Get payer phone
+    payer_phone = request.payer_phone or user.get("phone")
+    if not payer_phone:
+        raise HTTPException(status_code=400, detail="Numéro de téléphone requis")
+    
+    payer_phone = payer_phone.replace("+233", "0").replace(" ", "")
+    payer_network = request.payer_network or detect_network_from_phone(payer_phone)
+    
+    now = datetime.now(timezone.utc)
+    transaction_id = f"VIPCARD_{uuid.uuid4().hex[:10].upper()}"
+    
+    # Create pending membership
+    membership = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "user_phone": user.get("phone"),
+        "tier": request.card_tier,
+        "card_name": card["name"],
+        "price_paid": price,
+        "transaction_id": transaction_id,
+        "status": "pending_payment",
+        "is_upgrade": is_upgrade,
+        "referrer_id": user.get("referred_by"),
+        "referrer_bonus_paid": False,
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=card["validity_days"])).isoformat()
+    }
+    await db.vip_memberships.insert_one(membership)
+    
+    # Initiate MoMo payment
+    callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/user/vip-cards/payment-webhook"
+    
+    collection_result = await bulkclix_payment_service.collect_momo_payment(
+        amount=price,
+        phone_number=payer_phone,
+        network=payer_network,
+        transaction_id=transaction_id,
+        callback_url=callback_url,
+        reference=f"SDM VIP {card['name']}"
+    )
+    
+    if not collection_result.get("success"):
+        await db.vip_memberships.update_one(
+            {"id": membership["id"]},
+            {"$set": {"status": "payment_failed", "error": collection_result.get("error")}}
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Échec de l'envoi du prompt: {collection_result.get('error', 'Erreur inconnue')}"
+        )
+    
+    # Update with BulkClix response
+    await db.vip_memberships.update_one(
+        {"id": membership["id"]},
+        {"$set": {
+            "bulkclix_ref": collection_result.get("data", {}).get("ext_transaction_id"),
+            "payment_initiated_at": now.isoformat()
+        }}
+    )
+    
+    return {
+        "success": True,
+        "membership_id": membership["id"],
+        "transaction_id": transaction_id,
+        "status": "pending_payment",
+        "message": f"Prompt de paiement envoyé! Approuvez GHS {price} sur votre téléphone pour activer votre carte {card['name']}.",
+        "card": card
+    }
+
 @sdm_router.get("/user/vip-cards")
 async def get_available_vip_cards():
     """Public: Get available VIP card types for purchase"""
@@ -8264,6 +8513,47 @@ async def process_vip_card_payment_success(membership: dict):
             {"$set": {"referrer_bonus_paid": True}}
         )
     
+    # ============== RECORD CARD SALE IN SDM PLATFORM ACCOUNT ==============
+    # Calculate SDM Platform revenue (card price minus bonuses)
+    card_price = membership["price_paid"]
+    bonuses_paid = 0
+    if is_first_purchase and user.get("referred_by"):
+        bonuses_paid = REFERRAL_BONUS + REFERRAL_WELCOME_BONUS  # 3 + 1 = 4 GHS
+    
+    sdm_revenue = card_price - bonuses_paid
+    
+    # Record card sale in sdm_card_sales collection
+    card_sale_record = {
+        "id": str(uuid.uuid4()),
+        "membership_id": membership["id"],
+        "user_id": user_id,
+        "user_phone": user.get("phone"),
+        "card_tier": membership["tier"],
+        "card_name": membership.get("card_name"),
+        "card_price": card_price,
+        "bonuses_paid": bonuses_paid,
+        "sdm_revenue": sdm_revenue,
+        "is_first_purchase": is_first_purchase,
+        "is_upgrade": is_upgrade,
+        "created_at": now,
+        "year": datetime.now(timezone.utc).year,
+        "month": datetime.now(timezone.utc).month,
+        "day": datetime.now(timezone.utc).day,
+        "hour": datetime.now(timezone.utc).hour
+    }
+    await db.sdm_card_sales.insert_one(card_sale_record)
+    
+    # Update SDM Platform balance
+    await db.sdm_platform_account.update_one(
+        {"account_type": "card_sales"},
+        {
+            "$inc": {"total_balance": sdm_revenue, "total_cards_sold": 1},
+            "$setOnInsert": {"created_at": now}
+        },
+        upsert=True
+    )
+    
+    logging.info(f"VIP Card sale recorded: {card_sale_record['id']} - Revenue: {sdm_revenue} GHS")
     logging.info(f"VIP Card membership activated: {membership['id']} for user {user_id}")
 
 # ============== CHECK VIP PAYMENT STATUS ==============

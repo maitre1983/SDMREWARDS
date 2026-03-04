@@ -45,6 +45,50 @@ MAX_CASH_CASHBACK_RATE = float(os.environ.get('MAX_CASH_CASHBACK_RATE', '15.0'))
 REFERRAL_BONUS = 3.0  # GHS for referrer when referral buys a card
 REFERRAL_WELCOME_BONUS = 1.0  # GHS for new user when buying a card
 
+# ============== VIP Card Configuration ==============
+VIP_CARDS = {
+    "bronze": {
+        "id": "bronze",
+        "name": "Bronze Card",
+        "price": 10.0,  # GHS
+        "color": "#CD7F32",
+        "benefits": ["Accès aux cashbacks de base", "Support standard"],
+        "cashback_multiplier": 1.0,
+        "max_withdrawal_per_day": 500.0,
+        "validity_days": 365
+    },
+    "silver": {
+        "id": "silver", 
+        "name": "Silver Card",
+        "price": 25.0,  # GHS
+        "color": "#C0C0C0",
+        "benefits": ["Cashback x1.5", "Support prioritaire", "Retraits plus élevés"],
+        "cashback_multiplier": 1.5,
+        "max_withdrawal_per_day": 1000.0,
+        "validity_days": 365
+    },
+    "gold": {
+        "id": "gold",
+        "name": "Gold Card",
+        "price": 50.0,  # GHS
+        "color": "#FFD700",
+        "benefits": ["Cashback x2", "Support VIP", "Accès partenaires exclusifs", "Loteries premium"],
+        "cashback_multiplier": 2.0,
+        "max_withdrawal_per_day": 2000.0,
+        "validity_days": 365
+    },
+    "platinum": {
+        "id": "platinum",
+        "name": "Platinum Card",
+        "price": 100.0,  # GHS
+        "color": "#E5E4E2",
+        "benefits": ["Cashback x3", "Support VIP 24/7", "Tous les avantages", "Bonus anniversaire"],
+        "cashback_multiplier": 3.0,
+        "max_withdrawal_per_day": 5000.0,
+        "validity_days": 365
+    }
+}
+
 # ============== Test Account Configuration ==============
 TEST_PHONE = "+233000000000"
 TEST_OTP = "0000"
