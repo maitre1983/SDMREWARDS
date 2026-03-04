@@ -565,9 +565,18 @@ export default function ClientDashboard() {
             <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-9 h-9 object-contain rounded-lg" />
             <span className="font-bold text-white">SDM</span>
           </div>
-          <button onClick={handleLogout} className="text-slate-400 hover:text-white">
-            <LogOut size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => navigate('/client/profile')} 
+              className="text-slate-400 hover:text-white"
+              data-testid="profile-btn"
+            >
+              <User size={20} />
+            </button>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-white">
+              <LogOut size={20} />
+            </button>
+          </div>
         </div>
       </header>
 

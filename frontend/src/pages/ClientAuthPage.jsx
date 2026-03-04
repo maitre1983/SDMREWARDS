@@ -136,8 +136,9 @@ export default function ClientAuthPage() {
       return;
     }
 
-    if (!otpVerified && !requestId.startsWith('TEST_')) {
-      toast.error('Please verify your phone number first');
+    // OTP verification is MANDATORY
+    if (!otpVerified) {
+      toast.error('Please verify your phone number with OTP first');
       return;
     }
 
@@ -151,8 +152,8 @@ export default function ClientAuthPage() {
         password,
         birthday: birthday || null,
         referral_code: referralCode || null,
-        otp_code: otpCode || '123456',
-        request_id: requestId || 'TEST_' + phone
+        otp_code: otpCode,
+        request_id: requestId
       });
 
       localStorage.setItem('sdm_client_token', response.data.access_token);

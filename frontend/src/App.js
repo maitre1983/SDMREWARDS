@@ -7,12 +7,14 @@ import { LanguageProvider } from "./context/LanguageContext";
 import HomePage from "./pages/HomePage";
 import ClientAuthPage from "./pages/ClientAuthPage";
 import ClientDashboard from "./pages/ClientDashboard";
+import ClientProfilePage from "./pages/ClientProfilePage";
 import PartnersPage from "./pages/PartnersPage";
 import MerchantAuthPage from "./pages/MerchantAuthPage";
 import MerchantDashboard from "./pages/MerchantDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import NotFoundPage from "./pages/NotFoundPage";
 
-// Generate admin paths with date-based security
+// Generate admin paths with date-based security (format: DDMMYY)
 const getAdminPaths = () => {
   const paths = [];
   for (let offset = -1; offset <= 1; offset++) {
@@ -20,7 +22,7 @@ const getAdminPaths = () => {
     date.setDate(date.getDate() + offset);
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
+    const year = String(date.getFullYear()).slice(-2); // Last 2 digits only
     paths.push(`/admin${day}${month}${year}`);
   }
   return paths;
@@ -30,13 +32,12 @@ const getTodayAdminPath = () => {
   const now = new Date();
   const day = String(now.getDate()).padStart(2, '0');
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear();
+  const year = String(now.getFullYear()).slice(-2); // Last 2 digits only
   return `/admin${day}${month}${year}`;
 };
 
 function App() {
   const adminPaths = getAdminPaths();
-  const todayAdminPath = getTodayAdminPath();
   
   return (
     <LanguageProvider>
@@ -59,21 +60,20 @@ function App() {
             {/* Client Routes */}
             <Route path="/client" element={<ClientAuthPage />} />
             <Route path="/client/dashboard" element={<ClientDashboard />} />
+            <Route path="/client/profile" element={<ClientProfilePage />} />
             <Route path="/client/partners" element={<PartnersPage />} />
             
             {/* Merchant Routes */}
             <Route path="/merchant" element={<MerchantAuthPage />} />
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
             
-            {/* Admin Routes */}
-            <Route path="/admin" element={<Navigate to={todayAdminPath} replace />} />
+            {/* Admin Routes - ONLY valid date paths (format: DDMMYY) */}
             {adminPaths.map(path => (
               <Route key={path} path={path} element={<AdminDashboard />} />
             ))}
             
-            {/* Legacy redirects */}
-            <Route path="/sdm/client" element={<Navigate to="/client" replace />} />
-            <Route path="/sdm/merchant" element={<Navigate to="/merchant" replace />} />
+            {/* 404 for everything else including /admin */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
       </div>

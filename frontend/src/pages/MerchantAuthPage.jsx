@@ -137,6 +137,12 @@ export default function MerchantAuthPage() {
       return;
     }
 
+    // OTP verification is MANDATORY
+    if (!otpVerified) {
+      toast.error('Please verify your phone number with OTP first');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await axios.post(`${API_URL}/api/auth/merchant/register`, {
@@ -147,8 +153,8 @@ export default function MerchantAuthPage() {
         password,
         business_type: businessType || null,
         business_address: businessAddress || null,
-        otp_code: otpCode || '123456',
-        request_id: requestId || 'TEST_' + phone
+        otp_code: otpCode,
+        request_id: requestId
       });
 
       localStorage.setItem('sdm_merchant_token', response.data.access_token);
