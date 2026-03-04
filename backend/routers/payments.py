@@ -11,8 +11,10 @@ from datetime import datetime, timezone
 import uuid
 import os
 import httpx
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Database reference (set from server.py)
 db = None
@@ -24,7 +26,18 @@ def set_db(database):
 # ============== CONFIG ==============
 BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")
 BULKCLIX_BASE_URL = os.environ.get("BULKCLIX_BASE_URL", "https://api.bulkclix.com/api/v1")
+CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "")
 PAYMENT_TEST_MODE = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
+
+# Import SMS service (lazy)
+_sms_service = None
+
+def get_sms():
+    global _sms_service
+    if _sms_service is None:
+        from services.sms_service import SMSService
+        _sms_service = SMSService(db)
+    return _sms_service
 
 
 # ============== HELPERS ==============
@@ -155,24 +168,32 @@ async def initiate_card_payment(request: CardPaymentRequest):
     
     # Production: Call BulkClix API
     try:
+        # Build callback URL
+        callback_url = f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else None
+        
         async with httpx.AsyncClient() as http_client:
+            payload = {
+                "phone": request.phone,
+                "amount": amount,
+                "network": network,
+                "reference": payment_ref,
+                "description": f"SDM {card_name} Purchase"
+            }
+            if callback_url:
+                payload["callback_url"] = callback_url
+                
             response = await http_client.post(
                 f"{BULKCLIX_BASE_URL}/payment-api/momocollection",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {BULKCLIX_API_KEY}"
                 },
-                json={
-                    "phone": request.phone,
-                    "amount": amount,
-                    "network": network,
-                    "reference": payment_ref,
-                    "description": f"SDM {card_name} Purchase"
-                },
+                json=payload,
                 timeout=30.0
             )
             
             result = response.json()
+            logger.info(f"BulkClix card payment response: {result}")
             
             if response.status_code == 200 and result.get("status") in ["success", "pending"]:
                 await db.momo_payments.update_one(
@@ -186,6 +207,13 @@ async def initiate_card_payment(request: CardPaymentRequest):
                         }
                     }
                 )
+                
+                # Send SMS notification
+                try:
+                    sms = get_sms()
+                    await sms.notify_payment_pending(request.phone, amount, card_name)
+                except Exception as e:
+                    logger.error(f"SMS notification error: {e}")
                 
                 return {
                     "success": True,
@@ -336,16 +364,19 @@ async def payment_callback(request: Request):
     """BulkClix payment callback webhook"""
     try:
         data = await request.json()
-    except:
+    except Exception:
         data = dict(request.query_params)
     
-    reference = data.get("reference") or data.get("transactionId")
+    logger.info(f"Payment callback received: {data}")
+    
+    reference = data.get("reference") or data.get("transactionId") or data.get("transaction_id")
     status = (data.get("status") or "").lower()
     
     if not reference:
+        logger.warning("Callback missing reference")
         return {"success": False, "message": "Missing reference"}
     
-    # Find payment
+    # Find payment by provider reference or our reference
     payment = await db.momo_payments.find_one(
         {"$or": [
             {"provider_reference": reference},
@@ -355,11 +386,18 @@ async def payment_callback(request: Request):
     )
     
     if not payment:
+        logger.warning(f"Payment not found for reference: {reference}")
         return {"success": False, "message": "Payment not found"}
     
-    if status in ["success", "successful", "completed"]:
+    logger.info(f"Processing callback for payment {payment['id']}, status: {status}")
+    
+    if status in ["success", "successful", "completed", "approved"]:
         await complete_payment(payment["id"])
-    elif status in ["failed", "cancelled", "declined"]:
+        logger.info(f"Payment {payment['id']} completed successfully")
+    elif status in ["failed", "cancelled", "declined", "rejected", "error"]:
+        # Get client phone for failure notification
+        client = await db.clients.find_one({"id": payment.get("client_id")}, {"_id": 0})
+        
         await db.momo_payments.update_one(
             {"id": payment["id"]},
             {
@@ -370,6 +408,18 @@ async def payment_callback(request: Request):
                 }
             }
         )
+        
+        # Send failure SMS
+        try:
+            if client and client.get("phone"):
+                sms = get_sms()
+                await sms.notify_payment_failed(client["phone"], payment["amount"], data.get("message", ""))
+        except Exception as e:
+            logger.error(f"Failure SMS error: {e}")
+            
+        logger.info(f"Payment {payment['id']} marked as failed")
+    else:
+        logger.info(f"Callback received with status '{status}', no action taken")
     
     return {"success": True, "message": "Callback processed"}
 
@@ -473,6 +523,9 @@ async def process_card_purchase(payment: Dict):
     card_type = metadata.get("card_type", "silver")
     referrer_id = metadata.get("referrer_id")
     
+    # Get client info for SMS
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    
     # Update client with card
     await db.clients.update_one(
         {"id": client_id},
@@ -539,8 +592,19 @@ async def process_card_purchase(payment: Dict):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
+    # Send SMS notification for card purchase
+    try:
+        sms = get_sms()
+        if client and client.get("phone"):
+            await sms.notify_card_purchase(client["phone"], card_type, payment["amount"], welcome_bonus)
+    except Exception as e:
+        logger.error(f"Card purchase SMS error: {e}")
+    
     # Process referral if exists
     if referrer_id:
+        # Get referrer info
+        referrer = await db.clients.find_one({"id": referrer_id}, {"_id": 0})
+        
         # Credit referrer
         await db.clients.update_one(
             {"id": referrer_id},
@@ -572,6 +636,15 @@ async def process_card_purchase(payment: Dict):
             },
             upsert=True
         )
+        
+        # Send SMS to referrer
+        try:
+            if referrer and referrer.get("phone"):
+                sms = get_sms()
+                referred_name = client.get("full_name", "A friend") if client else "A friend"
+                await sms.notify_referral_bonus(referrer["phone"], referrer_bonus, referred_name)
+        except Exception as e:
+            logger.error(f"Referral SMS error: {e}")
 
 
 async def process_merchant_payment(payment: Dict):
@@ -583,8 +656,10 @@ async def process_merchant_payment(payment: Dict):
     if not merchant_id:
         return
     
-    # Get merchant
+    # Get client and merchant
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0})
     merchant = await db.merchants.find_one({"id": merchant_id}, {"_id": 0})
+    
     if not merchant:
         return
     
@@ -635,3 +710,24 @@ async def process_merchant_payment(payment: Dict):
         "status": "completed",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    # Send SMS notifications
+    try:
+        sms = get_sms()
+        
+        # Notify client of cashback
+        if client and client.get("phone"):
+            await sms.notify_payment_received(
+                client["phone"], 
+                payment["amount"], 
+                merchant.get("business_name", "Merchant"),
+                net_cashback
+            )
+        
+        # Notify merchant of payment
+        if merchant.get("phone"):
+            client_name = client.get("full_name", "A customer") if client else "A customer"
+            await sms.notify_merchant_payment(merchant["phone"], payment["amount"], client_name)
+            
+    except Exception as e:
+        logger.error(f"Merchant payment SMS error: {e}")
