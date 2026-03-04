@@ -32,7 +32,9 @@ import {
   AlertCircle,
   Camera,
   Percent,
-  MapPin
+  MapPin,
+  Banknote,
+  Send
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -69,6 +71,14 @@ export default function ClientDashboard() {
   const [merchantPayAmount, setMerchantPayAmount] = useState('');
   const [merchantPayStatus, setMerchantPayStatus] = useState(null);
   const [merchantPaymentId, setMerchantPaymentId] = useState(null);
+
+  // Withdrawal modal state
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [withdrawalPhone, setWithdrawalPhone] = useState('');
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalNetwork, setWithdrawalNetwork] = useState('');
+  const [withdrawalStatus, setWithdrawalStatus] = useState(null);
+  const [withdrawalId, setWithdrawalId] = useState(null);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -428,6 +438,97 @@ export default function ClientDashboard() {
     }
   };
 
+  // ============== WITHDRAWAL FUNCTIONS ==============
+
+  const openWithdrawalModal = () => {
+    setWithdrawalPhone(client?.phone || '');
+    setWithdrawalAmount('');
+    setWithdrawalNetwork('');
+    setWithdrawalStatus(null);
+    setWithdrawalId(null);
+    setShowWithdrawalModal(true);
+  };
+
+  const initiateWithdrawal = async () => {
+    const amount = parseFloat(withdrawalAmount);
+    if (!amount || amount < 5) {
+      toast.error('Minimum withdrawal amount is GHS 5');
+      return;
+    }
+    
+    if (amount > (client?.cashback_balance || 0)) {
+      toast.error(`Insufficient balance. Available: GHS ${(client?.cashback_balance || 0).toFixed(2)}`);
+      return;
+    }
+
+    if (!withdrawalPhone) {
+      toast.error('Please enter phone number');
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setWithdrawalStatus('processing');
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/withdrawal/initiate`, {
+        phone: withdrawalPhone,
+        amount: amount,
+        network: withdrawalNetwork || null
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data.success) {
+        setWithdrawalId(res.data.withdrawal_id);
+        setWithdrawalStatus('pending');
+        
+        if (res.data.test_mode) {
+          toast.info('Test mode: Click "Confirm Withdrawal" to simulate payout');
+        } else {
+          toast.success('Withdrawal is being processed!');
+        }
+      }
+    } catch (error) {
+      setWithdrawalStatus('failed');
+      toast.error(error.response?.data?.detail || 'Withdrawal failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const confirmTestWithdrawal = async () => {
+    if (!withdrawalId) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/withdrawal/test/confirm/${withdrawalId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data.success) {
+        setWithdrawalStatus('success');
+        toast.success(`Withdrawal successful! New balance: GHS ${res.data.new_balance.toFixed(2)}`);
+        setTimeout(() => {
+          setShowWithdrawalModal(false);
+          fetchDashboardData();
+        }, 2000);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Confirmation failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const closeWithdrawalModal = () => {
+    setShowWithdrawalModal(false);
+    setWithdrawalPhone('');
+    setWithdrawalAmount('');
+    setWithdrawalNetwork('');
+    setWithdrawalStatus(null);
+    setWithdrawalId(null);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('sdm_client_token');
     localStorage.removeItem('sdm_client_data');
@@ -499,6 +600,18 @@ export default function ClientDashboard() {
               <p className="font-semibold">GHS {(client?.total_spent || 0).toFixed(2)}</p>
             </div>
           </div>
+          
+          {/* Withdraw Button */}
+          {isActive && (client?.cashback_balance || 0) >= 5 && (
+            <Button
+              onClick={openWithdrawalModal}
+              className="mt-4 w-full bg-white/20 hover:bg-white/30 text-white"
+              data-testid="withdraw-btn"
+            >
+              <Banknote size={18} className="mr-2" />
+              Withdraw to MoMo
+            </Button>
+          )}
         </div>
 
         {/* Inactive Account Banner */}
@@ -1150,6 +1263,167 @@ export default function ClientDashboard() {
                     <CreditCard className="mr-2" size={18} />
                   )}
                   Pay with MoMo
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============== WITHDRAWAL MODAL ============== */}
+      {showWithdrawalModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={closeWithdrawalModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+            
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Banknote className="text-emerald-400" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-white">Withdraw Cashback</h3>
+              <p className="text-slate-400 text-sm mt-1">
+                Send your cashback to Mobile Money
+              </p>
+            </div>
+            
+            {/* Balance Info */}
+            <div className="bg-slate-900 rounded-xl p-4 mb-6 text-center">
+              <p className="text-slate-400 text-sm">Available Balance</p>
+              <p className="text-amber-400 text-3xl font-bold">
+                GHS {(client?.cashback_balance || 0).toFixed(2)}
+              </p>
+            </div>
+            
+            {withdrawalStatus === 'success' ? (
+              <div className="text-center py-6">
+                <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
+                <p className="text-emerald-400 text-xl font-bold">Withdrawal Successful!</p>
+                <p className="text-slate-400 mt-2">Funds sent to {withdrawalPhone}</p>
+              </div>
+            ) : withdrawalStatus === 'pending' ? (
+              <div className="text-center py-4">
+                <Clock className="text-amber-400 mx-auto mb-4 animate-pulse" size={48} />
+                <p className="text-white font-medium mb-2">Withdrawal Pending</p>
+                <p className="text-slate-400 text-sm mb-4">
+                  Amount: GHS {parseFloat(withdrawalAmount).toFixed(2)}<br />
+                  To: {withdrawalPhone}
+                </p>
+                
+                {/* Test Mode Confirm */}
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                  <p className="text-slate-500 text-xs mb-3">Test Mode</p>
+                  <Button
+                    onClick={confirmTestWithdrawal}
+                    disabled={isProcessingPayment}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600"
+                    data-testid="confirm-withdrawal-btn"
+                  >
+                    {isProcessingPayment ? (
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                    ) : (
+                      <CheckCircle className="mr-2" size={16} />
+                    )}
+                    Confirm Withdrawal (Test)
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Phone Number */}
+                <div className="mb-4">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    MoMo Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Input
+                      type="tel"
+                      placeholder="0XX XXX XXXX"
+                      value={withdrawalPhone}
+                      onChange={(e) => setWithdrawalPhone(e.target.value)}
+                      className="pl-10 bg-slate-900 border-slate-700 text-white"
+                      data-testid="withdrawal-phone"
+                    />
+                  </div>
+                </div>
+                
+                {/* Network (Optional) */}
+                <div className="mb-4">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    Network (Optional)
+                  </label>
+                  <select
+                    value={withdrawalNetwork}
+                    onChange={(e) => setWithdrawalNetwork(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2"
+                    data-testid="withdrawal-network"
+                  >
+                    <option value="">Auto-detect</option>
+                    <option value="MTN">MTN MoMo</option>
+                    <option value="VODAFONE">Vodafone Cash</option>
+                    <option value="AIRTELTIGO">AirtelTigo Money</option>
+                  </select>
+                </div>
+                
+                {/* Amount */}
+                <div className="mb-6">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    Amount (GHS) - Min: 5, Max: {Math.min(client?.cashback_balance || 0, 1000).toFixed(0)}
+                  </label>
+                  <Input
+                    type="number"
+                    min="5"
+                    max={Math.min(client?.cashback_balance || 0, 1000)}
+                    step="0.01"
+                    placeholder="Enter amount"
+                    value={withdrawalAmount}
+                    onChange={(e) => setWithdrawalAmount(e.target.value)}
+                    className="bg-slate-900 border-slate-700 text-white text-2xl text-center py-6"
+                    data-testid="withdrawal-amount"
+                  />
+                </div>
+                
+                {/* Quick Amount Buttons */}
+                <div className="flex gap-2 mb-6">
+                  {[5, 10, 20, 50].filter(a => a <= (client?.cashback_balance || 0)).map(amt => (
+                    <button
+                      key={amt}
+                      onClick={() => setWithdrawalAmount(amt.toString())}
+                      className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
+                    >
+                      {amt}
+                    </button>
+                  ))}
+                  {(client?.cashback_balance || 0) >= 5 && (
+                    <button
+                      onClick={() => setWithdrawalAmount((client?.cashback_balance || 0).toFixed(2))}
+                      className="flex-1 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg text-sm"
+                    >
+                      All
+                    </button>
+                  )}
+                </div>
+                
+                {/* Withdraw Button */}
+                <Button
+                  onClick={initiateWithdrawal}
+                  disabled={isProcessingPayment || !withdrawalAmount || parseFloat(withdrawalAmount) < 5}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 py-6"
+                  data-testid="initiate-withdrawal-btn"
+                >
+                  {isProcessingPayment ? (
+                    <Loader2 className="animate-spin mr-2" size={18} />
+                  ) : (
+                    <Send className="mr-2" size={18} />
+                  )}
+                  Withdraw GHS {withdrawalAmount || '0'}
                 </Button>
               </>
             )}

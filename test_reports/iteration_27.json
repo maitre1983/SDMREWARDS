@@ -1,0 +1,78 @@
+{
+  "summary": "Testing complete for new features: Social share buttons (landing), cashback withdrawal (backend + frontend), admin payment logos CRUD. Fixed critical bug in payments.py (payload['id'] → payload['sub']). All tests passing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [],
+    "fixed": [
+      {
+        "file": "/app/backend/routers/payments.py",
+        "issue": "JWT payload used 'id' key but auth module uses 'sub' key",
+        "fix": "Changed payload['id'] to payload['sub'] on lines 762, 905, 993",
+        "impact": "Withdrawal endpoints were returning 500 Internal Server Error"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_withdrawal_payment_logos.py",
+    "/app/test_reports/pytest/withdrawal_payment_logos_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/routers/payments.py",
+    "/app/backend/tests/test_withdrawal_payment_logos.py"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 tests passed)",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "Admin": {"email": "emileparfait2003@gmail.com", "password": "Gerard0103@"},
+    "Test Client (Gold)": {"phone": "+233551111111", "password": "TestPass123"}
+  },
+  "seed_data_creation": "None - used existing test client",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All new features working. Withdrawal endpoint fixed and tested. Test client balance is now GHS 1.83 (after test withdrawal of GHS 5). Payment logos CRUD all working.",
+  "mocked_apis": {
+    "BulkClix MoMo": "MOCKED - PAYMENT_TEST_MODE=true",
+    "BulkClix SMS": "MOCKED - SMS_TEST_MODE=true"
+  },
+  "features_tested": {
+    "Landing_Page_Social_Share": {
+      "WhatsApp_Button": "✅ Visible, data-testid='share-whatsapp'",
+      "Facebook_Button": "✅ Visible, data-testid='share-facebook'",
+      "Twitter_Button": "✅ Visible, data-testid='share-twitter'",
+      "Telegram_Button": "✅ Visible, data-testid='share-telegram'"
+    },
+    "Client_Withdrawal": {
+      "POST /api/payments/withdrawal/initiate": "✅ Working (returns pending status in test mode)",
+      "POST /api/payments/withdrawal/test/confirm/{id}": "✅ Working (deducts balance, creates transaction)",
+      "Withdrawal_Button_Visibility": "✅ Shows only when balance >= 5",
+      "Withdrawal_Modal": "✅ Opens with phone, network, amount fields",
+      "Min_Amount_Validation": "✅ Rejects amounts < 5 GHS",
+      "Max_Amount_Validation": "✅ Rejects amounts > 1000 GHS",
+      "Insufficient_Balance_Check": "✅ Returns error if balance too low"
+    },
+    "Admin_Payment_Logos": {
+      "GET /api/admin/payment-logos/public": "✅ Returns active logos (no auth required)",
+      "GET /api/admin/payment-logos": "✅ Returns all logos (admin auth required)",
+      "POST /api/admin/payment-logos": "✅ Creates new logo",
+      "PUT /api/admin/payment-logos/{id}": "✅ Updates existing logo",
+      "DELETE /api/admin/payment-logos/{id}": "✅ Deletes logo"
+    }
+  },
+  "bug_fixed": {
+    "description": "Withdrawal endpoint was returning 500 Internal Server Error due to JWT payload key mismatch",
+    "root_cause": "payments.py was using payload['id'] but auth.py creates tokens with 'sub' as the user ID key",
+    "file": "/app/backend/routers/payments.py",
+    "lines_fixed": [762, 905, 993],
+    "before": "payload['id']",
+    "after": "payload['sub']"
+  }
+}

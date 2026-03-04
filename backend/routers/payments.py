@@ -731,3 +731,367 @@ async def process_merchant_payment(payment: Dict):
             
     except Exception as e:
         logger.error(f"Merchant payment SMS error: {e}")
+
+
+# ============== CASHBACK WITHDRAWAL ==============
+
+class WithdrawalRequest(BaseModel):
+    phone: str  # Destination MoMo number
+    amount: float
+    network: Optional[str] = None  # MTN, VODAFONE, AIRTELTIGO
+
+
+@router.post("/withdrawal/initiate")
+async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
+    """
+    Initiate cashback withdrawal to Mobile Money
+    """
+    # Get client from token
+    auth_header = req.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization required")
+    
+    token = auth_header.split(" ")[1]
+    
+    # Decode token (simple validation)
+    from routers.auth import decode_token
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "client":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    client = await db.clients.find_one({"id": payload["sub"]}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Validate amount
+    min_withdrawal = 5.0
+    max_withdrawal = 1000.0
+    
+    if request.amount < min_withdrawal:
+        raise HTTPException(status_code=400, detail=f"Minimum withdrawal amount is GHS {min_withdrawal}")
+    
+    if request.amount > max_withdrawal:
+        raise HTTPException(status_code=400, detail=f"Maximum withdrawal amount is GHS {max_withdrawal}")
+    
+    # Check balance
+    current_balance = client.get("cashback_balance", 0)
+    if current_balance < request.amount:
+        raise HTTPException(status_code=400, detail=f"Insufficient balance. Available: GHS {current_balance:.2f}")
+    
+    # Detect network
+    network = request.network or detect_network(request.phone)
+    if not network:
+        raise HTTPException(status_code=400, detail="Invalid phone number or unsupported network. Please specify network.")
+    
+    # Generate withdrawal reference
+    withdrawal_ref = f"SDM-WD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
+    
+    # Create withdrawal record
+    withdrawal_record = {
+        "id": str(uuid.uuid4()),
+        "reference": withdrawal_ref,
+        "type": "withdrawal",
+        "client_id": client["id"],
+        "client_phone": client["phone"],
+        "destination_phone": request.phone,
+        "network": network,
+        "amount": request.amount,
+        "fee": 0,  # No withdrawal fee for now
+        "net_amount": request.amount,
+        "status": "pending",
+        "test_mode": is_test_mode(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "provider_reference": None,
+        "provider_message": None
+    }
+    
+    await db.withdrawals.insert_one(withdrawal_record)
+    
+    # In test mode, return for manual confirmation
+    if is_test_mode():
+        return {
+            "success": True,
+            "withdrawal_id": withdrawal_record["id"],
+            "reference": withdrawal_ref,
+            "amount": request.amount,
+            "destination": request.phone,
+            "network": network,
+            "status": "pending",
+            "test_mode": True,
+            "message": "Test mode: Use /api/payments/withdrawal/test/confirm/{id} to simulate payout"
+        }
+    
+    # Production mode: Call BulkClix Disbursement API
+    try:
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"{BULKCLIX_BASE_URL}/payment-api/momodisbursement",
+                headers={
+                    "Authorization": f"Bearer {BULKCLIX_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "phone": request.phone,
+                    "amount": request.amount,
+                    "network": network,
+                    "reference": withdrawal_ref,
+                    "narration": "SDM Cashback Withdrawal",
+                    "callback_url": f"{CALLBACK_BASE_URL}/api/payments/withdrawal/callback"
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Update record with provider reference
+                await db.withdrawals.update_one(
+                    {"id": withdrawal_record["id"]},
+                    {"$set": {
+                        "provider_reference": data.get("transactionId"),
+                        "provider_message": data.get("message"),
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                return {
+                    "success": True,
+                    "withdrawal_id": withdrawal_record["id"],
+                    "reference": withdrawal_ref,
+                    "amount": request.amount,
+                    "destination": request.phone,
+                    "network": network,
+                    "status": "processing",
+                    "message": "Withdrawal is being processed. You will receive funds shortly."
+                }
+            else:
+                logger.error(f"BulkClix disbursement error: {response.status_code} - {response.text}")
+                await db.withdrawals.update_one(
+                    {"id": withdrawal_record["id"]},
+                    {"$set": {"status": "failed", "provider_message": response.text}}
+                )
+                raise HTTPException(status_code=500, detail="Withdrawal request failed. Please try again.")
+                
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Payment provider timeout. Please try again.")
+    except Exception as e:
+        logger.error(f"Withdrawal error: {e}")
+        raise HTTPException(status_code=500, detail="Withdrawal service unavailable")
+
+
+@router.post("/withdrawal/test/confirm/{withdrawal_id}")
+async def confirm_test_withdrawal(withdrawal_id: str, req: Request):
+    """
+    Test mode: Manually confirm a withdrawal to simulate successful payout
+    """
+    # Get client from token
+    auth_header = req.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization required")
+    
+    token = auth_header.split(" ")[1]
+    from routers.auth import decode_token
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "client":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Find withdrawal
+    withdrawal = await db.withdrawals.find_one({"id": withdrawal_id}, {"_id": 0})
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    
+    # Verify ownership
+    if withdrawal["client_id"] != payload["sub"]:
+        raise HTTPException(status_code=403, detail="Not your withdrawal")
+    
+    if withdrawal["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"Withdrawal already {withdrawal['status']}")
+    
+    if not withdrawal.get("test_mode"):
+        raise HTTPException(status_code=400, detail="This endpoint is only for test mode withdrawals")
+    
+    # Get client
+    client = await db.clients.find_one({"id": withdrawal["client_id"]}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Check balance again
+    if client.get("cashback_balance", 0) < withdrawal["amount"]:
+        raise HTTPException(status_code=400, detail="Insufficient balance")
+    
+    # Deduct from balance
+    new_balance = client["cashback_balance"] - withdrawal["amount"]
+    await db.clients.update_one(
+        {"id": client["id"]},
+        {"$set": {
+            "cashback_balance": new_balance,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Update withdrawal status
+    await db.withdrawals.update_one(
+        {"id": withdrawal_id},
+        {"$set": {
+            "status": "success",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Record transaction
+    await db.transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "withdrawal",
+        "client_id": client["id"],
+        "amount": -withdrawal["amount"],
+        "description": f"Cashback withdrawal to {withdrawal['destination_phone']}",
+        "payment_reference": withdrawal["reference"],
+        "status": "completed",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Send SMS notification
+    try:
+        sms = get_sms()
+        await sms.send_sms(
+            client["phone"],
+            f"SDM Rewards: Your withdrawal of GHS {withdrawal['amount']:.2f} to {withdrawal['destination_phone']} was successful. New balance: GHS {new_balance:.2f}"
+        )
+    except Exception as e:
+        logger.error(f"Withdrawal SMS error: {e}")
+    
+    return {
+        "success": True,
+        "message": "Withdrawal confirmed successfully",
+        "amount": withdrawal["amount"],
+        "destination": withdrawal["destination_phone"],
+        "new_balance": new_balance
+    }
+
+
+@router.get("/withdrawal/status/{withdrawal_id}")
+async def get_withdrawal_status(withdrawal_id: str, req: Request):
+    """
+    Get withdrawal status
+    """
+    auth_header = req.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization required")
+    
+    token = auth_header.split(" ")[1]
+    from routers.auth import decode_token
+    payload = decode_token(token)
+    if not payload or payload.get("type") != "client":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    withdrawal = await db.withdrawals.find_one({"id": withdrawal_id}, {"_id": 0})
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    
+    if withdrawal["client_id"] != payload["sub"]:
+        raise HTTPException(status_code=403, detail="Not your withdrawal")
+    
+    return {
+        "id": withdrawal["id"],
+        "reference": withdrawal["reference"],
+        "amount": withdrawal["amount"],
+        "destination": withdrawal["destination_phone"],
+        "network": withdrawal["network"],
+        "status": withdrawal["status"],
+        "created_at": withdrawal["created_at"],
+        "completed_at": withdrawal.get("completed_at")
+    }
+
+
+@router.post("/withdrawal/callback")
+async def withdrawal_callback(request: Request):
+    """
+    BulkClix callback for withdrawal status updates
+    """
+    try:
+        body = await request.json()
+        logger.info(f"Withdrawal callback received: {body}")
+        
+        reference = body.get("reference")
+        status = body.get("status", "").lower()
+        
+        if not reference:
+            return {"success": False, "message": "Missing reference"}
+        
+        withdrawal = await db.withdrawals.find_one({"reference": reference}, {"_id": 0})
+        if not withdrawal:
+            return {"success": False, "message": "Withdrawal not found"}
+        
+        if status in ["success", "successful", "completed"]:
+            # Get client and deduct balance
+            client = await db.clients.find_one({"id": withdrawal["client_id"]}, {"_id": 0})
+            if client:
+                new_balance = max(0, client.get("cashback_balance", 0) - withdrawal["amount"])
+                await db.clients.update_one(
+                    {"id": client["id"]},
+                    {"$set": {
+                        "cashback_balance": new_balance,
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                # Record transaction
+                await db.transactions.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "type": "withdrawal",
+                    "client_id": client["id"],
+                    "amount": -withdrawal["amount"],
+                    "description": f"Cashback withdrawal to {withdrawal['destination_phone']}",
+                    "payment_reference": withdrawal["reference"],
+                    "status": "completed",
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+                
+                # Send SMS
+                try:
+                    sms = get_sms()
+                    await sms.send_sms(
+                        client["phone"],
+                        f"SDM Rewards: Your withdrawal of GHS {withdrawal['amount']:.2f} to {withdrawal['destination_phone']} was successful."
+                    )
+                except Exception as e:
+                    logger.error(f"Withdrawal SMS error: {e}")
+            
+            await db.withdrawals.update_one(
+                {"id": withdrawal["id"]},
+                {"$set": {
+                    "status": "success",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+        elif status in ["failed", "error", "declined"]:
+            await db.withdrawals.update_one(
+                {"id": withdrawal["id"]},
+                {"$set": {
+                    "status": "failed",
+                    "provider_message": body.get("message", "Withdrawal failed"),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Notify client of failure
+            client = await db.clients.find_one({"id": withdrawal["client_id"]}, {"_id": 0})
+            if client:
+                try:
+                    sms = get_sms()
+                    await sms.send_sms(
+                        client["phone"],
+                        f"SDM Rewards: Your withdrawal of GHS {withdrawal['amount']:.2f} could not be processed. Please try again."
+                    )
+                except Exception as e:
+                    logger.error(f"Failed withdrawal SMS error: {e}")
+        
+        return {"success": True, "message": "Callback processed"}
+        
+    except Exception as e:
+        logger.error(f"Withdrawal callback error: {e}")
+        return {"success": False, "message": str(e)}

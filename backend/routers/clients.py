@@ -389,3 +389,22 @@ async def update_profile(
     )
     
     return {"success": True, "message": "Profile updated"}
+
+
+# ============== WITHDRAWALS ==============
+
+@router.get("/withdrawals")
+async def get_client_withdrawals(
+    limit: int = 20,
+    current_client: dict = Depends(get_current_client)
+):
+    """Get client withdrawal history"""
+    withdrawals = await db.withdrawals.find(
+        {"client_id": current_client["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return {
+        "withdrawals": withdrawals,
+        "total": len(withdrawals)
+    }

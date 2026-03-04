@@ -128,6 +128,11 @@ export const translations = {
     trust_verified_merchants: "Verified Merchants",
     trust_powered_by: "Powered by",
     
+    // ============== SHARE SECTION ==============
+    share_tagline: "SPREAD THE WORD",
+    share_title: "Share SDM Rewards with Friends",
+    share_subtitle: "Help your friends discover cashback rewards. Share on your favorite platform!",
+    
     // ============== CTA SECTION ==============
     cta_title: "Ready to Start Earning?",
     cta_subtitle: "Join thousands of smart shoppers earning cashback on every purchase",
@@ -304,6 +309,11 @@ export const translations = {
     trust_data_protection: "Protection des Données",
     trust_verified_merchants: "Marchands Vérifiés",
     trust_powered_by: "Propulsé par",
+    
+    // ============== SHARE SECTION ==============
+    share_tagline: "PARTAGEZ",
+    share_title: "Partagez SDM Rewards avec vos Amis",
+    share_subtitle: "Aidez vos amis à découvrir les récompenses cashback. Partagez sur votre plateforme préférée !",
     
     // ============== CTA SECTION ==============
     cta_title: "Prêt à Commencer à Gagner ?",

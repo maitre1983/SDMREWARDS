@@ -640,3 +640,87 @@ async def get_revenue_report(
         "by_type": by_type,
         "card_sales_count": len(card_sales)
     }
+
+
+# ============== PAYMENT LOGOS MANAGEMENT ==============
+
+class PaymentLogoRequest(BaseModel):
+    name: str  # e.g., "Visa", "MTN MoMo"
+    logo_url: str
+    display_order: int = 0
+    is_active: bool = True
+
+
+@router.get("/payment-logos")
+async def get_payment_logos(current_admin: dict = Depends(get_current_admin)):
+    """Get all payment logos"""
+    logos = await db.payment_logos.find({}, {"_id": 0}).sort("display_order", 1).to_list(100)
+    return {"logos": logos}
+
+
+@router.post("/payment-logos")
+async def add_payment_logo(request: PaymentLogoRequest, current_admin: dict = Depends(get_current_admin)):
+    """Add a new payment logo"""
+    logo_data = {
+        "id": str(uuid.uuid4()),
+        "name": request.name,
+        "logo_url": request.logo_url,
+        "display_order": request.display_order,
+        "is_active": request.is_active,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_admin["id"]
+    }
+    
+    await db.payment_logos.insert_one(logo_data)
+    
+    return {
+        "success": True,
+        "message": f"Payment logo '{request.name}' added",
+        "logo": {k: v for k, v in logo_data.items() if k != "_id"}
+    }
+
+
+@router.put("/payment-logos/{logo_id}")
+async def update_payment_logo(
+    logo_id: str,
+    request: PaymentLogoRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update a payment logo"""
+    logo = await db.payment_logos.find_one({"id": logo_id})
+    if not logo:
+        raise HTTPException(status_code=404, detail="Logo not found")
+    
+    await db.payment_logos.update_one(
+        {"id": logo_id},
+        {"$set": {
+            "name": request.name,
+            "logo_url": request.logo_url,
+            "display_order": request.display_order,
+            "is_active": request.is_active,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"success": True, "message": "Payment logo updated"}
+
+
+@router.delete("/payment-logos/{logo_id}")
+async def delete_payment_logo(logo_id: str, current_admin: dict = Depends(get_current_admin)):
+    """Delete a payment logo"""
+    result = await db.payment_logos.delete_one({"id": logo_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Logo not found")
+    
+    return {"success": True, "message": "Payment logo deleted"}
+
+
+# Public endpoint - no auth required
+@router.get("/payment-logos/public")
+async def get_public_payment_logos():
+    """Get active payment logos for public display"""
+    logos = await db.payment_logos.find(
+        {"is_active": True},
+        {"_id": 0, "created_by": 0}
+    ).sort("display_order", 1).to_list(100)
+    return {"logos": logos}

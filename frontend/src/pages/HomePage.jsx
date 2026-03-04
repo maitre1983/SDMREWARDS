@@ -26,7 +26,11 @@ import {
   Zap,
   Heart,
   Award,
-  BadgeCheck
+  BadgeCheck,
+  Share2,
+  Facebook,
+  Twitter,
+  MessageCircle
 } from 'lucide-react';
 
 // SDM Logo URL - Stored externally
@@ -87,6 +91,26 @@ export default function HomePage() {
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     setIsMobileMenuOpen(false);
+  };
+
+  // Social sharing functions
+  const shareUrl = typeof window !== 'undefined' ? window.location.origin : 'https://sdmrewards.com';
+  const shareText = language === 'fr' 
+    ? 'Rejoignez SDM Rewards et gagnez du cashback sur chaque achat ! 🎁💰'
+    : 'Join SDM Rewards and earn cashback on every purchase! 🎁💰';
+
+  const handleShare = (platform) => {
+    const encodedUrl = encodeURIComponent(shareUrl);
+    const encodedText = encodeURIComponent(shareText);
+    
+    const shareLinks = {
+      whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`,
+      twitter: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedText}`,
+      telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`
+    };
+    
+    window.open(shareLinks[platform], '_blank', 'width=600,height=400');
   };
 
   return (
@@ -614,6 +638,63 @@ export default function HomePage() {
               <img src={PAYMENT_LOGOS.vodafone} alt="Vodafone Cash" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
               <span className="text-slate-400 font-semibold">BulkClix</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============== SHARE SECTION ============== */}
+      <section className="py-16 bg-slate-900">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <div className="inline-flex items-center gap-2 bg-purple-500/20 border border-purple-500/30 rounded-full px-4 py-2 mb-6">
+            <Share2 className="text-purple-400" size={16} />
+            <span className="text-purple-400 text-sm font-medium">{t('share_tagline')}</span>
+          </div>
+          
+          <h2 className="text-2xl sm:text-3xl font-bold mb-4">{t('share_title')}</h2>
+          <p className="text-slate-400 mb-8 max-w-xl mx-auto">{t('share_subtitle')}</p>
+          
+          <div className="flex flex-wrap justify-center gap-4">
+            {/* WhatsApp */}
+            <button
+              onClick={() => handleShare('whatsapp')}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl transition-colors"
+              data-testid="share-whatsapp"
+            >
+              <MessageCircle size={20} />
+              <span>WhatsApp</span>
+            </button>
+            
+            {/* Facebook */}
+            <button
+              onClick={() => handleShare('facebook')}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl transition-colors"
+              data-testid="share-facebook"
+            >
+              <Facebook size={20} />
+              <span>Facebook</span>
+            </button>
+            
+            {/* Twitter/X */}
+            <button
+              onClick={() => handleShare('twitter')}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-xl transition-colors"
+              data-testid="share-twitter"
+            >
+              <Twitter size={20} />
+              <span>Twitter</span>
+            </button>
+            
+            {/* Telegram */}
+            <button
+              onClick={() => handleShare('telegram')}
+              className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-6 py-3 rounded-xl transition-colors"
+              data-testid="share-telegram"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+              </svg>
+              <span>Telegram</span>
+            </button>
           </div>
         </div>
       </section>
