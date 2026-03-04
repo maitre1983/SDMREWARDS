@@ -8136,7 +8136,7 @@ async def buy_sdm_vip_card(request: BuySDMVIPCardRequest, user: dict = Depends(g
     await db.vip_memberships.insert_one(membership)
     
     # Initiate MoMo payment
-    callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/user/vip-cards/payment-webhook"
+    callback_url = f"{os.environ.get('BACKEND_URL', 'https://web-boost-seo.preview.emergentagent.com')}/api/sdm/payments/webhook/vip-card"
     
     collection_result = await bulkclix_payment_service.collect_momo_payment(
         amount=price,
@@ -8353,7 +8353,7 @@ async def vip_card_payment_webhook(request: Request):
         
         # Find pending membership by transaction ID
         membership = await db.vip_memberships.find_one(
-            {"payment_reference": transaction_id},
+            {"transaction_id": transaction_id},
             {"_id": 0}
         )
         
@@ -8418,8 +8418,9 @@ async def process_vip_card_payment_success(membership: dict):
             {"$set": {"status": "upgraded"}}
         )
     
-    # Get card type for details
-    card_type = await db.vip_card_types.find_one({"id": membership["card_type_id"]}, {"_id": 0})
+    # Get card config from VIP_CARDS
+    card_tier = membership.get("tier", "silver")
+    card_config = VIP_CARDS.get(card_tier, {})
     
     # Activate membership
     await db.vip_memberships.update_one(
@@ -8433,13 +8434,12 @@ async def process_vip_card_payment_success(membership: dict):
     
     # Update user record
     user_updates = {
-        "vip_tier": membership["tier"],
+        "vip_tier": membership["tier"].upper(),
         "vip_membership_id": membership["id"],
         "membership_status": "active",
-        "membership_confirmed_at": now
+        "membership_confirmed_at": now,
+        "monthly_withdrawal_limit": card_config.get("max_withdrawal_per_day", 1000) * 30
     }
-    if card_type:
-        user_updates["monthly_withdrawal_limit"] = card_type.get("monthly_withdrawal_limit", 2500)
     
     await db.sdm_users.update_one(
         {"id": user_id},
