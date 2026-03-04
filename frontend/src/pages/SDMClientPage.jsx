@@ -589,8 +589,8 @@ export default function SDMClientPage() {
         card_tier: cardTier
       }, { headers });
       
-      toast.success(response.data.message || 'Prompt de paiement envoyé!');
-      toast.info('Approuvez le paiement sur votre téléphone MoMo pour activer votre carte.');
+      toast.success(response.data.message || 'Payment prompt sent!');
+      toast.info('Approve the payment on your MoMo phone to activate your card.');
       
       // Store transaction ID for status polling
       setVipPurchaseTxnId(response.data.transaction_id);
@@ -599,7 +599,7 @@ export default function SDMClientPage() {
       pollVipPaymentStatus(response.data.transaction_id);
       
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec de l\'achat');
+      toast.error(error.response?.data?.detail || 'Purchase failed');
     } finally {
       setIsServiceLoading(false);
     }
@@ -621,12 +621,12 @@ export default function SDMClientPage() {
         );
         
         if (response.data.status === 'active') {
-          toast.success('🎉 Carte VIP activée avec succès!');
+          toast.success('🎉 VIP Card activated successfully!');
           if (response.data.referral_bonus > 0) {
-            toast.success(`Bonus parrain: +GHS ${response.data.referral_bonus}`);
+            toast.success(`Referral bonus: +GHS ${response.data.referral_bonus}`);
           }
           if (response.data.welcome_bonus > 0) {
-            toast.success(`Bonus bienvenue: +GHS ${response.data.welcome_bonus}`);
+            toast.success(`Welcome bonus: +GHS ${response.data.welcome_bonus}`);
           }
           setVipPurchaseTxnId(null);
           setActiveService(null);
@@ -634,7 +634,7 @@ export default function SDMClientPage() {
           fetchServiceData();
           return;
         } else if (response.data.status === 'payment_failed') {
-          toast.error('Paiement échoué. Veuillez réessayer.');
+          toast.error('Payment failed. Please try again.');
           setVipPurchaseTxnId(null);
           return;
         }
@@ -643,7 +643,7 @@ export default function SDMClientPage() {
         if (attempts < maxAttempts) {
           setTimeout(checkStatus, 5000); // Check every 5 seconds
         } else {
-          toast.info('Vérification du statut expirée. Rechargez la page pour voir votre carte.');
+          toast.info('Status check expired. Reload the page to see your card.');
           setVipPurchaseTxnId(null);
         }
       } catch (error) {
@@ -2322,7 +2322,7 @@ export default function SDMClientPage() {
                           ) : canPurchase ? (
                             <Button
                               onClick={() => handlePurchaseVIP(card.id)}
-                              disabled={isServiceLoading || (serviceBalance?.cashback_balance || 0) < priceToShow}
+                              disabled={isServiceLoading}
                               className="w-full"
                               style={{ backgroundColor: card.badge_color === '#C0C0C0' ? '#6B7280' : card.badge_color }}
                             >
@@ -2342,7 +2342,7 @@ export default function SDMClientPage() {
                 </div>
 
                 <p className="text-xs text-center text-slate-500 mt-4">
-                  Payment will be deducted from your cashback balance
+                  Payment via MoMo - You will receive a payment prompt on your phone
                 </p>
               </div>
             )}

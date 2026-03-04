@@ -8657,7 +8657,7 @@ async def buy_sdm_vip_card(request: BuySDMVIPCardRequest, user: dict = Depends(g
         "membership_id": membership["id"],
         "transaction_id": transaction_id,
         "status": "pending_payment",
-        "message": f"Prompt de paiement envoyé! Approuvez GHS {price} sur votre téléphone pour activer votre carte {card['name']}.",
+        "message": f"Payment prompt sent! Approve GHS {price} on your phone to activate your {card['name']}.",
         "card": card
     }
 
