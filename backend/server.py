@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+from passlib.context import CryptContext
 
 # Load environment variables
 load_dotenv()
@@ -45,6 +46,9 @@ async def lifespan(app: FastAPI):
     
     # Initialize platform config
     await init_platform_config()
+    
+    # Initialize super admin
+    await init_super_admin()
     
     yield
     
@@ -107,6 +111,40 @@ async def create_indexes():
         logger.info("✅ Database indexes created")
     except Exception as e:
         logger.error(f"❌ Index creation error: {e}")
+
+# ============== SUPER ADMIN INITIALIZATION ==============
+async def init_super_admin():
+    """Create super admin account if it doesn't exist"""
+    try:
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        # Check if super admin exists
+        existing = await db.admins.find_one({"email": "emileparfait2003@gmail.com"})
+        if not existing:
+            hashed_password = pwd_context.hash("Gerard0103@")
+            admin_data = {
+                "email": "emileparfait2003@gmail.com",
+                "password": hashed_password,
+                "name": "Super Admin",
+                "role": "super_admin",
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            }
+            await db.admins.insert_one(admin_data)
+            logger.info("✅ Super admin account created")
+        else:
+            # Ensure the account is active
+            if not existing.get("is_active"):
+                await db.admins.update_one(
+                    {"email": "emileparfait2003@gmail.com"},
+                    {"$set": {"is_active": True, "updated_at": datetime.now(timezone.utc)}}
+                )
+                logger.info("✅ Super admin account reactivated")
+            else:
+                logger.info("✅ Super admin account exists and is active")
+    except Exception as e:
+        logger.error(f"❌ Super admin initialization error: {e}")
 
 # ============== PLATFORM CONFIG ==============
 async def init_platform_config():
