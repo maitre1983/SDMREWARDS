@@ -7,6 +7,34 @@
 
 ## CHANGELOG
 
+### March 4, 2026 - Phase 7: Legal Pages & Compliance ✅
+
+**Legal Pages Created:**
+- `/terms` - Terms of Service (comprehensive, 16 sections)
+- `/privacy` - Privacy Policy (data protection, user rights)
+- `/merchant-terms` - Merchant Agreement + Anti-Fraud Policy
+
+**Key Legal Disclaimers Added:**
+- "SDM REWARDS is NOT a bank, financial institution, or investment company"
+- Platform operates as digital loyalty technology only
+- Does not hold deposits or provide banking services
+- Payments processed directly through external systems (MoMo/banks)
+
+**Registration Legal Notice:**
+- Client: "By creating an account, you agree to Terms of Service and Privacy Policy"
+- Merchant: "By registering, you agree to Merchant Terms and Privacy Policy"
+
+**Footer Updates:**
+- Legal section with all policy links
+- Legal disclaimer banner
+- Contact Support link
+
+**Compliance with Ghana regulations:**
+- Clear distinction from banking/financial services
+- Ready for Bank of Ghana review if needed
+
+---
+
 ### March 4, 2026 - Phase 6: UI/UX Premium Redesign & Security ✅
 
 **New Fintech Premium Design (Auth Pages):**

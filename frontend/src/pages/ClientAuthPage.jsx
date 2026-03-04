@@ -534,6 +534,14 @@ export default function ClientAuthPage() {
                   {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Create Account'}
                 </Button>
 
+                {/* Legal Agreement */}
+                <p className="text-slate-500 text-xs text-center">
+                  By creating an account, you agree to SDM REWARDS{' '}
+                  <a href="/terms" className="text-amber-400 hover:underline">Terms of Service</a>
+                  {' '}and{' '}
+                  <a href="/privacy" className="text-amber-400 hover:underline">Privacy Policy</a>.
+                </p>
+
                 <div className="text-center">
                   <p className="text-slate-400">
                     Already have an account?{' '}

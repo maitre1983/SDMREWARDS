@@ -537,6 +537,14 @@ export default function MerchantAuthPage() {
                   {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Register Business'}
                 </Button>
 
+                {/* Legal Agreement */}
+                <p className="text-slate-500 text-xs text-center">
+                  By registering, you agree to SDM REWARDS{' '}
+                  <a href="/merchant-terms" className="text-emerald-400 hover:underline">Merchant Terms</a>
+                  {' '}and{' '}
+                  <a href="/privacy" className="text-emerald-400 hover:underline">Privacy Policy</a>.
+                </p>
+
                 <div className="text-center">
                   <p className="text-slate-400">
                     Already registered?{' '}

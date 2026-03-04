@@ -764,12 +764,19 @@ export default function HomePage() {
             <div>
               <h4 className="font-semibold mb-4">{t('footer_legal')}</h4>
               <ul className="space-y-2">
-                <li><a href="#" className="text-slate-400 hover:text-white">{t('footer_privacy')}</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-white">{t('footer_terms')}</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-white">{t('footer_faq')}</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-white">{t('footer_help')}</a></li>
+                <li><a href="/terms" className="text-slate-400 hover:text-white">{t('footer_terms')}</a></li>
+                <li><a href="/privacy" className="text-slate-400 hover:text-white">{t('footer_privacy')}</a></li>
+                <li><a href="/merchant-terms" className="text-slate-400 hover:text-white">{t('footer_merchant_terms')}</a></li>
+                <li><a href="mailto:support@sdmrewards.com" className="text-slate-400 hover:text-white">{t('footer_contact')}</a></li>
               </ul>
             </div>
+          </div>
+          
+          {/* Legal Disclaimer */}
+          <div className="bg-slate-800/50 rounded-xl p-4 mb-8 text-center">
+            <p className="text-slate-500 text-sm">
+              SDM REWARDS is a digital loyalty and cashback platform. It is not a bank, financial institution, or investment service provider.
+            </p>
           </div>
           
           {/* Bottom */}

@@ -14,6 +14,11 @@ import MerchantDashboard from "./pages/MerchantDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFoundPage from "./pages/NotFoundPage";
 
+// Legal Pages
+import TermsOfServicePage from "./pages/TermsOfServicePage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import MerchantTermsPage from "./pages/MerchantTermsPage";
+
 // Generate admin paths with date-based security (format: DDMMYY)
 const getAdminPaths = () => {
   const paths = [];
@@ -66,6 +71,11 @@ function App() {
             {/* Merchant Routes */}
             <Route path="/merchant" element={<MerchantAuthPage />} />
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
+            
+            {/* Legal Pages */}
+            <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/merchant-terms" element={<MerchantTermsPage />} />
             
             {/* Admin Routes - ONLY valid date paths (format: DDMMYY) */}
             {adminPaths.map(path => (

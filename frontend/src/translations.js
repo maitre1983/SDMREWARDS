@@ -146,8 +146,8 @@ export const translations = {
     footer_contact: "Contact Us",
     footer_privacy: "Privacy Policy",
     footer_terms: "Terms of Service",
-    footer_faq: "FAQ",
-    footer_help: "Help Center",
+    footer_merchant_terms: "Merchant Terms",
+    footer_contact: "Contact Support",
     footer_copyright: "© 2026 SDM Rewards. All rights reserved.",
     footer_address: "Accra, Ghana",
     
@@ -328,8 +328,8 @@ export const translations = {
     footer_contact: "Contactez-nous",
     footer_privacy: "Politique de Confidentialité",
     footer_terms: "Conditions d'Utilisation",
-    footer_faq: "FAQ",
-    footer_help: "Centre d'Aide",
+    footer_merchant_terms: "Conditions Marchands",
+    footer_contact: "Contacter le Support",
     footer_copyright: "© 2026 SDM Rewards. Tous droits réservés.",
     footer_address: "Accra, Ghana",
     
