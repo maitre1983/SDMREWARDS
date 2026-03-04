@@ -6706,8 +6706,8 @@ async def get_service_fees():
     }
 
 @sdm_router.post("/user/services/airtime")
-async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_current_user)):
-    """User: Buy airtime using cashback balance - SDM fee applied"""
+async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_active_vip_user)):
+    """User: Buy airtime using cashback balance - SDM fee applied. Requires active VIP card."""
     network = None
     if request.network:
         try:
@@ -6777,8 +6777,8 @@ async def buy_airtime(request: BuyAirtimeRequest, user: dict = Depends(get_curre
         raise HTTPException(status_code=400, detail=str(e))
 
 @sdm_router.post("/user/services/data")
-async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_user)):
-    """User: Buy data bundle using cashback balance - SDM fee applied"""
+async def buy_data(request: BuyDataRequest, user: dict = Depends(get_active_vip_user)):
+    """User: Buy data bundle using cashback balance - SDM fee applied. Requires active VIP card."""
     try:
         # Get bundle price for promo calculation
         bundles = bulkclix_service.get_data_bundles()
@@ -6847,8 +6847,8 @@ async def buy_data(request: BuyDataRequest, user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail=str(e))
 
 @sdm_router.post("/user/services/bill")
-async def pay_bill(request: PayBillRequest, user: dict = Depends(get_current_user)):
-    """User: Pay utility bill using cashback balance - SDM fee applied"""
+async def pay_bill(request: PayBillRequest, user: dict = Depends(get_active_vip_user)):
+    """User: Pay utility bill using cashback balance - SDM fee applied. Requires active VIP card."""
     try:
         provider = BillProvider(request.provider)
     except ValueError:
@@ -6917,8 +6917,8 @@ async def pay_bill(request: PayBillRequest, user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail=str(e))
 
 @sdm_router.post("/user/services/withdraw")
-async def withdraw_to_momo(request: MoMoWithdrawalRequest, user: dict = Depends(get_current_user)):
-    """User: Withdraw cashback to Mobile Money"""
+async def withdraw_to_momo(request: MoMoWithdrawalRequest, user: dict = Depends(get_active_vip_user)):
+    """User: Withdraw cashback to Mobile Money. Requires active VIP card."""
     network = None
     if request.network:
         try:

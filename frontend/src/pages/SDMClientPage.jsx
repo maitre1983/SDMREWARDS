@@ -1392,129 +1392,210 @@ export default function SDMClientPage() {
         {/* SUPER APP SERVICES TAB */}
         {activeTab === 'services' && (
           <div className="space-y-4" data-testid="services-tab">
-            {/* Service Balance Info */}
-            {serviceBalance && (
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-4 text-white">
-                <p className="text-sm opacity-80">Available Cashback Balance</p>
-                <p className="text-2xl font-bold">GHS {serviceBalance.cashback_balance?.toFixed(2) || '0.00'}</p>
-                <div className="flex gap-4 mt-2 text-xs">
-                  <span>Monthly Limit: GHS {serviceBalance.monthly_limit}</span>
-                  <span>Used: GHS {serviceBalance.monthly_used?.toFixed(2)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Service Selection Menu */}
-            {!activeService && (
-              <div className="space-y-3">
-                <h3 className="font-semibold text-slate-900">Use My Cashback</h3>
-                
-                {/* Airtime */}
-                <button
-                  onClick={() => setActiveService('airtime')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
-                  data-testid="service-airtime"
-                >
-                  {getServicePromo('AIRTIME') && (
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                      -{getServicePromo('AIRTIME').discount_percent}%
+            {/* Check if user has active VIP card */}
+            {(() => {
+              const hasActiveVip = myVipMembership?.status === 'active' || user?.membership_status === 'active' || user?.vip_tier;
+              
+              return (
+                <>
+                  {/* Alert Banner for Inactive Users */}
+                  {!hasActiveVip && (
+                    <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-4 text-white">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+                          <Lock size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg">Compte Inactif</h3>
+                          <p className="text-sm opacity-90 mt-1">
+                            Achetez une carte VIP SDM pour débloquer tous les services: Airtime, Data, Bill Pay, et Retraits MoMo.
+                          </p>
+                          <Button
+                            onClick={() => setActiveService('vip')}
+                            className="mt-3 bg-white text-amber-600 hover:bg-amber-50 font-semibold"
+                            size="sm"
+                          >
+                            <Crown size={16} className="mr-2" />
+                            Acheter ma Carte VIP
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
-                    <Phone className="text-orange-600" size={24} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Buy Airtime</p>
-                    <p className="text-sm text-slate-500">Airtime MTN, Vodafone, AirtelTigo</p>
-                  </div>
-                  <ChevronRight className="text-slate-400" size={20} />
-                </button>
 
-                {/* Data Bundle */}
-                <button
-                  onClick={() => setActiveService('data')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
-                  data-testid="service-data"
-                >
-                  {getServicePromo('DATA') && (
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                      -{getServicePromo('DATA').discount_percent}%
+                  {/* Service Balance Info - Only show for active VIP */}
+                  {hasActiveVip && serviceBalance && (
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-4 text-white">
+                      <p className="text-sm opacity-80">Available Cashback Balance</p>
+                      <p className="text-2xl font-bold">GHS {serviceBalance.cashback_balance?.toFixed(2) || '0.00'}</p>
+                      <div className="flex gap-4 mt-2 text-xs">
+                        <span>Monthly Limit: GHS {serviceBalance.monthly_limit}</span>
+                        <span>Used: GHS {serviceBalance.monthly_used?.toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <Wifi className="text-blue-600" size={24} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Data Bundle</p>
-                    <p className="text-sm text-slate-500">Data bundles for all networks</p>
-                  </div>
-                  <ChevronRight className="text-slate-400" size={20} />
-                </button>
 
-                {/* Bill Payment */}
-                <button
-                  onClick={() => setActiveService('bill')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
-                  data-testid="service-bill"
-                >
-                  {getServicePromo('BILL_PAYMENT') && (
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                      -{getServicePromo('BILL_PAYMENT').discount_percent}%
-                    </div>
-                  )}
-                  <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center">
-                    <Zap className="text-yellow-600" size={24} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Pay a Bill</p>
-                    <p className="text-sm text-slate-500">ECG, GWCL, DSTV, GOTV</p>
-                  </div>
-                  <ChevronRight className="text-slate-400" size={20} />
-                </button>
+                  {/* Service Selection Menu */}
+                  {!activeService && (
+                    <div className="space-y-3">
+                      {/* VIP Card - Always First and Highlighted for Non-VIP */}
+                      <button
+                        onClick={() => setActiveService('vip')}
+                        className={`w-full rounded-xl p-4 flex items-center gap-4 relative ${
+                          hasActiveVip 
+                            ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white' 
+                            : 'bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white animate-pulse'
+                        }`}
+                        data-testid="service-vip"
+                      >
+                        {myVipMembership && (
+                          <div className="absolute -top-2 -right-2 bg-white text-amber-600 text-xs px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                            {myVipMembership.tier}
+                          </div>
+                        )}
+                        {!hasActiveVip && (
+                          <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                            REQUIS
+                          </div>
+                        )}
+                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                          <Crown className="text-white" size={24} />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-bold">{hasActiveVip ? 'SDM VIP Card' : 'Activer Mon Compte'}</p>
+                          <p className="text-sm opacity-80">
+                            {hasActiveVip 
+                              ? (myVipMembership ? `Upgrade vers ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold ou Platinum')
+                              : 'Achetez une carte pour débloquer les services'
+                            }
+                          </p>
+                        </div>
+                        <ChevronRight className="text-white/80" size={20} />
+                      </button>
 
-                {/* MoMo Withdrawal */}
-                <button
-                  onClick={() => setActiveService('momo')}
-                  className="w-full bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-200 hover:border-blue-300 transition-colors relative"
-                  data-testid="service-momo"
-                >
-                  {getServicePromo('MOMO_WITHDRAWAL') && (
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                      -{getServicePromo('MOMO_WITHDRAWAL').discount_percent}%
-                    </div>
-                  )}
-                  <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                    <Banknote className="text-green-600" size={24} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold text-slate-900">Mobile Money Withdrawal</p>
-                    <p className="text-sm text-slate-500">Withdraw to MTN, Vodafone, AirtelTigo</p>
-                  </div>
-                  <ChevronRight className="text-slate-400" size={20} />
-                </button>
+                      <h3 className="font-semibold text-slate-900 mt-4">
+                        {hasActiveVip ? 'Utiliser Mon Cashback' : 'Services (VIP Requis)'}
+                      </h3>
+                      
+                      {/* Airtime - Locked for non-VIP */}
+                      <button
+                        onClick={() => hasActiveVip ? setActiveService('airtime') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
+                          hasActiveVip 
+                            ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
+                            : 'border-slate-100 opacity-60 cursor-not-allowed'
+                        }`}
+                        data-testid="service-airtime"
+                      >
+                        {!hasActiveVip && (
+                          <div className="absolute -top-2 -right-2 bg-slate-400 text-white text-xs p-1 rounded-full">
+                            <Lock size={12} />
+                          </div>
+                        )}
+                        {hasActiveVip && getServicePromo('AIRTIME') && (
+                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                            -{getServicePromo('AIRTIME').discount_percent}%
+                          </div>
+                        )}
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${hasActiveVip ? 'bg-orange-100' : 'bg-slate-100'}`}>
+                          <Phone className={hasActiveVip ? 'text-orange-600' : 'text-slate-400'} size={24} />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className={`font-semibold ${hasActiveVip ? 'text-slate-900' : 'text-slate-400'}`}>Buy Airtime</p>
+                          <p className="text-sm text-slate-500">Airtime MTN, Vodafone, AirtelTigo</p>
+                        </div>
+                        {hasActiveVip ? <ChevronRight className="text-slate-400" size={20} /> : <Lock className="text-slate-300" size={20} />}
+                      </button>
 
-                {/* VIP Membership */}
-                <button
-                  onClick={() => setActiveService('vip')}
-                  className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-xl p-4 flex items-center gap-4 text-white relative"
-                  data-testid="service-vip"
-                >
-                  {myVipMembership && (
-                    <div className="absolute -top-2 -right-2 bg-white text-amber-600 text-xs px-2 py-0.5 rounded-full font-bold border border-amber-200">
-                      {myVipMembership.tier}
-                    </div>
-                  )}
-                  <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                    <Crown className="text-white" size={24} />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-semibold">SDM VIP Card</p>
-                    <p className="text-sm opacity-80">
-                      {myVipMembership ? `Upgrade to ${myVipMembership.tier === 'SILVER' ? 'Gold' : 'Platinum'}` : 'Silver, Gold or Platinum'}
-                    </p>
-                  </div>
-                  <ChevronRight className="text-white/80" size={20} />
-                </button>
+                      {/* Data Bundle - Locked for non-VIP */}
+                      <button
+                        onClick={() => hasActiveVip ? setActiveService('data') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
+                          hasActiveVip 
+                            ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
+                            : 'border-slate-100 opacity-60 cursor-not-allowed'
+                        }`}
+                        data-testid="service-data"
+                      >
+                        {!hasActiveVip && (
+                          <div className="absolute -top-2 -right-2 bg-slate-400 text-white text-xs p-1 rounded-full">
+                            <Lock size={12} />
+                          </div>
+                        )}
+                        {hasActiveVip && getServicePromo('DATA') && (
+                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                            -{getServicePromo('DATA').discount_percent}%
+                          </div>
+                        )}
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${hasActiveVip ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                          <Wifi className={hasActiveVip ? 'text-blue-600' : 'text-slate-400'} size={24} />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className={`font-semibold ${hasActiveVip ? 'text-slate-900' : 'text-slate-400'}`}>Data Bundle</p>
+                          <p className="text-sm text-slate-500">Data bundles for all networks</p>
+                        </div>
+                        {hasActiveVip ? <ChevronRight className="text-slate-400" size={20} /> : <Lock className="text-slate-300" size={20} />}
+                      </button>
+
+                      {/* Bill Payment - Locked for non-VIP */}
+                      <button
+                        onClick={() => hasActiveVip ? setActiveService('bill') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
+                          hasActiveVip 
+                            ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
+                            : 'border-slate-100 opacity-60 cursor-not-allowed'
+                        }`}
+                        data-testid="service-bill"
+                      >
+                        {!hasActiveVip && (
+                          <div className="absolute -top-2 -right-2 bg-slate-400 text-white text-xs p-1 rounded-full">
+                            <Lock size={12} />
+                          </div>
+                        )}
+                        {hasActiveVip && getServicePromo('BILL_PAYMENT') && (
+                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                            -{getServicePromo('BILL_PAYMENT').discount_percent}%
+                          </div>
+                        )}
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${hasActiveVip ? 'bg-yellow-100' : 'bg-slate-100'}`}>
+                          <Zap className={hasActiveVip ? 'text-yellow-600' : 'text-slate-400'} size={24} />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className={`font-semibold ${hasActiveVip ? 'text-slate-900' : 'text-slate-400'}`}>Pay a Bill</p>
+                          <p className="text-sm text-slate-500">ECG, GWCL, DSTV, GOTV</p>
+                        </div>
+                        {hasActiveVip ? <ChevronRight className="text-slate-400" size={20} /> : <Lock className="text-slate-300" size={20} />}
+                      </button>
+
+                      {/* MoMo Withdrawal - Locked for non-VIP */}
+                      <button
+                        onClick={() => hasActiveVip ? setActiveService('momo') : toast.error('Achetez une carte VIP pour accéder à ce service')}
+                        className={`w-full bg-white rounded-xl p-4 flex items-center gap-4 border transition-colors relative ${
+                          hasActiveVip 
+                            ? 'border-slate-200 hover:border-blue-300 cursor-pointer' 
+                            : 'border-slate-100 opacity-60 cursor-not-allowed'
+                        }`}
+                        data-testid="service-momo"
+                      >
+                        {!hasActiveVip && (
+                          <div className="absolute -top-2 -right-2 bg-slate-400 text-white text-xs p-1 rounded-full">
+                            <Lock size={12} />
+                          </div>
+                        )}
+                        {hasActiveVip && getServicePromo('MOMO_WITHDRAWAL') && (
+                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                            -{getServicePromo('MOMO_WITHDRAWAL').discount_percent}%
+                          </div>
+                        )}
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${hasActiveVip ? 'bg-green-100' : 'bg-slate-100'}`}>
+                          <Banknote className={hasActiveVip ? 'text-green-600' : 'text-slate-400'} size={24} />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className={`font-semibold ${hasActiveVip ? 'text-slate-900' : 'text-slate-400'}`}>Mobile Money Withdrawal</p>
+                          <p className="text-sm text-slate-500">Withdraw to MTN, Vodafone, AirtelTigo</p>
+                        </div>
+                        {hasActiveVip ? <ChevronRight className="text-slate-400" size={20} /> : <Lock className="text-slate-300" size={20} />}
+                      </button>
 
                 {/* Partenaires SDM */}
                 <button
@@ -2253,6 +2334,9 @@ export default function SDMClientPage() {
                 )}
               </div>
             )}
+                </>
+              );
+            })()}
           </div>
         )}
 

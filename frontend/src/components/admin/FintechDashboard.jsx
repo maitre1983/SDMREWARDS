@@ -92,6 +92,9 @@ export default function FintechDashboard({ token }) {
     auto_activate: true
   });
   
+  // Card Sales state
+  const [cardSales, setCardSales] = useState(null);
+  
   const headers = { Authorization: `Bearer ${token}` };
 
   const fetchData = async () => {
@@ -419,6 +422,17 @@ export default function FintechDashboard({ token }) {
     }
   };
 
+  // Fetch card sales data
+  const fetchCardSales = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/sdm/admin/platform/card-sales`, { headers });
+      setCardSales(response.data);
+    } catch (error) {
+      console.error('Card sales fetch error:', error);
+      toast.error('Failed to load card sales data');
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -437,6 +451,8 @@ export default function FintechDashboard({ token }) {
       fetchLeaderboard();
     } else if (activeSubTab === 'vip-cards') {
       fetchVipCards();
+    } else if (activeSubTab === 'card-sales') {
+      fetchCardSales();
     } else if (activeSubTab === 'partners') {
       fetchPartners();
     } else if (activeSubTab === 'lottery') {
@@ -688,6 +704,7 @@ export default function FintechDashboard({ token }) {
           { id: 'overview', label: 'Overview', icon: TrendingUp },
           { id: 'leaderboard', label: 'Top Clients', icon: Trophy },
           { id: 'vip-cards', label: 'VIP Cards', icon: Crown },
+          { id: 'card-sales', label: 'Card Sales', icon: DollarSign },
           { id: 'lottery', label: 'Lottery', icon: Ticket },
           { id: 'partners', label: 'Partners', icon: MapPin },
           { id: 'withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
@@ -1365,6 +1382,210 @@ export default function FintechDashboard({ token }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Card Sales Dashboard */}
+      {activeSubTab === 'card-sales' && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Total Balance</p>
+              <p className="text-2xl font-bold">GHS {cardSales?.platform_balance?.toFixed(2) || '0.00'}</p>
+              <p className="text-xs opacity-70 mt-1">Platform Revenue</p>
+            </div>
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Total Cards Sold</p>
+              <p className="text-2xl font-bold">{cardSales?.total_cards_sold || 0}</p>
+              <p className="text-xs opacity-70 mt-1">All Time</p>
+            </div>
+            <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">Today's Revenue</p>
+              <p className="text-2xl font-bold">GHS {cardSales?.today?.revenue?.toFixed(2) || '0.00'}</p>
+              <p className="text-xs opacity-70 mt-1">{cardSales?.today?.cards_sold || 0} cards sold</p>
+            </div>
+            <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl p-4 text-white">
+              <p className="text-sm opacity-80">This Month</p>
+              <p className="text-2xl font-bold">GHS {cardSales?.this_month?.revenue?.toFixed(2) || '0.00'}</p>
+              <p className="text-xs opacity-70 mt-1">{cardSales?.this_month?.cards_sold || 0} cards sold</p>
+            </div>
+          </div>
+
+          {/* Period Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl p-5 border border-slate-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Calendar className="text-blue-600" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900">Today</h4>
+                  <p className="text-xs text-slate-500">{new Date().toLocaleDateString('fr-FR')}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Revenue:</span>
+                  <span className="font-semibold text-emerald-600">GHS {cardSales?.today?.revenue?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Cards Sold:</span>
+                  <span className="font-semibold">{cardSales?.today?.cards_sold || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Bonuses Paid:</span>
+                  <span className="font-semibold text-amber-600">GHS {cardSales?.today?.bonuses_paid?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-5 border border-slate-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <Activity className="text-purple-600" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900">This Week</h4>
+                  <p className="text-xs text-slate-500">Current week</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Revenue:</span>
+                  <span className="font-semibold text-emerald-600">GHS {cardSales?.this_week?.revenue?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Cards Sold:</span>
+                  <span className="font-semibold">{cardSales?.this_week?.cards_sold || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Bonuses Paid:</span>
+                  <span className="font-semibold text-amber-600">GHS {cardSales?.this_week?.bonuses_paid?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-5 border border-slate-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <TrendingUp className="text-emerald-600" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900">This Month</h4>
+                  <p className="text-xs text-slate-500">{new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Revenue:</span>
+                  <span className="font-semibold text-emerald-600">GHS {cardSales?.this_month?.revenue?.toFixed(2) || '0.00'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Cards Sold:</span>
+                  <span className="font-semibold">{cardSales?.this_month?.cards_sold || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Bonuses Paid:</span>
+                  <span className="font-semibold text-amber-600">GHS {cardSales?.this_month?.bonuses_paid?.toFixed(2) || '0.00'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sales by Tier */}
+          {cardSales?.by_tier && Object.keys(cardSales.by_tier).length > 0 && (
+            <div className="bg-white rounded-xl p-6 border border-slate-200">
+              <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <Crown size={18} className="text-amber-500" />
+                Sales by Tier
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(cardSales.by_tier).map(([tier, stats]) => (
+                  <div 
+                    key={tier} 
+                    className={`p-4 rounded-lg border ${
+                      tier === 'platinum' ? 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300' :
+                      tier === 'gold' ? 'bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200' :
+                      tier === 'silver' ? 'bg-gradient-to-br from-slate-50 to-gray-100 border-slate-200' :
+                      'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200'
+                    }`}
+                  >
+                    <p className="font-semibold capitalize text-slate-800">{tier}</p>
+                    <p className="text-2xl font-bold text-slate-900">{stats.count}</p>
+                    <p className="text-sm text-emerald-600">GHS {stats.revenue?.toFixed(2)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recent Sales */}
+          <div className="bg-white rounded-xl border border-slate-200">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                <FileText size={18} className="text-slate-500" />
+                Recent Card Sales
+              </h4>
+              <Button 
+                onClick={fetchCardSales} 
+                variant="outline" 
+                size="sm"
+                className="gap-2"
+              >
+                <RefreshCw size={14} />
+                Refresh
+              </Button>
+            </div>
+            
+            {cardSales?.recent_sales?.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {cardSales.recent_sales.slice(0, 20).map((sale, index) => (
+                  <div key={index} className="p-4 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          sale.card_tier === 'platinum' ? 'bg-slate-200' :
+                          sale.card_tier === 'gold' ? 'bg-amber-100' :
+                          sale.card_tier === 'silver' ? 'bg-slate-100' :
+                          'bg-orange-100'
+                        }`}>
+                          <Crown className={`${
+                            sale.card_tier === 'platinum' ? 'text-slate-600' :
+                            sale.card_tier === 'gold' ? 'text-amber-600' :
+                            sale.card_tier === 'silver' ? 'text-slate-500' :
+                            'text-orange-600'
+                          }`} size={18} />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900">{sale.user_phone || 'Unknown'}</p>
+                          <p className="text-sm text-slate-500 capitalize">{sale.card_tier || 'N/A'} Card</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-emerald-600">+GHS {sale.sdm_revenue?.toFixed(2) || sale.price?.toFixed(2) || '0.00'}</p>
+                        <p className="text-xs text-slate-400">
+                          {sale.created_at ? new Date(sale.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    {sale.bonuses_paid > 0 && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-amber-600">
+                        <Gift size={12} />
+                        Bonuses paid: GHS {sale.bonuses_paid?.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-500">
+                <DollarSign size={40} className="mx-auto mb-3 opacity-30" />
+                <p>No card sales recorded yet</p>
+                <p className="text-sm">Sales will appear here when users purchase VIP cards</p>
+              </div>
+            )}
           </div>
         </div>
       )}

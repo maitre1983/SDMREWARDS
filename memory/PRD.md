@@ -508,8 +508,70 @@ Configuration via:
 
 ---
 
-*Last Updated: March 3, 2026*
+*Last Updated: March 4, 2026*
 *BulkClix Payment Integration: FULLY WORKING - Real payments enabled*
 *Customer Payment Flow: Customer pays first, then merchant receives*
 *Admin Transaction History: Complete visibility for Super Admin*
 *Merchant Settlement Config: MoMo/Bank with KYC verification*
+*VIP Card System: COMPLETE - Services require active VIP membership*
+
+---
+
+## VIP CARD SYSTEM (NEW - March 4, 2026)
+
+### Overview
+Le système de carte VIP est maintenant entièrement implémenté. Les nouveaux utilisateurs sont **inactifs (Bronze)** et ne peuvent accéder à aucun service tant qu'ils n'ont pas acheté une carte VIP.
+
+### Flux d'Activation
+1. **Inscription**: Utilisateur crée un compte → statut `membership_status: pending`
+2. **Services Bloqués**: Tous les services (Airtime, Data, Bill Pay, Withdraw) sont inaccessibles
+3. **Achat VIP**: Utilisateur va dans Services → SDM VIP CARD → Choisit une carte
+4. **Paiement MoMo**: Prompt MoMo envoyé pour le paiement
+5. **Activation**: Après confirmation webhook:
+   - `membership_status: active`
+   - `vip_tier: SILVER/GOLD/PLATINUM`
+   - Bonus parrain crédité (3 GHS) si parrain existe
+   - Bonus filleul crédité (1 GHS)
+   - Revenu SDM enregistré
+
+### Cartes VIP Disponibles
+| Carte | Prix | Bonus Parrain | Bonus Filleul |
+|-------|------|---------------|---------------|
+| Bronze (Inactif) | Gratuit | - | - |
+| Silver | GHS 25 | GHS 3 | GHS 1 |
+| Gold | GHS 50 | GHS 3 | GHS 1 |
+| Platinum | GHS 95 | GHS 3 | GHS 1 |
+
+### Protection des Services (Backend)
+- Les 4 endpoints de services utilisent `get_active_vip_user`
+- Retourne erreur 403 si `membership_status != 'active'` ou pas de `vip_tier`
+- Message: "Vous devez acheter une carte VIP pour accéder à ce service"
+
+### Interface Client (Frontend)
+- **Bannière "Compte Inactif"** (orange) pour les utilisateurs sans VIP
+- **Services verrouillés** avec icônes de cadenas et opacité réduite
+- **Bouton VIP** mis en évidence avec badge "REQUIS" et animation
+- **Toast d'erreur** si clic sur service bloqué
+
+### Interface Admin (Fintech Ledger → Card Sales)
+- **Dashboard de ventes**:
+  - Total Balance (revenus plateforme)
+  - Total Cards Sold
+  - Today's Revenue
+  - This Month Revenue
+- **Statistiques par période**: Today, This Week, This Month
+- **Ventes par tier**: Bronze, Silver, Gold, Platinum
+- **Liste des ventes récentes**: User, Card, Revenue, Date
+
+### API Endpoints
+- `GET /api/sdm/user/sdm-vip-cards`: Liste des cartes disponibles
+- `POST /api/sdm/user/sdm-vip-cards/buy`: Initie l'achat d'une carte VIP via MoMo
+- `GET /api/sdm/user/vip-cards/payment-status/{transaction_id}`: Vérifie le statut du paiement
+- `POST /api/sdm/payments/webhook/vip_card`: Webhook de confirmation de paiement VIP
+- `GET /api/sdm/admin/platform/card-sales`: Dashboard des ventes de cartes (admin)
+
+### Collections MongoDB
+- **sdm_users**: `membership_status`, `vip_tier` ajoutés
+- **sdm_card_sales**: Historique des ventes de cartes
+- **sdm_platform_revenue**: Revenus de la plateforme (commissions + ventes)
+- **vip_memberships**: Adhésions VIP actives
