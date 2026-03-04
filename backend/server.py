@@ -168,6 +168,10 @@ from routers.clients import router as clients_router
 from routers.merchants import router as merchants_router
 from routers.transactions import router as transactions_router
 from routers.admin import router as admin_router
+from routers import payments as payments_router_module
+
+# Set database for payments router
+payments_router_module.set_db(db)
 
 # ============== REGISTER ROUTERS ==============
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -175,6 +179,7 @@ app.include_router(clients_router, prefix="/api/clients", tags=["Clients"])
 app.include_router(merchants_router, prefix="/api/merchants", tags=["Merchants"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
+app.include_router(payments_router_module.router, prefix="/api/payments", tags=["Payments"])
 
 # ============== ERROR HANDLERS ==============
 from fastapi.responses import JSONResponse

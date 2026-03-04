@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { 
   Sparkles, 
   CreditCard, 
   History, 
   Users, 
+  User,
   QrCode,
   Settings,
   LogOut,
@@ -22,7 +24,10 @@ import {
   Loader2,
   ShoppingBag,
   ArrowUpRight,
-  ArrowDownLeft
+  ArrowDownLeft,
+  Phone,
+  X,
+  AlertCircle
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -38,6 +43,15 @@ export default function ClientDashboard() {
   const [transactions, setTransactions] = useState([]);
   const [referrals, setReferrals] = useState(null);
   const [availableCards, setAvailableCards] = useState([]);
+  
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedCard, setSelectedCard] = useState(null);
+  const [paymentPhone, setPaymentPhone] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(null); // null, 'pending', 'processing', 'success', 'failed'
+  const [paymentId, setPaymentId] = useState(null);
+  const pollingRef = useRef(null);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -47,6 +61,13 @@ export default function ClientDashboard() {
       return;
     }
     fetchDashboardData();
+    
+    // Cleanup polling on unmount
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
   }, [token]);
 
   const fetchDashboardData = async () => {
@@ -95,21 +116,117 @@ export default function ClientDashboard() {
   };
 
   const handlePurchaseCard = async (cardType) => {
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.post(`${API_URL}/api/clients/cards/purchase`, {
-        card_type: cardType,
-        payment_method: 'momo'
-      }, { headers });
-      
-      toast.success(res.data.message || 'Card purchased successfully!');
-      if (res.data.welcome_bonus) {
-        toast.success(`Welcome bonus: +GHS ${res.data.welcome_bonus}`);
-      }
-      fetchDashboardData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Purchase failed');
+    // Find card details
+    const cardDetails = availableCards.find(c => c.type === cardType);
+    if (!cardDetails) {
+      toast.error('Card not found');
+      return;
     }
+    
+    // Set initial phone from client data
+    setPaymentPhone(client?.phone || '');
+    setSelectedCard(cardDetails);
+    setShowPaymentModal(true);
+    setPaymentStatus(null);
+    setPaymentId(null);
+  };
+  
+  const initiatePayment = async () => {
+    if (!paymentPhone || paymentPhone.length < 10) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setPaymentStatus('processing');
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/card/initiate`, {
+        phone: paymentPhone,
+        card_type: selectedCard.type
+      });
+      
+      if (res.data.success) {
+        setPaymentId(res.data.payment_id);
+        setPaymentStatus('pending');
+        
+        // In test mode, show confirm button
+        if (res.data.test_mode) {
+          toast.info('Test mode: Click "Confirm Payment" to simulate MoMo approval');
+        } else {
+          toast.success('MoMo prompt sent! Please approve on your phone.');
+          // Start polling for status
+          startPolling(res.data.payment_id);
+        }
+      }
+    } catch (error) {
+      setPaymentStatus('failed');
+      toast.error(error.response?.data?.detail || 'Payment initiation failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+  
+  const startPolling = (pId) => {
+    // Poll every 3 seconds for payment status
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/payments/status/${pId}`);
+        if (res.data.status === 'success') {
+          clearInterval(pollingRef.current);
+          setPaymentStatus('success');
+          toast.success('Payment successful! Your card is now active.');
+          setTimeout(() => {
+            setShowPaymentModal(false);
+            fetchDashboardData();
+          }, 2000);
+        } else if (res.data.status === 'failed') {
+          clearInterval(pollingRef.current);
+          setPaymentStatus('failed');
+          toast.error('Payment failed. Please try again.');
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 3000);
+    
+    // Stop polling after 2 minutes
+    setTimeout(() => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    }, 120000);
+  };
+  
+  const confirmTestPayment = async () => {
+    if (!paymentId) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/test/confirm/${paymentId}`);
+      if (res.data.success) {
+        setPaymentStatus('success');
+        toast.success('Payment confirmed! Your card is now active.');
+        setTimeout(() => {
+          setShowPaymentModal(false);
+          fetchDashboardData();
+        }, 2000);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Confirmation failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+  
+  const closePaymentModal = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+    setShowPaymentModal(false);
+    setSelectedCard(null);
+    setPaymentStatus(null);
+    setPaymentId(null);
   };
 
   const copyReferralCode = () => {
@@ -491,6 +608,140 @@ export default function ClientDashboard() {
           </button>
         </div>
       </nav>
+      
+      {/* Payment Modal */}
+      {showPaymentModal && selectedCard && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={closePaymentModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              disabled={isProcessingPayment}
+            >
+              <X size={20} />
+            </button>
+            
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div 
+                className="w-16 h-16 rounded-2xl mx-auto mb-3"
+                style={{ background: selectedCard.color }}
+              />
+              <h3 className="text-white text-xl font-bold">{selectedCard.name}</h3>
+              <p className="text-amber-400 text-2xl font-bold mt-1">GHS {selectedCard.price}</p>
+            </div>
+            
+            {/* Payment Status Display */}
+            {paymentStatus === 'success' ? (
+              <div className="text-center py-8">
+                <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
+                <p className="text-white text-lg font-semibold">Payment Successful!</p>
+                <p className="text-slate-400 mt-2">Your card is now active</p>
+              </div>
+            ) : paymentStatus === 'failed' ? (
+              <div className="text-center py-8">
+                <AlertCircle className="text-red-400 mx-auto mb-4" size={64} />
+                <p className="text-white text-lg font-semibold">Payment Failed</p>
+                <p className="text-slate-400 mt-2">Please try again</p>
+                <Button
+                  onClick={() => setPaymentStatus(null)}
+                  className="mt-4 bg-amber-500 hover:bg-amber-600"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : paymentStatus === 'pending' ? (
+              <div className="text-center py-6">
+                <div className="relative">
+                  <Phone className="text-amber-400 mx-auto mb-4" size={48} />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
+                </div>
+                <p className="text-white text-lg font-semibold">Waiting for Payment</p>
+                <p className="text-slate-400 mt-2 text-sm">
+                  Please approve the MoMo prompt on your phone
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
+                  <Loader2 className="animate-spin" size={16} />
+                  <span className="text-sm">Waiting for confirmation...</span>
+                </div>
+                
+                {/* Test Mode Confirm Button */}
+                <div className="mt-6 pt-4 border-t border-slate-700">
+                  <p className="text-slate-500 text-xs mb-3">Test Mode</p>
+                  <Button
+                    onClick={confirmTestPayment}
+                    disabled={isProcessingPayment}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600"
+                    data-testid="confirm-test-payment-btn"
+                  >
+                    {isProcessingPayment ? (
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                    ) : (
+                      <CheckCircle className="mr-2" size={16} />
+                    )}
+                    Confirm Payment (Test)
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Phone Input */}
+                <div className="mb-6">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    MoMo Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Input
+                      type="tel"
+                      placeholder="+233 XX XXX XXXX"
+                      value={paymentPhone}
+                      onChange={(e) => setPaymentPhone(e.target.value)}
+                      className="pl-10 bg-slate-900 border-slate-700 text-white"
+                      data-testid="momo-phone-input"
+                    />
+                  </div>
+                  <p className="text-slate-500 text-xs mt-2">
+                    A payment prompt will be sent to this number
+                  </p>
+                </div>
+                
+                {/* Payment Summary */}
+                <div className="bg-slate-900 rounded-lg p-4 mb-6">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-slate-400">Card</span>
+                    <span className="text-white">{selectedCard.name}</span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-slate-400">Price</span>
+                    <span className="text-white">GHS {selectedCard.price}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-slate-700">
+                    <span className="text-slate-400">Welcome Bonus</span>
+                    <span className="text-emerald-400">+GHS 1.00</span>
+                  </div>
+                </div>
+                
+                {/* Pay Button */}
+                <Button
+                  onClick={initiatePayment}
+                  disabled={isProcessingPayment || !paymentPhone}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 py-6"
+                  data-testid="initiate-payment-btn"
+                >
+                  {isProcessingPayment ? (
+                    <Loader2 className="animate-spin mr-2" size={18} />
+                  ) : (
+                    <CreditCard className="mr-2" size={18} />
+                  )}
+                  Pay with MoMo
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
