@@ -80,6 +80,10 @@ export default function SDMClientPage() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStep, setPaymentStep] = useState('scan'); // scan, amount, processing, success
   
+  // Partner details modal state
+  const [selectedPartner, setSelectedPartner] = useState(null);
+  const [showPartnerDetails, setShowPartnerDetails] = useState(false);
+  
   // Service form states
   const [airtimeForm, setAirtimeForm] = useState({ phone: '', amount: '', network: '' });
   const [dataForm, setDataForm] = useState({ phone: '', bundleId: '' });
@@ -1277,7 +1281,8 @@ export default function SDMClientPage() {
                 {partners.map((partner) => (
                   <div 
                     key={partner.id} 
-                    className="bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-100 hover:border-blue-200 transition-colors"
+                    onClick={() => { setSelectedPartner(partner); setShowPartnerDetails(true); }}
+                    className="bg-white rounded-xl p-4 flex items-center gap-4 border border-slate-100 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
                     data-testid={`partner-${partner.id}`}
                   >
                     {/* Partner Logo/Icon */}
@@ -1301,12 +1306,15 @@ export default function SDMClientPage() {
                       )}
                     </div>
 
-                    {/* Cashback Rate */}
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-lg font-bold text-emerald-600">
-                        {partner.cashback_rate || 5}%
-                      </p>
-                      <p className="text-xs text-slate-400">Cashback</p>
+                    {/* Cashback Rate & Arrow */}
+                    <div className="text-right flex-shrink-0 flex items-center gap-2">
+                      <div>
+                        <p className="text-lg font-bold text-emerald-600">
+                          {partner.cashback_rate || 5}%
+                        </p>
+                        <p className="text-xs text-slate-400">Cashback</p>
+                      </div>
+                      <ChevronRight size={20} className="text-slate-300" />
                     </div>
                   </div>
                 ))}
@@ -2523,6 +2531,138 @@ export default function SDMClientPage() {
           </div>
         )}
       </div>
+
+      {/* Partner Details Modal */}
+      {showPartnerDetails && selectedPartner && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center" onClick={() => setShowPartnerDetails(false)}>
+          <div 
+            className="bg-white rounded-t-3xl w-full max-w-lg max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-cyan-500 p-6 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <button 
+                  onClick={() => setShowPartnerDetails(false)}
+                  className="p-2 rounded-full bg-white/20 hover:bg-white/30"
+                >
+                  <X size={20} />
+                </button>
+                <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium">
+                  {selectedPartner.cashback_rate || 5}% Cashback
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center">
+                  {selectedPartner.logo ? (
+                    <img src={selectedPartner.logo} alt={selectedPartner.name} className="w-14 h-14 rounded-lg object-cover" />
+                  ) : (
+                    <Store className="w-8 h-8 text-blue-600" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">{selectedPartner.name}</h2>
+                  <p className="opacity-80">{selectedPartner.category}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              {/* Contact Information */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <Phone size={18} className="text-blue-600" />
+                  Contact
+                </h3>
+                {selectedPartner.phone ? (
+                  <a 
+                    href={`tel:${selectedPartner.phone}`}
+                    className="flex items-center justify-between p-3 bg-white rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="text-slate-700">{selectedPartner.phone}</span>
+                    <Button size="sm" variant="outline" className="gap-1">
+                      <Phone size={14} />
+                      Appeler
+                    </Button>
+                  </a>
+                ) : (
+                  <p className="text-slate-400 text-sm">Numéro non disponible</p>
+                )}
+              </div>
+
+              {/* Location */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                  <MapPin size={18} className="text-emerald-600" />
+                  Localisation
+                </h3>
+                {selectedPartner.address || selectedPartner.city ? (
+                  <div className="space-y-2">
+                    {selectedPartner.address && (
+                      <p className="text-slate-700">{selectedPartner.address}</p>
+                    )}
+                    {selectedPartner.city && (
+                      <p className="text-slate-500 text-sm">{selectedPartner.city}</p>
+                    )}
+                    {selectedPartner.gps_location && (
+                      <a 
+                        href={`https://www.google.com/maps/search/?api=1&query=${selectedPartner.gps_location}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 text-sm hover:underline mt-2"
+                      >
+                        <MapPin size={14} />
+                        Voir sur Google Maps
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-sm">Adresse non disponible</p>
+                )}
+              </div>
+
+              {/* Business Hours */}
+              {selectedPartner.business_hours && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Clock size={18} className="text-orange-600" />
+                    Horaires d'ouverture
+                  </h3>
+                  <p className="text-slate-700">{selectedPartner.business_hours}</p>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedPartner.description && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <h3 className="font-semibold text-slate-900 mb-2">À propos</h3>
+                  <p className="text-slate-600 text-sm">{selectedPartner.description}</p>
+                </div>
+              )}
+
+              {/* Pay Button */}
+              <Button
+                onClick={() => {
+                  setShowPartnerDetails(false);
+                  setScannedMerchant({
+                    id: selectedPartner.id,
+                    business_name: selectedPartner.name,
+                    qr_code: selectedPartner.qr_code,
+                    cashback_rate: selectedPartner.cashback_rate || 5
+                  });
+                  setPaymentStep('amount');
+                  setActiveTab('wallet');
+                }}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white h-14 text-lg font-semibold"
+              >
+                <DollarSign size={20} className="mr-2" />
+                Payer chez ce marchand
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QR Scanner Modal */}
       {showScanner && (

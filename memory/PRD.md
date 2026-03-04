@@ -109,9 +109,21 @@ Configuration via:
 4. Frais enregistrés dans `sdm_commissions` comme revenu SDM
 5. Client débité du montant + frais
 
-### Cashback Policy (Updated March 3, 2026)
+### Cashback Policy (Updated March 4, 2026)
 - **Cashback disponible IMMÉDIATEMENT** (plus de période d'attente)
 - Crédité dans `wallet_available` au lieu de `wallet_pending`
+- Utilisable le même jour, à la même heure
+
+### Partner Directory (Updated March 4, 2026)
+- Liste cliquable des partenaires dans l'onglet "Our Partners"
+- Au clic, affichage d'un modal avec:
+  - Nom et logo du partenaire
+  - Taux de cashback
+  - **Numéro de téléphone** (cliquable pour appeler)
+  - **Adresse et localisation** (lien vers Google Maps si GPS disponible)
+  - Horaires d'ouverture
+  - Bouton "Payer chez ce marchand"
+- API `/api/sdm/partners` inclut: phone, address, city, gps_location, qr_code, business_hours
 
 ### SDM Commission Management (NEW - March 3, 2026)
 - Onglet "Commissions SDM" dans le tableau de bord admin (super_admin seulement)

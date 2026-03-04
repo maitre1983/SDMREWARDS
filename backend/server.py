@@ -7278,13 +7278,16 @@ async def get_public_partners(category: Optional[str] = None, city: Optional[str
             "name": m.get("business_name", m.get("name", "Unknown")),
             "category": m.get("business_category", "General"),
             "city": m.get("city", ""),
-            "address": m.get("gps_location", m.get("address", "")),
+            "address": m.get("address", m.get("gps_location", "")),
+            "gps_location": m.get("gps_location", ""),
             "phone": m.get("phone", ""),
             "cashback_rate": m.get("cashback_rate", 1.0),
             "is_active": True,
             "is_merchant": True,
             "logo": m.get("logo", None),
-            "description": m.get("description", "SDM Partner Merchant")
+            "description": m.get("description", "SDM Partner Merchant"),
+            "qr_code": m.get("qr_code", ""),
+            "business_hours": m.get("business_hours", "")
         })
     
     # Get unique categories for filter
