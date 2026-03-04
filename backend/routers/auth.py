@@ -8,7 +8,9 @@ import os
 import bcrypt
 import jwt
 import httpx
+import uuid
 import logging
+import random
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -35,6 +37,7 @@ JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
 # BulkClix Config
 BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
+BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
 BULKCLIX_OTP_USER = os.environ.get('BULKCLIX_OTP_USER', '')
 BULKCLIX_OTP_PASS = os.environ.get('BULKCLIX_OTP_PASS', '')
 
@@ -205,13 +208,13 @@ async def get_current_admin(authorization: str = Header(...)) -> dict:
 
 @router.post("/otp/send")
 async def send_otp(request: SendOTPRequest):
-    """Send OTP to phone number via BulkClix"""
+    """Send OTP to phone number via BulkClix SMS API"""
     phone = normalize_phone(request.phone)
     phone_clean = phone.replace("+233", "0")
     
-    # Check if credentials are configured
-    if not BULKCLIX_OTP_USER or not BULKCLIX_OTP_PASS:
-        logger.warning("BulkClix OTP not configured, using test mode")
+    # Check if API key is configured
+    if not BULKCLIX_API_KEY:
+        logger.warning("BulkClix API key not configured, using test mode")
         # Test mode - always return success
         return {
             "success": True,
@@ -220,48 +223,57 @@ async def send_otp(request: SendOTPRequest):
             "test_mode": True
         }
     
+    # Generate OTP
+    otp_code = str(random.randint(100000, 999999))
+    request_id = f"OTP-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
+    
     try:
         async with httpx.AsyncClient() as http_client:
+            # Send OTP via BulkClix SMS API
             response = await http_client.post(
-                "https://api.bulkclix.com/otp/send",
+                f"{BULKCLIX_BASE_URL}/sms-api/send",
+                headers={
+                    "Content-Type": "application/json",
+                    "api-key": BULKCLIX_API_KEY
+                },
                 json={
-                    "username": BULKCLIX_OTP_USER,
-                    "password": BULKCLIX_OTP_PASS,
-                    "phone": phone_clean,
-                    "sender_id": "SDM"
+                    "sender_id": "SDM",
+                    "phone": phone,
+                    "message": f"SDM Rewards: Your verification code is {otp_code}. Valid for 10 minutes. Do not share this code."
                 },
                 timeout=30.0
             )
             
             result = response.json()
             
-            if response.status_code == 200 and result.get("status") == "success":
+            if response.status_code == 200:
                 # Store OTP record
                 await db.otp_records.insert_one({
                     "phone": phone,
-                    "request_id": result.get("request_id"),
+                    "request_id": request_id,
+                    "otp_code": otp_code,  # Store for verification
                     "created_at": datetime.now(timezone.utc).isoformat(),
+                    "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
                     "verified": False
                 })
                 
                 return {
                     "success": True,
-                    "request_id": result.get("request_id"),
+                    "request_id": request_id,
                     "message": "OTP sent successfully"
                 }
             else:
                 raise HTTPException(status_code=400, detail=result.get("message", "Failed to send OTP"))
                 
     except httpx.RequestError as e:
-        logger.error(f"BulkClix OTP error: {e}")
+        logger.error(f"BulkClix SMS OTP error: {e}")
         raise HTTPException(status_code=500, detail="Failed to send OTP")
 
 
 @router.post("/otp/verify")
 async def verify_otp(request: VerifyOTPRequest):
-    """Verify OTP code via BulkClix"""
+    """Verify OTP code"""
     phone = normalize_phone(request.phone)
-    phone_clean = phone.replace("+233", "0")
     
     # Test mode
     if request.request_id.startswith("TEST_"):
@@ -270,36 +282,32 @@ async def verify_otp(request: VerifyOTPRequest):
         else:
             raise HTTPException(status_code=400, detail="Invalid OTP code")
     
-    if not BULKCLIX_API_KEY:
-        raise HTTPException(status_code=500, detail="OTP service not configured")
+    # Find OTP record
+    otp_record = await db.otp_records.find_one({
+        "request_id": request.request_id,
+        "phone": phone,
+        "verified": False
+    })
     
-    try:
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                "https://api.bulkclix.com/otp/verify",
-                json={
-                    "request_id": request.request_id,
-                    "otp": request.otp_code
-                },
-                headers={"Authorization": f"Bearer {BULKCLIX_API_KEY}"},
-                timeout=30.0
-            )
-            
-            result = response.json()
-            
-            if response.status_code == 200 and result.get("valid"):
-                # Mark as verified
-                await db.otp_records.update_one(
-                    {"request_id": request.request_id},
-                    {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
-                )
-                return {"success": True, "message": "OTP verified"}
-            else:
-                raise HTTPException(status_code=400, detail="Invalid OTP code")
-                
-    except httpx.RequestError as e:
-        logger.error(f"BulkClix verify error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to verify OTP")
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP request")
+    
+    # Check expiry
+    expires_at = datetime.fromisoformat(otp_record["expires_at"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    
+    # Verify code
+    if otp_record["otp_code"] != request.otp_code:
+        raise HTTPException(status_code=400, detail="Invalid OTP code")
+    
+    # Mark as verified
+    await db.otp_records.update_one(
+        {"request_id": request.request_id},
+        {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"success": True, "message": "OTP verified successfully"}
 
 
 # ============== CLIENT AUTH ==============
@@ -309,15 +317,14 @@ async def register_client(request: ClientRegisterRequest):
     """Register new client"""
     phone = normalize_phone(request.phone)
     
-    # Verify OTP first
+    # Verify OTP first - MANDATORY
     otp_record = await db.otp_records.find_one({
         "request_id": request.request_id,
         "verified": True
     })
     
-    # Allow test mode
-    if not otp_record and not request.request_id.startswith("TEST_"):
-        raise HTTPException(status_code=400, detail="Please verify your phone number first")
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Please verify your phone number with OTP first")
     
     # Check for duplicate phone
     existing_phone = await db.clients.find_one({"phone": phone})
@@ -437,14 +444,14 @@ async def register_merchant(request: MerchantRegisterRequest):
     """Register new merchant"""
     phone = normalize_phone(request.phone)
     
-    # Verify OTP first
+    # Verify OTP first - MANDATORY
     otp_record = await db.otp_records.find_one({
         "request_id": request.request_id,
         "verified": True
     })
     
-    if not otp_record and not request.request_id.startswith("TEST_"):
-        raise HTTPException(status_code=400, detail="Please verify your phone number first")
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Please verify your phone number with OTP first")
     
     # Check for duplicate phone
     existing = await db.merchants.find_one({"phone": phone})

@@ -82,10 +82,10 @@ class SMSService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.base_url}/sms/send",
+                    f"{self.base_url}/sms-api/send",
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}"
+                        "api-key": self.api_key
                     },
                     json={
                         "sender_id": self.sender_id,

@@ -73,7 +73,7 @@ class MoMoPaymentService:
         """Get API headers"""
         return {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
+            "api-key": self.api_key,
             "Accept": "application/json"
         }
     
@@ -137,7 +137,7 @@ class MoMoPaymentService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.base_url}/payment-api/momocollection",
+                    f"{self.base_url}/payment-api/momopay",
                     headers=self._get_headers(),
                     json={
                         "phone": phone,
@@ -348,11 +348,10 @@ class MoMoPaymentService:
         
         # Get card config
         config = await self.db.platform_config.find_one({"type": "cards"}, {"_id": 0})
-        card_info = None
         if config and "cards" in config:
             for card in config["cards"]:
                 if card["type"] == card_type:
-                    card_info = card
+                    # Card type found in config
                     break
         
         # Update client with card
