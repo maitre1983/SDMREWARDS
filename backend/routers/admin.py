@@ -28,6 +28,13 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
 
+# ============== HELPER FUNCTIONS ==============
+
+def check_is_super_admin(admin: dict) -> bool:
+    """Check if admin is super admin - supports both is_super_admin field and role field"""
+    return admin.get("is_super_admin", False) or admin.get("role") == "super_admin"
+
+
 # ============== REQUEST MODELS ==============
 
 class CreateAdminRequest(BaseModel):
@@ -1375,7 +1382,7 @@ async def update_commissions(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Update platform commission settings"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
@@ -1406,7 +1413,7 @@ async def update_card_prices(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Update membership card prices, benefits, and durations"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
@@ -1500,7 +1507,7 @@ async def create_card_type(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Create a new custom card type"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Check if slug already exists
@@ -1549,7 +1556,7 @@ async def update_card_type(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Update a custom card type"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Check if it's a default card
@@ -1590,7 +1597,7 @@ async def delete_card_type(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Delete a custom card type"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     if card_id.startswith("default_"):
@@ -1628,7 +1635,7 @@ async def update_service_commissions(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Update service commissions (airtime, data, ECG, etc.)"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
@@ -1661,7 +1668,7 @@ async def update_referral_bonuses(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Update referral bonus amounts"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
@@ -1684,7 +1691,7 @@ async def create_client_manual(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Manually create a client account"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Check for duplicate phone
@@ -1742,7 +1749,7 @@ async def create_merchant_manual(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Manually create a merchant account"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Check for duplicate phone
@@ -1800,7 +1807,7 @@ async def send_bulk_sms_clients(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Send bulk SMS to clients with filters"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     from services.bulkclix_service import send_sms
@@ -1868,7 +1875,7 @@ async def send_bulk_sms_merchants(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Send bulk SMS to merchants with filters"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     from services.bulkclix_service import send_sms
@@ -1930,7 +1937,7 @@ async def send_bulk_sms_merchants(
 @router.get("/admins")
 async def list_admins(current_admin: dict = Depends(get_current_admin)):
     """List all admins (super admin only)"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     admins = await db.admins.find(
@@ -1947,7 +1954,7 @@ async def create_admin(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Create new admin (super admin only)"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Check duplicate email
@@ -2319,10 +2326,10 @@ async def change_settings_pin(
     """Change Settings PIN (Super Admin only - emileparfait2003@gmail.com)"""
     # Only super admin with specific email can change PIN
     admin_email = current_admin.get("email", "").lower()
-    is_super = current_admin.get("is_super_admin", False)
+    is_super = check_is_super_admin(current_admin)
     
     if not is_super or admin_email != "emileparfait2003@gmail.com":
-        logger.warning(f"PIN change denied: is_super={is_super}, email={admin_email}")
+        logger.warning(f"PIN change denied: is_super={is_super}, email={admin_email}, role={current_admin.get('role')}")
         raise HTTPException(status_code=403, detail="Only the Super Admin (emileparfait2003@gmail.com) can change the PIN")
     
     # Validate PIN format
@@ -2399,7 +2406,7 @@ async def change_admin_password(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Change admin password with OTP verification"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Verify current password
@@ -2451,7 +2458,7 @@ async def change_admin_password(
 @router.get("/admins")
 async def get_all_admins(current_admin: dict = Depends(get_current_admin)):
     """Get all admin accounts (Super Admin only)"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     admins = await db.admins.find(
@@ -2468,7 +2475,7 @@ async def create_admin_with_role(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Create a new admin account"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Check if email exists
@@ -2510,7 +2517,7 @@ async def update_admin(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Update admin role and permissions"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Can't modify own account this way
@@ -2543,7 +2550,7 @@ async def delete_admin(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Delete an admin account"""
-    if not current_admin.get("is_super_admin"):
+    if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     # Can't delete own account
