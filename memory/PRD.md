@@ -7,6 +7,37 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - Merchant Dashboard Phase 2 Enhancement ✅
+
+**Statistiques Avancées par Période:**
+- Sélecteur de période: Aujourd'hui, Semaine, Mois, Année
+- 4 cartes de statistiques avec indicateurs de croissance (%)
+- Comparaison avec période précédente
+
+**Mini Comptabilité:**
+- Total ventes depuis inscription
+- Total cashback distribué
+- Total transactions & clients uniques
+- Breakdown par période (jour/semaine/mois/année)
+
+**Graphiques Analytiques:**
+- Graphique à barres avec Recharts
+- Évolution ventes (vert) et cashback (orange)
+- 3 vues: 7 jours, 4 semaines, 6 mois
+- Totaux affichés sous le graphique
+
+**Nouveaux Endpoints API:**
+- `GET /api/merchants/dashboard/advanced-stats?period=` - Stats par période avec growth
+- `GET /api/merchants/dashboard/summary` - Mini comptabilité complète
+- `GET /api/merchants/dashboard/chart-data?chart_type=` - Données pour graphiques
+
+**Nouveau Composant Frontend:**
+- `/app/frontend/src/components/merchant/AdvancedDashboard.jsx`
+
+**Tests:** 100% réussite (16/16 backend, frontend complet)
+
+---
+
 ### March 5, 2026 - Merchant Settings Phase 1 Enhancement ✅
 
 **Protection PIN Optionnelle:**
