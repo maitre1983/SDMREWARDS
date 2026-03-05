@@ -7,6 +7,48 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - Admin Dashboard Financial & Card Enhancements ✅
+
+**1. Commissions SDM sur Cashback (Overview):**
+- Total des commissions prélevées (All Time): GHS 13.80
+- Filtrable par période (jour/semaine/mois/année)
+- Intégré dans la section Financial Highlights
+
+**2. Service Fees Analytics (Overview):**
+- 4 types de services: Airtime, Data Bundles, ECG/Électricité, Paiement Marchand
+- Affichage: transactions, volume, fees par service
+- Top Services (par utilisation) avec barres de progression
+- Graphique mensuel des fees
+
+**3. Durée des Cartes (Settings > Card Prices):**
+- Champ "Durée" ajouté pour chaque carte (Silver, Gold, Platinum)
+- Options: 1 mois, 3 mois, 6 mois, 1 an, 2 ans, 3 ans
+- Durées par défaut: Silver=1 an, Gold=1 an, Platinum=2 ans
+
+**4. Création de Nouveaux Types de Cartes:**
+- Interface pour créer des cartes personnalisées (ex: Diamond, Business, Student)
+- Champs: Nom, Slug, Prix, Durée, Avantages, Couleur
+- Carte Diamond créée: GHS 500, 2 ans, 15% cashback
+
+**5. Synchronisation Globale:**
+- Landing page affiche les durées dynamiquement via `/api/public/card-types`
+- Endpoint public retourne `duration_label` formaté ("1 an", "2 ans", etc.)
+
+**Nouveaux Endpoints API:**
+- `GET /api/public/card-types` - Cartes publiques avec durées
+- `GET /api/admin/settings/card-types` - Liste complète admin
+- `POST /api/admin/settings/card-types` - Créer carte personnalisée
+- `PUT /api/admin/settings/card-types/{id}` - Modifier carte
+- `DELETE /api/admin/settings/card-types/{id}` - Supprimer carte
+
+**Nouveaux Composants Frontend:**
+- `/app/frontend/src/components/admin/ServiceFeesAnalytics.jsx`
+- `/app/frontend/src/components/admin/CardTypesManager.jsx`
+
+**Tests:** 100% réussite (16/16 backend, frontend complet)
+
+---
+
 ### March 5, 2026 - Merchant Dashboard Phase 2 Enhancement ✅
 
 **Statistiques Avancées par Période:**
