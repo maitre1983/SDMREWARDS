@@ -7,6 +7,16 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - Bug Fix: PIN Protection ✅
+
+**Problème résolu:**
+- Le PIN par défaut `0000` n'était pas créé au démarrage du serveur
+- Cause: Variable `pwd_context` non définie dans `server.py`
+- Fix: Ajout de l'instanciation `pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")`
+- Le PIN est maintenant créé automatiquement et fonctionne correctement
+
+---
+
 ### March 5, 2026 - Phase 11: Advanced SMS & Security Features ✅
 
 **Phase 2 - SMS Center Improvements:**
