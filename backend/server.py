@@ -284,14 +284,14 @@ def format_duration(days: int) -> str:
     """Format duration in days to human readable string"""
     if days >= 730:
         years = days // 365
-        return f"{years} ans"
+        return f"{years} year{'s' if years > 1 else ''}"
     elif days >= 365:
-        return "1 an"
+        return "1 year"
     elif days >= 30:
         months = days // 30
-        return f"{months} mois"
+        return f"{months} month{'s' if months > 1 else ''}"
     else:
-        return f"{days} jours"
+        return f"{days} day{'s' if days > 1 else ''}"
 
 # ============== IMPORT ROUTERS ==============
 from routers.auth import router as auth_router

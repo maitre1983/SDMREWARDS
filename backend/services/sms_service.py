@@ -197,18 +197,18 @@ class SMSService:
     async def notify_card_expiring(self, phone: str, card_type: str, days_remaining: int):
         """Notify client that their card is expiring soon"""
         message = (
-            f"SDM Rewards: Votre carte {card_type.capitalize()} expire dans {days_remaining} jours! "
-            f"Renouvelez maintenant pour continuer à gagner du cashback. "
-            f"Connectez-vous à votre compte SDM."
+            f"SDM Rewards: Your {card_type.capitalize()} card expires in {days_remaining} day(s)! "
+            f"Renew now to keep earning cashback. "
+            f"Login to your SDM account."
         )
         return await self.send_sms(phone, message, "card_expiring")
     
     async def notify_card_expired(self, phone: str, card_type: str):
         """Notify client that their card has expired"""
         message = (
-            f"SDM Rewards: Votre carte {card_type.capitalize()} a expiré. "
-            f"Renouvelez votre abonnement pour continuer à profiter du cashback. "
-            f"Connectez-vous sur SDM Rewards."
+            f"SDM Rewards: Your {card_type.capitalize()} card has expired. "
+            f"Renew your membership to continue enjoying cashback rewards. "
+            f"Login at SDM Rewards."
         )
         return await self.send_sms(phone, message, "card_expired")
     

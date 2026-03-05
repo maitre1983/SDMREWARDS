@@ -130,11 +130,11 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               <Lock className={pinStatus?.pin_enabled ? 'text-emerald-400' : 'text-slate-500'} size={20} />
             </div>
             <div>
-              <p className="text-white font-medium">Protection par PIN</p>
+              <p className="text-white font-medium">PIN Protection</p>
               <p className="text-slate-400 text-sm">
                 {pinStatus?.pin_enabled 
-                  ? 'Votre menu Settings est protégé' 
-                  : 'L\'accès aux paramètres est libre'}
+                  ? 'Your Settings menu is protected' 
+                  : 'Settings access is open'}
               </p>
             </div>
           </div>

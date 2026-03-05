@@ -803,7 +803,7 @@ async def process_card_upgrade(payment: Dict):
     try:
         if client.get("phone"):
             sms = get_sms()
-            message = f"Félicitations! Votre carte SDM a été mise à niveau vers {to_card.upper()}. Votre nouvelle carte est valide pour {new_duration_days} jours."
+            message = f"Congratulations! Your SDM card has been upgraded to {to_card.upper()}. Your new card is valid for {new_duration_days} days."
             await sms.send_raw_sms(client["phone"], message)
     except Exception as e:
         logger.error(f"Card upgrade SMS error: {e}")

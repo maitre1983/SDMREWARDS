@@ -7,6 +7,29 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - English Language Migration ✅
+
+**System-wide English Translation:**
+- All SEO meta tags (title, description, og:*, twitter:*)
+- Schema.org JSON-LD structured data
+- SMS notification templates (card expiring, referral bonus, etc.)
+- Backend API error messages
+- Frontend UI text (Client Dashboard, Merchant components)
+- Duration labels ("1 year", "2 years", "6 months" instead of French)
+
+**Files Modified:**
+- `/app/frontend/public/index.html` - SEO meta tags
+- `/app/frontend/src/components/client/ReferralQRCode.jsx` - UI text
+- `/app/frontend/src/pages/ClientDashboard.jsx` - All UI text
+- `/app/frontend/src/components/merchant/PinSettings.jsx` - UI text
+- `/app/frontend/src/components/merchant/ForgotPinModal.jsx` - UI text
+- `/app/backend/routers/clients.py` - Error messages, duration formatting
+- `/app/backend/routers/payments.py` - SMS messages
+- `/app/backend/services/sms_service.py` - Notification templates
+- `/app/backend/server.py` - Duration formatting
+
+---
+
 ### March 5, 2026 - SMS Notifications & SEO Package ✅
 
 **1. Notifications SMS pour 3 événements:**

@@ -586,7 +586,7 @@ export default function ClientDashboard() {
 
   const initiateUpgrade = async () => {
     if (!upgradePaymentPhone || upgradePaymentPhone.length < 10) {
-      toast.error('Veuillez entrer un numéro de téléphone valide');
+      toast.error('Please enter a valid phone number');
       return;
     }
     
@@ -612,7 +612,7 @@ export default function ClientDashboard() {
       }
     } catch (error) {
       setUpgradeStatus('failed');
-      toast.error(error.response?.data?.detail || 'Échec de la mise à niveau');
+      toast.error(error.response?.data?.detail || 'Upgrade failed');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -626,7 +626,7 @@ export default function ClientDashboard() {
       const res = await axios.post(`${API_URL}/api/payments/test/confirm/${upgradePaymentId}`);
       if (res.data.success) {
         setUpgradeStatus('success');
-        toast.success('Mise à niveau réussie! Votre nouvelle carte est active.');
+        toast.success('Upgrade successful! Your new card is active.');
         setTimeout(() => {
           setShowUpgradeModal(false);
           fetchDashboardData();
@@ -752,12 +752,12 @@ export default function ClientDashboard() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full uppercase">
-                    Compte Inactif
+                    Inactive Account
                   </span>
                 </div>
-                <p className="text-white font-medium">Activez votre compte</p>
+                <p className="text-white font-medium">Activate your account</p>
                 <p className="text-slate-400 text-sm mt-1">
-                  Achetez une carte de membre pour commencer à gagner du cashback sur tous vos achats !
+                  Purchase a membership card to start earning cashback on all your purchases!
                 </p>
                 <Button
                   onClick={() => setActiveTab('home')}
@@ -766,7 +766,7 @@ export default function ClientDashboard() {
                   data-testid="activate-account-btn"
                 >
                   <CreditCard size={16} className="mr-2" />
-                  Acheter une carte
+                  Buy a card
                 </Button>
               </div>
             </div>
@@ -796,7 +796,7 @@ export default function ClientDashboard() {
             {isActive && card && (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                  <CreditCard size={18} /> Ma Carte
+                  <CreditCard size={18} /> My Card
                 </h3>
                 <div className={`rounded-xl p-4 ${
                   client?.card_type === 'platinum' ? 'bg-gradient-to-br from-slate-600 to-slate-500' :
@@ -837,15 +837,15 @@ export default function ClientDashboard() {
                           cardValidity.days_remaining <= 30 ? 'text-amber-400' : 'text-emerald-400'
                         }`}>
                           {cardValidity.is_expired 
-                            ? 'Carte expirée' 
+                            ? 'Card expired' 
                             : cardValidity.days_remaining <= 30 
-                              ? `Expire dans ${cardValidity.days_remaining} jours`
-                              : 'Carte active'}
+                              ? `Expires in ${cardValidity.days_remaining} days`
+                              : 'Card active'}
                         </span>
                       </div>
                       {!cardValidity.is_expired && cardValidity.days_remaining !== null && (
                         <span className="text-white font-bold">
-                          {cardValidity.days_remaining} jours
+                          {cardValidity.days_remaining} days
                         </span>
                       )}
                     </div>
@@ -858,7 +858,7 @@ export default function ClientDashboard() {
                       </div>
                       <div className="bg-slate-900 p-2 rounded-lg">
                         <p className="text-slate-500 text-xs">Expiration</p>
-                        <p className="text-white">{cardValidity.end_date || 'Illimitée'}</p>
+                        <p className="text-white">{cardValidity.end_date || 'Unlimited'}</p>
                       </div>
                     </div>
 
@@ -866,8 +866,8 @@ export default function ClientDashboard() {
                     {cardValidity.duration_days && !cardValidity.is_expired && (
                       <div>
                         <div className="flex justify-between text-xs text-slate-400 mb-1">
-                          <span>Utilisé: {cardValidity.days_used} jours</span>
-                          <span>Total: {cardValidity.duration_days} jours</span>
+                          <span>Used: {cardValidity.days_used} days</span>
+                          <span>Total: {cardValidity.duration_days} days</span>
                         </div>
                         <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
                           <div 
@@ -886,7 +886,7 @@ export default function ClientDashboard() {
                         className="w-full bg-amber-500 hover:bg-amber-600"
                         onClick={() => setActiveTab('card')}
                       >
-                        Renouveler ma carte
+                        Renew my card
                       </Button>
                     )}
                   </div>
@@ -898,7 +898,7 @@ export default function ClientDashboard() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <Crown className="text-amber-400" size={18} />
-                        <span className="text-white font-medium">Mise à niveau disponible</span>
+                        <span className="text-white font-medium">Upgrade available</span>
                       </div>
                       <Zap className="text-amber-400" size={16} />
                     </div>
@@ -924,7 +924,7 @@ export default function ClientDashboard() {
                           </div>
                           <div className="text-right">
                             <p className="text-amber-400 font-bold">+GHS {upgradeCard.priceDifference}</p>
-                            <p className="text-slate-500 text-xs">différence</p>
+                            <p className="text-slate-500 text-xs">difference</p>
                           </div>
                         </button>
                       ))}
@@ -937,7 +937,7 @@ export default function ClientDashboard() {
             {/* Buy Card Section */}
             {!isActive && (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                <h3 className="text-white font-semibold mb-4">Choisissez votre carte</h3>
+                <h3 className="text-white font-semibold mb-4">Choose your card</h3>
                 <div className="space-y-3">
                   {availableCards.map((cardItem) => (
                     <div 
@@ -967,7 +967,7 @@ export default function ClientDashboard() {
                         className="bg-gradient-to-r from-amber-500 to-orange-500"
                         data-testid={`buy-${cardItem.type}-btn`}
                       >
-                        Acheter
+                        Buy
                       </Button>
                     </div>
                   ))}
@@ -1114,11 +1114,11 @@ export default function ClientDashboard() {
               </div>
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-emerald-400">{referrals?.active_referrals || 0}</p>
-                <p className="text-slate-400 text-xs">Actifs</p>
+                <p className="text-slate-400 text-xs">Active</p>
               </div>
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-amber-400">GHS {referrals?.total_bonus_earned || 0}</p>
-                <p className="text-slate-400 text-xs">Gagnés</p>
+                <p className="text-slate-400 text-xs">Earned</p>
               </div>
             </div>
 
@@ -1130,7 +1130,7 @@ export default function ClientDashboard() {
 
             {/* Referrals List */}
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <h3 className="text-white font-semibold mb-4">Vos Filleuls</h3>
+              <h3 className="text-white font-semibold mb-4">Your Referrals</h3>
               {referrals?.referrals?.length > 0 ? (
                 <div className="space-y-3">
                   {referrals.referrals.map((ref) => (
@@ -1152,7 +1152,7 @@ export default function ClientDashboard() {
                         </span>
                       ) : (
                         <span className="text-slate-500 text-sm flex items-center gap-1">
-                          <Clock size={14} /> En attente
+                          <Clock size={14} /> Pending
                         </span>
                       )}
                     </div>
@@ -1161,8 +1161,8 @@ export default function ClientDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <Gift className="text-slate-600 mx-auto mb-3" size={40} />
-                  <p className="text-slate-400">Pas encore de filleuls</p>
-                  <p className="text-slate-500 text-sm mt-1">Partagez votre code pour commencer à gagner!</p>
+                  <p className="text-slate-400">No referrals yet</p>
+                  <p className="text-slate-500 text-sm mt-1">Share your code to start earning!</p>
                 </div>
               )}
             </div>
@@ -1671,7 +1671,7 @@ export default function ClientDashboard() {
               <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <Crown className="text-white" size={32} />
               </div>
-              <h3 className="text-white text-xl font-bold">Mise à niveau</h3>
+              <h3 className="text-white text-xl font-bold">Upgrade</h3>
               <p className="text-slate-400 text-sm mt-1">
                 {client?.card_type?.toUpperCase()} → {selectedUpgradeCard.name}
               </p>
@@ -1681,19 +1681,19 @@ export default function ClientDashboard() {
             {upgradeStatus === 'success' ? (
               <div className="text-center py-8">
                 <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
-                <p className="text-white text-lg font-semibold">Mise à niveau réussie !</p>
-                <p className="text-slate-400 mt-2">Votre nouvelle carte {selectedUpgradeCard.name} est active</p>
+                <p className="text-white text-lg font-semibold">Upgrade successful!</p>
+                <p className="text-slate-400 mt-2">Your new {selectedUpgradeCard.name} card is active</p>
               </div>
             ) : upgradeStatus === 'failed' ? (
               <div className="text-center py-8">
                 <AlertCircle className="text-red-400 mx-auto mb-4" size={64} />
-                <p className="text-white text-lg font-semibold">Échec du paiement</p>
-                <p className="text-slate-400 mt-2">Veuillez réessayer</p>
+                <p className="text-white text-lg font-semibold">Payment failed</p>
+                <p className="text-slate-400 mt-2">Please try again</p>
                 <Button
                   onClick={() => setUpgradeStatus(null)}
                   className="mt-4 bg-amber-500 hover:bg-amber-600"
                 >
-                  Réessayer
+                  Try again
                 </Button>
               </div>
             ) : upgradeStatus === 'pending' ? (
@@ -1702,13 +1702,13 @@ export default function ClientDashboard() {
                   <Phone className="text-amber-400 mx-auto mb-4" size={48} />
                   <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
                 </div>
-                <p className="text-white text-lg font-semibold">En attente du paiement</p>
+                <p className="text-white text-lg font-semibold">Awaiting payment</p>
                 <p className="text-slate-400 mt-2 text-sm">
-                  Approuvez la demande MoMo sur votre téléphone
+                  Approve the MoMo request on your phone
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
                   <Loader2 className="animate-spin" size={16} />
-                  <span className="text-sm">En attente de confirmation...</span>
+                  <span className="text-sm">Waiting for confirmation...</span>
                 </div>
                 
                 {/* Test Mode Confirm Button */}
@@ -1734,11 +1734,11 @@ export default function ClientDashboard() {
                 {/* Upgrade Details */}
                 <div className="bg-slate-900 rounded-xl p-4 mb-6">
                   <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
-                    <span className="text-slate-400">Carte actuelle</span>
+                    <span className="text-slate-400">Current card</span>
                     <span className="text-white font-medium">{client?.card_type?.toUpperCase()}</span>
                   </div>
                   <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
-                    <span className="text-slate-400">Nouvelle carte</span>
+                    <span className="text-slate-400">New card</span>
                     <div className="flex items-center gap-2">
                       <div 
                         className="w-4 h-4 rounded"
@@ -1748,11 +1748,11 @@ export default function ClientDashboard() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
-                    <span className="text-slate-400">Validité</span>
+                    <span className="text-slate-400">Validity</span>
                     <span className="text-white">{selectedUpgradeCard.duration_label}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 font-medium">À payer (différence)</span>
+                    <span className="text-slate-400 font-medium">To pay (difference)</span>
                     <span className="text-amber-400 text-xl font-bold">GHS {selectedUpgradeCard.priceDifference}</span>
                   </div>
                 </div>
@@ -1760,7 +1760,7 @@ export default function ClientDashboard() {
                 {/* Phone Input */}
                 <div className="mb-6">
                   <label className="text-slate-300 text-sm block mb-2">
-                    Numéro MoMo
+                    MoMo Number
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
@@ -1787,7 +1787,7 @@ export default function ClientDashboard() {
                   ) : (
                     <Crown className="mr-2" size={18} />
                   )}
-                  Payer GHS {selectedUpgradeCard.priceDifference} et Upgrader
+                  Pay GHS {selectedUpgradeCard.priceDifference} and Upgrade
                 </Button>
               </>
             )}

@@ -17,13 +17,13 @@ export default function ReferralQRCode({ referralCode, clientName }) {
   const copyReferralCode = () => {
     navigator.clipboard.writeText(referralCode);
     setCopied(true);
-    toast.success('Code copié !');
+    toast.success('Code copied!');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralUrl);
-    toast.success('Lien copié !');
+    toast.success('Link copied!');
   };
 
   const downloadQRCode = () => {
@@ -61,22 +61,22 @@ export default function ReferralQRCode({ referralCode, clientName }) {
         
         ctx.font = '14px Arial';
         ctx.fillStyle = '#6b7280';
-        ctx.fillText('Scannez pour rejoindre SDM', canvas.width / 2, size + padding + 75);
+        ctx.fillText('Scan to join SDM Rewards', canvas.width / 2, size + padding + 75);
 
         // Download
         const link = document.createElement('a');
         link.download = `SDM-Referral-${referralCode}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-        toast.success('QR Code téléchargé !');
+        toast.success('QR Code downloaded!');
       };
       img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
     }
   };
 
   const shareVia = (platform) => {
-    const message = `Rejoins SDM REWARDS et gagne du cashback sur tous tes achats ! Utilise mon code: ${referralCode}`;
-    const fullMessage = `${message}\n\nInscris-toi ici: ${referralUrl}`;
+    const message = `Join SDM REWARDS and earn cashback on all your purchases! Use my code: ${referralCode}`;
+    const fullMessage = `${message}\n\nSign up here: ${referralUrl}`;
 
     switch (platform) {
       case 'whatsapp':
@@ -86,7 +86,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
         window.open(`sms:?body=${encodeURIComponent(fullMessage)}`, '_blank');
         break;
       case 'email':
-        window.open(`mailto:?subject=${encodeURIComponent('Rejoins SDM REWARDS !')}&body=${encodeURIComponent(fullMessage)}`, '_blank');
+        window.open(`mailto:?subject=${encodeURIComponent('Join SDM REWARDS!')}&body=${encodeURIComponent(fullMessage)}`, '_blank');
         break;
       case 'telegram':
         window.open(`https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(message)}`, '_blank');
@@ -94,7 +94,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
       case 'native':
         if (navigator.share) {
           navigator.share({
-            title: 'SDM REWARDS - Code de parrainage',
+            title: 'SDM REWARDS - Referral Code',
             text: message,
             url: referralUrl
           }).catch(() => {});
@@ -114,10 +114,10 @@ export default function ReferralQRCode({ referralCode, clientName }) {
         <div className="text-center mb-4">
           <div className="flex items-center justify-center gap-2 mb-2">
             <QrCode className="text-purple-400" size={24} />
-            <h3 className="text-white font-semibold text-lg">Votre QR Code de Parrainage</h3>
+            <h3 className="text-white font-semibold text-lg">Your Referral QR Code</h3>
           </div>
           <p className="text-slate-400 text-sm">
-            Faites scanner ce code pour parrainer vos amis
+            Have friends scan this code to refer them
           </p>
         </div>
 
@@ -142,7 +142,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
 
         {/* Referral Code Text */}
         <div className="mt-4 text-center">
-          <p className="text-slate-400 text-sm mb-1">Code de parrainage</p>
+          <p className="text-slate-400 text-sm mb-1">Referral Code</p>
           <div className="flex items-center justify-center gap-2">
             <p className="text-2xl font-bold text-white font-mono tracking-wider">
               {referralCode}
@@ -157,7 +157,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
             </button>
           </div>
           <p className="text-emerald-400 text-sm mt-2">
-            Gagnez GHS 3 pour chaque ami qui rejoint !
+            Earn GHS 3 for each friend who joins!
           </p>
         </div>
 
@@ -169,7 +169,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
             data-testid="download-qr-btn"
           >
             <Download size={18} className="mr-2" />
-            Télécharger
+            Download
           </Button>
           <Button
             onClick={() => shareVia('native')}
@@ -178,7 +178,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
             data-testid="share-qr-btn"
           >
             <Share2 size={18} className="mr-2" />
-            Partager
+            Share
           </Button>
         </div>
       </div>
@@ -186,7 +186,7 @@ export default function ReferralQRCode({ referralCode, clientName }) {
       {/* Share Options */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
         <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-          <Share2 size={18} /> Partagez votre code
+          <Share2 size={18} /> Share your code
         </h3>
         <div className="grid grid-cols-5 gap-3">
           <button
@@ -241,30 +241,30 @@ export default function ReferralQRCode({ referralCode, clientName }) {
             <div className="w-12 h-12 bg-slate-600 rounded-full flex items-center justify-center">
               <Copy size={20} className="text-white" />
             </div>
-            <span className="text-slate-300 text-xs">Copier</span>
+            <span className="text-slate-300 text-xs">Copy</span>
           </button>
         </div>
       </div>
 
       {/* How it works */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
-        <h4 className="text-white font-medium mb-3">Comment ça marche ?</h4>
+        <h4 className="text-white font-medium mb-3">How it works</h4>
         <div className="space-y-2 text-sm">
           <div className="flex items-start gap-3">
             <span className="w-6 h-6 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">1</span>
-            <p className="text-slate-300">Partagez votre QR Code ou lien avec vos amis</p>
+            <p className="text-slate-300">Share your QR Code or link with friends</p>
           </div>
           <div className="flex items-start gap-3">
             <span className="w-6 h-6 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">2</span>
-            <p className="text-slate-300">Ils scannent le code ou cliquent sur le lien</p>
+            <p className="text-slate-300">They scan the code or click the link</p>
           </div>
           <div className="flex items-start gap-3">
             <span className="w-6 h-6 bg-purple-500/20 text-purple-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">3</span>
-            <p className="text-slate-300">Ils s'inscrivent avec votre code pré-rempli</p>
+            <p className="text-slate-300">They sign up with your code pre-filled</p>
           </div>
           <div className="flex items-start gap-3">
             <span className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-xs font-bold shrink-0">4</span>
-            <p className="text-slate-300">Vous recevez GHS 3 quand ils achètent une carte !</p>
+            <p className="text-slate-300">You get GHS 3 when they buy a card!</p>
           </div>
         </div>
       </div>

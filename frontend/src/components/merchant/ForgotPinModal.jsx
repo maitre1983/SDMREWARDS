@@ -149,13 +149,13 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
             {testOtp && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                 <p className="text-amber-400 text-sm">
-                  <strong>Mode Test:</strong> Votre OTP est <code className="bg-slate-900 px-2 py-1 rounded">{testOtp}</code>
+                  <strong>Test Mode:</strong> Your OTP is <code className="bg-slate-900 px-2 py-1 rounded">{testOtp}</code>
                 </p>
               </div>
             )}
 
             <div>
-              <label className="text-slate-400 text-sm block mb-2">Code OTP</label>
+              <label className="text-slate-400 text-sm block mb-2">OTP Code</label>
               <Input
                 type="text"
                 inputMode="numeric"
@@ -224,16 +224,16 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
             <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="text-emerald-400" size={32} />
             </div>
-            <h4 className="text-white font-semibold mb-2">PIN réinitialisé !</h4>
+            <h4 className="text-white font-semibold mb-2">PIN Reset!</h4>
             <p className="text-slate-400 text-sm mb-6">
-              Votre nouveau code PIN a été configuré avec succès.
+              Your new PIN code has been configured successfully.
             </p>
             <Button
               onClick={handleClose}
               className="bg-emerald-500 hover:bg-emerald-600"
               data-testid="close-success-btn"
             >
-              Continuer
+              Continue
             </Button>
           </div>
         )}

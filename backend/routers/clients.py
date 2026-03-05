@@ -93,13 +93,15 @@ async def get_available_cards():
     
     def format_duration(days):
         if days >= 730:
-            return f"{days // 365} ans"
+            years = days // 365
+            return f"{years} year{'s' if years > 1 else ''}"
         elif days >= 365:
-            return "1 an"
+            return "1 year"
         elif days >= 30:
-            return f"{days // 30} mois"
+            months = days // 30
+            return f"{months} month{'s' if months > 1 else ''}"
         else:
-            return f"{days} jours"
+            return f"{days} day{'s' if days > 1 else ''}"
     
     default_cards = [
         {
@@ -385,7 +387,7 @@ async def get_card_status(current_client: dict = Depends(get_current_client)):
             "has_card": False,
             "card_type": None,
             "status": "no_card",
-            "message": "Aucune carte active"
+            "message": "No active card"
         }
     
     expires_at = current_client.get("card_expires_at")
@@ -447,18 +449,18 @@ async def upgrade_card(
     
     # Check if client has an active card
     if current_client.get("status") != ClientStatus.ACTIVE.value:
-        raise HTTPException(status_code=400, detail="Vous devez avoir une carte active pour effectuer une mise à niveau")
+        raise HTTPException(status_code=400, detail="You must have an active card to upgrade")
     
     current_card_type = current_client.get("card_type")
     if not current_card_type:
-        raise HTTPException(status_code=400, detail="Aucune carte actuelle trouvée")
+        raise HTTPException(status_code=400, detail="No current card found")
     
     # Check if card is expired
     card_expires_at = current_client.get("card_expires_at")
     if card_expires_at:
         expiry_date = datetime.fromisoformat(card_expires_at.replace('Z', '+00:00'))
         if datetime.now(timezone.utc) >= expiry_date:
-            raise HTTPException(status_code=400, detail="Votre carte est expirée. Veuillez renouveler au lieu de mettre à niveau")
+            raise HTTPException(status_code=400, detail="Your card is expired. Please renew instead of upgrading")
     
     # Define card hierarchy
     card_order = ['silver', 'gold', 'platinum', 'diamond', 'business']
@@ -497,7 +499,7 @@ async def upgrade_card(
     # Calculate price difference
     price_difference = new_price - current_price
     if price_difference <= 0:
-        raise HTTPException(status_code=400, detail="La mise à niveau n'est pas possible vers cette carte")
+        raise HTTPException(status_code=400, detail="Upgrade to this card is not possible")
     
     # Create payment record for upgrade
     payment_id = str(uuid.uuid4())
@@ -530,7 +532,7 @@ async def upgrade_card(
         "from_card": current_card_type,
         "to_card": request.new_card_type,
         "test_mode": test_mode,
-        "message": f"Paiement de GHS {price_difference} requis pour la mise à niveau"
+        "message": f"Payment of GHS {price_difference} required for upgrade"
     }
 
 
