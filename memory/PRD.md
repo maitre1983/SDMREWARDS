@@ -7,6 +7,26 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - Monthly Analytics Selector & PIN Bug Fix ✅
+
+**1. Monthly Growth → Monthly Analytics Selector:**
+- Replaced "Monthly Growth (Last 6 Months)" grid with a dropdown month selector
+- New input type="month" with data-testid="month-selector"
+- Admin can select any month to view analytics
+- Displays: Transactions, Volume, New Clients, New Merchants, Cashback Paid, Card Sales
+
+**2. Admin PIN Change Bug Fix:**
+- Fixed: Super admin couldn't change PIN despite correct credentials
+- Root cause: Email comparison wasn't case-insensitive
+- Fix: Added `.lower()` to email comparison in `/api/admin/settings/change-pin`
+
+**New Endpoint:**
+- `GET /api/admin/analytics/monthly?month=YYYY-MM` - Returns analytics for specific month
+
+**Tests:** 100% (9/9 backend, 100% frontend)
+
+---
+
 ### March 5, 2026 - English Language Migration ✅
 
 **System-wide English Translation:**
