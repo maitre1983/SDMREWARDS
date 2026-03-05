@@ -26,8 +26,19 @@ import {
   CreditCard,
   Wallet,
   BarChart3,
-  Phone
+  Phone,
+  Shield,
+  UserCog,
+  Building,
+  ChevronRight
 } from 'lucide-react';
+
+// Merchant Components
+import PinModal from '../components/merchant/PinModal';
+import ForgotPinModal from '../components/merchant/ForgotPinModal';
+import CashierManager from '../components/merchant/CashierManager';
+import BusinessInfoEditor from '../components/merchant/BusinessInfoEditor';
+import PinSettings from '../components/merchant/PinSettings';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
@@ -50,6 +61,17 @@ export default function MerchantDashboard() {
     bank_account: ''
   });
 
+  // Settings sub-tabs
+  const [settingsTab, setSettingsTab] = useState('cashback');
+  
+  // PIN Protection states
+  const [pinStatus, setPinStatus] = useState({ pin_enabled: false, has_pin: false });
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [showForgotPinModal, setShowForgotPinModal] = useState(false);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
+
   const token = localStorage.getItem('sdm_merchant_token');
 
   useEffect(() => {
@@ -58,7 +80,19 @@ export default function MerchantDashboard() {
       return;
     }
     fetchDashboardData();
+    fetchPinStatus();
   }, [token]);
+
+  const fetchPinStatus = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/merchants/settings/pin-status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPinStatus(res.data);
+    } catch (error) {
+      console.error('Error fetching PIN status:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -145,6 +179,69 @@ export default function MerchantDashboard() {
   const copyQRCode = (code) => {
     navigator.clipboard.writeText(code);
     toast.success('QR code copied!');
+  };
+
+  // PIN verification functions
+  const handleSettingsClick = () => {
+    if (pinStatus.pin_enabled && !pinVerified) {
+      setShowPinModal(true);
+      setPinError('');
+    } else {
+      setActiveTab('settings');
+    }
+  };
+
+  const handleVerifyPin = async (pin) => {
+    setIsVerifyingPin(true);
+    setPinError('');
+    
+    try {
+      await axios.post(
+        `${API_URL}/api/merchants/settings/pin/verify`,
+        { pin },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setPinVerified(true);
+      setShowPinModal(false);
+      setActiveTab('settings');
+    } catch (error) {
+      setPinError(error.response?.data?.detail || 'PIN incorrect');
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  const handlePinModalClose = (action) => {
+    setShowPinModal(false);
+    if (action === 'forgot') {
+      setShowForgotPinModal(true);
+    }
+  };
+
+  const handleRequestOTP = async (method) => {
+    const res = await axios.post(
+      `${API_URL}/api/merchants/settings/pin/forgot`,
+      { method },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return res.data;
+  };
+
+  const handleResetPin = async (otp, newPin) => {
+    await axios.post(
+      `${API_URL}/api/merchants/settings/pin/reset`,
+      { otp, new_pin: newPin },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    fetchPinStatus();
+  };
+
+  const handlePinStatusChange = (newStatus) => {
+    setPinStatus(newStatus);
+    // If PIN was disabled, reset verification
+    if (!newStatus.pin_enabled) {
+      setPinVerified(false);
+    }
   };
 
   const handleLogout = () => {
@@ -397,144 +494,167 @@ export default function MerchantDashboard() {
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            {/* Cashback Settings */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Percent size={18} /> Cashback Rate
-              </h3>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    min="1"
-                    max="20"
-                    step="0.5"
-                    value={settings.cashback_rate}
-                    onChange={(e) => setSettings({...settings, cashback_rate: e.target.value})}
-                    className="bg-slate-900 border-slate-700 text-white text-lg"
-                  />
-                  <p className="text-slate-500 text-xs mt-1">Range: 1% - 20%</p>
-                </div>
-                <Button
-                  onClick={handleSaveCashbackRate}
-                  disabled={isSaving}
-                  className="bg-emerald-500 hover:bg-emerald-600"
+            {/* Settings Sub-tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {[
+                { id: 'cashback', label: 'Cashback', icon: Percent },
+                { id: 'payment', label: 'Paiement', icon: Wallet },
+                { id: 'cashiers', label: 'Caissiers', icon: UserCog },
+                { id: 'business', label: 'Commerce', icon: Building },
+                { id: 'security', label: 'Sécurité', icon: Shield }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSettingsTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                    settingsTab === tab.id
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  data-testid={`settings-tab-${tab.id}`}
                 >
-                  {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                </Button>
-              </div>
+                  <tab.icon size={16} />
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            {/* Payment Info */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Wallet size={18} /> Payment Information
-              </h3>
-              
-              {/* MoMo */}
-              <div className="space-y-4 mb-6">
-                <h4 className="text-slate-300 text-sm font-medium">Mobile Money</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-slate-400 text-xs">MoMo Number</Label>
-                    <div className="relative mt-1">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+            {/* Cashback Settings */}
+            {settingsTab === 'cashback' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Percent size={18} /> Taux de Cashback
+                </h3>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      step="0.5"
+                      value={settings.cashback_rate}
+                      onChange={(e) => setSettings({...settings, cashback_rate: e.target.value})}
+                      className="bg-slate-900 border-slate-700 text-white text-lg"
+                    />
+                    <p className="text-slate-500 text-xs mt-1">Plage: 1% - 20%</p>
+                  </div>
+                  <Button
+                    onClick={handleSaveCashbackRate}
+                    disabled={isSaving}
+                    className="bg-emerald-500 hover:bg-emerald-600"
+                  >
+                    {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Settings */}
+            {settingsTab === 'payment' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                  <Wallet size={18} /> Informations de Paiement
+                </h3>
+                
+                {/* MoMo */}
+                <div className="space-y-4 mb-6">
+                  <h4 className="text-slate-300 text-sm font-medium">Mobile Money</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-400 text-xs">Numéro MoMo</Label>
+                      <div className="relative mt-1">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                        <Input
+                          type="tel"
+                          placeholder="0XX XXX XXXX"
+                          value={settings.momo_number}
+                          onChange={(e) => setSettings({...settings, momo_number: e.target.value})}
+                          className="pl-10 bg-slate-900 border-slate-700 text-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-slate-400 text-xs">Réseau</Label>
+                      <select
+                        value={settings.momo_network}
+                        onChange={(e) => setSettings({...settings, momo_network: e.target.value})}
+                        className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
+                      >
+                        <option value="">Sélectionner</option>
+                        <option value="MTN">MTN</option>
+                        <option value="Vodafone">Vodafone</option>
+                        <option value="AirtelTigo">AirtelTigo</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bank */}
+                <div className="space-y-4">
+                  <h4 className="text-slate-300 text-sm font-medium">Compte Bancaire</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-slate-400 text-xs">Nom de la Banque</Label>
                       <Input
-                        type="tel"
-                        placeholder="0XX XXX XXXX"
-                        value={settings.momo_number}
-                        onChange={(e) => setSettings({...settings, momo_number: e.target.value})}
-                        className="pl-10 bg-slate-900 border-slate-700 text-white"
+                        type="text"
+                        placeholder="Ex: GCB Bank"
+                        value={settings.bank_name}
+                        onChange={(e) => setSettings({...settings, bank_name: e.target.value})}
+                        className="mt-1 bg-slate-900 border-slate-700 text-white"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-slate-400 text-xs">Numéro de Compte</Label>
+                      <Input
+                        type="text"
+                        placeholder="Numéro de compte"
+                        value={settings.bank_account}
+                        onChange={(e) => setSettings({...settings, bank_account: e.target.value})}
+                        className="mt-1 bg-slate-900 border-slate-700 text-white"
                       />
                     </div>
                   </div>
-                  <div>
-                    <Label className="text-slate-400 text-xs">Network</Label>
-                    <select
-                      value={settings.momo_network}
-                      onChange={(e) => setSettings({...settings, momo_network: e.target.value})}
-                      className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
-                    >
-                      <option value="">Select</option>
-                      <option value="MTN">MTN</option>
-                      <option value="Vodafone">Vodafone</option>
-                      <option value="AirtelTigo">AirtelTigo</option>
-                    </select>
-                  </div>
                 </div>
-              </div>
 
-              {/* Bank */}
-              <div className="space-y-4">
-                <h4 className="text-slate-300 text-sm font-medium">Bank Account</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-slate-400 text-xs">Bank Name</Label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. GCB Bank"
-                      value={settings.bank_name}
-                      onChange={(e) => setSettings({...settings, bank_name: e.target.value})}
-                      className="mt-1 bg-slate-900 border-slate-700 text-white"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-slate-400 text-xs">Account Number</Label>
-                    <Input
-                      type="text"
-                      placeholder="Account number"
-                      value={settings.bank_account}
-                      onChange={(e) => setSettings({...settings, bank_account: e.target.value})}
-                      className="mt-1 bg-slate-900 border-slate-700 text-white"
-                    />
-                  </div>
-                </div>
+                <Button
+                  onClick={handleSavePaymentInfo}
+                  disabled={isSaving}
+                  className="mt-6 w-full bg-emerald-500 hover:bg-emerald-600"
+                >
+                  {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : <Save className="mr-2" size={18} />}
+                  Sauvegarder
+                </Button>
               </div>
+            )}
 
-              <Button
-                onClick={handleSavePaymentInfo}
-                disabled={isSaving}
-                className="mt-6 w-full bg-emerald-500 hover:bg-emerald-600"
-              >
-                {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : <Save className="mr-2" size={18} />}
-                Save Payment Info
-              </Button>
-            </div>
+            {/* Cashiers Management */}
+            {settingsTab === 'cashiers' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <CashierManager token={token} />
+              </div>
+            )}
 
             {/* Business Info */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Store size={18} /> Business Information
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Business Name</span>
-                  <span className="text-white">{merchant?.business_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Owner</span>
-                  <span className="text-white">{merchant?.owner_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Phone</span>
-                  <span className="text-white">{merchant?.phone}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Business Type</span>
-                  <span className="text-white">{merchant?.business_type || 'Not set'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Address</span>
-                  <span className="text-white">{merchant?.business_address || 'Not set'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Member Since</span>
-                  <span className="text-white">
-                    {new Date(merchant?.created_at).toLocaleDateString()}
-                  </span>
-                </div>
+            {settingsTab === 'business' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <BusinessInfoEditor 
+                  token={token} 
+                  merchant={merchant} 
+                  onUpdate={(updatedMerchant) => setMerchant(updatedMerchant)}
+                />
               </div>
-            </div>
+            )}
+
+            {/* Security / PIN Settings */}
+            {settingsTab === 'security' && (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                <PinSettings 
+                  token={token} 
+                  pinStatus={pinStatus} 
+                  onPinStatusChange={handlePinStatusChange}
+                />
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -567,15 +687,37 @@ export default function MerchantDashboard() {
             <span className="text-xs">History</span>
           </button>
           <button
-            onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center gap-1 ${activeTab === 'settings' ? 'text-emerald-400' : 'text-slate-500'}`}
+            onClick={handleSettingsClick}
+            className={`flex flex-col items-center gap-1 relative ${activeTab === 'settings' ? 'text-emerald-400' : 'text-slate-500'}`}
             data-testid="nav-settings"
           >
             <Settings size={22} />
             <span className="text-xs">Settings</span>
+            {pinStatus.pin_enabled && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full"></span>
+            )}
           </button>
         </div>
       </nav>
+
+      {/* PIN Modal */}
+      <PinModal
+        isOpen={showPinModal}
+        onClose={handlePinModalClose}
+        onVerify={handleVerifyPin}
+        isLoading={isVerifyingPin}
+        error={pinError}
+      />
+
+      {/* Forgot PIN Modal */}
+      <ForgotPinModal
+        isOpen={showForgotPinModal}
+        onClose={() => setShowForgotPinModal(false)}
+        onRequestOTP={handleRequestOTP}
+        onResetPin={handleResetPin}
+        merchantPhone={merchant?.phone}
+        merchantEmail={merchant?.email}
+      />
     </div>
   );
 }
