@@ -76,6 +76,32 @@ class UpdateCardPricesRequest(BaseModel):
     silver_benefits: Optional[str] = None
     gold_benefits: Optional[str] = None
     platinum_benefits: Optional[str] = None
+    silver_duration: Optional[int] = None  # Duration in days
+    gold_duration: Optional[int] = None
+    platinum_duration: Optional[int] = None
+
+
+class CreateCardTypeRequest(BaseModel):
+    name: str  # e.g., "Diamond", "Business", "Student"
+    slug: str  # e.g., "diamond", "business", "student"
+    price: float
+    duration_days: int  # Duration in days (30, 90, 365, 730, etc.)
+    benefits: str
+    color: Optional[str] = "#6366f1"  # Hex color for badge
+    icon: Optional[str] = "credit-card"  # Icon name
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class UpdateCardTypeRequest(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    duration_days: Optional[int] = None
+    benefits: Optional[str] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
 
 
 class UpdateServiceCommissionsRequest(BaseModel):
@@ -412,6 +438,87 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
             "new_clients": new_clients
         })
     
+    # ============== 9. SDM CASHBACK COMMISSIONS ==============
+    # Commission on cashback (5% default) - already stored in transactions
+    all_transactions_with_commission = await db.transactions.find(
+        {"type": "payment", "commission_amount": {"$exists": True}},
+        {"_id": 0, "commission_amount": 1, "created_at": 1}
+    ).to_list(100000)
+    
+    total_sdm_commissions = sum(t.get("commission_amount", 0) for t in all_transactions_with_commission)
+    
+    # Commission by period
+    sdm_commission_by_period = {
+        "day": 0,
+        "week": 0,
+        "month": 0,
+        "year": 0
+    }
+    
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    for t in all_transactions_with_commission:
+        created_at = t.get("created_at", "")
+        commission = t.get("commission_amount", 0)
+        if created_at >= day_start.isoformat():
+            sdm_commission_by_period["day"] += commission
+        if created_at >= week_start.isoformat():
+            sdm_commission_by_period["week"] += commission
+        if created_at >= month_start.isoformat():
+            sdm_commission_by_period["month"] += commission
+        if created_at >= year_start.isoformat():
+            sdm_commission_by_period["year"] += commission
+    
+    # ============== 10. SERVICE FEES ANALYTICS ==============
+    service_transactions = await db.transactions.find(
+        {"type": {"$in": ["airtime", "data_bundle", "ecg_payment", "merchant_payment"]}},
+        {"_id": 0, "type": 1, "amount": 1, "service_fee": 1, "created_at": 1}
+    ).to_list(100000)
+    
+    service_fees = {
+        "airtime": {"count": 0, "volume": 0, "fees": 0},
+        "data_bundle": {"count": 0, "volume": 0, "fees": 0},
+        "ecg_payment": {"count": 0, "volume": 0, "fees": 0},
+        "merchant_payment": {"count": 0, "volume": 0, "fees": 0}
+    }
+    
+    monthly_service_fees = {}  # For chart
+    
+    for t in service_transactions:
+        svc_type = t.get("type", "")
+        if svc_type in service_fees:
+            service_fees[svc_type]["count"] += 1
+            service_fees[svc_type]["volume"] += t.get("amount", 0)
+            service_fees[svc_type]["fees"] += t.get("service_fee", 0)
+        
+        # Monthly breakdown
+        created_at = t.get("created_at", "")
+        if created_at:
+            month_key = created_at[:7]  # YYYY-MM
+            if month_key not in monthly_service_fees:
+                monthly_service_fees[month_key] = 0
+            monthly_service_fees[month_key] += t.get("service_fee", 0)
+    
+    # Top services by usage
+    top_services = sorted(
+        [{"service": k, **v} for k, v in service_fees.items()],
+        key=lambda x: x["count"],
+        reverse=True
+    )
+    
+    # Monthly fees chart data (last 6 months)
+    monthly_fees_chart = []
+    for i in range(5, -1, -1):
+        m = (now.replace(day=1) - timedelta(days=i*30)).replace(day=1)
+        month_key = m.strftime("%Y-%m")
+        monthly_fees_chart.append({
+            "month": m.strftime("%b"),
+            "fees": monthly_service_fees.get(month_key, 0)
+        })
+    
     return {
         "card_stats": {
             "silver": silver_cards,
@@ -424,7 +531,42 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
             "total_gmv": total_gmv,
             "total_cashback_distributed": total_cashback_all,
             "total_card_revenue": card_revenue,
-            "total_referral_bonuses": total_referral_bonuses
+            "total_referral_bonuses": total_referral_bonuses,
+            "total_sdm_commissions": round(total_sdm_commissions, 2),
+            "sdm_commission_by_period": {
+                k: round(v, 2) for k, v in sdm_commission_by_period.items()
+            }
+        },
+        "service_fees": {
+            "by_service": {
+                "airtime": {
+                    "label": "Airtime",
+                    "count": service_fees["airtime"]["count"],
+                    "volume": round(service_fees["airtime"]["volume"], 2),
+                    "fees": round(service_fees["airtime"]["fees"], 2)
+                },
+                "data_bundle": {
+                    "label": "Data Bundles",
+                    "count": service_fees["data_bundle"]["count"],
+                    "volume": round(service_fees["data_bundle"]["volume"], 2),
+                    "fees": round(service_fees["data_bundle"]["fees"], 2)
+                },
+                "ecg_payment": {
+                    "label": "ECG / Électricité",
+                    "count": service_fees["ecg_payment"]["count"],
+                    "volume": round(service_fees["ecg_payment"]["volume"], 2),
+                    "fees": round(service_fees["ecg_payment"]["fees"], 2)
+                },
+                "merchant_payment": {
+                    "label": "Paiement Marchand",
+                    "count": service_fees["merchant_payment"]["count"],
+                    "volume": round(service_fees["merchant_payment"]["volume"], 2),
+                    "fees": round(service_fees["merchant_payment"]["fees"], 2)
+                }
+            },
+            "top_services": top_services,
+            "monthly_chart": monthly_fees_chart,
+            "total_fees": round(sum(s["fees"] for s in service_fees.values()), 2)
         },
         "top_merchants": top_merchants[:5],
         "top_clients": top_clients[:5],
@@ -1154,24 +1296,35 @@ async def update_card_prices(
     request: UpdateCardPricesRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Update membership card prices and benefits"""
+    """Update membership card prices, benefits, and durations"""
     if not current_admin.get("is_super_admin"):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
     
+    # Prices
     if request.silver_price is not None:
         updates["card_prices.silver"] = request.silver_price
     if request.gold_price is not None:
         updates["card_prices.gold"] = request.gold_price
     if request.platinum_price is not None:
         updates["card_prices.platinum"] = request.platinum_price
+    
+    # Benefits
     if request.silver_benefits is not None:
         updates["card_benefits.silver"] = request.silver_benefits
     if request.gold_benefits is not None:
         updates["card_benefits.gold"] = request.gold_benefits
     if request.platinum_benefits is not None:
         updates["card_benefits.platinum"] = request.platinum_benefits
+    
+    # Durations (in days)
+    if request.silver_duration is not None:
+        updates["card_durations.silver"] = request.silver_duration
+    if request.gold_duration is not None:
+        updates["card_durations.gold"] = request.gold_duration
+    if request.platinum_duration is not None:
+        updates["card_durations.platinum"] = request.platinum_duration
     
     await db.platform_config.update_one({"key": "main"}, {"$set": updates})
     
@@ -1184,6 +1337,180 @@ async def update_card_prices(
     })
     
     return {"success": True, "message": "Card prices updated"}
+
+
+# ============== DYNAMIC CARD TYPES MANAGEMENT ==============
+
+@router.get("/settings/card-types")
+async def get_card_types(current_admin: dict = Depends(get_current_admin)):
+    """Get all card types (both default and custom)"""
+    
+    # Get platform config for default cards
+    config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+    
+    default_cards = []
+    if config:
+        card_prices = config.get("card_prices", {})
+        card_benefits = config.get("card_benefits", {})
+        card_durations = config.get("card_durations", {"silver": 365, "gold": 365, "platinum": 730})
+        
+        for card_type in ["silver", "gold", "platinum"]:
+            default_cards.append({
+                "id": f"default_{card_type}",
+                "slug": card_type,
+                "name": card_type.capitalize(),
+                "price": card_prices.get(card_type, 0),
+                "duration_days": card_durations.get(card_type, 365),
+                "benefits": card_benefits.get(card_type, ""),
+                "color": {"silver": "#94a3b8", "gold": "#f59e0b", "platinum": "#6366f1"}.get(card_type, "#6366f1"),
+                "icon": "credit-card",
+                "is_default": True,
+                "is_active": True,
+                "sort_order": {"silver": 1, "gold": 2, "platinum": 3}.get(card_type, 0)
+            })
+    
+    # Get custom card types
+    custom_cards = await db.card_types.find(
+        {},
+        {"_id": 0}
+    ).sort("sort_order", 1).to_list(100)
+    
+    # Mark custom cards
+    for card in custom_cards:
+        card["is_default"] = False
+    
+    all_cards = default_cards + custom_cards
+    all_cards.sort(key=lambda x: x.get("sort_order", 99))
+    
+    return {"card_types": all_cards, "total": len(all_cards)}
+
+
+@router.post("/settings/card-types")
+async def create_card_type(
+    request: CreateCardTypeRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Create a new custom card type"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Check if slug already exists
+    existing = await db.card_types.find_one({"slug": request.slug.lower()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Card type with this slug already exists")
+    
+    # Also check default slugs
+    if request.slug.lower() in ["silver", "gold", "platinum"]:
+        raise HTTPException(status_code=400, detail="Cannot use reserved card type names")
+    
+    card_type = {
+        "id": str(uuid.uuid4()),
+        "slug": request.slug.lower(),
+        "name": request.name,
+        "price": request.price,
+        "duration_days": request.duration_days,
+        "benefits": request.benefits,
+        "color": request.color or "#6366f1",
+        "icon": request.icon or "credit-card",
+        "is_active": request.is_active,
+        "sort_order": request.sort_order,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.card_types.insert_one(card_type)
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "create_card_type",
+        "details": {"card_name": request.name, "slug": request.slug},
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    card_type.pop("_id", None)
+    return {"success": True, "card_type": card_type}
+
+
+@router.put("/settings/card-types/{card_id}")
+async def update_card_type(
+    card_id: str,
+    request: UpdateCardTypeRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update a custom card type"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Check if it's a default card
+    if card_id.startswith("default_"):
+        raise HTTPException(status_code=400, detail="Cannot update default cards via this endpoint. Use /settings/card-prices instead")
+    
+    card = await db.card_types.find_one({"id": card_id})
+    if not card:
+        raise HTTPException(status_code=404, detail="Card type not found")
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.name is not None:
+        updates["name"] = request.name
+    if request.price is not None:
+        updates["price"] = request.price
+    if request.duration_days is not None:
+        updates["duration_days"] = request.duration_days
+    if request.benefits is not None:
+        updates["benefits"] = request.benefits
+    if request.color is not None:
+        updates["color"] = request.color
+    if request.icon is not None:
+        updates["icon"] = request.icon
+    if request.is_active is not None:
+        updates["is_active"] = request.is_active
+    if request.sort_order is not None:
+        updates["sort_order"] = request.sort_order
+    
+    await db.card_types.update_one({"id": card_id}, {"$set": updates})
+    
+    return {"success": True, "message": "Card type updated"}
+
+
+@router.delete("/settings/card-types/{card_id}")
+async def delete_card_type(
+    card_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Delete a custom card type"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    if card_id.startswith("default_"):
+        raise HTTPException(status_code=400, detail="Cannot delete default card types")
+    
+    # Check if any clients have this card
+    card = await db.card_types.find_one({"id": card_id})
+    if not card:
+        raise HTTPException(status_code=404, detail="Card type not found")
+    
+    clients_with_card = await db.clients.count_documents({"card_type": card["slug"]})
+    if clients_with_card > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cannot delete: {clients_with_card} clients have this card type"
+        )
+    
+    await db.card_types.delete_one({"id": card_id})
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "delete_card_type",
+        "details": {"card_slug": card["slug"], "card_name": card.get("name")},
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Card type deleted"}
 
 
 @router.put("/settings/service-commissions")
@@ -2023,7 +2350,7 @@ async def get_all_admins(current_admin: dict = Depends(get_current_admin)):
 
 
 @router.post("/admins/create")
-async def create_admin(
+async def create_admin_with_role(
     request: CreateAdminRoleRequest,
     current_admin: dict = Depends(get_current_admin)
 ):

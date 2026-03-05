@@ -66,6 +66,21 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Fetch card types from API
+  const [cardTypes, setCardTypes] = useState([]);
+  useEffect(() => {
+    const fetchCards = async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/public/card-types`);
+        const data = await res.json();
+        setCardTypes(data.card_types || []);
+      } catch (error) {
+        console.error('Error fetching card types:', error);
+      }
+    };
+    fetchCards();
+  }, []);
+
   // Stats counter animation
   const [stats, setStats] = useState({ members: 0, merchants: 0, cashback: 0 });
   useEffect(() => {
@@ -368,7 +383,15 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-2xl font-bold">{t('card_silver_name')}</h3>
-                    <p className="text-3xl font-bold text-slate-300 mt-2">{t('card_silver_price')}</p>
+                    <p className="text-3xl font-bold text-slate-300 mt-2">
+                      {cardTypes.find(c => c.slug === 'silver')?.price 
+                        ? `GHS ${cardTypes.find(c => c.slug === 'silver')?.price}` 
+                        : t('card_silver_price')}
+                    </p>
+                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
+                      <Clock size={14} />
+                      {cardTypes.find(c => c.slug === 'silver')?.duration_label || '1 an'}
+                    </p>
                   </div>
                   <img src={SDM_LOGO_URL} alt="SDM" className="w-16 h-16 object-contain opacity-50" />
                 </div>
@@ -399,7 +422,15 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-2xl font-bold text-amber-300">{t('card_gold_name')}</h3>
-                    <p className="text-3xl font-bold text-amber-400 mt-2">{t('card_gold_price')}</p>
+                    <p className="text-3xl font-bold text-amber-400 mt-2">
+                      {cardTypes.find(c => c.slug === 'gold')?.price 
+                        ? `GHS ${cardTypes.find(c => c.slug === 'gold')?.price}` 
+                        : t('card_gold_price')}
+                    </p>
+                    <p className="text-amber-300/70 text-sm mt-1 flex items-center gap-1">
+                      <Clock size={14} />
+                      {cardTypes.find(c => c.slug === 'gold')?.duration_label || '1 an'}
+                    </p>
                   </div>
                   <img src={SDM_LOGO_URL} alt="SDM" className="w-16 h-16 object-contain" />
                 </div>
@@ -430,7 +461,15 @@ export default function HomePage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-2xl font-bold">{t('card_platinum_name')}</h3>
-                    <p className="text-3xl font-bold text-slate-200 mt-2">{t('card_platinum_price')}</p>
+                    <p className="text-3xl font-bold text-slate-200 mt-2">
+                      {cardTypes.find(c => c.slug === 'platinum')?.price 
+                        ? `GHS ${cardTypes.find(c => c.slug === 'platinum')?.price}` 
+                        : t('card_platinum_price')}
+                    </p>
+                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
+                      <Clock size={14} />
+                      {cardTypes.find(c => c.slug === 'platinum')?.duration_label || '2 ans'}
+                    </p>
                   </div>
                   <img src={SDM_LOGO_URL} alt="SDM" className="w-16 h-16 object-contain opacity-70" />
                 </div>

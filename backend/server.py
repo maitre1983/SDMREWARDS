@@ -190,9 +190,16 @@ async def init_platform_config():
             
             # Cards
             "cards": {
-                "silver": {"name": "Silver Card", "price": 25, "color": "#C0C0C0"},
-                "gold": {"name": "Gold Card", "price": 50, "color": "#FFD700"},
-                "platinum": {"name": "Platinum Card", "price": 100, "color": "#E5E4E2"}
+                "silver": {"name": "Silver Card", "price": 25, "color": "#C0C0C0", "duration_days": 365},
+                "gold": {"name": "Gold Card", "price": 50, "color": "#FFD700", "duration_days": 365},
+                "platinum": {"name": "Platinum Card", "price": 100, "color": "#E5E4E2", "duration_days": 730}
+            },
+            
+            # Card durations (for legacy compatibility)
+            "card_durations": {
+                "silver": 365,
+                "gold": 365,
+                "platinum": 730
             },
             
             # Cashback settings
@@ -230,6 +237,61 @@ async def health_check():
         "version": "2.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+# ============== PUBLIC CARD TYPES ENDPOINT ==============
+@app.get("/api/public/card-types")
+async def get_public_card_types():
+    """Get all active card types for landing page and client registration"""
+    
+    # Get platform config for default cards
+    config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+    
+    cards = []
+    if config:
+        card_prices = config.get("card_prices", {})
+        card_benefits = config.get("card_benefits", {})
+        card_durations = config.get("card_durations", {"silver": 365, "gold": 365, "platinum": 730})
+        
+        for card_type in ["silver", "gold", "platinum"]:
+            cards.append({
+                "slug": card_type,
+                "name": card_type.capitalize(),
+                "price": card_prices.get(card_type, 0),
+                "duration_days": card_durations.get(card_type, 365),
+                "duration_label": format_duration(card_durations.get(card_type, 365)),
+                "benefits": card_benefits.get(card_type, ""),
+                "color": {"silver": "#94a3b8", "gold": "#f59e0b", "platinum": "#6366f1"}.get(card_type, "#6366f1"),
+                "icon": "credit-card",
+                "is_default": True
+            })
+    
+    # Get active custom card types
+    custom_cards = await db.card_types.find(
+        {"is_active": True},
+        {"_id": 0, "id": 0, "created_at": 0, "updated_at": 0}
+    ).sort("sort_order", 1).to_list(100)
+    
+    for card in custom_cards:
+        card["is_default"] = False
+        card["duration_label"] = format_duration(card.get("duration_days", 365))
+    
+    all_cards = cards + custom_cards
+    return {"card_types": all_cards}
+
+
+def format_duration(days: int) -> str:
+    """Format duration in days to human readable string"""
+    if days >= 730:
+        years = days // 365
+        return f"{years} ans"
+    elif days >= 365:
+        return "1 an"
+    elif days >= 30:
+        months = days // 30
+        return f"{months} mois"
+    else:
+        return f"{days} jours"
 
 # ============== IMPORT ROUTERS ==============
 from routers.auth import router as auth_router

@@ -45,6 +45,10 @@ import {
   Phone
 } from 'lucide-react';
 
+// Admin Components
+import ServiceFeesAnalytics from '../components/admin/ServiceFeesAnalytics';
+import CardTypesManager from '../components/admin/CardTypesManager';
+
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
@@ -103,7 +107,8 @@ export default function AdminDashboard() {
     silver_price: 25, gold_price: 50, platinum_price: 100,
     silver_benefits: '3% cashback on all purchases', 
     gold_benefits: '5% cashback + Priority support',
-    platinum_benefits: '7% cashback + VIP benefits + Exclusive offers'
+    platinum_benefits: '7% cashback + VIP benefits + Exclusive offers',
+    silver_duration: 365, gold_duration: 365, platinum_duration: 730
   });
   const [commissionsForm, setCommissionsForm] = useState({
     platform_commission_rate: 5, min_cashback: 1, max_cashback: 20
@@ -268,6 +273,14 @@ export default function AdminDashboard() {
               silver_benefits: configRes.data.config.card_benefits.silver || prev.silver_benefits,
               gold_benefits: configRes.data.config.card_benefits.gold || prev.gold_benefits,
               platinum_benefits: configRes.data.config.card_benefits.platinum || prev.platinum_benefits
+            }));
+          }
+          if (configRes.data.config.card_durations) {
+            setCardPricesForm(prev => ({
+              ...prev,
+              silver_duration: configRes.data.config.card_durations.silver || 365,
+              gold_duration: configRes.data.config.card_durations.gold || 365,
+              platinum_duration: configRes.data.config.card_durations.platinum || 730
             }));
           }
           if (configRes.data.config.platform_commission_rate) {
@@ -1190,6 +1203,9 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* SDM Commissions & Service Fees Analytics */}
+            <ServiceFeesAnalytics token={token} advancedStats={advancedStats} />
+
             {/* Top Performers Section */}
             <div className="grid md:grid-cols-2 gap-6">
               {/* Top Performing Merchants */}
@@ -1763,100 +1779,151 @@ export default function AdminDashboard() {
 
                 {/* Card Prices Settings */}
                 {settingsTab === 'cards' && (
-                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                    <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-                      <CreditCard size={20} className="text-amber-400" /> Membership Card Configuration
-                    </h3>
-                    <div className="grid md:grid-cols-3 gap-6">
-                      {/* Silver Card */}
-                      <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Medal className="text-slate-400" size={24} />
-                      <h4 className="text-white font-medium">Silver Card</h4>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-slate-400 text-sm">Price (GHS)</Label>
-                        <Input
-                          type="number"
-                          value={cardPricesForm.silver_price}
-                          onChange={(e) => setCardPricesForm({...cardPricesForm, silver_price: parseFloat(e.target.value)})}
-                          className="bg-slate-800 border-slate-700 text-white mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-slate-400 text-sm">Benefits</Label>
-                        <textarea
-                          value={cardPricesForm.silver_benefits}
-                          onChange={(e) => setCardPricesForm({...cardPricesForm, silver_benefits: e.target.value})}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                  <div className="space-y-6">
+                    {/* Default Cards Configuration */}
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                      <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                        <CreditCard size={20} className="text-amber-400" /> Cartes par défaut (Prix, Durée, Avantages)
+                      </h3>
+                      <div className="grid md:grid-cols-3 gap-6">
+                        {/* Silver Card */}
+                        <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Medal className="text-slate-400" size={24} />
+                            <h4 className="text-white font-medium">Silver Card</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-slate-400 text-sm">Prix (GHS)</Label>
+                              <Input
+                                type="number"
+                                value={cardPricesForm.silver_price}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, silver_price: parseFloat(e.target.value)})}
+                                className="bg-slate-800 border-slate-700 text-white mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Durée</Label>
+                              <select
+                                value={cardPricesForm.silver_duration || 365}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, silver_duration: parseInt(e.target.value)})}
+                                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-white"
+                              >
+                                <option value={30}>1 mois</option>
+                                <option value={90}>3 mois</option>
+                                <option value={180}>6 mois</option>
+                                <option value={365}>1 an</option>
+                                <option value={730}>2 ans</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Avantages</Label>
+                              <textarea
+                                value={cardPricesForm.silver_benefits}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, silver_benefits: e.target.value})}
+                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
 
-                  {/* Gold Card */}
-                  <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 rounded-xl p-4 border border-amber-700/50">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Award className="text-amber-400" size={24} />
-                      <h4 className="text-amber-400 font-medium">Gold Card</h4>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-slate-400 text-sm">Price (GHS)</Label>
-                        <Input
-                          type="number"
-                          value={cardPricesForm.gold_price}
-                          onChange={(e) => setCardPricesForm({...cardPricesForm, gold_price: parseFloat(e.target.value)})}
-                          className="bg-slate-800 border-amber-700/50 text-white mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-slate-400 text-sm">Benefits</Label>
-                        <textarea
-                          value={cardPricesForm.gold_benefits}
-                          onChange={(e) => setCardPricesForm({...cardPricesForm, gold_benefits: e.target.value})}
-                          className="w-full bg-slate-800 border border-amber-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                        {/* Gold Card */}
+                        <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 rounded-xl p-4 border border-amber-700/50">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Award className="text-amber-400" size={24} />
+                            <h4 className="text-amber-400 font-medium">Gold Card</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-slate-400 text-sm">Prix (GHS)</Label>
+                              <Input
+                                type="number"
+                                value={cardPricesForm.gold_price}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, gold_price: parseFloat(e.target.value)})}
+                                className="bg-slate-800 border-amber-700/50 text-white mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Durée</Label>
+                              <select
+                                value={cardPricesForm.gold_duration || 365}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, gold_duration: parseInt(e.target.value)})}
+                                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-amber-700/50 rounded-md text-white"
+                              >
+                                <option value={30}>1 mois</option>
+                                <option value={90}>3 mois</option>
+                                <option value={180}>6 mois</option>
+                                <option value={365}>1 an</option>
+                                <option value={730}>2 ans</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Avantages</Label>
+                              <textarea
+                                value={cardPricesForm.gold_benefits}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, gold_benefits: e.target.value})}
+                                className="w-full bg-slate-800 border border-amber-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
 
-                  {/* Platinum Card */}
-                  <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 rounded-xl p-4 border border-purple-700/50">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Crown className="text-purple-400" size={24} />
-                      <h4 className="text-purple-400 font-medium">Platinum Card</h4>
+                        {/* Platinum Card */}
+                        <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 rounded-xl p-4 border border-purple-700/50">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Crown className="text-purple-400" size={24} />
+                            <h4 className="text-purple-400 font-medium">Platinum Card</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-slate-400 text-sm">Prix (GHS)</Label>
+                              <Input
+                                type="number"
+                                value={cardPricesForm.platinum_price}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_price: parseFloat(e.target.value)})}
+                                className="bg-slate-800 border-purple-700/50 text-white mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Durée</Label>
+                              <select
+                                value={cardPricesForm.platinum_duration || 730}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_duration: parseInt(e.target.value)})}
+                                className="w-full mt-1 px-3 py-2 bg-slate-800 border border-purple-700/50 rounded-md text-white"
+                              >
+                                <option value={30}>1 mois</option>
+                                <option value={90}>3 mois</option>
+                                <option value={180}>6 mois</option>
+                                <option value={365}>1 an</option>
+                                <option value={730}>2 ans</option>
+                                <option value={1095}>3 ans</option>
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Avantages</Label>
+                              <textarea
+                                value={cardPricesForm.platinum_benefits}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_benefits: e.target.value})}
+                                className="w-full bg-slate-800 border border-purple-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-6 flex justify-end">
+                        <Button onClick={handleSaveCardPrices} className="bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
+                          {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                          Sauvegarder
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-slate-400 text-sm">Price (GHS)</Label>
-                        <Input
-                          type="number"
-                          value={cardPricesForm.platinum_price}
-                          onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_price: parseFloat(e.target.value)})}
-                          className="bg-slate-800 border-purple-700/50 text-white mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-slate-400 text-sm">Benefits</Label>
-                        <textarea
-                          value={cardPricesForm.platinum_benefits}
-                          onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_benefits: e.target.value})}
-                          className="w-full bg-slate-800 border border-purple-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
-                        />
-                      </div>
+
+                    {/* Custom Card Types Manager */}
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                      <CardTypesManager token={token} onUpdate={fetchDashboardData} />
                     </div>
                   </div>
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <Button onClick={handleSaveCardPrices} className="bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
-                    {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
-                    Save Card Prices
-                  </Button>
-                </div>
-              </div>
-            )}
+                )}
 
             {/* Commission Settings */}
             {settingsTab === 'commissions' && (
