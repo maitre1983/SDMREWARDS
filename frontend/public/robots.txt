@@ -1,0 +1,15 @@
+# SDM REWARDS - robots.txt
+# https://www.sdmrewards.com
+
+User-agent: *
+Allow: /
+Disallow: /admin*
+Disallow: /api/
+Disallow: /client/profile
+Disallow: /merchant/dashboard
+
+# Sitemap location
+Sitemap: https://web-boost-seo.preview.emergentagent.com/sitemap.xml
+
+# Crawl-delay for politeness
+Crawl-delay: 1

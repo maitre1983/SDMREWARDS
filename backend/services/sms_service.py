@@ -193,6 +193,28 @@ class SMSService:
             f"Please try again or contact support."
         )
         return await self.send_sms(phone, message, "payment_failed")
+    
+    async def notify_card_expiring(self, phone: str, card_type: str, days_remaining: int):
+        """Notify client that their card is expiring soon"""
+        message = (
+            f"SDM Rewards: Votre carte {card_type.capitalize()} expire dans {days_remaining} jours! "
+            f"Renouvelez maintenant pour continuer à gagner du cashback. "
+            f"Connectez-vous à votre compte SDM."
+        )
+        return await self.send_sms(phone, message, "card_expiring")
+    
+    async def notify_card_expired(self, phone: str, card_type: str):
+        """Notify client that their card has expired"""
+        message = (
+            f"SDM Rewards: Votre carte {card_type.capitalize()} a expiré. "
+            f"Renouvelez votre abonnement pour continuer à profiter du cashback. "
+            f"Connectez-vous sur SDM Rewards."
+        )
+        return await self.send_sms(phone, message, "card_expired")
+    
+    async def send_raw_sms(self, phone: str, message: str):
+        """Send a custom SMS message"""
+        return await self.send_sms(phone, message, "custom")
 
 
 # Global SMS service instance

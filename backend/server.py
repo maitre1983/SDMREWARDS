@@ -326,6 +326,89 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         }
     )
 
+
+# ============== CARD EXPIRATION REMINDER TASK ==============
+from datetime import timedelta
+
+@app.post("/api/tasks/card-expiration-reminders")
+async def send_card_expiration_reminders():
+    """
+    Send SMS reminders to clients whose cards are expiring soon.
+    Called by external cron job (daily).
+    Sends reminders at: 7 days, 3 days, 1 day before expiration.
+    """
+    from services.sms_service import get_sms_service
+    
+    sms = get_sms_service(db)
+    now = datetime.now(timezone.utc)
+    
+    # Find clients with expiring cards
+    reminder_days = [7, 3, 1]
+    sent_count = 0
+    
+    for days in reminder_days:
+        target_date = now + timedelta(days=days)
+        start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Find clients whose cards expire on this target date
+        expiring_clients = await db.clients.find({
+            "status": "active",
+            "card_expires_at": {
+                "$gte": start_of_day.isoformat(),
+                "$lte": end_of_day.isoformat()
+            }
+        }, {"_id": 0, "id": 1, "phone": 1, "card_type": 1, "full_name": 1}).to_list(1000)
+        
+        for client in expiring_clients:
+            # Check if we already sent a reminder for this day
+            existing_reminder = await db.sms_logs.find_one({
+                "phone": client["phone"],
+                "type": "card_expiring",
+                "created_at": {"$gte": start_of_day.isoformat()}
+            })
+            
+            if not existing_reminder:
+                try:
+                    await sms.notify_card_expiring(
+                        client["phone"],
+                        client.get("card_type", ""),
+                        days
+                    )
+                    sent_count += 1
+                    logger.info(f"Sent expiration reminder to {client['phone']} ({days} days)")
+                except Exception as e:
+                    logger.error(f"Failed to send reminder to {client['phone']}: {e}")
+    
+    # Also check for already expired cards (send once)
+    expired_clients = await db.clients.find({
+        "status": "active",
+        "card_expires_at": {"$lt": now.isoformat()}
+    }, {"_id": 0, "id": 1, "phone": 1, "card_type": 1}).to_list(100)
+    
+    for client in expired_clients:
+        # Check if we sent expired notification in last 7 days
+        week_ago = (now - timedelta(days=7)).isoformat()
+        existing_expired_sms = await db.sms_logs.find_one({
+            "phone": client["phone"],
+            "type": "card_expired",
+            "created_at": {"$gte": week_ago}
+        })
+        
+        if not existing_expired_sms:
+            try:
+                await sms.notify_card_expired(client["phone"], client.get("card_type", ""))
+                sent_count += 1
+            except Exception as e:
+                logger.error(f"Failed to send expired notification: {e}")
+    
+    return {
+        "success": True,
+        "reminders_sent": sent_count,
+        "timestamp": now.isoformat()
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
