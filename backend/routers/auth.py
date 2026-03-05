@@ -40,6 +40,7 @@ BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
 BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
 BULKCLIX_OTP_USER = os.environ.get('BULKCLIX_OTP_USER', '')
 BULKCLIX_OTP_PASS = os.environ.get('BULKCLIX_OTP_PASS', '')
+BULKCLIX_OTP_SENDER_ID = os.environ.get('BULKCLIX_OTP_SENDER_ID', '')
 
 
 # ============== REQUEST MODELS ==============
