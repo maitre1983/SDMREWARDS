@@ -118,6 +118,30 @@ export default function AdminDashboard() {
   const [newClientForm, setNewClientForm] = useState({ full_name: '', phone: '', username: '', email: '', card_type: '' });
   const [newMerchantForm, setNewMerchantForm] = useState({ business_name: '', owner_name: '', phone: '', email: '', cashback_rate: 5, city: '', address: '' });
 
+  // Phase 2 & 3: Advanced features states
+  const [smsHistory, setSmsHistory] = useState([]);
+  const [smsTemplates, setSmsTemplates] = useState([]);
+  const [scheduledSMS, setScheduledSMS] = useState([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({ name: '', message: '', category: 'general' });
+  
+  // Security states
+  const [pinEnabled, setPinEnabled] = useState(false);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [showSetPinModal, setShowSetPinModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '', otp_code: '' });
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpPreview, setOtpPreview] = useState('');
+  
+  // Admin management states
+  const [allAdmins, setAllAdmins] = useState([]);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [newAdminForm, setNewAdminForm] = useState({ email: '', password: '', name: '', role: 'admin_support' });
+
   useEffect(() => {
     if (token) {
       verifyToken();
@@ -623,6 +647,269 @@ export default function AdminDashboard() {
       setActionLoading(false);
     }
   };
+
+  // ============== PHASE 2: SMS ADVANCED FUNCTIONS ==============
+  
+  // Fetch SMS data
+  const fetchSMSData = async () => {
+    try {
+      const headers = getHeaders();
+      const [historyRes, templatesRes, scheduledRes] = await Promise.all([
+        axios.get(`${API_URL}/api/admin/sms/history`, { headers }),
+        axios.get(`${API_URL}/api/admin/sms/templates`, { headers }),
+        axios.get(`${API_URL}/api/admin/sms/scheduled`, { headers })
+      ]);
+      setSmsHistory(historyRes.data.logs || []);
+      setSmsTemplates(templatesRes.data.templates || []);
+      setScheduledSMS(scheduledRes.data.scheduled || []);
+    } catch (error) {
+      console.error('SMS data fetch error:', error);
+    }
+  };
+
+  // Create SMS template
+  const handleCreateTemplate = async () => {
+    if (!newTemplate.name || !newTemplate.message) {
+      toast.error('Please fill template name and message');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/sms/templates`, newTemplate, { headers });
+      toast.success('Template created');
+      setShowTemplateModal(false);
+      setNewTemplate({ name: '', message: '', category: 'general' });
+      fetchSMSData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create template');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Delete SMS template
+  const handleDeleteTemplate = async (templateId) => {
+    if (!window.confirm('Delete this template?')) return;
+    try {
+      const headers = getHeaders();
+      await axios.delete(`${API_URL}/api/admin/sms/templates/${templateId}`, { headers });
+      toast.success('Template deleted');
+      fetchSMSData();
+    } catch (error) {
+      toast.error('Failed to delete template');
+    }
+  };
+
+  // Cancel scheduled SMS
+  const handleCancelScheduledSMS = async (scheduleId) => {
+    if (!window.confirm('Cancel this scheduled SMS?')) return;
+    try {
+      const headers = getHeaders();
+      await axios.delete(`${API_URL}/api/admin/sms/scheduled/${scheduleId}`, { headers });
+      toast.success('Scheduled SMS cancelled');
+      fetchSMSData();
+    } catch (error) {
+      toast.error('Failed to cancel scheduled SMS');
+    }
+  };
+
+  // ============== PHASE 3: SECURITY FUNCTIONS ==============
+  
+  // Check PIN status
+  const checkPinStatus = async () => {
+    try {
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/settings/pin-status`, { headers });
+      setPinEnabled(res.data.pin_enabled);
+      if (!res.data.pin_enabled) {
+        setPinVerified(true); // No PIN = auto verified
+      }
+    } catch (error) {
+      console.error('PIN status check error:', error);
+      setPinVerified(true); // Default to verified if error
+    }
+  };
+
+  // Verify PIN
+  const handleVerifyPin = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/settings/verify-pin`, { pin: pinInput }, { headers });
+      setPinVerified(true);
+      setShowPinModal(false);
+      setPinInput('');
+      toast.success('PIN verified');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid PIN');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Set new PIN
+  const handleSetPin = async () => {
+    if (newPinInput.length < 4 || newPinInput.length > 6 || !/^\d+$/.test(newPinInput)) {
+      toast.error('PIN must be 4-6 digits');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/settings/set-pin`, { pin: newPinInput }, { headers });
+      toast.success('PIN set successfully');
+      setShowSetPinModal(false);
+      setNewPinInput('');
+      setPinEnabled(true);
+      checkPinStatus();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to set PIN');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Disable PIN
+  const handleDisablePin = async () => {
+    if (!pinInput) {
+      toast.error('Enter current PIN to disable');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/settings/disable-pin`, { pin: pinInput }, { headers });
+      toast.success('PIN disabled');
+      setPinEnabled(false);
+      setPinInput('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid PIN');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Request OTP for password change
+  const handleRequestOTP = async () => {
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      const res = await axios.post(`${API_URL}/api/admin/settings/request-otp`, {}, { headers });
+      setOtpSent(true);
+      if (res.data.otp_preview) {
+        setOtpPreview(res.data.otp_preview);
+        toast.success(`OTP (Test Mode): ${res.data.otp_preview}`);
+      } else {
+        toast.success('OTP sent to your phone');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send OTP');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Change password
+  const handleChangePassword = async () => {
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (passwordForm.new_password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/settings/change-password`, {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+        otp_code: passwordForm.otp_code,
+        otp_method: 'sms'
+      }, { headers });
+      toast.success('Password changed successfully');
+      setShowPasswordModal(false);
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '', otp_code: '' });
+      setOtpSent(false);
+      setOtpPreview('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to change password');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ============== ADMIN MANAGEMENT ==============
+  
+  // Fetch all admins
+  const fetchAdmins = async () => {
+    try {
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/admins`, { headers });
+      setAllAdmins(res.data.admins || []);
+    } catch (error) {
+      console.error('Admins fetch error:', error);
+    }
+  };
+
+  // Create new admin
+  const handleCreateAdmin = async () => {
+    if (!newAdminForm.email || !newAdminForm.password || !newAdminForm.name) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/admins/create`, newAdminForm, { headers });
+      toast.success('Admin created successfully');
+      setShowAdminModal(false);
+      setNewAdminForm({ email: '', password: '', name: '', role: 'admin_support' });
+      fetchAdmins();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create admin');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Update admin status
+  const handleToggleAdminStatus = async (adminId, isActive) => {
+    try {
+      const headers = getHeaders();
+      await axios.put(`${API_URL}/api/admin/admins/${adminId}`, { is_active: !isActive }, { headers });
+      toast.success(`Admin ${isActive ? 'deactivated' : 'activated'}`);
+      fetchAdmins();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update admin');
+    }
+  };
+
+  // Delete admin
+  const handleDeleteAdmin = async (adminId) => {
+    if (!window.confirm('Delete this admin account?')) return;
+    try {
+      const headers = getHeaders();
+      await axios.delete(`${API_URL}/api/admin/admins/${adminId}`, { headers });
+      toast.success('Admin deleted');
+      fetchAdmins();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete admin');
+    }
+  };
+
+  // Load SMS data and check PIN when Settings tab is accessed
+  useEffect(() => {
+    if (activeTab === 'settings' && token) {
+      checkPinStatus();
+      fetchSMSData();
+      if (admin?.is_super_admin) {
+        fetchAdmins();
+      }
+    }
+  }, [activeTab, token]);
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -1396,20 +1683,21 @@ export default function AdminDashboard() {
         {activeTab === 'settings' && (
           <div className="space-y-6">
             {/* Settings Sub-tabs */}
-            <div className="flex flex-wrap gap-2 bg-slate-800 p-2 rounded-xl">
+            <div className="flex flex-wrap gap-2 bg-slate-800 p-2 rounded-xl overflow-x-auto">
               {[
                 { id: 'cards', label: 'Card Prices', icon: CreditCard },
                 { id: 'commissions', label: 'Commissions', icon: Percent },
                 { id: 'services', label: 'Service Fees', icon: Sliders },
                 { id: 'referrals', label: 'Referrals', icon: Gift },
                 { id: 'users', label: 'Add Users', icon: UserPlus },
-                { id: 'sms', label: 'Bulk SMS', icon: MessageSquare },
-                { id: 'admin', label: 'Admin Info', icon: Shield }
+                { id: 'sms', label: 'SMS Center', icon: MessageSquare },
+                { id: 'security', label: 'Security', icon: Shield },
+                { id: 'admins', label: 'Admin Users', icon: Users }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setSettingsTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all whitespace-nowrap ${
                     settingsTab === tab.id 
                       ? 'bg-blue-600 text-white' 
                       : 'text-slate-400 hover:bg-slate-700'
@@ -1780,68 +2068,307 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Bulk SMS */}
+            {/* SMS Center (Phase 2) */}
             {settingsTab === 'sms' && (
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* SMS to Clients */}
-                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                    <MessageSquare size={20} className="text-purple-400" /> Bulk SMS to Clients
-                  </h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Send mass notifications to clients with filters.
-                  </p>
-                  <Button 
-                    onClick={() => { setBulkSMSType('clients'); setShowBulkSMSModal(true); }} 
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                  >
-                    <MessageSquare size={16} className="mr-2" /> Send to Clients
-                  </Button>
+              <div className="space-y-6">
+                {/* Quick Send Actions */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                    <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                      <MessageSquare size={20} className="text-purple-400" /> Bulk SMS to Clients
+                    </h3>
+                    <Button 
+                      onClick={() => { setBulkSMSType('clients'); setShowBulkSMSModal(true); }} 
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                    >
+                      <MessageSquare size={16} className="mr-2" /> Send to Clients
+                    </Button>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                    <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                      <MessageSquare size={20} className="text-amber-400" /> Bulk SMS to Merchants
+                    </h3>
+                    <Button 
+                      onClick={() => { setBulkSMSType('merchants'); setShowBulkSMSModal(true); }} 
+                      className="w-full bg-amber-600 hover:bg-amber-700"
+                    >
+                      <MessageSquare size={16} className="mr-2" /> Send to Merchants
+                    </Button>
+                  </div>
                 </div>
 
-                {/* SMS to Merchants */}
+                {/* SMS Templates */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-white font-semibold flex items-center gap-2">
+                      <CreditCard size={20} className="text-cyan-400" /> SMS Templates
+                    </h3>
+                    <Button onClick={() => setShowTemplateModal(true)} className="bg-cyan-600 hover:bg-cyan-700" size="sm">
+                      <UserPlus size={14} className="mr-1" /> New Template
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {smsTemplates.length > 0 ? smsTemplates.map(template => (
+                      <div key={template.id} className="flex justify-between items-center p-3 bg-slate-900 rounded-lg">
+                        <div>
+                          <p className="text-white font-medium">{template.name}</p>
+                          <p className="text-slate-400 text-sm truncate max-w-md">{template.message}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => { setBulkSMSMessage(template.message); setShowBulkSMSModal(true); }}
+                            className="text-blue-400 hover:bg-blue-500/10"
+                          >
+                            Use
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteTemplate(template.id)}
+                            className="text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-slate-500 text-center py-4">No templates yet. Create one to save time!</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* SMS History */}
                 <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
                   <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                    <MessageSquare size={20} className="text-amber-400" /> Bulk SMS to Merchants
+                    <History size={20} className="text-slate-400" /> Recent SMS History
                   </h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Send mass notifications to merchants with filters.
-                  </p>
-                  <Button 
-                    onClick={() => { setBulkSMSType('merchants'); setShowBulkSMSModal(true); }} 
-                    className="w-full bg-amber-600 hover:bg-amber-700"
-                  >
-                    <MessageSquare size={16} className="mr-2" /> Send to Merchants
-                  </Button>
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-slate-400 bg-slate-900 sticky top-0">
+                        <tr>
+                          <th className="text-left p-2">Date</th>
+                          <th className="text-left p-2">Recipient</th>
+                          <th className="text-left p-2">Message</th>
+                          <th className="text-left p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/50">
+                        {smsHistory.length > 0 ? smsHistory.slice(0, 20).map((log, idx) => (
+                          <tr key={idx} className="hover:bg-slate-900/50">
+                            <td className="p-2 text-slate-300">{new Date(log.created_at).toLocaleDateString()}</td>
+                            <td className="p-2 text-slate-300">{log.phone}</td>
+                            <td className="p-2 text-slate-400 truncate max-w-xs">{log.message?.slice(0, 50)}...</td>
+                            <td className="p-2">{getStatusBadge(log.status || 'sent')}</td>
+                          </tr>
+                        )) : (
+                          <tr><td colSpan="4" className="text-center text-slate-500 py-8">No SMS sent yet</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Admin Info */}
-            {settingsTab === 'admin' && (
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md">
-                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                  <Shield size={20} className="text-purple-400" /> Admin Account
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-                    <span className="text-slate-400">Email</span>
-                    <span className="text-white">{admin?.email}</span>
-                  </div>
-                  <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-                    <span className="text-slate-400">Name</span>
-                    <span className="text-white">{admin?.name || 'Admin'}</span>
-                  </div>
-                  <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
-                    <span className="text-slate-400">Role</span>
-                    <span className="text-purple-400 font-medium">
-                      {admin?.is_super_admin ? 'Super Admin' : 'Admin'}
-                    </span>
+            {/* Security Settings (Phase 3) */}
+            {settingsTab === 'security' && (
+              <div className="space-y-6 max-w-2xl">
+                {/* PIN Security */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Shield size={20} className="text-purple-400" /> PIN Protection for Settings
+                  </h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Protect the Settings menu with a 4-6 digit PIN code. You'll need to enter this PIN each time you access Settings.
+                  </p>
+                  
+                  {pinEnabled ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                        <span className="text-emerald-400 flex items-center gap-2">
+                          <CheckCircle size={16} /> PIN Protection Enabled
+                        </span>
+                      </div>
+                      <div className="flex gap-3">
+                        <Input
+                          type="password"
+                          placeholder="Enter current PIN"
+                          value={pinInput}
+                          onChange={(e) => setPinInput(e.target.value)}
+                          className="bg-slate-900 border-slate-700 text-white"
+                          maxLength={6}
+                        />
+                        <Button onClick={handleDisablePin} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500/10" disabled={actionLoading}>
+                          Disable PIN
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                        <span className="text-amber-400 flex items-center gap-2">
+                          <AlertCircle size={16} /> PIN Protection Disabled
+                        </span>
+                      </div>
+                      <Button onClick={() => setShowSetPinModal(true)} className="bg-purple-600 hover:bg-purple-700">
+                        <Shield size={16} className="mr-2" /> Enable PIN Protection
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Password Change */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Eye size={20} className="text-blue-400" /> Change Password
+                  </h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Change your admin password. Requires OTP verification for security.
+                  </p>
+                  <Button onClick={() => setShowPasswordModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                    <Eye size={16} className="mr-2" /> Change Password
+                  </Button>
+                </div>
+
+                {/* Current Admin Info */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Users size={20} className="text-slate-400" /> Current Admin
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
+                      <span className="text-slate-400">Email</span>
+                      <span className="text-white">{admin?.email}</span>
+                    </div>
+                    <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
+                      <span className="text-slate-400">Name</span>
+                      <span className="text-white">{admin?.name || 'Admin'}</span>
+                    </div>
+                    <div className="flex justify-between p-3 bg-slate-900 rounded-lg">
+                      <span className="text-slate-400">Role</span>
+                      <span className="text-purple-400 font-medium">
+                        {admin?.is_super_admin ? 'Super Admin' : admin?.role || 'Admin'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <p className="text-slate-500 text-xs mt-4">
-                  Password change and PIN security features coming in Phase 3.
-                </p>
+              </div>
+            )}
+
+            {/* Admin Users Management (Phase 3) */}
+            {settingsTab === 'admins' && (
+              <div className="space-y-6">
+                {admin?.is_super_admin ? (
+                  <>
+                    {/* Create Admin Button */}
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-white font-semibold flex items-center gap-2">
+                        <Users size={20} className="text-blue-400" /> Admin Accounts
+                      </h3>
+                      <Button onClick={() => setShowAdminModal(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <UserPlus size={16} className="mr-2" /> Create Admin
+                      </Button>
+                    </div>
+
+                    {/* Admin List */}
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-slate-900 text-slate-400 text-sm">
+                          <tr>
+                            <th className="text-left p-4">Admin</th>
+                            <th className="text-left p-4">Role</th>
+                            <th className="text-left p-4">Status</th>
+                            <th className="text-left p-4">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700">
+                          {allAdmins.map(adm => (
+                            <tr key={adm.id} className="hover:bg-slate-900/50">
+                              <td className="p-4">
+                                <p className="text-white font-medium">{adm.name || 'Admin'}</p>
+                                <p className="text-slate-500 text-sm">{adm.email}</p>
+                              </td>
+                              <td className="p-4">
+                                <span className={`px-2 py-1 rounded-full text-xs ${
+                                  adm.is_super_admin ? 'bg-purple-500/20 text-purple-400' :
+                                  adm.role === 'admin_support' ? 'bg-blue-500/20 text-blue-400' :
+                                  adm.role === 'admin_merchants' ? 'bg-emerald-500/20 text-emerald-400' :
+                                  adm.role === 'admin_finance' ? 'bg-amber-500/20 text-amber-400' :
+                                  'bg-slate-500/20 text-slate-400'
+                                }`}>
+                                  {adm.is_super_admin ? 'Super Admin' : 
+                                   adm.role === 'admin_support' ? 'Support' :
+                                   adm.role === 'admin_merchants' ? 'Merchants' :
+                                   adm.role === 'admin_finance' ? 'Finance' :
+                                   adm.role === 'admin_readonly' ? 'Read-only' : 'Admin'}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                {getStatusBadge(adm.is_active ? 'active' : 'suspended')}
+                              </td>
+                              <td className="p-4">
+                                {adm.id !== admin?.id && (
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleToggleAdminStatus(adm.id, adm.is_active)}
+                                      className={adm.is_active ? 'text-amber-400 hover:bg-amber-500/10' : 'text-emerald-400 hover:bg-emerald-500/10'}
+                                    >
+                                      {adm.is_active ? <Ban size={14} /> : <UserCheck size={14} />}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteAdmin(adm.id)}
+                                      className="text-red-400 hover:bg-red-500/10"
+                                    >
+                                      <Trash2 size={14} />
+                                    </Button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Role Descriptions */}
+                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                      <h4 className="text-white font-medium mb-4">Admin Roles</h4>
+                      <div className="grid md:grid-cols-2 gap-3 text-sm">
+                        <div className="p-3 bg-purple-500/10 rounded-lg">
+                          <p className="text-purple-400 font-medium">Super Admin</p>
+                          <p className="text-slate-400">Full control over all platform features</p>
+                        </div>
+                        <div className="p-3 bg-blue-500/10 rounded-lg">
+                          <p className="text-blue-400 font-medium">Admin Support</p>
+                          <p className="text-slate-400">Manage clients, send SMS, view stats</p>
+                        </div>
+                        <div className="p-3 bg-emerald-500/10 rounded-lg">
+                          <p className="text-emerald-400 font-medium">Admin Merchants</p>
+                          <p className="text-slate-400">Manage merchants, approve partners</p>
+                        </div>
+                        <div className="p-3 bg-amber-500/10 rounded-lg">
+                          <p className="text-amber-400 font-medium">Admin Finance</p>
+                          <p className="text-slate-400">View stats, transactions, commissions</p>
+                        </div>
+                        <div className="p-3 bg-slate-500/10 rounded-lg">
+                          <p className="text-slate-300 font-medium">Read-only Admin</p>
+                          <p className="text-slate-400">View-only access to all data</p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 text-center">
+                    <AlertCircle className="text-amber-400 mx-auto mb-3" size={32} />
+                    <p className="text-amber-400">Only Super Admin can manage admin accounts</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2563,6 +3090,237 @@ export default function AdminDashboard() {
               >
                 {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <MessageSquare size={16} className="mr-2" />}
                 Send Bulk SMS
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SMS TEMPLATE MODAL */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <MessageSquare className="text-cyan-400" size={20} />
+              Create SMS Template
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Template Name</Label>
+                <Input
+                  type="text"
+                  value={newTemplate.name}
+                  onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Welcome Message"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Category</Label>
+                <select
+                  value={newTemplate.category}
+                  onChange={(e) => setNewTemplate({...newTemplate, category: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="general">General</option>
+                  <option value="promotion">Promotion</option>
+                  <option value="notification">Notification</option>
+                  <option value="reminder">Reminder</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Message</Label>
+                <textarea
+                  value={newTemplate.message}
+                  onChange={(e) => setNewTemplate({...newTemplate, message: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white min-h-[100px]"
+                  placeholder="Type your template message..."
+                  maxLength={160}
+                />
+                <p className="text-slate-500 text-xs mt-1">{newTemplate.message.length}/160 characters</p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => setShowTemplateModal(false)} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleCreateTemplate} className="flex-1 bg-cyan-600 hover:bg-cyan-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                Save Template
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SET PIN MODAL */}
+      {showSetPinModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-sm p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Shield className="text-purple-400" size={20} />
+              Set Security PIN
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Enter a 4-6 digit PIN to protect Settings access.
+            </p>
+            <div className="space-y-4">
+              <Input
+                type="password"
+                value={newPinInput}
+                onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="bg-slate-900 border-slate-700 text-white text-center text-2xl tracking-widest"
+                placeholder="****"
+                maxLength={6}
+              />
+              <p className="text-slate-500 text-xs text-center">{newPinInput.length}/6 digits</p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => { setShowSetPinModal(false); setNewPinInput(''); }} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleSetPin} className="flex-1 bg-purple-600 hover:bg-purple-700" disabled={actionLoading || newPinInput.length < 4}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Shield size={16} className="mr-2" />}
+                Set PIN
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHANGE PASSWORD MODAL */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Eye className="text-blue-400" size={20} />
+              Change Password
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Current Password</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.current_password}
+                  onChange={(e) => setPasswordForm({...passwordForm, current_password: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">New Password</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.new_password}
+                  onChange={(e) => setPasswordForm({...passwordForm, new_password: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Confirm New Password</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.confirm_password}
+                  onChange={(e) => setPasswordForm({...passwordForm, confirm_password: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              
+              {!otpSent ? (
+                <Button onClick={handleRequestOTP} className="w-full bg-amber-600 hover:bg-amber-700" disabled={actionLoading}>
+                  {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
+                  Request OTP
+                </Button>
+              ) : (
+                <div>
+                  <Label className="text-slate-300 mb-2 block">Enter OTP</Label>
+                  <Input
+                    type="text"
+                    value={passwordForm.otp_code}
+                    onChange={(e) => setPasswordForm({...passwordForm, otp_code: e.target.value})}
+                    className="bg-slate-900 border-slate-700 text-white text-center tracking-widest"
+                    placeholder="000000"
+                    maxLength={6}
+                  />
+                  {otpPreview && (
+                    <p className="text-amber-400 text-xs mt-2 text-center">Test Mode OTP: {otpPreview}</p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => { setShowPasswordModal(false); setPasswordForm({ current_password: '', new_password: '', confirm_password: '', otp_code: '' }); setOtpSent(false); setOtpPreview(''); }} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleChangePassword} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={actionLoading || !otpSent}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
+                Change Password
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE ADMIN MODAL */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <UserPlus className="text-blue-400" size={20} />
+              Create Admin Account
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Name *</Label>
+                <Input
+                  type="text"
+                  value={newAdminForm.name}
+                  onChange={(e) => setNewAdminForm({...newAdminForm, name: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Admin Name"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Email *</Label>
+                <Input
+                  type="email"
+                  value={newAdminForm.email}
+                  onChange={(e) => setNewAdminForm({...newAdminForm, email: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="admin@example.com"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Password *</Label>
+                <Input
+                  type="password"
+                  value={newAdminForm.password}
+                  onChange={(e) => setNewAdminForm({...newAdminForm, password: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="********"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Role</Label>
+                <select
+                  value={newAdminForm.role}
+                  onChange={(e) => setNewAdminForm({...newAdminForm, role: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="admin_support">Admin Support (Clients)</option>
+                  <option value="admin_merchants">Admin Merchants</option>
+                  <option value="admin_finance">Admin Finance (View only)</option>
+                  <option value="admin_readonly">Read-only Admin</option>
+                  <option value="super_admin">Super Admin (Full access)</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button onClick={() => setShowAdminModal(false)} variant="outline" className="flex-1 border-slate-600">
+                Cancel
+              </Button>
+              <Button onClick={handleCreateAdmin} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <UserPlus size={16} className="mr-2" />}
+                Create Admin
               </Button>
             </div>
           </div>

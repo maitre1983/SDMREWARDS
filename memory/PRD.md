@@ -7,6 +7,41 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - Phase 11: Advanced SMS & Security Features ✅
+
+**Phase 2 - SMS Center Improvements:**
+- SMS Templates (create, use, delete reusable messages)
+- SMS History view (date, recipient, message, status)
+- Bulk SMS with filters to Clients and Merchants
+- Character count display (160 max)
+
+**Phase 3 - Security & Admin Management:**
+- **PIN Protection:**
+  - Set 4-6 digit PIN for Settings access
+  - PIN verification with 3-attempt lockout (5 min)
+  - Enable/Disable PIN functionality
+
+- **Password Management:**
+  - Change password with OTP verification
+  - Request OTP via SMS (Test Mode shows OTP directly)
+
+- **Admin Role Management:**
+  - Create sub-admin accounts
+  - 5 predefined roles with specific permissions:
+    - Super Admin (full control)
+    - Admin Support (clients, SMS, stats)
+    - Admin Merchants (merchants, approvals)
+    - Admin Finance (stats, transactions, commissions)
+    - Read-only Admin (view only)
+  - Activate/Deactivate/Delete admin accounts
+
+**Backend API Endpoints Added:**
+- SMS: `/api/admin/sms/history`, `/api/admin/sms/templates`, `/api/admin/sms/scheduled`
+- Security: `/api/admin/settings/set-pin`, `/api/admin/settings/verify-pin`, `/api/admin/settings/change-password`
+- Admins: `/api/admin/admins`, `/api/admin/admins/create`, `/api/admin/admins/{id}`
+
+---
+
 ### March 4, 2026 - Phase 10: Enhanced Settings Menu (Phase 1) ✅
 
 **Settings Sub-tabs Implemented:**

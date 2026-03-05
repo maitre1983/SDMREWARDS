@@ -116,6 +116,71 @@ class BulkSMSRequest(BaseModel):
     message: str
     recipient_filter: str  # "all", "active", "inactive", "silver", "gold", "platinum", "pending", "top"
     recipient_ids: Optional[List[str]] = None  # For custom selection
+    scheduled_at: Optional[str] = None  # ISO datetime for scheduled SMS
+    template_id: Optional[str] = None
+
+
+# ============== PHASE 2 & 3: ADVANCED FEATURES ==============
+
+class SMSTemplateRequest(BaseModel):
+    name: str
+    message: str
+    category: str = "general"  # general, promotion, notification, reminder
+
+
+class SetPINRequest(BaseModel):
+    pin: str  # 4-6 digits
+    otp_code: Optional[str] = None
+
+
+class VerifyPINRequest(BaseModel):
+    pin: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    otp_code: str
+    otp_method: str = "sms"  # sms or email
+
+
+class CreateAdminRoleRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str  # super_admin, admin_support, admin_merchants, admin_finance, admin_readonly
+    permissions: Optional[List[str]] = None
+
+
+class UpdateAdminRoleRequest(BaseModel):
+    role: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+# Admin role definitions
+ADMIN_ROLES = {
+    "super_admin": {
+        "name": "Super Admin",
+        "permissions": ["all"]
+    },
+    "admin_support": {
+        "name": "Admin Support",
+        "permissions": ["view_clients", "edit_clients", "send_sms_clients", "view_stats"]
+    },
+    "admin_merchants": {
+        "name": "Admin Merchants", 
+        "permissions": ["view_merchants", "edit_merchants", "approve_merchants", "send_sms_merchants", "view_stats"]
+    },
+    "admin_finance": {
+        "name": "Admin Finance",
+        "permissions": ["view_stats", "view_transactions", "view_commissions"]
+    },
+    "admin_readonly": {
+        "name": "Read-only Admin",
+        "permissions": ["view_clients", "view_merchants", "view_stats"]
+    }
+}
 
 
 # ============== DASHBOARD ==============
@@ -1611,3 +1676,438 @@ async def get_public_payment_logos():
         {"_id": 0, "created_by": 0}
     ).sort("display_order", 1).to_list(100)
     return {"logos": logos}
+
+
+
+# ============== PHASE 2: SMS ADVANCED FEATURES ==============
+
+@router.get("/sms/history")
+async def get_sms_history(
+    limit: int = 50,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get SMS sending history"""
+    logs = await db.sms_logs.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return {"logs": logs, "total": len(logs)}
+
+
+@router.get("/sms/templates")
+async def get_sms_templates(current_admin: dict = Depends(get_current_admin)):
+    """Get all SMS templates"""
+    templates = await db.sms_templates.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return {"templates": templates}
+
+
+@router.post("/sms/templates")
+async def create_sms_template(
+    request: SMSTemplateRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Create a new SMS template"""
+    template_id = str(uuid.uuid4())[:8]
+    
+    template_data = {
+        "id": template_id,
+        "name": request.name,
+        "message": request.message,
+        "category": request.category,
+        "created_by": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.sms_templates.insert_one(template_data)
+    
+    return {"success": True, "template_id": template_id}
+
+
+@router.delete("/sms/templates/{template_id}")
+async def delete_sms_template(
+    template_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Delete an SMS template"""
+    result = await db.sms_templates.delete_one({"id": template_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return {"success": True, "message": "Template deleted"}
+
+
+@router.post("/sms/schedule")
+async def schedule_sms(
+    request: BulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Schedule SMS for later sending"""
+    if not request.scheduled_at:
+        raise HTTPException(status_code=400, detail="scheduled_at is required")
+    
+    schedule_id = str(uuid.uuid4())[:8]
+    
+    schedule_data = {
+        "id": schedule_id,
+        "message": request.message,
+        "recipient_filter": request.recipient_filter,
+        "recipient_type": "clients",  # or merchants
+        "recipient_ids": request.recipient_ids,
+        "scheduled_at": request.scheduled_at,
+        "status": "pending",
+        "created_by": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.scheduled_sms.insert_one(schedule_data)
+    
+    return {"success": True, "schedule_id": schedule_id, "scheduled_at": request.scheduled_at}
+
+
+@router.get("/sms/scheduled")
+async def get_scheduled_sms(current_admin: dict = Depends(get_current_admin)):
+    """Get all scheduled SMS"""
+    scheduled = await db.scheduled_sms.find(
+        {"status": "pending"},
+        {"_id": 0}
+    ).sort("scheduled_at", 1).to_list(100)
+    
+    return {"scheduled": scheduled}
+
+
+@router.delete("/sms/scheduled/{schedule_id}")
+async def cancel_scheduled_sms(
+    schedule_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Cancel a scheduled SMS"""
+    result = await db.scheduled_sms.update_one(
+        {"id": schedule_id, "status": "pending"},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Scheduled SMS not found or already sent")
+    
+    return {"success": True, "message": "Scheduled SMS cancelled"}
+
+
+# ============== PHASE 3: SECURITY & ADMIN MANAGEMENT ==============
+
+@router.post("/settings/set-pin")
+async def set_settings_pin(
+    request: SetPINRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Set or update PIN for Settings access"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Validate PIN format
+    if not request.pin.isdigit() or len(request.pin) < 4 or len(request.pin) > 6:
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
+    
+    # Hash the PIN
+    pin_hash = bcrypt.hashpw(request.pin.encode(), bcrypt.gensalt()).decode()
+    
+    # Store PIN config
+    await db.admin_security.update_one(
+        {"admin_id": current_admin["id"]},
+        {"$set": {
+            "admin_id": current_admin["id"],
+            "pin_hash": pin_hash,
+            "pin_enabled": True,
+            "failed_attempts": 0,
+            "locked_until": None,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    
+    return {"success": True, "message": "PIN set successfully"}
+
+
+@router.post("/settings/verify-pin")
+async def verify_settings_pin(
+    request: VerifyPINRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Verify PIN to access Settings"""
+    security = await db.admin_security.find_one({"admin_id": current_admin["id"]})
+    
+    if not security or not security.get("pin_enabled"):
+        return {"success": True, "message": "PIN not enabled"}
+    
+    # Check if locked
+    if security.get("locked_until"):
+        locked_until = datetime.fromisoformat(security["locked_until"])
+        if datetime.now(timezone.utc) < locked_until:
+            remaining = (locked_until - datetime.now(timezone.utc)).seconds
+            raise HTTPException(status_code=423, detail=f"Account locked. Try again in {remaining} seconds")
+    
+    # Verify PIN
+    if not bcrypt.checkpw(request.pin.encode(), security["pin_hash"].encode()):
+        # Increment failed attempts
+        failed = security.get("failed_attempts", 0) + 1
+        updates = {"failed_attempts": failed}
+        
+        if failed >= 3:
+            # Lock for 5 minutes
+            updates["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+            await db.admin_security.update_one({"admin_id": current_admin["id"]}, {"$set": updates})
+            raise HTTPException(status_code=423, detail="Too many failed attempts. Locked for 5 minutes")
+        
+        await db.admin_security.update_one({"admin_id": current_admin["id"]}, {"$set": updates})
+        raise HTTPException(status_code=401, detail=f"Invalid PIN. {3 - failed} attempts remaining")
+    
+    # Reset failed attempts on success
+    await db.admin_security.update_one(
+        {"admin_id": current_admin["id"]},
+        {"$set": {"failed_attempts": 0, "locked_until": None}}
+    )
+    
+    return {"success": True, "message": "PIN verified"}
+
+
+@router.get("/settings/pin-status")
+async def get_pin_status(current_admin: dict = Depends(get_current_admin)):
+    """Check if PIN is enabled for Settings"""
+    security = await db.admin_security.find_one({"admin_id": current_admin["id"]})
+    
+    return {
+        "pin_enabled": security.get("pin_enabled", False) if security else False,
+        "is_locked": bool(security.get("locked_until")) if security else False
+    }
+
+
+@router.post("/settings/disable-pin")
+async def disable_settings_pin(
+    request: VerifyPINRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Disable PIN protection (requires current PIN)"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    security = await db.admin_security.find_one({"admin_id": current_admin["id"]})
+    
+    if not security or not security.get("pin_enabled"):
+        return {"success": True, "message": "PIN already disabled"}
+    
+    # Verify current PIN
+    if not bcrypt.checkpw(request.pin.encode(), security["pin_hash"].encode()):
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+    
+    await db.admin_security.update_one(
+        {"admin_id": current_admin["id"]},
+        {"$set": {"pin_enabled": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"success": True, "message": "PIN disabled"}
+
+
+@router.post("/settings/request-otp")
+async def request_password_change_otp(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Request OTP for password change"""
+    from services.bulkclix_service import send_sms
+    import random
+    
+    # Generate 6-digit OTP
+    otp_code = str(random.randint(100000, 999999))
+    
+    # Store OTP
+    await db.otp_records.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "code": otp_code,
+        "purpose": "password_change",
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        "used": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Get admin phone (if exists)
+    admin_doc = await db.admins.find_one({"id": current_admin["id"]})
+    phone = admin_doc.get("phone")
+    
+    if phone:
+        # Send via SMS
+        message = f"SDM REWARDS: Your password change OTP is {otp_code}. Valid for 10 minutes."
+        await send_sms(phone, message)
+    
+    return {
+        "success": True,
+        "message": "OTP sent",
+        "method": "sms" if phone else "displayed",
+        "otp_preview": otp_code if not phone else None  # Show OTP if no phone (test mode)
+    }
+
+
+@router.post("/settings/change-password")
+async def change_admin_password(
+    request: ChangePasswordRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Change admin password with OTP verification"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Verify current password
+    admin_doc = await db.admins.find_one({"id": current_admin["id"]})
+    if not bcrypt.checkpw(request.current_password.encode(), admin_doc["password"].encode()):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Verify OTP
+    otp_record = await db.otp_records.find_one({
+        "admin_id": current_admin["id"],
+        "code": request.otp_code,
+        "purpose": "password_change",
+        "used": False
+    })
+    
+    if not otp_record:
+        raise HTTPException(status_code=401, detail="Invalid OTP")
+    
+    # Check expiry
+    if datetime.now(timezone.utc) > datetime.fromisoformat(otp_record["expires_at"]):
+        raise HTTPException(status_code=401, detail="OTP expired")
+    
+    # Mark OTP as used
+    await db.otp_records.update_one({"id": otp_record["id"]}, {"$set": {"used": True}})
+    
+    # Update password
+    new_password_hash = bcrypt.hashpw(request.new_password.encode(), bcrypt.gensalt()).decode()
+    await db.admins.update_one(
+        {"id": current_admin["id"]},
+        {"$set": {
+            "password": new_password_hash,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "password_changed",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Password changed successfully"}
+
+
+# ============== ADMIN ROLE MANAGEMENT ==============
+
+@router.get("/admins")
+async def get_all_admins(current_admin: dict = Depends(get_current_admin)):
+    """Get all admin accounts (Super Admin only)"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    admins = await db.admins.find(
+        {},
+        {"_id": 0, "password": 0}
+    ).to_list(100)
+    
+    return {"admins": admins, "roles": ADMIN_ROLES}
+
+
+@router.post("/admins/create")
+async def create_admin(
+    request: CreateAdminRoleRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Create a new admin account"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Check if email exists
+    existing = await db.admins.find_one({"email": request.email.lower()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Validate role
+    if request.role not in ADMIN_ROLES:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    
+    # Create admin
+    admin_id = str(uuid.uuid4())[:8]
+    password_hash = bcrypt.hashpw(request.password.encode(), bcrypt.gensalt()).decode()
+    
+    admin_data = {
+        "id": admin_id,
+        "email": request.email.lower(),
+        "password": password_hash,
+        "name": request.name,
+        "role": request.role,
+        "is_super_admin": request.role == "super_admin",
+        "is_active": True,
+        "permissions": request.permissions or ADMIN_ROLES[request.role]["permissions"],
+        "created_by": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.admins.insert_one(admin_data)
+    
+    return {"success": True, "admin_id": admin_id, "message": f"Admin '{request.name}' created"}
+
+
+@router.put("/admins/{admin_id}")
+async def update_admin(
+    admin_id: str,
+    request: UpdateAdminRoleRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update admin role and permissions"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Can't modify own account this way
+    if admin_id == current_admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot modify own account")
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if request.role:
+        if request.role not in ADMIN_ROLES:
+            raise HTTPException(status_code=400, detail="Invalid role")
+        updates["role"] = request.role
+        updates["is_super_admin"] = request.role == "super_admin"
+        updates["permissions"] = ADMIN_ROLES[request.role]["permissions"]
+    
+    if request.permissions:
+        updates["permissions"] = request.permissions
+    
+    if request.is_active is not None:
+        updates["is_active"] = request.is_active
+    
+    await db.admins.update_one({"id": admin_id}, {"$set": updates})
+    
+    return {"success": True, "message": "Admin updated"}
+
+
+@router.delete("/admins/{admin_id}")
+async def delete_admin(
+    admin_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Delete an admin account"""
+    if not current_admin.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Can't delete own account
+    if admin_id == current_admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete own account")
+    
+    result = await db.admins.delete_one({"id": admin_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    return {"success": True, "message": "Admin deleted"}
