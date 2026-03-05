@@ -344,6 +344,7 @@ async def verify_otp(request: VerifyOTPRequest):
 @router.post("/client/register")
 async def register_client(request: ClientRegisterRequest):
     """Register new client"""
+    logger.info(f"Client registration attempt for phone: {request.phone}")
     phone = normalize_phone(request.phone)
     
     # Verify OTP first - MANDATORY
@@ -353,6 +354,7 @@ async def register_client(request: ClientRegisterRequest):
     })
     
     if not otp_record:
+        logger.warning(f"OTP not verified for request_id: {request.request_id}")
         raise HTTPException(status_code=400, detail="Please verify your phone number with OTP first")
     
     # Check for duplicate phone

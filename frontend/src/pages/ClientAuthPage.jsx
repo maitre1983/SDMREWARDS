@@ -136,15 +136,22 @@ export default function ClientAuthPage() {
 
     setIsLoading(true);
     try {
-      await axios.post(`${API_URL}/api/auth/otp/verify`, {
+      const response = await axios.post(`${API_URL}/api/auth/otp/verify`, {
         phone: normalizePhone(phone),
         otp_code: otpCode,
         request_id: requestId
       });
 
+      console.log('OTP verification response:', response.data);
       setOtpVerified(true);
-      toast.success('Phone verified!');
+      toast.success('Phone verified! Completing registration...');
+      
+      // Automatically go back to registration form after short delay
+      setTimeout(() => {
+        setMode('register');
+      }, 1500);
     } catch (error) {
+      console.error('OTP verification error:', error.response?.data);
       toast.error(error.response?.data?.detail || 'Invalid OTP code');
     } finally {
       setIsLoading(false);
