@@ -76,6 +76,8 @@ class Client(BaseModel):
     card_type: Optional[CardType] = None
     card_number: Optional[str] = None
     card_purchased_at: Optional[str] = None
+    card_expires_at: Optional[str] = None  # Card expiration date
+    card_duration_days: Optional[int] = None  # Duration in days
     
     # QR Code
     qr_code: str = Field(default_factory=lambda: f"SDM-C-{uuid.uuid4().hex[:8].upper()}")

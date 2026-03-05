@@ -49,6 +49,7 @@ export default function ClientDashboard() {
   // Data states
   const [client, setClient] = useState(null);
   const [card, setCard] = useState(null);
+  const [cardValidity, setCardValidity] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [referrals, setReferrals] = useState(null);
   const [availableCards, setAvailableCards] = useState([]);
@@ -129,6 +130,16 @@ export default function ClientDashboard() {
       setClient(dashRes.data.client);
       setCard(dashRes.data.card);
       setTransactions(dashRes.data.recent_transactions || []);
+      
+      // Fetch card validity if client has a card
+      if (dashRes.data.client?.card_type) {
+        try {
+          const cardRes = await axios.get(`${API_URL}/api/clients/cards/my-card`, { headers });
+          setCardValidity(cardRes.data.validity);
+        } catch (e) {
+          console.error('Card validity fetch error:', e);
+        }
+      }
       
       // Fetch available cards
       const cardsRes = await axios.get(`${API_URL}/api/clients/cards/available`);
@@ -661,24 +672,108 @@ export default function ClientDashboard() {
             {isActive && card && (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                  <CreditCard size={18} /> My Card
+                  <CreditCard size={18} /> Ma Carte
                 </h3>
                 <div className={`rounded-xl p-4 ${
                   client?.card_type === 'platinum' ? 'bg-gradient-to-br from-slate-600 to-slate-500' :
                   client?.card_type === 'gold' ? 'bg-gradient-to-br from-amber-500 to-yellow-400' :
                   'bg-gradient-to-br from-slate-400 to-slate-300'
                 }`}>
-                  <p className="text-white/80 text-sm">{card?.card_number}</p>
-                  <p className="text-white font-bold text-lg mt-2">{client?.full_name}</p>
-                  <p className="text-white/80 text-xs mt-1">@{client?.username}</p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-white/80 text-sm">{card?.card_number}</p>
+                      <p className="text-white font-bold text-lg mt-2">{client?.full_name}</p>
+                      <p className="text-white/80 text-xs mt-1">@{client?.username}</p>
+                    </div>
+                    <img src={SDM_LOGO_URL} alt="SDM" className="w-10 h-10 object-contain opacity-80" />
+                  </div>
                 </div>
+                
+                {/* Card Validity Info */}
+                {cardValidity && (
+                  <div className="mt-4 space-y-3">
+                    {/* Validity Status */}
+                    <div className={`p-3 rounded-lg flex items-center justify-between ${
+                      cardValidity.is_expired 
+                        ? 'bg-red-500/10 border border-red-500/30' 
+                        : cardValidity.days_remaining <= 30 
+                          ? 'bg-amber-500/10 border border-amber-500/30'
+                          : 'bg-emerald-500/10 border border-emerald-500/30'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {cardValidity.is_expired ? (
+                          <AlertCircle className="text-red-400" size={18} />
+                        ) : cardValidity.days_remaining <= 30 ? (
+                          <Clock className="text-amber-400" size={18} />
+                        ) : (
+                          <CheckCircle className="text-emerald-400" size={18} />
+                        )}
+                        <span className={`font-medium ${
+                          cardValidity.is_expired ? 'text-red-400' : 
+                          cardValidity.days_remaining <= 30 ? 'text-amber-400' : 'text-emerald-400'
+                        }`}>
+                          {cardValidity.is_expired 
+                            ? 'Carte expirée' 
+                            : cardValidity.days_remaining <= 30 
+                              ? `Expire dans ${cardValidity.days_remaining} jours`
+                              : 'Carte active'}
+                        </span>
+                      </div>
+                      {!cardValidity.is_expired && cardValidity.days_remaining !== null && (
+                        <span className="text-white font-bold">
+                          {cardValidity.days_remaining} jours
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="bg-slate-900 p-2 rounded-lg">
+                        <p className="text-slate-500 text-xs">Activation</p>
+                        <p className="text-white">{cardValidity.start_date || 'N/A'}</p>
+                      </div>
+                      <div className="bg-slate-900 p-2 rounded-lg">
+                        <p className="text-slate-500 text-xs">Expiration</p>
+                        <p className="text-white">{cardValidity.end_date || 'Illimitée'}</p>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    {cardValidity.duration_days && !cardValidity.is_expired && (
+                      <div>
+                        <div className="flex justify-between text-xs text-slate-400 mb-1">
+                          <span>Utilisé: {cardValidity.days_used} jours</span>
+                          <span>Total: {cardValidity.duration_days} jours</span>
+                        </div>
+                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              cardValidity.days_remaining <= 30 ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (cardValidity.days_used / cardValidity.duration_days) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Renew Button */}
+                    {cardValidity.is_expired && (
+                      <Button 
+                        className="w-full bg-amber-500 hover:bg-amber-600"
+                        onClick={() => setActiveTab('card')}
+                      >
+                        Renouveler ma carte
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {/* Buy Card Section */}
             {!isActive && (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                <h3 className="text-white font-semibold mb-4">Choose Your Card</h3>
+                <h3 className="text-white font-semibold mb-4">Choisissez votre carte</h3>
                 <div className="space-y-3">
                   {availableCards.map((cardItem) => (
                     <div 
@@ -692,7 +787,14 @@ export default function ClientDashboard() {
                         />
                         <div>
                           <p className="text-white font-medium">{cardItem.name}</p>
-                          <p className="text-amber-400 font-bold">GHS {cardItem.price}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-amber-400 font-bold">GHS {cardItem.price}</p>
+                            {cardItem.duration_label && (
+                              <span className="text-slate-400 text-xs flex items-center gap-1">
+                                <Clock size={12} /> {cardItem.duration_label}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Button
@@ -701,7 +803,7 @@ export default function ClientDashboard() {
                         className="bg-gradient-to-r from-amber-500 to-orange-500"
                         data-testid={`buy-${cardItem.type}-btn`}
                       >
-                        Buy
+                        Acheter
                       </Button>
                     </div>
                   ))}

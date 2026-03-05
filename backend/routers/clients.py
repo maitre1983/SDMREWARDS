@@ -81,50 +81,80 @@ async def get_client_dashboard(current_client: dict = Depends(get_current_client
 
 @router.get("/cards/available")
 async def get_available_cards():
-    """Get available membership cards"""
+    """Get available membership cards with duration info"""
     config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
     cards = config.get("cards", {}) if config else {}
+    card_durations = config.get("card_durations", {"silver": 365, "gold": 365, "platinum": 730}) if config else {}
     
-    return {
-        "cards": [
-            {
-                "type": "silver",
-                "name": cards.get("silver", {}).get("name", "Silver Card"),
-                "price": cards.get("silver", {}).get("price", 25),
-                "color": cards.get("silver", {}).get("color", "#C0C0C0"),
-                "benefits": [
-                    "Access to all partner merchants",
-                    "Earn cashback on every purchase",
-                    "Digital membership card with QR code",
-                    "Referral bonus program"
-                ]
-            },
-            {
-                "type": "gold",
-                "name": cards.get("gold", {}).get("name", "Gold Card"),
-                "price": cards.get("gold", {}).get("price", 50),
-                "color": cards.get("gold", {}).get("color", "#FFD700"),
-                "benefits": [
-                    "All Silver benefits",
-                    "Priority customer support",
-                    "Exclusive merchant offers",
-                    "Higher cashback limits"
-                ]
-            },
-            {
-                "type": "platinum",
-                "name": cards.get("platinum", {}).get("name", "Platinum Card"),
-                "price": cards.get("platinum", {}).get("price", 100),
-                "color": cards.get("platinum", {}).get("color", "#E5E4E2"),
-                "benefits": [
-                    "All Gold benefits",
-                    "VIP merchant access",
-                    "Birthday bonus rewards",
-                    "Premium support hotline"
-                ]
-            }
-        ]
-    }
+    def format_duration(days):
+        if days >= 730:
+            return f"{days // 365} ans"
+        elif days >= 365:
+            return "1 an"
+        elif days >= 30:
+            return f"{days // 30} mois"
+        else:
+            return f"{days} jours"
+    
+    default_cards = [
+        {
+            "type": "silver",
+            "name": cards.get("silver", {}).get("name", "Silver Card"),
+            "price": cards.get("silver", {}).get("price", 25),
+            "color": cards.get("silver", {}).get("color", "#C0C0C0"),
+            "duration_days": cards.get("silver", {}).get("duration_days") or card_durations.get("silver", 365),
+            "duration_label": format_duration(cards.get("silver", {}).get("duration_days") or card_durations.get("silver", 365)),
+            "benefits": [
+                "Access to all partner merchants",
+                "Earn cashback on every purchase",
+                "Digital membership card with QR code",
+                "Referral bonus program"
+            ]
+        },
+        {
+            "type": "gold",
+            "name": cards.get("gold", {}).get("name", "Gold Card"),
+            "price": cards.get("gold", {}).get("price", 50),
+            "color": cards.get("gold", {}).get("color", "#FFD700"),
+            "duration_days": cards.get("gold", {}).get("duration_days") or card_durations.get("gold", 365),
+            "duration_label": format_duration(cards.get("gold", {}).get("duration_days") or card_durations.get("gold", 365)),
+            "benefits": [
+                "All Silver benefits",
+                "Priority customer support",
+                "Exclusive merchant offers",
+                "Higher cashback limits"
+            ]
+        },
+        {
+            "type": "platinum",
+            "name": cards.get("platinum", {}).get("name", "Platinum Card"),
+            "price": cards.get("platinum", {}).get("price", 100),
+            "color": cards.get("platinum", {}).get("color", "#E5E4E2"),
+            "duration_days": cards.get("platinum", {}).get("duration_days") or card_durations.get("platinum", 730),
+            "duration_label": format_duration(cards.get("platinum", {}).get("duration_days") or card_durations.get("platinum", 730)),
+            "benefits": [
+                "All Gold benefits",
+                "VIP merchant access",
+                "Birthday bonus rewards",
+                "Premium support hotline"
+            ]
+        }
+    ]
+    
+    # Add custom card types
+    custom_cards = await db.card_types.find({"is_active": True}, {"_id": 0}).to_list(50)
+    for card in custom_cards:
+        default_cards.append({
+            "type": card["slug"],
+            "name": card["name"],
+            "price": card["price"],
+            "color": card.get("color", "#6366f1"),
+            "duration_days": card.get("duration_days", 365),
+            "duration_label": format_duration(card.get("duration_days", 365)),
+            "benefits": card.get("benefits", "").split(", ") if card.get("benefits") else []
+        })
+    
+    return {"cards": default_cards}
 
 
 @router.post("/cards/purchase")
@@ -137,20 +167,44 @@ async def purchase_card(
     
     # Check if already has active card
     if current_client.get("status") == ClientStatus.ACTIVE.value:
-        raise HTTPException(status_code=400, detail="You already have an active membership card")
+        # Check if card is expired - allow re-purchase if expired
+        card_expires_at = current_client.get("card_expires_at")
+        if card_expires_at:
+            expiry_date = datetime.fromisoformat(card_expires_at.replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) < expiry_date:
+                raise HTTPException(status_code=400, detail="You already have an active membership card")
+        else:
+            raise HTTPException(status_code=400, detail="You already have an active membership card")
     
-    # Get card price from config
+    # Get card price and duration from config
     config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
     cards = config.get("cards", {}) if config else {}
+    card_durations = config.get("card_durations", {"silver": 365, "gold": 365, "platinum": 730}) if config else {}
+    
     card_info = cards.get(request.card_type.value, {})
     price = card_info.get("price", 25)
+    
+    # Get duration - first check cards config, then card_durations, then default
+    duration_days = card_info.get("duration_days") or card_durations.get(request.card_type.value, 365)
+    
+    # Check for custom card types
+    custom_card = await db.card_types.find_one({"slug": request.card_type.value, "is_active": True})
+    if custom_card:
+        price = custom_card.get("price", price)
+        duration_days = custom_card.get("duration_days", duration_days)
+    
+    # Calculate dates
+    now = datetime.now(timezone.utc)
+    start_date = now
+    end_date = now + timedelta(days=duration_days)
     
     # Create card
     card = MembershipCard(
         client_id=client_id,
         card_type=request.card_type,
         price=price,
-        payment_method=request.payment_method
+        payment_method=request.payment_method,
+        expires_at=end_date.isoformat()
     )
     
     # For MoMo payment, initiate collection
@@ -168,23 +222,24 @@ async def purchase_card(
         payment_method=request.payment_method,
         payment_reference=card.payment_reference,
         payment_phone=request.payment_phone,
-        description=f"Purchase {request.card_type.value.title()} Card"
+        description=f"Purchase {request.card_type.value.title()} Card ({duration_days} days)"
     )
     
     # Save card and transaction
     await db.membership_cards.insert_one(card.model_dump())
     await db.transactions.insert_one(transaction.model_dump())
     
-    # Update client status
-    now = datetime.now(timezone.utc).isoformat()
+    # Update client status with card dates
     await db.clients.update_one(
         {"id": client_id},
         {"$set": {
             "status": ClientStatus.ACTIVE.value,
             "card_type": request.card_type.value,
             "card_number": card.card_number,
-            "card_purchased_at": now,
-            "updated_at": now
+            "card_purchased_at": start_date.isoformat(),
+            "card_expires_at": end_date.isoformat(),
+            "card_duration_days": duration_days,
+            "updated_at": now.isoformat()
         }}
     )
     
@@ -262,7 +317,7 @@ async def purchase_card(
 
 @router.get("/cards/my-card")
 async def get_my_card(current_client: dict = Depends(get_current_client)):
-    """Get client's membership card"""
+    """Get client's membership card with validity status"""
     if current_client.get("status") != ClientStatus.ACTIVE.value:
         return {"card": None, "message": "No active card. Purchase a card to activate your account."}
     
@@ -271,7 +326,108 @@ async def get_my_card(current_client: dict = Depends(get_current_client)):
         {"_id": 0}
     )
     
-    return {"card": card}
+    if not card:
+        return {"card": None, "message": "No card found"}
+    
+    # Calculate validity status
+    now = datetime.now(timezone.utc)
+    purchased_at = current_client.get("card_purchased_at")
+    expires_at = current_client.get("card_expires_at") or card.get("expires_at")
+    duration_days = current_client.get("card_duration_days", 365)
+    
+    # Calculate days remaining
+    is_expired = False
+    days_remaining = 0
+    expiry_date = None
+    
+    if expires_at:
+        expiry_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        delta = expiry_date - now
+        days_remaining = max(0, delta.days)
+        is_expired = now >= expiry_date
+    
+    # Format dates for display
+    start_date_formatted = None
+    end_date_formatted = None
+    if purchased_at:
+        start_date_formatted = datetime.fromisoformat(purchased_at.replace('Z', '+00:00')).strftime("%d/%m/%Y")
+    if expiry_date:
+        end_date_formatted = expiry_date.strftime("%d/%m/%Y")
+    
+    return {
+        "card": card,
+        "validity": {
+            "is_active": not is_expired,
+            "is_expired": is_expired,
+            "purchased_at": purchased_at,
+            "expires_at": expires_at,
+            "start_date": start_date_formatted,
+            "end_date": end_date_formatted,
+            "duration_days": duration_days,
+            "days_remaining": days_remaining,
+            "days_used": duration_days - days_remaining if duration_days else 0
+        }
+    }
+
+
+@router.get("/cards/status")
+async def get_card_status(current_client: dict = Depends(get_current_client)):
+    """Get card status summary (quick check)"""
+    now = datetime.now(timezone.utc)
+    
+    if current_client.get("status") != ClientStatus.ACTIVE.value:
+        return {
+            "has_card": False,
+            "card_type": None,
+            "status": "no_card",
+            "message": "Aucune carte active"
+        }
+    
+    expires_at = current_client.get("card_expires_at")
+    card_type = current_client.get("card_type")
+    
+    if not expires_at:
+        # Legacy card without expiry - assume valid
+        return {
+            "has_card": True,
+            "card_type": card_type,
+            "status": "active",
+            "days_remaining": None,
+            "message": "Carte active (validité illimitée)"
+        }
+    
+    expiry_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+    delta = expiry_date - now
+    days_remaining = max(0, delta.days)
+    is_expired = now >= expiry_date
+    
+    if is_expired:
+        return {
+            "has_card": True,
+            "card_type": card_type,
+            "status": "expired",
+            "days_remaining": 0,
+            "expires_at": expires_at,
+            "message": "Carte expirée - Renouvelez votre abonnement"
+        }
+    elif days_remaining <= 30:
+        return {
+            "has_card": True,
+            "card_type": card_type,
+            "status": "expiring_soon",
+            "days_remaining": days_remaining,
+            "expires_at": expires_at,
+            "message": f"Carte expire dans {days_remaining} jours"
+        }
+    else:
+        return {
+            "has_card": True,
+            "card_type": card_type,
+            "status": "active",
+            "days_remaining": days_remaining,
+            "expires_at": expires_at,
+            "message": f"Carte active - {days_remaining} jours restants"
+        }
 
 
 # ============== TRANSACTIONS ==============

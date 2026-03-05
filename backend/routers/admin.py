@@ -619,10 +619,42 @@ async def list_clients(
 
 @router.get("/clients/{client_id}")
 async def get_client(client_id: str, current_admin: dict = Depends(get_current_admin)):
-    """Get client details"""
+    """Get client details with card validity status"""
     client_doc = await db.clients.find_one({"id": client_id}, {"_id": 0, "password_hash": 0})
     if not client_doc:
         raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Calculate card validity
+    card_validity = None
+    if client_doc.get("card_type"):
+        now = datetime.now(timezone.utc)
+        expires_at = client_doc.get("card_expires_at")
+        purchased_at = client_doc.get("card_purchased_at")
+        
+        if expires_at:
+            expiry_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            delta = expiry_date - now
+            days_remaining = max(0, delta.days)
+            is_expired = now >= expiry_date
+            
+            card_validity = {
+                "status": "expired" if is_expired else ("expiring_soon" if days_remaining <= 30 else "active"),
+                "is_active": not is_expired,
+                "purchased_at": purchased_at,
+                "expires_at": expires_at,
+                "days_remaining": days_remaining,
+                "duration_days": client_doc.get("card_duration_days", 365)
+            }
+        else:
+            # Legacy card without expiry
+            card_validity = {
+                "status": "active",
+                "is_active": True,
+                "purchased_at": purchased_at,
+                "expires_at": None,
+                "days_remaining": None,
+                "duration_days": None
+            }
     
     # Get client's transactions
     transactions = await db.transactions.find(
@@ -638,6 +670,7 @@ async def get_client(client_id: str, current_admin: dict = Depends(get_current_a
     
     return {
         "client": client_doc,
+        "card_validity": card_validity,
         "transactions": transactions,
         "referrals": referrals
     }
