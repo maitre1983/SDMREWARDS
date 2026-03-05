@@ -7,7 +7,49 @@
 
 ## CHANGELOG
 
-### March 5, 2026 - Bug Fix: PIN Protection ✅
+### March 5, 2026 - Merchant Settings Phase 1 Enhancement ✅
+
+**Protection PIN Optionnelle:**
+- Activation/désactivation du PIN par le marchand
+- Modal de saisie PIN si activé (verrouillage après 3 tentatives)
+- Fonction "Forgot PIN" avec OTP (SMS ou Email)
+- Réinitialisation du PIN après vérification OTP
+
+**Gestion des Caissiers:**
+- CRUD complet pour les caissiers (créer, modifier, désactiver, supprimer)
+- Chaque caissier possède un code unique et un numéro de caisse
+- Affichage des statistiques par caissier (transactions, volume)
+
+**Modification Infos Commerce:**
+- Édition: Nom, Type, Adresse, Ville, GPS, Google Maps URL
+- Note: Téléphone non modifiable par le marchand (admin uniquement)
+
+**Nouveaux Endpoints API:**
+- `GET /api/merchants/settings/pin-status` - État du PIN
+- `POST /api/merchants/settings/pin/enable` - Activer le PIN
+- `POST /api/merchants/settings/pin/disable` - Désactiver le PIN
+- `POST /api/merchants/settings/pin/verify` - Vérifier le PIN
+- `POST /api/merchants/settings/pin/change` - Changer le PIN
+- `POST /api/merchants/settings/pin/forgot` - Demander OTP
+- `POST /api/merchants/settings/pin/reset` - Réinitialiser PIN avec OTP
+- `GET /api/merchants/cashiers` - Liste des caissiers
+- `POST /api/merchants/cashiers` - Créer un caissier
+- `PUT /api/merchants/cashiers/{id}` - Modifier un caissier
+- `DELETE /api/merchants/cashiers/{id}` - Supprimer un caissier
+- `PUT /api/merchants/settings/business-info` - Mise à jour infos commerce
+
+**Nouveaux Composants Frontend:**
+- `/app/frontend/src/components/merchant/PinModal.jsx`
+- `/app/frontend/src/components/merchant/ForgotPinModal.jsx`
+- `/app/frontend/src/components/merchant/CashierManager.jsx`
+- `/app/frontend/src/components/merchant/BusinessInfoEditor.jsx`
+- `/app/frontend/src/components/merchant/PinSettings.jsx`
+
+**Tests:** 100% réussite (26/26 backend, frontend complet)
+
+---
+
+### March 5, 2026 - Bug Fix: Admin PIN Protection ✅
 
 **Problème résolu:**
 - Le PIN par défaut `0000` n'était pas créé au démarrage du serveur
