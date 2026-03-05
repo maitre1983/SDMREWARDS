@@ -169,7 +169,7 @@ class BulkClixService:
         """Get API headers"""
         return {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
+            "x-api-key": self.api_key,
             "Accept": "application/json"
         }
     
@@ -947,16 +947,23 @@ class BulkClixService:
         api_success = False
         if self.is_configured():
             try:
+                # Format phone for BulkClix (0XXXXXXXXX format)
+                bulkclix_phone = phone_number
+                if phone_number.startswith("+233"):
+                    bulkclix_phone = "0" + phone_number[4:]
+                elif phone_number.startswith("233"):
+                    bulkclix_phone = "0" + phone_number[3:]
+                
                 async with httpx.AsyncClient() as client:
                     response = await client.post(
-                        f"{self.base_url}/payment-api/momopay",
+                        f"{self.base_url}/payment-api/send/mobilemoney",
                         headers=self._get_headers(),
                         json={
-                            "phone": phone_number,
-                            "amount": net_amount,
-                            "network": network.value,
-                            "reference": transaction.reference,
-                            "description": "SDM Cashback Withdrawal"
+                            "amount": str(net_amount),
+                            "account_number": bulkclix_phone,
+                            "channel": network.value.upper(),  # MTN, TELECEL, AIRTELTIGO
+                            "account_name": "",
+                            "client_reference": transaction.reference
                         },
                         timeout=60.0
                     )

@@ -172,21 +172,28 @@ async def initiate_card_payment(request: CardPaymentRequest):
         callback_url = f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else None
         
         async with httpx.AsyncClient() as http_client:
+            # Format phone for BulkClix (0XXXXXXXXX format)
+            bulkclix_phone = request.phone
+            if request.phone.startswith("+233"):
+                bulkclix_phone = "0" + request.phone[4:]
+            elif request.phone.startswith("233"):
+                bulkclix_phone = "0" + request.phone[3:]
+            
             payload = {
-                "phone": request.phone,
                 "amount": amount,
-                "network": network,
-                "reference": payment_ref,
-                "description": f"SDM {card_name} Purchase"
+                "phone_number": bulkclix_phone,
+                "network": network.upper(),  # MTN, TELECEL, AIRTELTIGO
+                "transaction_id": payment_ref,
+                "reference": "SDM REWARDS"
             }
             if callback_url:
                 payload["callback_url"] = callback_url
                 
             response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/payment-api/momocollection",
+                f"{BULKCLIX_BASE_URL}/payment-api/momopay",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {BULKCLIX_API_KEY}"
+                    "x-api-key": BULKCLIX_API_KEY
                 },
                 json=payload,
                 timeout=30.0
@@ -901,20 +908,26 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
     
     # Production mode: Call BulkClix Disbursement API
     try:
+        # Format phone for BulkClix (0XXXXXXXXX format)
+        bulkclix_phone = request.phone
+        if request.phone.startswith("+233"):
+            bulkclix_phone = "0" + request.phone[4:]
+        elif request.phone.startswith("233"):
+            bulkclix_phone = "0" + request.phone[3:]
+        
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/payment-api/momodisbursement",
+                f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
                 headers={
-                    "Authorization": f"Bearer {BULKCLIX_API_KEY}",
+                    "x-api-key": BULKCLIX_API_KEY,
                     "Content-Type": "application/json"
                 },
                 json={
-                    "phone": request.phone,
-                    "amount": request.amount,
-                    "network": network,
-                    "reference": withdrawal_ref,
-                    "narration": "SDM Cashback Withdrawal",
-                    "callback_url": f"{CALLBACK_BASE_URL}/api/payments/withdrawal/callback"
+                    "amount": str(request.amount),
+                    "account_number": bulkclix_phone,
+                    "channel": network.upper(),  # MTN, TELECEL, AIRTELTIGO
+                    "account_name": "",  # Will be filled by BulkClix
+                    "client_reference": withdrawal_ref
                 },
                 timeout=30.0
             )

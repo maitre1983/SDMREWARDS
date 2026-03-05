@@ -80,17 +80,24 @@ class SMSService:
         
         # Production - send via BulkClix
         try:
+            # Format phone for BulkClix (0XXXXXXXXX format)
+            bulkclix_phone = phone
+            if phone.startswith("+233"):
+                bulkclix_phone = "0" + phone[4:]
+            elif phone.startswith("233"):
+                bulkclix_phone = "0" + phone[3:]
+            
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     f"{self.base_url}/sms-api/send",
                     headers={
                         "Content-Type": "application/json",
-                        "api-key": self.api_key
+                        "x-api-key": self.api_key
                     },
                     json={
                         "sender_id": self.sender_id,
-                        "phone": phone,
-                        "message": message
+                        "message": message,
+                        "recipients": [bulkclix_phone]
                     },
                     timeout=30.0
                 )
