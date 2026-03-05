@@ -7,7 +7,7 @@ Handles MoMo payment collection for VIP cards and merchant payments
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, Dict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 import os
 import httpx
@@ -514,6 +514,8 @@ async def complete_payment(payment_id: str):
         await process_card_purchase(payment)
     elif payment["type"] == "merchant_payment":
         await process_merchant_payment(payment)
+    elif payment["type"] == "card_upgrade":
+        await process_card_upgrade(payment)
 
 
 async def process_card_purchase(payment: Dict):
@@ -731,6 +733,80 @@ async def process_merchant_payment(payment: Dict):
             
     except Exception as e:
         logger.error(f"Merchant payment SMS error: {e}")
+
+
+async def process_card_upgrade(payment: Dict):
+    """Process completed card upgrade - upgrade client's card"""
+    client_id = payment["client_id"]
+    from_card = payment.get("from_card_type", "silver")
+    to_card = payment.get("to_card_type", "gold")
+    new_duration_days = payment.get("new_duration_days", 365)
+    
+    # Get client
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not client:
+        logger.error(f"Card upgrade: Client {client_id} not found")
+        return
+    
+    now = datetime.now(timezone.utc)
+    
+    # Calculate new expiration (extend from now + new duration)
+    new_expires_at = now + timedelta(days=new_duration_days)
+    
+    # Update client card type
+    await db.clients.update_one(
+        {"id": client_id},
+        {
+            "$set": {
+                "card_type": to_card,
+                "card_purchased_at": now.isoformat(),
+                "card_expires_at": new_expires_at.isoformat(),
+                "card_duration_days": new_duration_days,
+                "updated_at": now.isoformat()
+            }
+        }
+    )
+    
+    # Update or create membership card
+    await db.membership_cards.update_one(
+        {"client_id": client_id, "is_active": True},
+        {
+            "$set": {
+                "card_type": to_card,
+                "expires_at": new_expires_at.isoformat(),
+                "upgraded_at": now.isoformat(),
+                "upgraded_from": from_card,
+                "upgrade_amount": payment["amount"]
+            }
+        }
+    )
+    
+    # Record transaction
+    await db.transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "type": "card_upgrade",
+        "client_id": client_id,
+        "amount": payment["amount"],
+        "description": f"Mise à niveau {from_card.upper()} → {to_card.upper()}",
+        "payment_method": "momo",
+        "payment_reference": payment.get("reference", payment["id"]),
+        "status": "completed",
+        "metadata": {
+            "from_card": from_card,
+            "to_card": to_card,
+            "new_duration_days": new_duration_days
+        },
+        "created_at": now.isoformat()
+    })
+    
+    # Send SMS notification
+    try:
+        if client.get("phone"):
+            sms = get_sms()
+            message = f"Félicitations! Votre carte SDM a été mise à niveau vers {to_card.upper()}. Votre nouvelle carte est valide pour {new_duration_days} jours."
+            await sms.send_raw_sms(client["phone"], message)
+    except Exception as e:
+        logger.error(f"Card upgrade SMS error: {e}")
 
 
 # ============== CASHBACK WITHDRAWAL ==============

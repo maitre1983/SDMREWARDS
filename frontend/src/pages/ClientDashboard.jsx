@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import QRScanner from '../components/QRScanner';
+import ReferralQRCode from '../components/client/ReferralQRCode';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
   Sparkles, 
@@ -34,7 +35,10 @@ import {
   Percent,
   MapPin,
   Banknote,
-  Send
+  Send,
+  Crown,
+  ArrowUp,
+  Zap
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -80,6 +84,13 @@ export default function ClientDashboard() {
   const [withdrawalNetwork, setWithdrawalNetwork] = useState('');
   const [withdrawalStatus, setWithdrawalStatus] = useState(null);
   const [withdrawalId, setWithdrawalId] = useState(null);
+
+  // Card Upgrade modal state
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [selectedUpgradeCard, setSelectedUpgradeCard] = useState(null);
+  const [upgradePaymentPhone, setUpgradePaymentPhone] = useState('');
+  const [upgradeStatus, setUpgradeStatus] = useState(null);
+  const [upgradePaymentId, setUpgradePaymentId] = useState(null);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -540,6 +551,103 @@ export default function ClientDashboard() {
     setWithdrawalId(null);
   };
 
+  // ============== CARD UPGRADE FUNCTIONS ==============
+
+  const getUpgradeOptions = () => {
+    if (!client?.card_type || !availableCards.length) return [];
+    
+    const cardOrder = ['silver', 'gold', 'platinum', 'diamond', 'business'];
+    const currentIndex = cardOrder.indexOf(client.card_type);
+    
+    // Get current card price
+    const currentCard = availableCards.find(c => c.type === client.card_type);
+    const currentPrice = currentCard?.price || 0;
+    
+    // Filter cards that are higher tier and calculate difference
+    return availableCards
+      .filter(card => {
+        const cardIndex = cardOrder.indexOf(card.type);
+        return cardIndex > currentIndex && card.price > currentPrice;
+      })
+      .map(card => ({
+        ...card,
+        priceDifference: card.price - currentPrice
+      }))
+      .sort((a, b) => a.price - b.price);
+  };
+
+  const openUpgradeModal = (card) => {
+    setSelectedUpgradeCard(card);
+    setUpgradePaymentPhone(client?.phone || '');
+    setUpgradeStatus(null);
+    setUpgradePaymentId(null);
+    setShowUpgradeModal(true);
+  };
+
+  const initiateUpgrade = async () => {
+    if (!upgradePaymentPhone || upgradePaymentPhone.length < 10) {
+      toast.error('Veuillez entrer un numéro de téléphone valide');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setUpgradeStatus('processing');
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(`${API_URL}/api/clients/cards/upgrade`, {
+        new_card_type: selectedUpgradeCard.type,
+        payment_phone: upgradePaymentPhone
+      }, { headers });
+      
+      if (res.data.success) {
+        setUpgradePaymentId(res.data.payment_id);
+        setUpgradeStatus('pending');
+        
+        if (res.data.test_mode) {
+          toast.info('Mode Test: Cliquez sur "Confirmer" pour simuler le paiement');
+        } else {
+          toast.success('Demande MoMo envoyée! Approuvez sur votre téléphone.');
+        }
+      }
+    } catch (error) {
+      setUpgradeStatus('failed');
+      toast.error(error.response?.data?.detail || 'Échec de la mise à niveau');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const confirmTestUpgrade = async () => {
+    if (!upgradePaymentId) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/test/confirm/${upgradePaymentId}`);
+      if (res.data.success) {
+        setUpgradeStatus('success');
+        toast.success('Mise à niveau réussie! Votre nouvelle carte est active.');
+        setTimeout(() => {
+          setShowUpgradeModal(false);
+          fetchDashboardData();
+        }, 2000);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Confirmation échouée');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const closeUpgradeModal = () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setShowUpgradeModal(false);
+    setSelectedUpgradeCard(null);
+    setUpgradeStatus(null);
+    setUpgradePaymentId(null);
+    setUpgradePaymentPhone('');
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('sdm_client_token');
     localStorage.removeItem('sdm_client_data');
@@ -636,14 +744,30 @@ export default function ClientDashboard() {
 
         {/* Inactive Account Banner */}
         {!isActive && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <CreditCard className="text-amber-400 shrink-0" size={24} />
-              <div>
-                <p className="text-amber-300 font-medium">Activate Your Account</p>
+          <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-5 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center shrink-0">
+                <AlertCircle className="text-amber-400" size={24} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs font-bold rounded-full uppercase">
+                    Compte Inactif
+                  </span>
+                </div>
+                <p className="text-white font-medium">Activez votre compte</p>
                 <p className="text-slate-400 text-sm mt-1">
-                  Purchase a membership card to start earning cashback rewards!
+                  Achetez une carte de membre pour commencer à gagner du cashback sur tous vos achats !
                 </p>
+                <Button
+                  onClick={() => setActiveTab('home')}
+                  className="mt-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                  size="sm"
+                  data-testid="activate-account-btn"
+                >
+                  <CreditCard size={16} className="mr-2" />
+                  Acheter une carte
+                </Button>
               </div>
             </div>
           </div>
@@ -765,6 +889,46 @@ export default function ClientDashboard() {
                         Renouveler ma carte
                       </Button>
                     )}
+                  </div>
+                )}
+
+                {/* Upgrade Card Button */}
+                {!cardValidity?.is_expired && getUpgradeOptions().length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Crown className="text-amber-400" size={18} />
+                        <span className="text-white font-medium">Mise à niveau disponible</span>
+                      </div>
+                      <Zap className="text-amber-400" size={16} />
+                    </div>
+                    <div className="space-y-2">
+                      {getUpgradeOptions().slice(0, 2).map((upgradeCard) => (
+                        <button
+                          key={upgradeCard.type}
+                          onClick={() => openUpgradeModal(upgradeCard)}
+                          className="w-full flex items-center justify-between p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg hover:from-amber-500/20 hover:to-orange-500/20 transition-all"
+                          data-testid={`upgrade-to-${upgradeCard.type}-btn`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-8 h-8 rounded-lg flex items-center justify-center"
+                              style={{ background: upgradeCard.color }}
+                            >
+                              <ArrowUp className="text-white" size={16} />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-white font-medium text-sm">{upgradeCard.name}</p>
+                              <p className="text-slate-400 text-xs">{upgradeCard.duration_label}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-amber-400 font-bold">+GHS {upgradeCard.priceDifference}</p>
+                            <p className="text-slate-500 text-xs">différence</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -950,76 +1114,23 @@ export default function ClientDashboard() {
               </div>
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-emerald-400">{referrals?.active_referrals || 0}</p>
-                <p className="text-slate-400 text-xs">Active</p>
+                <p className="text-slate-400 text-xs">Actifs</p>
               </div>
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-amber-400">GHS {referrals?.total_bonus_earned || 0}</p>
-                <p className="text-slate-400 text-xs">Earned</p>
+                <p className="text-slate-400 text-xs">Gagnés</p>
               </div>
             </div>
 
-            {/* Referral Code Card */}
-            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-6 text-center">
-              <Users className="mx-auto text-purple-400 mb-2" size={32} />
-              <p className="text-slate-300 mb-2">Your Referral Code</p>
-              <p className="text-2xl font-bold text-white font-mono">{client?.referral_code}</p>
-              <p className="text-emerald-400 text-sm mt-2">
-                Earn GHS 3 for each friend who joins!
-              </p>
-            </div>
-            
-            {/* Share Options */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Share2 size={18} /> Share Your Code
-              </h3>
-              <div className="grid grid-cols-4 gap-3">
-                <button
-                  onClick={() => shareReferral('whatsapp')}
-                  className="flex flex-col items-center gap-2 p-3 bg-emerald-500/20 rounded-xl hover:bg-emerald-500/30 transition-colors"
-                  data-testid="share-whatsapp"
-                >
-                  <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
-                    <Phone size={18} className="text-white" />
-                  </div>
-                  <span className="text-slate-300 text-xs">WhatsApp</span>
-                </button>
-                <button
-                  onClick={() => shareReferral('twitter')}
-                  className="flex flex-col items-center gap-2 p-3 bg-sky-500/20 rounded-xl hover:bg-sky-500/30 transition-colors"
-                  data-testid="share-twitter"
-                >
-                  <div className="w-10 h-10 bg-sky-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold">𝕏</span>
-                  </div>
-                  <span className="text-slate-300 text-xs">Twitter</span>
-                </button>
-                <button
-                  onClick={() => shareReferral('facebook')}
-                  className="flex flex-col items-center gap-2 p-3 bg-blue-500/20 rounded-xl hover:bg-blue-500/30 transition-colors"
-                  data-testid="share-facebook"
-                >
-                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold">f</span>
-                  </div>
-                  <span className="text-slate-300 text-xs">Facebook</span>
-                </button>
-                <button
-                  onClick={() => shareReferral('copy')}
-                  className="flex flex-col items-center gap-2 p-3 bg-slate-700/50 rounded-xl hover:bg-slate-700 transition-colors"
-                  data-testid="share-copy"
-                >
-                  <div className="w-10 h-10 bg-slate-600 rounded-full flex items-center justify-center">
-                    <Copy size={18} className="text-white" />
-                  </div>
-                  <span className="text-slate-300 text-xs">Copy Link</span>
-                </button>
-              </div>
-            </div>
+            {/* QR Code Referral Component */}
+            <ReferralQRCode 
+              referralCode={client?.referral_code}
+              clientName={client?.full_name}
+            />
 
             {/* Referrals List */}
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <h3 className="text-white font-semibold mb-4">Your Referrals</h3>
+              <h3 className="text-white font-semibold mb-4">Vos Filleuls</h3>
               {referrals?.referrals?.length > 0 ? (
                 <div className="space-y-3">
                   {referrals.referrals.map((ref) => (
@@ -1029,9 +1140,9 @@ export default function ClientDashboard() {
                           <User className="text-slate-400" size={18} />
                         </div>
                         <div>
-                          <p className="text-white text-sm">{ref.referred_client?.full_name || 'User'}</p>
+                          <p className="text-white text-sm">{ref.referred_client?.full_name || 'Utilisateur'}</p>
                           <p className="text-slate-500 text-xs">
-                            {new Date(ref.created_at).toLocaleDateString()}
+                            {new Date(ref.created_at).toLocaleDateString('fr-FR')}
                           </p>
                         </div>
                       </div>
@@ -1041,7 +1152,7 @@ export default function ClientDashboard() {
                         </span>
                       ) : (
                         <span className="text-slate-500 text-sm flex items-center gap-1">
-                          <Clock size={14} /> Pending
+                          <Clock size={14} /> En attente
                         </span>
                       )}
                     </div>
@@ -1050,8 +1161,8 @@ export default function ClientDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <Gift className="text-slate-600 mx-auto mb-3" size={40} />
-                  <p className="text-slate-400">No referrals yet</p>
-                  <p className="text-slate-500 text-sm mt-1">Share your code to start earning!</p>
+                  <p className="text-slate-400">Pas encore de filleuls</p>
+                  <p className="text-slate-500 text-sm mt-1">Partagez votre code pour commencer à gagner!</p>
                 </div>
               )}
             </div>
@@ -1535,6 +1646,148 @@ export default function ClientDashboard() {
                     <Send className="mr-2" size={18} />
                   )}
                   Withdraw GHS {withdrawalAmount || '0'}
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============== CARD UPGRADE MODAL ============== */}
+      {showUpgradeModal && selectedUpgradeCard && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative">
+            {/* Close Button */}
+            <button
+              onClick={closeUpgradeModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+              disabled={isProcessingPayment}
+            >
+              <X size={20} />
+            </button>
+            
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Crown className="text-white" size={32} />
+              </div>
+              <h3 className="text-white text-xl font-bold">Mise à niveau</h3>
+              <p className="text-slate-400 text-sm mt-1">
+                {client?.card_type?.toUpperCase()} → {selectedUpgradeCard.name}
+              </p>
+            </div>
+            
+            {/* Payment Status Display */}
+            {upgradeStatus === 'success' ? (
+              <div className="text-center py-8">
+                <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
+                <p className="text-white text-lg font-semibold">Mise à niveau réussie !</p>
+                <p className="text-slate-400 mt-2">Votre nouvelle carte {selectedUpgradeCard.name} est active</p>
+              </div>
+            ) : upgradeStatus === 'failed' ? (
+              <div className="text-center py-8">
+                <AlertCircle className="text-red-400 mx-auto mb-4" size={64} />
+                <p className="text-white text-lg font-semibold">Échec du paiement</p>
+                <p className="text-slate-400 mt-2">Veuillez réessayer</p>
+                <Button
+                  onClick={() => setUpgradeStatus(null)}
+                  className="mt-4 bg-amber-500 hover:bg-amber-600"
+                >
+                  Réessayer
+                </Button>
+              </div>
+            ) : upgradeStatus === 'pending' ? (
+              <div className="text-center py-6">
+                <div className="relative inline-block">
+                  <Phone className="text-amber-400 mx-auto mb-4" size={48} />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
+                </div>
+                <p className="text-white text-lg font-semibold">En attente du paiement</p>
+                <p className="text-slate-400 mt-2 text-sm">
+                  Approuvez la demande MoMo sur votre téléphone
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
+                  <Loader2 className="animate-spin" size={16} />
+                  <span className="text-sm">En attente de confirmation...</span>
+                </div>
+                
+                {/* Test Mode Confirm Button */}
+                <div className="mt-6 pt-4 border-t border-slate-700">
+                  <p className="text-slate-500 text-xs mb-3">Mode Test</p>
+                  <Button
+                    onClick={confirmTestUpgrade}
+                    disabled={isProcessingPayment}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600"
+                    data-testid="confirm-test-upgrade-btn"
+                  >
+                    {isProcessingPayment ? (
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                    ) : (
+                      <CheckCircle className="mr-2" size={16} />
+                    )}
+                    Confirmer (Test)
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Upgrade Details */}
+                <div className="bg-slate-900 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
+                    <span className="text-slate-400">Carte actuelle</span>
+                    <span className="text-white font-medium">{client?.card_type?.toUpperCase()}</span>
+                  </div>
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
+                    <span className="text-slate-400">Nouvelle carte</span>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-4 h-4 rounded"
+                        style={{ background: selectedUpgradeCard.color }}
+                      />
+                      <span className="text-white font-medium">{selectedUpgradeCard.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
+                    <span className="text-slate-400">Validité</span>
+                    <span className="text-white">{selectedUpgradeCard.duration_label}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">À payer (différence)</span>
+                    <span className="text-amber-400 text-xl font-bold">GHS {selectedUpgradeCard.priceDifference}</span>
+                  </div>
+                </div>
+
+                {/* Phone Input */}
+                <div className="mb-6">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    Numéro MoMo
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Input
+                      type="tel"
+                      placeholder="+233 XX XXX XXXX"
+                      value={upgradePaymentPhone}
+                      onChange={(e) => setUpgradePaymentPhone(e.target.value)}
+                      className="pl-10 bg-slate-900 border-slate-700 text-white"
+                      data-testid="upgrade-momo-phone"
+                    />
+                  </div>
+                </div>
+                
+                {/* Pay Button */}
+                <Button
+                  onClick={initiateUpgrade}
+                  disabled={isProcessingPayment || !upgradePaymentPhone}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 py-6"
+                  data-testid="initiate-upgrade-btn"
+                >
+                  {isProcessingPayment ? (
+                    <Loader2 className="animate-spin mr-2" size={18} />
+                  ) : (
+                    <Crown className="mr-2" size={18} />
+                  )}
+                  Payer GHS {selectedUpgradeCard.priceDifference} et Upgrader
                 </Button>
               </>
             )}

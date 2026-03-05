@@ -39,6 +39,11 @@ class PurchaseCardRequest(BaseModel):
     payment_phone: Optional[str] = None  # For MoMo
 
 
+class UpgradeCardRequest(BaseModel):
+    new_card_type: str
+    payment_phone: str
+
+
 # ============== DASHBOARD ==============
 
 @router.get("/me")
@@ -428,6 +433,105 @@ async def get_card_status(current_client: dict = Depends(get_current_client)):
             "expires_at": expires_at,
             "message": f"Carte active - {days_remaining} jours restants"
         }
+
+
+# ============== CARD UPGRADE ==============
+
+@router.post("/cards/upgrade")
+async def upgrade_card(
+    request: UpgradeCardRequest,
+    current_client: dict = Depends(get_current_client)
+):
+    """Upgrade membership card (pay difference only)"""
+    client_id = current_client["id"]
+    
+    # Check if client has an active card
+    if current_client.get("status") != ClientStatus.ACTIVE.value:
+        raise HTTPException(status_code=400, detail="Vous devez avoir une carte active pour effectuer une mise à niveau")
+    
+    current_card_type = current_client.get("card_type")
+    if not current_card_type:
+        raise HTTPException(status_code=400, detail="Aucune carte actuelle trouvée")
+    
+    # Check if card is expired
+    card_expires_at = current_client.get("card_expires_at")
+    if card_expires_at:
+        expiry_date = datetime.fromisoformat(card_expires_at.replace('Z', '+00:00'))
+        if datetime.now(timezone.utc) >= expiry_date:
+            raise HTTPException(status_code=400, detail="Votre carte est expirée. Veuillez renouveler au lieu de mettre à niveau")
+    
+    # Define card hierarchy
+    card_order = ['silver', 'gold', 'platinum', 'diamond', 'business']
+    current_index = card_order.index(current_card_type) if current_card_type in card_order else -1
+    new_index = card_order.index(request.new_card_type) if request.new_card_type in card_order else -1
+    
+    if new_index == -1:
+        # Check custom card types
+        custom_card = await db.card_types.find_one({"slug": request.new_card_type, "is_active": True})
+        if not custom_card:
+            raise HTTPException(status_code=400, detail="Type de carte invalide")
+    
+    if new_index != -1 and new_index <= current_index:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez mettre à niveau que vers une carte supérieure")
+    
+    # Get prices from config
+    config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+    cards = config.get("cards", {}) if config else {}
+    
+    # Get current card price
+    current_card_info = cards.get(current_card_type, {})
+    current_price = current_card_info.get("price", 25)
+    
+    # Get new card price and duration
+    new_card_info = cards.get(request.new_card_type, {})
+    new_price = new_card_info.get("price", 50)
+    new_duration_days = new_card_info.get("duration_days", 365)
+    
+    # Check for custom card types
+    if not new_card_info:
+        custom_card = await db.card_types.find_one({"slug": request.new_card_type, "is_active": True})
+        if custom_card:
+            new_price = custom_card.get("price", 50)
+            new_duration_days = custom_card.get("duration_days", 365)
+    
+    # Calculate price difference
+    price_difference = new_price - current_price
+    if price_difference <= 0:
+        raise HTTPException(status_code=400, detail="La mise à niveau n'est pas possible vers cette carte")
+    
+    # Create payment record for upgrade
+    payment_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    
+    # Check if test mode
+    test_mode = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
+    
+    payment_record = {
+        "id": payment_id,
+        "type": "card_upgrade",
+        "client_id": client_id,
+        "from_card_type": current_card_type,
+        "to_card_type": request.new_card_type,
+        "amount": price_difference,
+        "payment_phone": request.payment_phone,
+        "status": "pending",
+        "new_duration_days": new_duration_days,
+        "test_mode": test_mode,
+        "reference": f"UPGRADE-{uuid.uuid4().hex[:8].upper()}",
+        "created_at": now.isoformat()
+    }
+    
+    await db.momo_payments.insert_one(payment_record)
+    
+    return {
+        "success": True,
+        "payment_id": payment_id,
+        "amount": price_difference,
+        "from_card": current_card_type,
+        "to_card": request.new_card_type,
+        "test_mode": test_mode,
+        "message": f"Paiement de GHS {price_difference} requis pour la mise à niveau"
+    }
 
 
 # ============== TRANSACTIONS ==============
