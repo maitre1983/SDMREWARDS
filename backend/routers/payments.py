@@ -202,13 +202,15 @@ async def initiate_card_payment(request: CardPaymentRequest):
             result = response.json()
             logger.info(f"BulkClix card payment response: {result}")
             
-            if response.status_code == 200 and result.get("status") in ["success", "pending"]:
+            # BulkClix returns "Payment Initiated Successful" message on success
+            if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
+                payment_data = result.get("data", {})
                 await db.momo_payments.update_one(
                     {"id": payment_record["id"]},
                     {
                         "$set": {
                             "status": "processing",
-                            "provider_reference": result.get("reference") or result.get("transactionId"),
+                            "provider_reference": payment_data.get("transaction_id") or payment_data.get("ext_transaction_id") or result.get("reference") or result.get("transactionId"),
                             "provider_message": result.get("message"),
                             "updated_at": datetime.now(timezone.utc).isoformat()
                         }
