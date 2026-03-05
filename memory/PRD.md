@@ -7,6 +7,34 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - AdminDashboard.jsx Refactoring ✅
+
+**Refactoring completed - File reduced from 3556 to 2949 lines (-17%)**
+
+**New Modular Components Created:**
+- `AdminOverview.jsx` (~300 lines) - Overview tab with all statistics, charts, Monthly Analytics
+- `AdminClients.jsx` (~150 lines) - Clients management table with actions
+- `AdminMerchants.jsx` (~175 lines) - Merchants management table with actions
+
+**Files Structure After Refactoring:**
+```
+/app/frontend/src/components/admin/
+├── AdminOverview.jsx       # NEW - Overview statistics
+├── AdminClients.jsx        # NEW - Clients management
+├── AdminMerchants.jsx      # NEW - Merchants management
+├── CardTypesManager.jsx    # Card types CRUD
+├── ServiceFeesAnalytics.jsx # Commissions & fees
+└── SDMCommissionsPanel.jsx # (Optional future split)
+```
+
+**Benefits:**
+- Better code organization and maintainability
+- Easier debugging and feature additions
+- Reusable components
+- Reduced main file complexity
+
+---
+
 ### March 5, 2026 - Monthly Analytics Selector & PIN Bug Fix ✅
 
 **1. Monthly Growth → Monthly Analytics Selector:**
