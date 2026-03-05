@@ -7,6 +7,31 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - SMS Notifications & SEO Package ✅
+
+**1. Notifications SMS pour 3 événements:**
+- **Parrainage** : SMS envoyé quand un filleul achète une carte (`notify_referral_bonus`)
+- **Paiement reçu** : SMS avec détails du cashback gagné (`notify_payment_received`)
+- **Expiration carte** : Rappels à 7, 3 et 1 jour(s) avant expiration (`notify_card_expiring`, `notify_card_expired`)
+
+**Nouvel Endpoint API:**
+- `POST /api/tasks/card-expiration-reminders` - Tâche pour envoyer les rappels d'expiration (à appeler par cron job quotidien)
+
+**2. Package SEO Complet:**
+- **robots.txt** : Bloque /admin et /api/, référence le sitemap
+- **sitemap.xml** : 11 URLs indexées (homepage, client, merchant, legal pages)
+- **Meta Tags** : title, description, keywords, robots, author
+- **Open Graph** : og:title, og:description, og:image, og:url pour Facebook/LinkedIn
+- **Twitter Cards** : summary_large_image pour partage Twitter
+- **Schema.org JSON-LD** :
+  - `Organization` : SDM Rewards, GIT NFT GHANA Ltd
+  - `WebApplication` : FinanceApplication, GHS 25-500
+  - `FAQPage` : 3 questions fréquentes
+
+**Tests:** 100% réussite (13/13 backend)
+
+---
+
 ### March 5, 2026 - Client Space Enhancements ✅
 
 **1. QR Code de Parrainage (Referral QR Code):**
