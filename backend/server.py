@@ -50,6 +50,9 @@ async def lifespan(app: FastAPI):
     # Initialize super admin
     await init_super_admin()
     
+    # Initialize Settings PIN
+    await init_settings_pin()
+    
     yield
     
     # Shutdown
@@ -145,6 +148,31 @@ async def init_super_admin():
                 logger.info("✅ Super admin account exists and is active")
     except Exception as e:
         logger.error(f"❌ Super admin initialization error: {e}")
+
+# ============== SETTINGS PIN INITIALIZATION ==============
+async def init_settings_pin():
+    """Initialize default Settings PIN (0000)"""
+    try:
+        existing = await db.settings_security.find_one({"key": "settings_pin"})
+        if not existing:
+            # Create default PIN (0000)
+            default_pin = "0000"
+            pin_hash = pwd_context.hash(default_pin)
+            
+            await db.settings_security.insert_one({
+                "key": "settings_pin",
+                "pin_hash": pin_hash,
+                "enabled": True,
+                "failed_attempts": 0,
+                "locked_until": None,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            })
+            logger.info("✅ Default Settings PIN (0000) created")
+        else:
+            logger.info("✅ Settings PIN already configured")
+    except Exception as e:
+        logger.error(f"❌ Settings PIN initialization error: {e}")
 
 # ============== PLATFORM CONFIG ==============
 async def init_platform_config():

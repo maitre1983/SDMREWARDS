@@ -1798,37 +1798,23 @@ async def cancel_scheduled_sms(
 
 # ============== PHASE 3: SECURITY & ADMIN MANAGEMENT ==============
 
-@router.post("/settings/set-pin")
-async def set_settings_pin(
-    request: SetPINRequest,
-    current_admin: dict = Depends(get_current_admin)
-):
-    """Set or update PIN for Settings access"""
-    if not current_admin.get("is_super_admin"):
-        raise HTTPException(status_code=403, detail="Super admin required")
+@router.get("/settings/pin-status")
+async def get_pin_status(current_admin: dict = Depends(get_current_admin)):
+    """Check if Settings PIN is enabled and if locked"""
+    security = await db.settings_security.find_one({"key": "settings_pin"})
     
-    # Validate PIN format
-    if not request.pin.isdigit() or len(request.pin) < 4 or len(request.pin) > 6:
-        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
+    is_locked = False
+    if security and security.get("locked_until"):
+        locked_until = security["locked_until"]
+        if isinstance(locked_until, str):
+            locked_until = datetime.fromisoformat(locked_until.replace('Z', '+00:00'))
+        if datetime.now(timezone.utc) < locked_until:
+            is_locked = True
     
-    # Hash the PIN
-    pin_hash = bcrypt.hashpw(request.pin.encode(), bcrypt.gensalt()).decode()
-    
-    # Store PIN config
-    await db.admin_security.update_one(
-        {"admin_id": current_admin["id"]},
-        {"$set": {
-            "admin_id": current_admin["id"],
-            "pin_hash": pin_hash,
-            "pin_enabled": True,
-            "failed_attempts": 0,
-            "locked_until": None,
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }},
-        upsert=True
-    )
-    
-    return {"success": True, "message": "PIN set successfully"}
+    return {
+        "pin_enabled": security.get("enabled", True) if security else True,
+        "is_locked": is_locked
+    }
 
 
 @router.post("/settings/verify-pin")
@@ -1836,78 +1822,96 @@ async def verify_settings_pin(
     request: VerifyPINRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Verify PIN to access Settings"""
-    security = await db.admin_security.find_one({"admin_id": current_admin["id"]})
+    """Verify PIN to access Settings (global PIN for all admins)"""
+    security = await db.settings_security.find_one({"key": "settings_pin"})
     
-    if not security or not security.get("pin_enabled"):
-        return {"success": True, "message": "PIN not enabled"}
+    if not security:
+        raise HTTPException(status_code=500, detail="Settings PIN not configured")
     
     # Check if locked
     if security.get("locked_until"):
-        locked_until = datetime.fromisoformat(security["locked_until"])
+        locked_until = security["locked_until"]
+        if isinstance(locked_until, str):
+            locked_until = datetime.fromisoformat(locked_until.replace('Z', '+00:00'))
         if datetime.now(timezone.utc) < locked_until:
-            remaining = (locked_until - datetime.now(timezone.utc)).seconds
-            raise HTTPException(status_code=423, detail=f"Account locked. Try again in {remaining} seconds")
+            remaining = int((locked_until - datetime.now(timezone.utc)).total_seconds())
+            raise HTTPException(status_code=423, detail=f"Locked. Try again in {remaining} seconds")
     
-    # Verify PIN
-    if not bcrypt.checkpw(request.pin.encode(), security["pin_hash"].encode()):
-        # Increment failed attempts
-        failed = security.get("failed_attempts", 0) + 1
-        updates = {"failed_attempts": failed}
-        
-        if failed >= 3:
-            # Lock for 5 minutes
-            updates["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
-            await db.admin_security.update_one({"admin_id": current_admin["id"]}, {"$set": updates})
-            raise HTTPException(status_code=423, detail="Too many failed attempts. Locked for 5 minutes")
-        
-        await db.admin_security.update_one({"admin_id": current_admin["id"]}, {"$set": updates})
-        raise HTTPException(status_code=401, detail=f"Invalid PIN. {3 - failed} attempts remaining")
+    # Verify PIN using bcrypt
+    try:
+        if not bcrypt.checkpw(request.pin.encode(), security["pin_hash"].encode()):
+            # Increment failed attempts
+            failed = security.get("failed_attempts", 0) + 1
+            updates = {"failed_attempts": failed}
+            
+            if failed >= 3:
+                # Lock for 5 minutes
+                updates["locked_until"] = datetime.now(timezone.utc) + timedelta(minutes=5)
+                await db.settings_security.update_one({"key": "settings_pin"}, {"$set": updates})
+                raise HTTPException(status_code=423, detail="Too many failed attempts. Locked for 5 minutes")
+            
+            await db.settings_security.update_one({"key": "settings_pin"}, {"$set": updates})
+            raise HTTPException(status_code=401, detail=f"Invalid PIN. {3 - failed} attempts remaining")
+    except ValueError:
+        # Fallback for passlib hashes
+        from passlib.context import CryptContext
+        pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        if not pwd_ctx.verify(request.pin, security["pin_hash"]):
+            failed = security.get("failed_attempts", 0) + 1
+            updates = {"failed_attempts": failed}
+            if failed >= 3:
+                updates["locked_until"] = datetime.now(timezone.utc) + timedelta(minutes=5)
+                await db.settings_security.update_one({"key": "settings_pin"}, {"$set": updates})
+                raise HTTPException(status_code=423, detail="Too many failed attempts. Locked for 5 minutes")
+            await db.settings_security.update_one({"key": "settings_pin"}, {"$set": updates})
+            raise HTTPException(status_code=401, detail=f"Invalid PIN. {3 - failed} attempts remaining")
     
     # Reset failed attempts on success
-    await db.admin_security.update_one(
-        {"admin_id": current_admin["id"]},
+    await db.settings_security.update_one(
+        {"key": "settings_pin"},
         {"$set": {"failed_attempts": 0, "locked_until": None}}
     )
     
     return {"success": True, "message": "PIN verified"}
 
 
-@router.get("/settings/pin-status")
-async def get_pin_status(current_admin: dict = Depends(get_current_admin)):
-    """Check if PIN is enabled for Settings"""
-    security = await db.admin_security.find_one({"admin_id": current_admin["id"]})
-    
-    return {
-        "pin_enabled": security.get("pin_enabled", False) if security else False,
-        "is_locked": bool(security.get("locked_until")) if security else False
-    }
-
-
-@router.post("/settings/disable-pin")
-async def disable_settings_pin(
-    request: VerifyPINRequest,
+@router.post("/settings/change-pin")
+async def change_settings_pin(
+    request: SetPINRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Disable PIN protection (requires current PIN)"""
-    if not current_admin.get("is_super_admin"):
-        raise HTTPException(status_code=403, detail="Super admin required")
+    """Change Settings PIN (Super Admin only - emileparfait2003@gmail.com)"""
+    # Only super admin with specific email can change PIN
+    if not current_admin.get("is_super_admin") or current_admin.get("email") != "emileparfait2003@gmail.com":
+        raise HTTPException(status_code=403, detail="Only the Super Admin (emileparfait2003@gmail.com) can change the PIN")
     
-    security = await db.admin_security.find_one({"admin_id": current_admin["id"]})
+    # Validate PIN format
+    if not request.pin.isdigit() or len(request.pin) < 4 or len(request.pin) > 6:
+        raise HTTPException(status_code=400, detail="PIN must be 4-6 digits")
     
-    if not security or not security.get("pin_enabled"):
-        return {"success": True, "message": "PIN already disabled"}
+    # Hash the new PIN
+    pin_hash = bcrypt.hashpw(request.pin.encode(), bcrypt.gensalt()).decode()
     
-    # Verify current PIN
-    if not bcrypt.checkpw(request.pin.encode(), security["pin_hash"].encode()):
-        raise HTTPException(status_code=401, detail="Invalid PIN")
-    
-    await db.admin_security.update_one(
-        {"admin_id": current_admin["id"]},
-        {"$set": {"pin_enabled": False, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    # Update PIN
+    await db.settings_security.update_one(
+        {"key": "settings_pin"},
+        {"$set": {
+            "pin_hash": pin_hash,
+            "failed_attempts": 0,
+            "locked_until": None,
+            "updated_at": datetime.now(timezone.utc)
+        }}
     )
     
-    return {"success": True, "message": "PIN disabled"}
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "settings_pin_changed",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Settings PIN changed successfully"}
 
 
 @router.post("/settings/request-otp")

@@ -903,13 +903,53 @@ export default function AdminDashboard() {
   // Load SMS data and check PIN when Settings tab is accessed
   useEffect(() => {
     if (activeTab === 'settings' && token) {
-      checkPinStatus();
+      // Always show PIN modal when entering Settings
+      if (!pinVerified) {
+        setShowPinModal(true);
+      }
       fetchSMSData();
       if (admin?.is_super_admin) {
         fetchAdmins();
       }
     }
   }, [activeTab, token]);
+
+  // Reset PIN verification when leaving Settings
+  useEffect(() => {
+    if (activeTab !== 'settings') {
+      setPinVerified(false);
+    }
+  }, [activeTab]);
+
+  // Handle tab change with PIN check
+  const handleTabChange = (tab) => {
+    if (tab === 'settings' && !pinVerified) {
+      setShowPinModal(true);
+      setActiveTab(tab);
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  // Change PIN (Super Admin only)
+  const handleChangePIN = async () => {
+    if (newPinInput.length < 4 || !/^\d+$/.test(newPinInput)) {
+      toast.error('PIN must be 4-6 digits');
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/settings/change-pin`, { pin: newPinInput }, { headers });
+      toast.success('PIN changed successfully');
+      setShowSetPinModal(false);
+      setNewPinInput('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to change PIN');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -1035,7 +1075,7 @@ export default function AdminDashboard() {
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                 activeTab === tab.id 
                   ? 'bg-purple-500 text-white' 
@@ -1682,42 +1722,54 @@ export default function AdminDashboard() {
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            {/* Settings Sub-tabs */}
-            <div className="flex flex-wrap gap-2 bg-slate-800 p-2 rounded-xl overflow-x-auto">
-              {[
-                { id: 'cards', label: 'Card Prices', icon: CreditCard },
-                { id: 'commissions', label: 'Commissions', icon: Percent },
-                { id: 'services', label: 'Service Fees', icon: Sliders },
-                { id: 'referrals', label: 'Referrals', icon: Gift },
-                { id: 'users', label: 'Add Users', icon: UserPlus },
-                { id: 'sms', label: 'SMS Center', icon: MessageSquare },
-                { id: 'security', label: 'Security', icon: Shield },
-                { id: 'admins', label: 'Admin Users', icon: Users }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setSettingsTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all whitespace-nowrap ${
-                    settingsTab === tab.id 
-                      ? 'bg-blue-600 text-white' 
-                      : 'text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  <tab.icon size={16} />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {/* PIN Required Message if not verified */}
+            {!pinVerified ? (
+              <div className="bg-slate-800 border border-slate-700 rounded-xl p-12 text-center">
+                <Shield className="text-purple-400 mx-auto mb-4" size={48} />
+                <h3 className="text-white text-xl font-semibold mb-2">PIN Required</h3>
+                <p className="text-slate-400 mb-6">Enter your PIN to access Settings</p>
+                <Button onClick={() => setShowPinModal(true)} className="bg-purple-600 hover:bg-purple-700">
+                  <Shield size={16} className="mr-2" /> Enter PIN
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* Settings Sub-tabs */}
+                <div className="flex flex-wrap gap-2 bg-slate-800 p-2 rounded-xl overflow-x-auto">
+                  {[
+                    { id: 'cards', label: 'Card Prices', icon: CreditCard },
+                    { id: 'commissions', label: 'Commissions', icon: Percent },
+                    { id: 'services', label: 'Service Fees', icon: Sliders },
+                    { id: 'referrals', label: 'Referrals', icon: Gift },
+                    { id: 'users', label: 'Add Users', icon: UserPlus },
+                    { id: 'sms', label: 'SMS Center', icon: MessageSquare },
+                    { id: 'security', label: 'Security', icon: Shield },
+                    { id: 'admins', label: 'Admin Users', icon: Users }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setSettingsTab(tab.id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all whitespace-nowrap ${
+                        settingsTab === tab.id 
+                          ? 'bg-blue-600 text-white' 
+                          : 'text-slate-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      <tab.icon size={16} />
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
 
-            {/* Card Prices Settings */}
-            {settingsTab === 'cards' && (
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-                  <CreditCard size={20} className="text-amber-400" /> Membership Card Configuration
-                </h3>
-                <div className="grid md:grid-cols-3 gap-6">
-                  {/* Silver Card */}
-                  <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
+                {/* Card Prices Settings */}
+                {settingsTab === 'cards' && (
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                    <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                      <CreditCard size={20} className="text-amber-400" /> Membership Card Configuration
+                    </h3>
+                    <div className="grid md:grid-cols-3 gap-6">
+                      {/* Silver Card */}
+                      <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
                     <div className="flex items-center gap-2 mb-4">
                       <Medal className="text-slate-400" size={24} />
                       <h4 className="text-white font-medium">Silver Card</h4>
@@ -2178,44 +2230,29 @@ export default function AdminDashboard() {
                 {/* PIN Security */}
                 <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
                   <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                    <Shield size={20} className="text-purple-400" /> PIN Protection for Settings
+                    <Shield size={20} className="text-purple-400" /> Settings PIN (Default: 0000)
                   </h3>
                   <p className="text-slate-400 text-sm mb-4">
-                    Protect the Settings menu with a 4-6 digit PIN code. You'll need to enter this PIN each time you access Settings.
+                    The Settings menu is protected by a PIN code. Only the Super Admin (emileparfait2003@gmail.com) can change the PIN.
                   </p>
                   
-                  {pinEnabled ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                        <span className="text-emerald-400 flex items-center gap-2">
-                          <CheckCircle size={16} /> PIN Protection Enabled
-                        </span>
-                      </div>
-                      <div className="flex gap-3">
-                        <Input
-                          type="password"
-                          placeholder="Enter current PIN"
-                          value={pinInput}
-                          onChange={(e) => setPinInput(e.target.value)}
-                          className="bg-slate-900 border-slate-700 text-white"
-                          maxLength={6}
-                        />
-                        <Button onClick={handleDisablePin} variant="outline" className="border-red-500 text-red-400 hover:bg-red-500/10" disabled={actionLoading}>
-                          Disable PIN
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                        <span className="text-amber-400 flex items-center gap-2">
-                          <AlertCircle size={16} /> PIN Protection Disabled
-                        </span>
-                      </div>
-                      <Button onClick={() => setShowSetPinModal(true)} className="bg-purple-600 hover:bg-purple-700">
-                        <Shield size={16} className="mr-2" /> Enable PIN Protection
-                      </Button>
-                    </div>
+                  <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg mb-4">
+                    <span className="text-emerald-400 flex items-center gap-2">
+                      <CheckCircle size={16} /> PIN Protection Active
+                    </span>
+                  </div>
+                  
+                  {/* Change PIN (Super Admin only) */}
+                  {admin?.email === 'emileparfait2003@gmail.com' && (
+                    <Button onClick={() => setShowSetPinModal(true)} className="bg-purple-600 hover:bg-purple-700">
+                      <Shield size={16} className="mr-2" /> Change Settings PIN
+                    </Button>
+                  )}
+                  
+                  {admin?.email !== 'emileparfait2003@gmail.com' && (
+                    <p className="text-slate-500 text-sm">
+                      Only the Super Admin (emileparfait2003@gmail.com) can modify the PIN.
+                    </p>
                   )}
                 </div>
 
@@ -2370,6 +2407,8 @@ export default function AdminDashboard() {
                   </div>
                 )}
               </div>
+            )}
+              </>
             )}
           </div>
         )}
@@ -3096,6 +3135,53 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* PIN ENTRY MODAL */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-sm p-6 text-center">
+            <Shield className="text-purple-400 mx-auto mb-4" size={48} />
+            <h3 className="text-white font-semibold text-xl mb-2">Enter PIN</h3>
+            <p className="text-slate-400 text-sm mb-6">
+              Enter your PIN to access Settings
+            </p>
+            <div className="space-y-4">
+              <Input
+                type="password"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="bg-slate-900 border-slate-700 text-white text-center text-3xl tracking-[0.5em] font-mono"
+                placeholder="••••"
+                maxLength={6}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && pinInput.length >= 4) {
+                    handleVerifyPin();
+                  }
+                }}
+              />
+              <p className="text-slate-500 text-xs">Default PIN: 0000</p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button 
+                onClick={() => { setShowPinModal(false); setPinInput(''); setActiveTab('overview'); }} 
+                variant="outline" 
+                className="flex-1 border-slate-600"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleVerifyPin} 
+                className="flex-1 bg-purple-600 hover:bg-purple-700" 
+                disabled={actionLoading || pinInput.length < 4}
+              >
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Shield size={16} className="mr-2" />}
+                Verify
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SMS TEMPLATE MODAL */}
       {showTemplateModal && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
@@ -3153,16 +3239,16 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* SET PIN MODAL */}
+      {/* CHANGE PIN MODAL */}
       {showSetPinModal && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-sm p-6">
             <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
               <Shield className="text-purple-400" size={20} />
-              Set Security PIN
+              Change Settings PIN
             </h3>
             <p className="text-slate-400 text-sm mb-4">
-              Enter a 4-6 digit PIN to protect Settings access.
+              Enter a new 4-6 digit PIN to protect Settings access.
             </p>
             <div className="space-y-4">
               <Input
@@ -3170,7 +3256,7 @@ export default function AdminDashboard() {
                 value={newPinInput}
                 onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 className="bg-slate-900 border-slate-700 text-white text-center text-2xl tracking-widest"
-                placeholder="****"
+                placeholder="New PIN"
                 maxLength={6}
               />
               <p className="text-slate-500 text-xs text-center">{newPinInput.length}/6 digits</p>
@@ -3179,9 +3265,9 @@ export default function AdminDashboard() {
               <Button onClick={() => { setShowSetPinModal(false); setNewPinInput(''); }} variant="outline" className="flex-1 border-slate-600">
                 Cancel
               </Button>
-              <Button onClick={handleSetPin} className="flex-1 bg-purple-600 hover:bg-purple-700" disabled={actionLoading || newPinInput.length < 4}>
+              <Button onClick={handleChangePIN} className="flex-1 bg-purple-600 hover:bg-purple-700" disabled={actionLoading || newPinInput.length < 4}>
                 {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Shield size={16} className="mr-2" />}
-                Set PIN
+                Change PIN
               </Button>
             </div>
           </div>
