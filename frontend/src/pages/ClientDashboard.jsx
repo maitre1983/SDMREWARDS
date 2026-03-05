@@ -65,6 +65,7 @@ export default function ClientDashboard() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [paymentId, setPaymentId] = useState(null);
+  const [isPaymentTestMode, setIsPaymentTestMode] = useState(false);
   const pollingRef = useRef(null);
   
   // QR Scanner state
@@ -76,6 +77,7 @@ export default function ClientDashboard() {
   const [merchantPayAmount, setMerchantPayAmount] = useState('');
   const [merchantPayStatus, setMerchantPayStatus] = useState(null);
   const [merchantPaymentId, setMerchantPaymentId] = useState(null);
+  const [isMerchantPayTestMode, setIsMerchantPayTestMode] = useState(false);
 
   // Withdrawal modal state
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
@@ -84,6 +86,7 @@ export default function ClientDashboard() {
   const [withdrawalNetwork, setWithdrawalNetwork] = useState('');
   const [withdrawalStatus, setWithdrawalStatus] = useState(null);
   const [withdrawalId, setWithdrawalId] = useState(null);
+  const [isWithdrawalTestMode, setIsWithdrawalTestMode] = useState(false);
 
   // Card Upgrade modal state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -91,6 +94,7 @@ export default function ClientDashboard() {
   const [upgradePaymentPhone, setUpgradePaymentPhone] = useState('');
   const [upgradeStatus, setUpgradeStatus] = useState(null);
   const [upgradePaymentId, setUpgradePaymentId] = useState(null);
+  const [isUpgradeTestMode, setIsUpgradeTestMode] = useState(false);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -221,6 +225,7 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
         setPaymentStatus('pending');
+        setIsPaymentTestMode(res.data.test_mode || false);
         
         // In test mode, show confirm button
         if (res.data.test_mode) {
@@ -347,6 +352,7 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setMerchantPaymentId(res.data.payment_id);
         setMerchantPayStatus('pending');
+        setIsMerchantPayTestMode(res.data.test_mode || false);
         
         if (res.data.test_mode) {
           toast.info('Test mode: Click "Confirm Payment" to simulate MoMo approval');
@@ -503,6 +509,7 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setWithdrawalId(res.data.withdrawal_id);
         setWithdrawalStatus('pending');
+        setIsWithdrawalTestMode(res.data.test_mode || false);
         
         if (res.data.test_mode) {
           toast.info('Test mode: Click "Confirm Withdrawal" to simulate payout');
@@ -603,11 +610,14 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setUpgradePaymentId(res.data.payment_id);
         setUpgradeStatus('pending');
+        setIsUpgradeTestMode(res.data.test_mode || false);
         
         if (res.data.test_mode) {
-          toast.info('Mode Test: Cliquez sur "Confirmer" pour simuler le paiement');
+          toast.info('Test mode: Click "Confirm" to simulate payment');
         } else {
-          toast.success('Demande MoMo envoyée! Approuvez sur votre téléphone.');
+          toast.success('MoMo prompt sent! Approve on your phone.');
+          // Start polling for upgrade payment status
+          startPolling(res.data.payment_id);
         }
       }
     } catch (error) {
@@ -1266,23 +1276,25 @@ export default function ClientDashboard() {
                   <span className="text-sm">Waiting for confirmation...</span>
                 </div>
                 
-                {/* Test Mode Confirm Button */}
-                <div className="mt-6 pt-4 border-t border-slate-700">
-                  <p className="text-slate-500 text-xs mb-3">Test Mode</p>
-                  <Button
-                    onClick={confirmTestPayment}
-                    disabled={isProcessingPayment}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600"
-                    data-testid="confirm-test-payment-btn"
-                  >
-                    {isProcessingPayment ? (
-                      <Loader2 className="animate-spin mr-2" size={16} />
-                    ) : (
-                      <CheckCircle className="mr-2" size={16} />
-                    )}
-                    Confirm Payment (Test)
-                  </Button>
-                </div>
+                {/* Test Mode Confirm Button - Only show in test mode */}
+                {isPaymentTestMode && (
+                  <div className="mt-6 pt-4 border-t border-slate-700">
+                    <p className="text-slate-500 text-xs mb-3">Test Mode</p>
+                    <Button
+                      onClick={confirmTestPayment}
+                      disabled={isProcessingPayment}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600"
+                      data-testid="confirm-test-payment-btn"
+                    >
+                      {isProcessingPayment ? (
+                        <Loader2 className="animate-spin mr-2" size={16} />
+                      ) : (
+                        <CheckCircle className="mr-2" size={16} />
+                      )}
+                      Confirm Payment (Test)
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -1422,23 +1434,25 @@ export default function ClientDashboard() {
                   </p>
                 </div>
                 
-                {/* Test Mode Confirm */}
-                <div className="mt-6 pt-4 border-t border-slate-700">
-                  <p className="text-slate-500 text-xs mb-3">Test Mode</p>
-                  <Button
-                    onClick={confirmMerchantTestPayment}
-                    disabled={isProcessingPayment}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600"
-                    data-testid="confirm-merchant-payment-btn"
-                  >
-                    {isProcessingPayment ? (
-                      <Loader2 className="animate-spin mr-2" size={16} />
-                    ) : (
-                      <CheckCircle className="mr-2" size={16} />
-                    )}
-                    Confirm Payment (Test)
-                  </Button>
-                </div>
+                {/* Test Mode Confirm - Only show in test mode */}
+                {isMerchantPayTestMode && (
+                  <div className="mt-6 pt-4 border-t border-slate-700">
+                    <p className="text-slate-500 text-xs mb-3">Test Mode</p>
+                    <Button
+                      onClick={confirmMerchantTestPayment}
+                      disabled={isProcessingPayment}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600"
+                      data-testid="confirm-merchant-payment-btn"
+                    >
+                      {isProcessingPayment ? (
+                        <Loader2 className="animate-spin mr-2" size={16} />
+                      ) : (
+                        <CheckCircle className="mr-2" size={16} />
+                      )}
+                      Confirm Payment (Test)
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -1538,23 +1552,25 @@ export default function ClientDashboard() {
                   To: {withdrawalPhone}
                 </p>
                 
-                {/* Test Mode Confirm */}
-                <div className="mt-4 pt-4 border-t border-slate-700">
-                  <p className="text-slate-500 text-xs mb-3">Test Mode</p>
-                  <Button
-                    onClick={confirmTestWithdrawal}
-                    disabled={isProcessingPayment}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600"
-                    data-testid="confirm-withdrawal-btn"
-                  >
-                    {isProcessingPayment ? (
-                      <Loader2 className="animate-spin mr-2" size={16} />
-                    ) : (
-                      <CheckCircle className="mr-2" size={16} />
-                    )}
-                    Confirm Withdrawal (Test)
-                  </Button>
-                </div>
+                {/* Test Mode Confirm - Only show in test mode */}
+                {isWithdrawalTestMode && (
+                  <div className="mt-4 pt-4 border-t border-slate-700">
+                    <p className="text-slate-500 text-xs mb-3">Test Mode</p>
+                    <Button
+                      onClick={confirmTestWithdrawal}
+                      disabled={isProcessingPayment}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600"
+                      data-testid="confirm-withdrawal-btn"
+                    >
+                      {isProcessingPayment ? (
+                        <Loader2 className="animate-spin mr-2" size={16} />
+                      ) : (
+                        <CheckCircle className="mr-2" size={16} />
+                      )}
+                      Confirm Withdrawal (Test)
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -1711,23 +1727,25 @@ export default function ClientDashboard() {
                   <span className="text-sm">Waiting for confirmation...</span>
                 </div>
                 
-                {/* Test Mode Confirm Button */}
-                <div className="mt-6 pt-4 border-t border-slate-700">
-                  <p className="text-slate-500 text-xs mb-3">Mode Test</p>
-                  <Button
-                    onClick={confirmTestUpgrade}
-                    disabled={isProcessingPayment}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600"
-                    data-testid="confirm-test-upgrade-btn"
-                  >
-                    {isProcessingPayment ? (
-                      <Loader2 className="animate-spin mr-2" size={16} />
-                    ) : (
-                      <CheckCircle className="mr-2" size={16} />
-                    )}
-                    Confirmer (Test)
-                  </Button>
-                </div>
+                {/* Test Mode Confirm Button - Only show in test mode */}
+                {isUpgradeTestMode && (
+                  <div className="mt-6 pt-4 border-t border-slate-700">
+                    <p className="text-slate-500 text-xs mb-3">Test Mode</p>
+                    <Button
+                      onClick={confirmTestUpgrade}
+                      disabled={isProcessingPayment}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600"
+                      data-testid="confirm-test-upgrade-btn"
+                    >
+                      {isProcessingPayment ? (
+                        <Loader2 className="animate-spin mr-2" size={16} />
+                      ) : (
+                        <CheckCircle className="mr-2" size={16} />
+                      )}
+                      Confirm (Test)
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
