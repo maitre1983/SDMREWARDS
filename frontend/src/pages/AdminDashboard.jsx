@@ -141,6 +141,14 @@ export default function AdminDashboard() {
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '', otp_code: '' });
   const [otpSent, setOtpSent] = useState(false);
   const [otpPreview, setOtpPreview] = useState('');
+
+  // Monthly analytics state
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [monthlyStats, setMonthlyStats] = useState(null);
+  const [loadingMonthlyStats, setLoadingMonthlyStats] = useState(false);
   
   // Admin management states
   const [allAdmins, setAllAdmins] = useState([]);
@@ -854,6 +862,38 @@ export default function AdminDashboard() {
     }
   };
 
+  // ============== MONTHLY ANALYTICS ==============
+  
+  const fetchMonthlyStats = async (month) => {
+    try {
+      setLoadingMonthlyStats(true);
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/analytics/monthly?month=${month}`, { headers });
+      setMonthlyStats(res.data);
+    } catch (error) {
+      console.error('Monthly stats fetch error:', error);
+      // Set default empty stats if API not available
+      setMonthlyStats({
+        month: month,
+        transactions: 0,
+        volume: 0,
+        new_clients: 0,
+        new_merchants: 0,
+        cashback_distributed: 0,
+        card_sales: 0
+      });
+    } finally {
+      setLoadingMonthlyStats(false);
+    }
+  };
+
+  // Fetch monthly stats when month changes
+  useEffect(() => {
+    if (token && selectedMonth) {
+      fetchMonthlyStats(selectedMonth);
+    }
+  }, [selectedMonth, token]);
+
   // ============== ADMIN MANAGEMENT ==============
   
   // Fetch all admins
@@ -1346,64 +1386,96 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* Monthly Growth Chart */}
-            {advancedStats?.monthly_data?.length > 0 && (
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            {/* Monthly Analytics with Month Selector */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-white font-semibold flex items-center gap-2">
                   <BarChart3 className="text-blue-400" size={20} />
-                  Monthly Growth (Last 6 Months)
+                  Monthly Analytics
                 </h3>
-                <div className="grid md:grid-cols-6 gap-3">
-                  {advancedStats.monthly_data.map((month, idx) => (
-                    <div key={idx} className="bg-slate-900 rounded-xl p-4">
-                      <p className="text-slate-400 text-xs text-center mb-3">{month.month_short}</p>
-                      
-                      {/* Simple bar visualization */}
-                      <div className="space-y-2">
-                        <div>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">Txns</span>
-                            <span className="text-slate-300">{month.transactions}</span>
-                          </div>
-                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-blue-500 rounded-full transition-all"
-                              style={{ width: `${Math.min((month.transactions / Math.max(...advancedStats.monthly_data.map(m => m.transactions || 1))) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">Volume</span>
-                            <span className="text-emerald-400">{month.volume > 1000 ? `${(month.volume/1000).toFixed(1)}K` : month.volume}</span>
-                          </div>
-                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-emerald-500 rounded-full transition-all"
-                              style={{ width: `${Math.min((month.volume / Math.max(...advancedStats.monthly_data.map(m => m.volume || 1))) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">New Users</span>
-                            <span className="text-purple-400">{month.new_clients}</span>
-                          </div>
-                          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-purple-500 rounded-full transition-all"
-                              style={{ width: `${Math.min((month.new_clients / Math.max(...advancedStats.monthly_data.map(m => m.new_clients || 1))) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
+                    className="bg-slate-900 border border-slate-600 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    data-testid="month-selector"
+                  />
                 </div>
               </div>
-            )}
+              
+              {loadingMonthlyStats ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin text-blue-400" size={32} />
+                </div>
+              ) : monthlyStats ? (
+                <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {/* Transactions */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-center">
+                    <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <Activity className="text-blue-400" size={24} />
+                    </div>
+                    <p className="text-2xl font-bold text-white">{monthlyStats.transactions || 0}</p>
+                    <p className="text-slate-400 text-sm">Transactions</p>
+                  </div>
+                  
+                  {/* Volume */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-center">
+                    <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <DollarSign className="text-emerald-400" size={24} />
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-400">
+                      GHS {monthlyStats.volume > 1000 ? `${(monthlyStats.volume / 1000).toFixed(1)}K` : monthlyStats.volume || 0}
+                    </p>
+                    <p className="text-slate-400 text-sm">Volume</p>
+                  </div>
+                  
+                  {/* New Clients */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-center">
+                    <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <UserPlus className="text-purple-400" size={24} />
+                    </div>
+                    <p className="text-2xl font-bold text-purple-400">{monthlyStats.new_clients || 0}</p>
+                    <p className="text-slate-400 text-sm">New Clients</p>
+                  </div>
+                  
+                  {/* New Merchants */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-center">
+                    <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <Store className="text-amber-400" size={24} />
+                    </div>
+                    <p className="text-2xl font-bold text-amber-400">{monthlyStats.new_merchants || 0}</p>
+                    <p className="text-slate-400 text-sm">New Merchants</p>
+                  </div>
+                  
+                  {/* Cashback Distributed */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-center">
+                    <div className="w-12 h-12 bg-pink-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <Gift className="text-pink-400" size={24} />
+                    </div>
+                    <p className="text-2xl font-bold text-pink-400">
+                      GHS {monthlyStats.cashback_distributed || 0}
+                    </p>
+                    <p className="text-slate-400 text-sm">Cashback Paid</p>
+                  </div>
+                  
+                  {/* Card Sales */}
+                  <div className="bg-slate-900 rounded-xl p-4 text-center">
+                    <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
+                      <CreditCard className="text-cyan-400" size={24} />
+                    </div>
+                    <p className="text-2xl font-bold text-cyan-400">{monthlyStats.card_sales || 0}</p>
+                    <p className="text-slate-400 text-sm">Card Sales</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <BarChart3 className="text-slate-600 mx-auto mb-4" size={48} />
+                  <p className="text-slate-400">Select a month to view analytics</p>
+                </div>
+              )}
+            </div>
 
             {/* Recent Activity */}
             <div className="grid md:grid-cols-2 gap-6">
@@ -1783,7 +1855,7 @@ export default function AdminDashboard() {
                     {/* Default Cards Configuration */}
                     <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
                       <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-                        <CreditCard size={20} className="text-amber-400" /> Cartes par défaut (Prix, Durée, Avantages)
+                        <CreditCard size={20} className="text-amber-400" /> Default Cards (Price, Duration, Benefits)
                       </h3>
                       <div className="grid md:grid-cols-3 gap-6">
                         {/* Silver Card */}
@@ -1794,7 +1866,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="space-y-3">
                             <div>
-                              <Label className="text-slate-400 text-sm">Prix (GHS)</Label>
+                              <Label className="text-slate-400 text-sm">Price (GHS)</Label>
                               <Input
                                 type="number"
                                 value={cardPricesForm.silver_price}
@@ -1803,21 +1875,21 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div>
-                              <Label className="text-slate-400 text-sm">Durée</Label>
+                              <Label className="text-slate-400 text-sm">Duration</Label>
                               <select
                                 value={cardPricesForm.silver_duration || 365}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, silver_duration: parseInt(e.target.value)})}
                                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-white"
                               >
-                                <option value={30}>1 mois</option>
-                                <option value={90}>3 mois</option>
-                                <option value={180}>6 mois</option>
-                                <option value={365}>1 an</option>
-                                <option value={730}>2 ans</option>
+                                <option value={30}>1 month</option>
+                                <option value={90}>3 months</option>
+                                <option value={180}>6 months</option>
+                                <option value={365}>1 year</option>
+                                <option value={730}>2 years</option>
                               </select>
                             </div>
                             <div>
-                              <Label className="text-slate-400 text-sm">Avantages</Label>
+                              <Label className="text-slate-400 text-sm">Benefits</Label>
                               <textarea
                                 value={cardPricesForm.silver_benefits}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, silver_benefits: e.target.value})}
@@ -1835,7 +1907,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="space-y-3">
                             <div>
-                              <Label className="text-slate-400 text-sm">Prix (GHS)</Label>
+                              <Label className="text-slate-400 text-sm">Price (GHS)</Label>
                               <Input
                                 type="number"
                                 value={cardPricesForm.gold_price}
@@ -1844,21 +1916,21 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div>
-                              <Label className="text-slate-400 text-sm">Durée</Label>
+                              <Label className="text-slate-400 text-sm">Duration</Label>
                               <select
                                 value={cardPricesForm.gold_duration || 365}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, gold_duration: parseInt(e.target.value)})}
                                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-amber-700/50 rounded-md text-white"
                               >
-                                <option value={30}>1 mois</option>
-                                <option value={90}>3 mois</option>
-                                <option value={180}>6 mois</option>
-                                <option value={365}>1 an</option>
-                                <option value={730}>2 ans</option>
+                                <option value={30}>1 month</option>
+                                <option value={90}>3 months</option>
+                                <option value={180}>6 months</option>
+                                <option value={365}>1 year</option>
+                                <option value={730}>2 years</option>
                               </select>
                             </div>
                             <div>
-                              <Label className="text-slate-400 text-sm">Avantages</Label>
+                              <Label className="text-slate-400 text-sm">Benefits</Label>
                               <textarea
                                 value={cardPricesForm.gold_benefits}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, gold_benefits: e.target.value})}
@@ -1876,7 +1948,7 @@ export default function AdminDashboard() {
                           </div>
                           <div className="space-y-3">
                             <div>
-                              <Label className="text-slate-400 text-sm">Prix (GHS)</Label>
+                              <Label className="text-slate-400 text-sm">Price (GHS)</Label>
                               <Input
                                 type="number"
                                 value={cardPricesForm.platinum_price}
@@ -1885,22 +1957,22 @@ export default function AdminDashboard() {
                               />
                             </div>
                             <div>
-                              <Label className="text-slate-400 text-sm">Durée</Label>
+                              <Label className="text-slate-400 text-sm">Duration</Label>
                               <select
                                 value={cardPricesForm.platinum_duration || 730}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_duration: parseInt(e.target.value)})}
                                 className="w-full mt-1 px-3 py-2 bg-slate-800 border border-purple-700/50 rounded-md text-white"
                               >
-                                <option value={30}>1 mois</option>
-                                <option value={90}>3 mois</option>
-                                <option value={180}>6 mois</option>
-                                <option value={365}>1 an</option>
-                                <option value={730}>2 ans</option>
+                                <option value={30}>1 month</option>
+                                <option value={90}>3 months</option>
+                                <option value={180}>6 months</option>
+                                <option value={365}>1 year</option>
+                                <option value={730}>2 years</option>
                                 <option value={1095}>3 ans</option>
                               </select>
                             </div>
                             <div>
-                              <Label className="text-slate-400 text-sm">Avantages</Label>
+                              <Label className="text-slate-400 text-sm">Benefits</Label>
                               <textarea
                                 value={cardPricesForm.platinum_benefits}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_benefits: e.target.value})}
@@ -1913,7 +1985,7 @@ export default function AdminDashboard() {
                       <div className="mt-6 flex justify-end">
                         <Button onClick={handleSaveCardPrices} className="bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
                           {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
-                          Sauvegarder
+                          Save
                         </Button>
                       </div>
                     </div>

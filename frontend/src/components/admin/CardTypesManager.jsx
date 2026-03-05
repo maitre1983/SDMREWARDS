@@ -12,12 +12,12 @@ import { Label } from '../ui/label';
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const DURATION_PRESETS = [
-  { days: 30, label: '1 mois' },
-  { days: 90, label: '3 mois' },
-  { days: 180, label: '6 mois' },
-  { days: 365, label: '1 an' },
-  { days: 730, label: '2 ans' },
-  { days: 1095, label: '3 ans' }
+  { days: 30, label: '1 month' },
+  { days: 90, label: '3 months' },
+  { days: 180, label: '6 months' },
+  { days: 365, label: '1 year' },
+  { days: 730, label: '2 years' },
+  { days: 1095, label: '3 years' }
 ];
 
 const COLORS = [
@@ -137,14 +137,14 @@ export default function CardTypesManager({ token, onUpdate }) {
           },
           { headers }
         );
-        toast.success('Nouvelle carte créée');
+        toast.success('New card created');
       }
       
       setShowModal(false);
       fetchCardTypes();
       if (onUpdate) onUpdate();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la sauvegarde');
+      toast.error(error.response?.data?.detail || 'Error saving card');
     } finally {
       setIsSaving(false);
     }
@@ -155,12 +155,12 @@ export default function CardTypesManager({ token, onUpdate }) {
       await axios.delete(`${API_URL}/api/admin/settings/card-types/${cardId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success('Carte supprimée');
+      toast.success('Card deleted');
       setShowDeleteConfirm(null);
       fetchCardTypes();
       if (onUpdate) onUpdate();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la suppression');
+      toast.error(error.response?.data?.detail || 'Error deleting card');
     }
   };
 
@@ -174,19 +174,19 @@ export default function CardTypesManager({ token, onUpdate }) {
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('Carte mise à jour');
+      toast.success('Card updated');
       fetchCardTypes();
       if (onUpdate) onUpdate();
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Error updating card');
     }
   };
 
   const formatDuration = (days) => {
-    if (days >= 730) return `${Math.floor(days / 365)} ans`;
-    if (days >= 365) return '1 an';
-    if (days >= 30) return `${Math.floor(days / 30)} mois`;
-    return `${days} jours`;
+    if (days >= 730) return `${Math.floor(days / 365)} years`;
+    if (days >= 365) return '1 year';
+    if (days >= 30) return `${Math.floor(days / 30)} months`;
+    return `${days} days`;
   };
 
   if (isLoading) {
@@ -204,8 +204,8 @@ export default function CardTypesManager({ token, onUpdate }) {
         <div className="flex items-center gap-3">
           <CreditCard className="text-amber-400" size={24} />
           <div>
-            <h3 className="text-white font-semibold">Types de Cartes</h3>
-            <p className="text-slate-400 text-sm">Gérez vos cartes de fidélité</p>
+            <h3 className="text-white font-semibold">Card Types</h3>
+            <p className="text-slate-400 text-sm">Manage your loyalty cards</p>
           </div>
         </div>
         <Button
@@ -214,7 +214,7 @@ export default function CardTypesManager({ token, onUpdate }) {
           data-testid="add-card-type-btn"
         >
           <Plus size={18} className="mr-2" />
-          Nouvelle carte
+          New Card
         </Button>
       </div>
 
@@ -307,7 +307,7 @@ export default function CardTypesManager({ token, onUpdate }) {
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-white font-semibold">
-                {editingCard ? 'Modifier la carte' : 'Nouvelle carte'}
+                {editingCard ? 'Edit Card' : 'New Card'}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
                 <X size={20} />
@@ -317,7 +317,7 @@ export default function CardTypesManager({ token, onUpdate }) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-400">Nom de la carte *</Label>
+                  <Label className="text-slate-400">Card Name *</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -326,7 +326,7 @@ export default function CardTypesManager({ token, onUpdate }) {
                   />
                 </div>
                 <div>
-                  <Label className="text-slate-400">Slug (identifiant) *</Label>
+                  <Label className="text-slate-400">Slug (identifier) *</Label>
                   <Input
                     value={formData.slug}
                     onChange={(e) => setFormData({ ...formData, slug: e.target.value.toLowerCase() })}
@@ -339,7 +339,7 @@ export default function CardTypesManager({ token, onUpdate }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-slate-400">Prix (GHS) *</Label>
+                  <Label className="text-slate-400">Price (GHS) *</Label>
                   <div className="relative mt-1">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                     <Input
@@ -353,7 +353,7 @@ export default function CardTypesManager({ token, onUpdate }) {
                   </div>
                 </div>
                 <div>
-                  <Label className="text-slate-400">Durée *</Label>
+                  <Label className="text-slate-400">Duration *</Label>
                   <select
                     value={formData.duration_days}
                     onChange={(e) => setFormData({ ...formData, duration_days: parseInt(e.target.value) })}
@@ -369,7 +369,7 @@ export default function CardTypesManager({ token, onUpdate }) {
               </div>
 
               <div>
-                <Label className="text-slate-400">Avantages / Benefits</Label>
+                <Label className="text-slate-400">Benefits</Label>
                 <textarea
                   value={formData.benefits}
                   onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
@@ -380,7 +380,7 @@ export default function CardTypesManager({ token, onUpdate }) {
               </div>
 
               <div>
-                <Label className="text-slate-400">Couleur</Label>
+                <Label className="text-slate-400">Color</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {COLORS.map((color) => (
                     <button
@@ -399,7 +399,7 @@ export default function CardTypesManager({ token, onUpdate }) {
               </div>
 
               <div>
-                <Label className="text-slate-400">Ordre d'affichage</Label>
+                <Label className="text-slate-400">Sort Order</Label>
                 <Input
                   type="number"
                   min="0"
@@ -415,7 +415,7 @@ export default function CardTypesManager({ token, onUpdate }) {
                   variant="outline"
                   className="flex-1 border-slate-700 text-slate-300"
                 >
-                  Annuler
+                  Cancel
                 </Button>
                 <Button
                   onClick={handleSave}

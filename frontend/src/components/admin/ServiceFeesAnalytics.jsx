@@ -50,8 +50,8 @@ export default function ServiceFeesAnalytics({ token, advancedStats }) {
             <Percent className="text-amber-400" size={24} />
           </div>
           <div>
-            <h3 className="text-white font-semibold">Commissions SDM sur Cashback</h3>
-            <p className="text-slate-400 text-sm">Total des commissions prélevées</p>
+            <h3 className="text-white font-semibold">SDM Cashback Commissions</h3>
+            <p className="text-slate-400 text-sm">Total commissions collected</p>
           </div>
         </div>
 
@@ -61,19 +61,19 @@ export default function ServiceFeesAnalytics({ token, advancedStats }) {
             <p className="text-amber-400 text-2xl font-bold">{formatCurrency(financial_stats?.total_sdm_commissions)}</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-3">
-            <p className="text-slate-500 text-xs">Aujourd'hui</p>
+            <p className="text-slate-500 text-xs">Today</p>
             <p className="text-white font-medium">{formatCurrency(financial_stats?.sdm_commission_by_period?.day)}</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-3">
-            <p className="text-slate-500 text-xs">Cette semaine</p>
+            <p className="text-slate-500 text-xs">This Week</p>
             <p className="text-white font-medium">{formatCurrency(financial_stats?.sdm_commission_by_period?.week)}</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-3">
-            <p className="text-slate-500 text-xs">Ce mois</p>
+            <p className="text-slate-500 text-xs">This Month</p>
             <p className="text-white font-medium">{formatCurrency(financial_stats?.sdm_commission_by_period?.month)}</p>
           </div>
           <div className="bg-slate-900/50 rounded-lg p-3">
-            <p className="text-slate-500 text-xs">Cette année</p>
+            <p className="text-slate-500 text-xs">This Year</p>
             <p className="text-white font-medium">{formatCurrency(financial_stats?.sdm_commission_by_period?.year)}</p>
           </div>
         </div>
@@ -88,7 +88,7 @@ export default function ServiceFeesAnalytics({ token, advancedStats }) {
             </div>
             <div>
               <h3 className="text-white font-semibold">Service Fees Analytics</h3>
-              <p className="text-slate-400 text-sm">Frais collectés par service</p>
+              <p className="text-slate-400 text-sm">Fees collected by service</p>
             </div>
           </div>
           <div className="text-right">
@@ -128,7 +128,7 @@ export default function ServiceFeesAnalytics({ token, advancedStats }) {
 
         {/* Top Services Ranking */}
         <div className="mb-6">
-          <h4 className="text-slate-300 text-sm font-medium mb-3">Top Services (par utilisation)</h4>
+          <h4 className="text-slate-300 text-sm font-medium mb-3">Top Services (by usage)</h4>
           <div className="space-y-2">
             {service_fees?.top_services?.filter(s => s.count > 0).slice(0, 4).map((service, index) => {
               const Icon = serviceIcons[service.service] || DollarSign;
@@ -155,7 +155,7 @@ export default function ServiceFeesAnalytics({ token, advancedStats }) {
               );
             })}
             {service_fees?.top_services?.every(s => s.count === 0) && (
-              <p className="text-slate-500 text-center py-4">Aucune transaction de service enregistrée</p>
+              <p className="text-slate-500 text-center py-4">No service transactions recorded</p>
             )}
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function ServiceFeesAnalytics({ token, advancedStats }) {
         {/* Monthly Fees Chart */}
         {service_fees?.monthly_chart && service_fees.monthly_chart.some(m => m.fees > 0) && (
           <div>
-            <h4 className="text-slate-300 text-sm font-medium mb-3">Fees par mois</h4>
+            <h4 className="text-slate-300 text-sm font-medium mb-3">Fees per month</h4>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={service_fees.monthly_chart}>

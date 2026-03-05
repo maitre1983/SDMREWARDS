@@ -552,13 +552,13 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
                     "fees": round(service_fees["data_bundle"]["fees"], 2)
                 },
                 "ecg_payment": {
-                    "label": "ECG / Électricité",
+                    "label": "ECG / Electricity",
                     "count": service_fees["ecg_payment"]["count"],
                     "volume": round(service_fees["ecg_payment"]["volume"], 2),
                     "fees": round(service_fees["ecg_payment"]["fees"], 2)
                 },
                 "merchant_payment": {
-                    "label": "Paiement Marchand",
+                    "label": "Merchant Payment",
                     "count": service_fees["merchant_payment"]["count"],
                     "volume": round(service_fees["merchant_payment"]["volume"], 2),
                     "fees": round(service_fees["merchant_payment"]["fees"], 2)
@@ -578,6 +578,82 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
         },
         "monthly_data": monthly_data
     }
+
+
+# ============== MONTHLY ANALYTICS ENDPOINT ==============
+
+@router.get("/analytics/monthly")
+async def get_monthly_analytics(
+    month: str,  # Format: YYYY-MM
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get analytics for a specific month"""
+    try:
+        # Parse the month parameter
+        year, month_num = month.split('-')
+        year = int(year)
+        month_num = int(month_num)
+        
+        # Create date range for the month
+        start_date = datetime(year, month_num, 1, tzinfo=timezone.utc)
+        if month_num == 12:
+            end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end_date = datetime(year, month_num + 1, 1, tzinfo=timezone.utc)
+        
+        start_iso = start_date.isoformat()
+        end_iso = end_date.isoformat()
+        
+        # Count transactions in this month
+        transactions = await db.transactions.count_documents({
+            "created_at": {"$gte": start_iso, "$lt": end_iso}
+        })
+        
+        # Calculate volume
+        all_txns = await db.transactions.find({
+            "created_at": {"$gte": start_iso, "$lt": end_iso}
+        }, {"_id": 0, "amount": 1, "type": 1}).to_list(100000)
+        
+        volume = sum(t.get("amount", 0) for t in all_txns)
+        
+        # Count new clients
+        new_clients = await db.clients.count_documents({
+            "created_at": {"$gte": start_iso, "$lt": end_iso}
+        })
+        
+        # Count new merchants
+        new_merchants = await db.merchants.count_documents({
+            "created_at": {"$gte": start_iso, "$lt": end_iso}
+        })
+        
+        # Calculate cashback distributed
+        cashback_txns = [t for t in all_txns if t.get("type") in ["cashback", "cashback_credit"]]
+        cashback_distributed = sum(t.get("amount", 0) for t in cashback_txns)
+        
+        # Count card sales
+        card_sales = sum(1 for t in all_txns if t.get("type") == "card_purchase")
+        
+        return {
+            "month": month,
+            "month_name": start_date.strftime("%B %Y"),
+            "transactions": transactions,
+            "volume": round(volume, 2),
+            "new_clients": new_clients,
+            "new_merchants": new_merchants,
+            "cashback_distributed": round(cashback_distributed, 2),
+            "card_sales": card_sales
+        }
+    except Exception as e:
+        logger.error(f"Monthly analytics error: {e}")
+        return {
+            "month": month,
+            "transactions": 0,
+            "volume": 0,
+            "new_clients": 0,
+            "new_merchants": 0,
+            "cashback_distributed": 0,
+            "card_sales": 0
+        }
 
 
 # ============== CLIENTS MANAGEMENT ==============
@@ -2242,7 +2318,11 @@ async def change_settings_pin(
 ):
     """Change Settings PIN (Super Admin only - emileparfait2003@gmail.com)"""
     # Only super admin with specific email can change PIN
-    if not current_admin.get("is_super_admin") or current_admin.get("email") != "emileparfait2003@gmail.com":
+    admin_email = current_admin.get("email", "").lower()
+    is_super = current_admin.get("is_super_admin", False)
+    
+    if not is_super or admin_email != "emileparfait2003@gmail.com":
+        logger.warning(f"PIN change denied: is_super={is_super}, email={admin_email}")
         raise HTTPException(status_code=403, detail="Only the Super Admin (emileparfait2003@gmail.com) can change the PIN")
     
     # Validate PIN format
