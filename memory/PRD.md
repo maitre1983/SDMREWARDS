@@ -7,6 +7,31 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - BulkClix API Integration - PRODUCTION READY ✅
+
+**API Integration Updated:**
+- **SMS**: `POST /api/v1/sms-api/send` with UUID sender_id
+- **MoMo Collection**: `POST /api/v1/payment-api/momopay`
+- **MoMo Disbursement**: `POST /api/v1/payment-api/send/mobilemoney`
+- **Authentication**: `x-api-key` header
+
+**Configuration:**
+```env
+BULKCLIX_API_KEY="TLAmJYgV9d60mh5QgNNT4b5ZhrjZ1KCGMF1H0OuC"
+BULKCLIX_OTP_SENDER_ID="8176b9c9-01a5-4d87-b7c8-5fe12799e5ed"
+PAYMENT_TEST_MODE=false
+SMS_TEST_MODE=false
+```
+
+**Files Updated:**
+- `/app/backend/services/sms_service.py` - SMS format & auth
+- `/app/backend/routers/payments.py` - MoMo Collection & Disbursement
+- `/app/backend/services/bulkclix_service.py` - Headers & endpoints
+
+**Status: PRODUCTION MODE ACTIVE** ✅
+
+---
+
 ### March 5, 2026 - AdminDashboard.jsx Refactoring ✅
 
 **Refactoring completed - File reduced from 3556 to 2949 lines (-17%)**
