@@ -323,7 +323,8 @@ async def verify_otp(request: VerifyOTPRequest):
             result = response.json()
             logger.info(f"BulkClix OTP verify response: {result}")
             
-            if response.status_code == 200 and result.get("message") == "OTP verified":
+            # BulkClix returns "OTP verification successful" on success
+            if response.status_code == 200 and "successful" in result.get("message", "").lower():
                 # Mark as verified in our DB
                 await db.otp_records.update_one(
                     {"request_id": request.request_id},
