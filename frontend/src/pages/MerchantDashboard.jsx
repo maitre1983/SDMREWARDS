@@ -39,6 +39,7 @@ import ForgotPinModal from '../components/merchant/ForgotPinModal';
 import CashierManager from '../components/merchant/CashierManager';
 import BusinessInfoEditor from '../components/merchant/BusinessInfoEditor';
 import PinSettings from '../components/merchant/PinSettings';
+import AdvancedDashboard from '../components/merchant/AdvancedDashboard';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
@@ -301,78 +302,13 @@ export default function MerchantDashboard() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
-        {/* Stats Cards */}
+        {/* Advanced Dashboard Tab */}
         {activeTab === 'home' && (
-          <div className="space-y-6">
-            {/* Revenue Overview */}
-            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-emerald-100 text-sm">Total Volume</p>
-                  <p className="text-3xl font-bold">GHS {(stats?.total_volume || 0).toLocaleString()}</p>
-                </div>
-                <BarChart3 size={48} className="text-emerald-200/50" />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-emerald-200 text-xs">Transactions</p>
-                  <p className="font-bold">{stats?.total_transactions || 0}</p>
-                </div>
-                <div>
-                  <p className="text-emerald-200 text-xs">Cashback Given</p>
-                  <p className="font-bold">GHS {(stats?.total_cashback_given || 0).toFixed(2)}</p>
-                </div>
-                <div>
-                  <p className="text-emerald-200 text-xs">Cashback Rate</p>
-                  <p className="font-bold">{merchant?.cashback_rate || 5}%</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Today's Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                <TrendingUp className="text-emerald-400 mb-2" size={24} />
-                <p className="text-slate-400 text-sm">Today's Sales</p>
-                <p className="text-white text-xl font-bold">GHS {(stats?.today_volume || 0).toFixed(2)}</p>
-              </div>
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                <DollarSign className="text-amber-400 mb-2" size={24} />
-                <p className="text-slate-400 text-sm">Today's Cashback</p>
-                <p className="text-white text-xl font-bold">GHS {(stats?.today_cashback || 0).toFixed(2)}</p>
-              </div>
-            </div>
-
-            {/* Recent Transactions */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                <History size={18} /> Recent Transactions
-              </h3>
-              {transactions.length > 0 ? (
-                <div className="space-y-3">
-                  {transactions.slice(0, 5).map((txn) => (
-                    <div key={txn.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <ArrowDownLeft className="text-emerald-400" size={18} />
-                        <div>
-                          <p className="text-white text-sm">{txn.description || 'Payment'}</p>
-                          <p className="text-slate-500 text-xs">
-                            {new Date(txn.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white font-medium">GHS {txn.amount?.toFixed(2)}</p>
-                        <p className="text-emerald-400 text-xs">+{txn.cashback_amount?.toFixed(2)} cashback</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-slate-500 text-center py-4">No transactions yet</p>
-              )}
-            </div>
-          </div>
+          <AdvancedDashboard 
+            token={token} 
+            basicStats={stats} 
+            merchant={merchant}
+          />
         )}
 
         {/* QR Codes Tab */}

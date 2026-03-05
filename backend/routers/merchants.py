@@ -205,6 +205,282 @@ async def get_merchant_dashboard(current_merchant: dict = Depends(get_current_me
     }
 
 
+@router.get("/dashboard/advanced-stats")
+async def get_advanced_stats(
+    period: str = "day",  # day, week, month, year
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get advanced dashboard statistics by period"""
+    merchant_id = current_merchant["id"]
+    now = datetime.now(timezone.utc)
+    
+    # Calculate date ranges
+    if period == "day":
+        current_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        previous_start = current_start - timedelta(days=1)
+        previous_end = current_start
+    elif period == "week":
+        current_start = now - timedelta(days=now.weekday())
+        current_start = current_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        previous_start = current_start - timedelta(weeks=1)
+        previous_end = current_start
+    elif period == "month":
+        current_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Previous month
+        if now.month == 1:
+            previous_start = now.replace(year=now.year-1, month=12, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            previous_start = now.replace(month=now.month-1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        previous_end = current_start
+    elif period == "year":
+        current_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        previous_start = now.replace(year=now.year-1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        previous_end = current_start
+    else:
+        current_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        previous_start = current_start - timedelta(days=1)
+        previous_end = current_start
+    
+    # Get current period transactions
+    current_transactions = await db.transactions.find({
+        "merchant_id": merchant_id,
+        "created_at": {"$gte": current_start.isoformat()}
+    }, {"_id": 0}).to_list(10000)
+    
+    # Get previous period transactions
+    previous_transactions = await db.transactions.find({
+        "merchant_id": merchant_id,
+        "created_at": {
+            "$gte": previous_start.isoformat(),
+            "$lt": previous_end.isoformat()
+        }
+    }, {"_id": 0}).to_list(10000)
+    
+    # Calculate current stats
+    current_volume = sum(t.get("amount", 0) for t in current_transactions)
+    current_cashback = sum(t.get("cashback_amount", 0) for t in current_transactions)
+    current_count = len(current_transactions)
+    
+    # Calculate previous stats
+    previous_volume = sum(t.get("amount", 0) for t in previous_transactions)
+    previous_cashback = sum(t.get("cashback_amount", 0) for t in previous_transactions)
+    previous_count = len(previous_transactions)
+    
+    # Calculate growth percentages
+    def calc_growth(current, previous):
+        if previous == 0:
+            return 100 if current > 0 else 0
+        return round(((current - previous) / previous) * 100, 1)
+    
+    volume_growth = calc_growth(current_volume, previous_volume)
+    cashback_growth = calc_growth(current_cashback, previous_cashback)
+    count_growth = calc_growth(current_count, previous_count)
+    
+    # Calculate average transaction
+    avg_transaction = current_volume / current_count if current_count > 0 else 0
+    prev_avg = previous_volume / previous_count if previous_count > 0 else 0
+    avg_growth = calc_growth(avg_transaction, prev_avg)
+    
+    return {
+        "period": period,
+        "period_label": {
+            "day": "Aujourd'hui",
+            "week": "Cette semaine",
+            "month": "Ce mois",
+            "year": "Cette année"
+        }.get(period, "Aujourd'hui"),
+        "current": {
+            "volume": round(current_volume, 2),
+            "cashback": round(current_cashback, 2),
+            "transactions": current_count,
+            "average_transaction": round(avg_transaction, 2)
+        },
+        "previous": {
+            "volume": round(previous_volume, 2),
+            "cashback": round(previous_cashback, 2),
+            "transactions": previous_count,
+            "average_transaction": round(prev_avg, 2)
+        },
+        "growth": {
+            "volume": volume_growth,
+            "cashback": cashback_growth,
+            "transactions": count_growth,
+            "average_transaction": avg_growth
+        },
+        "period_start": current_start.isoformat(),
+        "period_end": now.isoformat()
+    }
+
+
+@router.get("/dashboard/summary")
+async def get_merchant_summary(current_merchant: dict = Depends(get_current_merchant)):
+    """Get merchant accounting summary (mini comptabilité)"""
+    merchant_id = current_merchant["id"]
+    now = datetime.now(timezone.utc)
+    
+    # Get all-time totals from merchant document
+    total_volume = current_merchant.get("total_volume", 0)
+    total_transactions = current_merchant.get("total_transactions", 0)
+    total_cashback = current_merchant.get("total_cashback_given", 0)
+    
+    # Calculate average
+    avg_transaction = total_volume / total_transactions if total_transactions > 0 else 0
+    
+    # Get stats by period
+    periods = {
+        "day": now.replace(hour=0, minute=0, second=0, microsecond=0),
+        "week": (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0),
+        "month": now.replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+        "year": now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    }
+    
+    period_stats = {}
+    for period_name, start_date in periods.items():
+        transactions = await db.transactions.find({
+            "merchant_id": merchant_id,
+            "created_at": {"$gte": start_date.isoformat()}
+        }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(10000)
+        
+        volume = sum(t.get("amount", 0) for t in transactions)
+        cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+        
+        period_stats[period_name] = {
+            "volume": round(volume, 2),
+            "cashback": round(cashback, 2),
+            "transactions": len(transactions)
+        }
+    
+    # Get unique clients served (count unique client_ids)
+    pipeline = [
+        {"$match": {"merchant_id": merchant_id}},
+        {"$group": {"_id": "$client_id"}},
+        {"$count": "unique_clients"}
+    ]
+    result = await db.transactions.aggregate(pipeline).to_list(1)
+    unique_clients = result[0]["unique_clients"] if result else 0
+    
+    return {
+        "all_time": {
+            "total_volume": round(total_volume, 2),
+            "total_cashback": round(total_cashback, 2),
+            "total_transactions": total_transactions,
+            "average_transaction": round(avg_transaction, 2),
+            "unique_clients": unique_clients
+        },
+        "by_period": period_stats,
+        "cashback_rate": current_merchant.get("cashback_rate", 5),
+        "member_since": current_merchant.get("created_at")
+    }
+
+
+@router.get("/dashboard/chart-data")
+async def get_chart_data(
+    chart_type: str = "daily",  # daily, weekly, monthly
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get chart data for sales and cashback evolution"""
+    merchant_id = current_merchant["id"]
+    now = datetime.now(timezone.utc)
+    
+    data_points = []
+    
+    if chart_type == "daily":
+        # Last 7 days
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            
+            transactions = await db.transactions.find({
+                "merchant_id": merchant_id,
+                "created_at": {
+                    "$gte": day_start.isoformat(),
+                    "$lt": day_end.isoformat()
+                }
+            }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(1000)
+            
+            volume = sum(t.get("amount", 0) for t in transactions)
+            cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+            
+            data_points.append({
+                "label": day.strftime("%a"),  # Mon, Tue, etc.
+                "date": day_start.isoformat(),
+                "volume": round(volume, 2),
+                "cashback": round(cashback, 2),
+                "transactions": len(transactions)
+            })
+    
+    elif chart_type == "weekly":
+        # Last 4 weeks
+        for i in range(3, -1, -1):
+            week_start = now - timedelta(weeks=i, days=now.weekday())
+            week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_end = week_start + timedelta(weeks=1)
+            
+            transactions = await db.transactions.find({
+                "merchant_id": merchant_id,
+                "created_at": {
+                    "$gte": week_start.isoformat(),
+                    "$lt": week_end.isoformat()
+                }
+            }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(5000)
+            
+            volume = sum(t.get("amount", 0) for t in transactions)
+            cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+            
+            data_points.append({
+                "label": f"S{week_start.isocalendar()[1]}",  # Week number
+                "date": week_start.isoformat(),
+                "volume": round(volume, 2),
+                "cashback": round(cashback, 2),
+                "transactions": len(transactions)
+            })
+    
+    elif chart_type == "monthly":
+        # Last 6 months
+        for i in range(5, -1, -1):
+            month = now.month - i
+            year = now.year
+            if month <= 0:
+                month += 12
+                year -= 1
+            
+            month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+            if month == 12:
+                month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+            
+            transactions = await db.transactions.find({
+                "merchant_id": merchant_id,
+                "created_at": {
+                    "$gte": month_start.isoformat(),
+                    "$lt": month_end.isoformat()
+                }
+            }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(10000)
+            
+            volume = sum(t.get("amount", 0) for t in transactions)
+            cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+            
+            data_points.append({
+                "label": month_start.strftime("%b"),  # Jan, Feb, etc.
+                "date": month_start.isoformat(),
+                "volume": round(volume, 2),
+                "cashback": round(cashback, 2),
+                "transactions": len(transactions)
+            })
+    
+    return {
+        "chart_type": chart_type,
+        "data": data_points,
+        "totals": {
+            "volume": sum(p["volume"] for p in data_points),
+            "cashback": sum(p["cashback"] for p in data_points),
+            "transactions": sum(p["transactions"] for p in data_points)
+        }
+    }
+
+
 # ============== SETTINGS ==============
 
 @router.get("/settings")
