@@ -19,6 +19,9 @@ from passlib.context import CryptContext
 # Load environment variables
 load_dotenv()
 
+# Password/PIN hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
