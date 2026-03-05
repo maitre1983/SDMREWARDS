@@ -7,6 +7,42 @@
 
 ## CHANGELOG
 
+### March 5, 2026 - Card Validity System Implementation ✅
+
+**Calcul Automatique de Validité:**
+- Date d'activation (card_purchased_at) stockée à l'achat
+- Date d'expiration (card_expires_at) calculée: start_date + duration_days
+- Durée en jours (card_duration_days) stockée pour référence
+
+**Endpoints Client:**
+- `GET /api/clients/cards/my-card` - Retourne validity avec:
+  - is_active, is_expired
+  - start_date, end_date (format DD/MM/YYYY)
+  - days_remaining, days_used
+  - duration_days
+- `GET /api/clients/cards/status` - Résumé rapide avec message
+
+**Renouvellement:**
+- Client peut racheter une carte si l'ancienne est expirée
+- Message d'avertissement si carte expire dans 30 jours
+
+**Dashboard Client (Frontend):**
+- Section "Ma Carte" avec informations complètes:
+  - Badge statut: "Carte active" (vert) / "Expire dans X jours" (orange) / "Carte expirée" (rouge)
+  - Jours restants affiché en gras
+  - Dates activation/expiration
+  - Barre de progression (jours utilisés / total)
+  - Bouton "Renouveler" si expiré
+
+**Synchronisation Globale:**
+- Landing page: durées chargées via /api/public/card-types
+- Admin Dashboard: card_validity inclus dans détails client
+- Cartes disponibles: duration_days et duration_label pour chaque carte
+
+**Tests:** 100% réussite (12/12 backend, frontend complet)
+
+---
+
 ### March 5, 2026 - Admin Dashboard Financial & Card Enhancements ✅
 
 **1. Commissions SDM sur Cashback (Overview):**
