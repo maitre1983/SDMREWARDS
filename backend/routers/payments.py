@@ -939,11 +939,13 @@ async def process_merchant_payment(payment: Dict):
 
 
 async def process_card_upgrade(payment: Dict):
-    """Process completed card upgrade - upgrade client's card"""
+    """Process completed card upgrade - upgrade client's card and credit welcome bonus"""
     client_id = payment["client_id"]
     from_card = payment.get("from_card_type", "silver")
     to_card = payment.get("to_card_type", "gold")
     new_duration_days = payment.get("new_duration_days", 365)
+    welcome_bonus = payment.get("welcome_bonus", 0)
+    cashback_used = payment.get("cashback_used", 0)
     
     # Get client
     client = await db.clients.find_one({"id": client_id}, {"_id": 0})
@@ -956,17 +958,28 @@ async def process_card_upgrade(payment: Dict):
     # Calculate new expiration (extend from now + new duration)
     new_expires_at = now + timedelta(days=new_duration_days)
     
-    # Update client card type
+    # Get welcome bonus from config if not in payment
+    if welcome_bonus == 0:
+        config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+        if config:
+            welcome_bonuses = config.get("welcome_bonuses", {})
+            default_bonuses = {"silver": 1.0, "gold": 2.0, "platinum": 3.0}
+            welcome_bonus = welcome_bonuses.get(to_card, default_bonuses.get(to_card, 1.0))
+    
+    # Update client card type and add welcome bonus
+    update_data = {
+        "card_type": to_card,
+        "card_purchased_at": now.isoformat(),
+        "card_expires_at": new_expires_at.isoformat(),
+        "card_duration_days": new_duration_days,
+        "updated_at": now.isoformat()
+    }
+    
     await db.clients.update_one(
         {"id": client_id},
         {
-            "$set": {
-                "card_type": to_card,
-                "card_purchased_at": now.isoformat(),
-                "card_expires_at": new_expires_at.isoformat(),
-                "card_duration_days": new_duration_days,
-                "updated_at": now.isoformat()
-            }
+            "$set": update_data,
+            "$inc": {"cashback_balance": welcome_bonus}
         }
     )
     
@@ -979,34 +992,53 @@ async def process_card_upgrade(payment: Dict):
                 "expires_at": new_expires_at.isoformat(),
                 "upgraded_at": now.isoformat(),
                 "upgraded_from": from_card,
-                "upgrade_amount": payment["amount"]
+                "upgrade_amount": payment["amount"],
+                "welcome_bonus_credited": welcome_bonus
             }
         }
     )
     
-    # Record transaction
+    # Record upgrade transaction
     await db.transactions.insert_one({
         "id": str(uuid.uuid4()),
         "type": "card_upgrade",
         "client_id": client_id,
         "amount": payment["amount"],
-        "description": f"Mise à niveau {from_card.upper()} → {to_card.upper()}",
-        "payment_method": "momo",
+        "description": f"Upgrade {from_card.upper()} → {to_card.upper()}",
+        "payment_method": "momo" if payment.get("momo_amount", 0) > 0 else "cashback",
         "payment_reference": payment.get("reference", payment["id"]),
         "status": "completed",
         "metadata": {
             "from_card": from_card,
             "to_card": to_card,
-            "new_duration_days": new_duration_days
+            "new_duration_days": new_duration_days,
+            "cashback_used": cashback_used,
+            "momo_amount": payment.get("momo_amount", payment["amount"])
         },
         "created_at": now.isoformat()
     })
+    
+    # Record welcome bonus transaction
+    if welcome_bonus > 0:
+        await db.transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "welcome_bonus",
+            "client_id": client_id,
+            "amount": welcome_bonus,
+            "description": f"Welcome bonus for {to_card.upper()} upgrade",
+            "status": "completed",
+            "metadata": {
+                "card_type": to_card,
+                "upgrade_from": from_card
+            },
+            "created_at": now.isoformat()
+        })
     
     # Send SMS notification
     try:
         if client.get("phone"):
             sms = get_sms()
-            message = f"Congratulations! Your SDM card has been upgraded to {to_card.upper()}. Your new card is valid for {new_duration_days} days."
+            message = f"Congratulations! Your SDM card has been upgraded to {to_card.upper()}. Welcome bonus of GHS {welcome_bonus:.2f} credited. Card valid for {new_duration_days} days."
             await sms.send_raw_sms(client["phone"], message)
     except Exception as e:
         logger.error(f"Card upgrade SMS error: {e}")

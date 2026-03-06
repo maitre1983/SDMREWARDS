@@ -98,6 +98,9 @@ export default function ClientDashboard() {
   const [upgradeStatus, setUpgradeStatus] = useState(null);
   const [upgradePaymentId, setUpgradePaymentId] = useState(null);
   const [isUpgradeTestMode, setIsUpgradeTestMode] = useState(false);
+  const [useUpgradeCashback, setUseUpgradeCashback] = useState(false);
+  const [upgradeCashbackAmount, setUpgradeCashbackAmount] = useState('');
+  const [upgradeWelcomeBonus, setUpgradeWelcomeBonus] = useState(0);
   
   // Services page
   const [showServices, setShowServices] = useState(false);
@@ -626,19 +629,16 @@ export default function ClientDashboard() {
     const cardOrder = ['silver', 'gold', 'platinum', 'diamond', 'business'];
     const currentIndex = cardOrder.indexOf(client.card_type);
     
-    // Get current card price
-    const currentCard = availableCards.find(c => c.type === client.card_type);
-    const currentPrice = currentCard?.price || 0;
-    
-    // Filter cards that are higher tier and calculate difference
+    // Filter cards that are higher tier - client pays FULL PRICE
     return availableCards
       .filter(card => {
         const cardIndex = cardOrder.indexOf(card.type);
-        return cardIndex > currentIndex && card.price > currentPrice;
+        return cardIndex > currentIndex;
       })
       .map(card => ({
         ...card,
-        priceDifference: card.price - currentPrice
+        fullPrice: card.price,  // Full price to pay
+        welcomeBonus: card.welcome_bonus || (card.type === 'silver' ? 1 : card.type === 'gold' ? 2 : card.type === 'platinum' ? 3 : 1)
       }))
       .sort((a, b) => a.price - b.price);
   };
@@ -648,12 +648,42 @@ export default function ClientDashboard() {
     setUpgradePaymentPhone(client?.phone || '');
     setUpgradeStatus(null);
     setUpgradePaymentId(null);
+    setUseUpgradeCashback(false);
+    setUpgradeCashbackAmount('');
+    setUpgradeWelcomeBonus(card.welcomeBonus || 0);
     setShowUpgradeModal(true);
   };
 
+  const calculateUpgradePayment = () => {
+    if (!selectedUpgradeCard) return { cashback: 0, momo: 0, total: 0 };
+    
+    const total = selectedUpgradeCard.fullPrice;
+    const maxCashback = client?.cashback_balance || 0;
+    
+    let cashbackToUse = 0;
+    if (useUpgradeCashback) {
+      if (upgradeCashbackAmount && parseFloat(upgradeCashbackAmount) > 0) {
+        cashbackToUse = Math.min(parseFloat(upgradeCashbackAmount), maxCashback, total);
+      } else {
+        cashbackToUse = Math.min(maxCashback, total);
+      }
+    }
+    
+    const momoAmount = total - cashbackToUse;
+    
+    return {
+      cashback: cashbackToUse,
+      momo: momoAmount,
+      total: total
+    };
+  };
+
   const initiateUpgrade = async () => {
-    if (!upgradePaymentPhone || upgradePaymentPhone.length < 10) {
-      toast.error('Please enter a valid phone number');
+    const payment = calculateUpgradePayment();
+    
+    // Validate phone if MoMo payment needed
+    if (payment.momo > 0 && (!upgradePaymentPhone || upgradePaymentPhone.length < 10)) {
+      toast.error('Please enter a valid phone number for MoMo payment');
       return;
     }
     
@@ -664,20 +694,34 @@ export default function ClientDashboard() {
       const headers = { Authorization: `Bearer ${token}` };
       const res = await axios.post(`${API_URL}/api/clients/cards/upgrade`, {
         new_card_type: selectedUpgradeCard.type,
-        payment_phone: upgradePaymentPhone
+        payment_phone: upgradePaymentPhone || null,
+        use_cashback: useUpgradeCashback,
+        cashback_amount: useUpgradeCashback ? (upgradeCashbackAmount ? parseFloat(upgradeCashbackAmount) : null) : null
       }, { headers });
       
       if (res.data.success) {
         setUpgradePaymentId(res.data.payment_id);
-        setUpgradeStatus('pending');
-        setIsUpgradeTestMode(res.data.test_mode || false);
+        setUpgradeWelcomeBonus(res.data.welcome_bonus || 0);
         
-        if (res.data.test_mode) {
-          toast.info('Test mode: Click "Confirm" to simulate payment');
+        // If fully paid with cashback
+        if (res.data.status === 'completed') {
+          setUpgradeStatus('success');
+          toast.success(res.data.message || 'Upgrade successful!');
+          setTimeout(() => {
+            setShowUpgradeModal(false);
+            fetchDashboardData();
+          }, 2000);
         } else {
-          toast.success('MoMo prompt sent! Approve on your phone.');
-          // Start polling for upgrade payment status
-          startPolling(res.data.payment_id);
+          // MoMo payment needed
+          setIsUpgradeTestMode(res.data.test_mode || false);
+          setUpgradeStatus('pending');
+          
+          if (res.data.test_mode) {
+            toast.info('Test mode: Click "Confirm" to simulate payment');
+          } else {
+            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount}! Approve on your phone.`);
+            startPolling(res.data.payment_id);
+          }
         }
       }
     } catch (error) {
@@ -716,6 +760,9 @@ export default function ClientDashboard() {
     setUpgradeStatus(null);
     setUpgradePaymentId(null);
     setUpgradePaymentPhone('');
+    setUseUpgradeCashback(false);
+    setUpgradeCashbackAmount('');
+    setUpgradeWelcomeBonus(0);
   };
 
   const handleLogout = () => {
@@ -1015,12 +1062,12 @@ export default function ClientDashboard() {
                             </div>
                             <div className="text-left">
                               <p className="text-white font-medium text-sm">{upgradeCard.name}</p>
-                              <p className="text-slate-400 text-xs">{upgradeCard.duration_label}</p>
+                              <p className="text-emerald-400 text-xs">+GHS {upgradeCard.welcomeBonus} bonus</p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-amber-400 font-bold">+GHS {upgradeCard.priceDifference}</p>
-                            <p className="text-slate-500 text-xs">difference</p>
+                            <p className="text-amber-400 font-bold">GHS {upgradeCard.fullPrice}</p>
+                            <p className="text-slate-500 text-xs">full price</p>
                           </div>
                         </button>
                       ))}
@@ -1872,7 +1919,7 @@ export default function ClientDashboard() {
             ) : (
               <>
                 {/* Upgrade Details */}
-                <div className="bg-slate-900 rounded-xl p-4 mb-6">
+                <div className="bg-slate-900 rounded-xl p-4 mb-4">
                   <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
                     <span className="text-slate-400">Current card</span>
                     <span className="text-white font-medium">{client?.card_type?.toUpperCase()}</span>
@@ -1891,44 +1938,142 @@ export default function ClientDashboard() {
                     <span className="text-slate-400">Validity</span>
                     <span className="text-white">{selectedUpgradeCard.duration_label}</span>
                   </div>
+                  <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-700">
+                    <span className="text-slate-400">Welcome Bonus</span>
+                    <span className="text-emerald-400 font-semibold">+GHS {selectedUpgradeCard.welcomeBonus}</span>
+                  </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400 font-medium">To pay (difference)</span>
-                    <span className="text-amber-400 text-xl font-bold">GHS {selectedUpgradeCard.priceDifference}</span>
+                    <span className="text-slate-400 font-medium">Price</span>
+                    <span className="text-amber-400 text-xl font-bold">GHS {selectedUpgradeCard.fullPrice}</span>
                   </div>
                 </div>
 
-                {/* Phone Input */}
-                <div className="mb-6">
-                  <label className="text-slate-300 text-sm block mb-2">
-                    MoMo Number
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <Input
-                      type="tel"
-                      placeholder="+233 XX XXX XXXX"
-                      value={upgradePaymentPhone}
-                      onChange={(e) => setUpgradePaymentPhone(e.target.value)}
-                      className="pl-10 bg-slate-900 border-slate-700 text-white"
-                      data-testid="upgrade-momo-phone"
-                    />
+                {/* Cashback Payment Option */}
+                {client?.cashback_balance > 0 && (
+                  <div className="bg-slate-900 rounded-xl p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Wallet className="text-emerald-400" size={18} />
+                        <span className="text-white font-medium">Use Cashback</span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={useUpgradeCashback}
+                          onChange={(e) => {
+                            setUseUpgradeCashback(e.target.checked);
+                            if (!e.target.checked) setUpgradeCashbackAmount('');
+                          }}
+                          className="sr-only peer"
+                          data-testid="use-cashback-toggle"
+                        />
+                        <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                      </label>
+                    </div>
+                    
+                    <p className="text-slate-400 text-sm mb-2">
+                      Available: <span className="text-emerald-400 font-semibold">GHS {client?.cashback_balance?.toFixed(2)}</span>
+                    </p>
+                    
+                    {useUpgradeCashback && (
+                      <div className="mt-3">
+                        <label className="text-slate-400 text-xs block mb-1">
+                          Amount to use (leave empty to use max)
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder={`Max: ${Math.min(client?.cashback_balance, selectedUpgradeCard.fullPrice).toFixed(2)}`}
+                          value={upgradeCashbackAmount}
+                          onChange={(e) => setUpgradeCashbackAmount(e.target.value)}
+                          max={Math.min(client?.cashback_balance, selectedUpgradeCard.fullPrice)}
+                          className="bg-slate-800 border-slate-700 text-white"
+                          data-testid="cashback-amount-input"
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+
+                {/* Payment Summary */}
+                {(() => {
+                  const payment = calculateUpgradePayment();
+                  return (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-4">
+                      <p className="text-amber-400 font-medium mb-2">Payment Summary</p>
+                      <div className="space-y-1 text-sm">
+                        {payment.cashback > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Cashback</span>
+                            <span className="text-emerald-400">-GHS {payment.cashback.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {payment.momo > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">MoMo Payment</span>
+                            <span className="text-white">GHS {payment.momo.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between pt-2 border-t border-amber-500/30">
+                          <span className="text-white font-medium">Total</span>
+                          <span className="text-amber-400 font-bold">GHS {payment.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Phone Input - Only show if MoMo payment needed */}
+                {(() => {
+                  const payment = calculateUpgradePayment();
+                  if (payment.momo > 0) {
+                    return (
+                      <div className="mb-4">
+                        <label className="text-slate-300 text-sm block mb-2">
+                          MoMo Number
+                        </label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                          <Input
+                            type="tel"
+                            placeholder="+233 XX XXX XXXX"
+                            value={upgradePaymentPhone}
+                            onChange={(e) => setUpgradePaymentPhone(e.target.value)}
+                            className="pl-10 bg-slate-900 border-slate-700 text-white"
+                            data-testid="upgrade-momo-phone"
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 
                 {/* Pay Button */}
-                <Button
-                  onClick={initiateUpgrade}
-                  disabled={isProcessingPayment || !upgradePaymentPhone}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 py-6"
-                  data-testid="initiate-upgrade-btn"
-                >
-                  {isProcessingPayment ? (
-                    <Loader2 className="animate-spin mr-2" size={18} />
-                  ) : (
-                    <Crown className="mr-2" size={18} />
-                  )}
-                  Pay GHS {selectedUpgradeCard.priceDifference} and Upgrade
-                </Button>
+                {(() => {
+                  const payment = calculateUpgradePayment();
+                  const buttonDisabled = isProcessingPayment || (payment.momo > 0 && !upgradePaymentPhone);
+                  const buttonText = payment.momo === 0 
+                    ? `Upgrade with Cashback (GHS ${payment.cashback.toFixed(2)})`
+                    : payment.cashback > 0 
+                      ? `Pay GHS ${payment.momo.toFixed(2)} and Upgrade`
+                      : `Pay GHS ${payment.total.toFixed(2)} and Upgrade`;
+                  
+                  return (
+                    <Button
+                      onClick={initiateUpgrade}
+                      disabled={buttonDisabled}
+                      className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 py-6"
+                      data-testid="initiate-upgrade-btn"
+                    >
+                      {isProcessingPayment ? (
+                        <Loader2 className="animate-spin mr-2" size={18} />
+                      ) : (
+                        <Crown className="mr-2" size={18} />
+                      )}
+                      {buttonText}
+                    </Button>
+                  );
+                })()}
               </>
             )}
           </div>

@@ -41,7 +41,9 @@ class PurchaseCardRequest(BaseModel):
 
 class UpgradeCardRequest(BaseModel):
     new_card_type: str
-    payment_phone: str
+    payment_phone: Optional[str] = None  # For MoMo payment
+    use_cashback: bool = False  # Use cashback balance
+    cashback_amount: Optional[float] = None  # Specific cashback amount to use
 
 
 # ============== DASHBOARD ==============
@@ -444,7 +446,20 @@ async def upgrade_card(
     request: UpgradeCardRequest,
     current_client: dict = Depends(get_current_client)
 ):
-    """Upgrade membership card (pay difference only)"""
+    """
+    Upgrade membership card to a higher tier.
+    
+    Payment options:
+    - Full MoMo payment (payment_phone required)
+    - Full cashback payment (use_cashback=True)
+    - Combination: cashback_amount + MoMo for remainder
+    
+    The client pays the FULL PRICE of the new card (not the difference).
+    Upon completion:
+    - Card type is upgraded
+    - Welcome bonus for new card is credited
+    - Transaction is recorded
+    """
     client_id = current_client["id"]
     
     # Check if client has an active card
@@ -458,9 +473,12 @@ async def upgrade_card(
     # Check if card is expired
     card_expires_at = current_client.get("card_expires_at")
     if card_expires_at:
-        expiry_date = datetime.fromisoformat(card_expires_at.replace('Z', '+00:00'))
-        if datetime.now(timezone.utc) >= expiry_date:
-            raise HTTPException(status_code=400, detail="Your card is expired. Please renew instead of upgrading")
+        try:
+            expiry_date = datetime.fromisoformat(card_expires_at.replace('Z', '+00:00'))
+            if datetime.now(timezone.utc) >= expiry_date:
+                raise HTTPException(status_code=400, detail="Your card is expired. Please renew instead of upgrading")
+        except ValueError:
+            pass
     
     # Define card hierarchy
     card_order = ['silver', 'gold', 'platinum', 'diamond', 'business']
@@ -471,20 +489,17 @@ async def upgrade_card(
         # Check custom card types
         custom_card = await db.card_types.find_one({"slug": request.new_card_type, "is_active": True})
         if not custom_card:
-            raise HTTPException(status_code=400, detail="Type de carte invalide")
+            raise HTTPException(status_code=400, detail="Invalid card type")
     
     if new_index != -1 and new_index <= current_index:
-        raise HTTPException(status_code=400, detail="Vous ne pouvez mettre à niveau que vers une carte supérieure")
+        raise HTTPException(status_code=400, detail="You can only upgrade to a higher tier card")
     
-    # Get prices from config
+    # Get prices and bonuses from config
     config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
     cards = config.get("cards", {}) if config else {}
+    welcome_bonuses = config.get("welcome_bonuses", {}) if config else {}
     
-    # Get current card price
-    current_card_info = cards.get(current_card_type, {})
-    current_price = current_card_info.get("price", 25)
-    
-    # Get new card price and duration
+    # Get new card price and duration (client pays FULL price)
     new_card_info = cards.get(request.new_card_type, {})
     new_price = new_card_info.get("price", 50)
     new_duration_days = new_card_info.get("duration_days", 365)
@@ -496,16 +511,41 @@ async def upgrade_card(
             new_price = custom_card.get("price", 50)
             new_duration_days = custom_card.get("duration_days", 365)
     
-    # Calculate price difference
-    price_difference = new_price - current_price
-    if price_difference <= 0:
-        raise HTTPException(status_code=400, detail="Upgrade to this card is not possible")
+    # Get welcome bonus for new card
+    default_bonuses = {"silver": 1.0, "gold": 2.0, "platinum": 3.0}
+    welcome_bonus = welcome_bonuses.get(request.new_card_type, default_bonuses.get(request.new_card_type, 1.0))
     
-    # Create payment record for upgrade
+    # Calculate payment breakdown
+    cashback_balance = current_client.get("cashback_balance", 0)
+    cashback_to_use = 0
+    momo_amount = new_price
+    
+    if request.use_cashback:
+        if request.cashback_amount is not None:
+            # Use specific amount
+            cashback_to_use = min(request.cashback_amount, cashback_balance, new_price)
+        else:
+            # Use full balance up to price
+            cashback_to_use = min(cashback_balance, new_price)
+        
+        momo_amount = new_price - cashback_to_use
+    
+    # Validate payment method
+    if momo_amount > 0 and not request.payment_phone:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"MoMo phone number required. Remaining amount to pay: GHS {momo_amount:.2f}"
+        )
+    
+    if cashback_to_use > cashback_balance:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient cashback balance. Available: GHS {cashback_balance:.2f}"
+        )
+    
+    # Create payment record
     payment_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
-    
-    # Check if test mode
     test_mode = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
     
     payment_record = {
@@ -514,7 +554,10 @@ async def upgrade_card(
         "client_id": client_id,
         "from_card_type": current_card_type,
         "to_card_type": request.new_card_type,
-        "amount": price_difference,
+        "amount": new_price,  # Full price
+        "cashback_used": cashback_to_use,
+        "momo_amount": momo_amount,
+        "welcome_bonus": welcome_bonus,
         "payment_phone": request.payment_phone,
         "status": "pending",
         "new_duration_days": new_duration_days,
@@ -525,14 +568,142 @@ async def upgrade_card(
     
     await db.momo_payments.insert_one(payment_record)
     
+    # If paying fully with cashback (no MoMo needed)
+    if momo_amount == 0:
+        # Deduct cashback immediately
+        await db.clients.update_one(
+            {"id": client_id},
+            {"$inc": {"cashback_balance": -cashback_to_use}}
+        )
+        
+        # Record cashback deduction transaction
+        await db.transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "upgrade_payment",
+            "client_id": client_id,
+            "amount": -cashback_to_use,
+            "description": f"Card upgrade payment ({current_card_type.upper()} → {request.new_card_type.upper()})",
+            "status": "completed",
+            "created_at": now.isoformat()
+        })
+        
+        # Process upgrade immediately
+        from routers.payments import complete_payment
+        await complete_payment(payment_id)
+        
+        return {
+            "success": True,
+            "payment_id": payment_id,
+            "amount": new_price,
+            "cashback_used": cashback_to_use,
+            "momo_amount": 0,
+            "from_card": current_card_type,
+            "to_card": request.new_card_type,
+            "welcome_bonus": welcome_bonus,
+            "status": "completed",
+            "message": f"Upgrade completed using GHS {cashback_to_use:.2f} cashback. Welcome bonus of GHS {welcome_bonus:.2f} credited!"
+        }
+    
+    # If cashback is used partially, deduct it now
+    if cashback_to_use > 0:
+        await db.clients.update_one(
+            {"id": client_id},
+            {"$inc": {"cashback_balance": -cashback_to_use}}
+        )
+        
+        # Record partial cashback payment
+        await db.transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "upgrade_payment_partial",
+            "client_id": client_id,
+            "amount": -cashback_to_use,
+            "description": f"Partial upgrade payment (cashback) - {current_card_type.upper()} → {request.new_card_type.upper()}",
+            "status": "completed",
+            "created_at": now.isoformat()
+        })
+    
+    # Initiate MoMo payment for remaining amount
+    if not test_mode:
+        # Call BulkClix API for MoMo payment
+        import httpx
+        BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")
+        BULKCLIX_BASE_URL = os.environ.get("BULKCLIX_BASE_URL", "https://api.bulkclix.com/api/v1")
+        CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "")
+        
+        try:
+            # Format phone for BulkClix
+            bulkclix_phone = request.payment_phone
+            if request.payment_phone.startswith("+233"):
+                bulkclix_phone = "0" + request.payment_phone[4:]
+            elif request.payment_phone.startswith("233"):
+                bulkclix_phone = "0" + request.payment_phone[3:]
+            
+            # Detect network
+            from routers.payments import detect_network
+            network = detect_network(request.payment_phone)
+            
+            async with httpx.AsyncClient(follow_redirects=True) as http_client:
+                payload = {
+                    "amount": momo_amount,
+                    "phone_number": bulkclix_phone,
+                    "network": network.upper() if network else "MTN",
+                    "transaction_id": payment_record["reference"],
+                    "reference": "SDM REWARDS UPGRADE",
+                    "callback_url": f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else "https://sdmrewards.com/api/payments/callback"
+                }
+                
+                response = await http_client.post(
+                    f"{BULKCLIX_BASE_URL}/payment-api/momopay",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "x-api-key": BULKCLIX_API_KEY
+                    },
+                    json=payload,
+                    timeout=30.0
+                )
+                
+                result = response.json() if response.text else {}
+                
+                if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
+                    payment_data = result.get("data", {})
+                    await db.momo_payments.update_one(
+                        {"id": payment_id},
+                        {"$set": {
+                            "status": "processing",
+                            "provider_reference": payment_data.get("ext_transaction_id"),
+                            "provider_message": result.get("message")
+                        }}
+                    )
+                else:
+                    # Refund cashback if MoMo initiation failed
+                    if cashback_to_use > 0:
+                        await db.clients.update_one(
+                            {"id": client_id},
+                            {"$inc": {"cashback_balance": cashback_to_use}}
+                        )
+                    raise HTTPException(status_code=400, detail=result.get("message", "Payment initiation failed"))
+                    
+        except httpx.RequestError:
+            # Refund cashback if network error
+            if cashback_to_use > 0:
+                await db.clients.update_one(
+                    {"id": client_id},
+                    {"$inc": {"cashback_balance": cashback_to_use}}
+                )
+            raise HTTPException(status_code=503, detail="Payment service temporarily unavailable")
+    
     return {
         "success": True,
         "payment_id": payment_id,
-        "amount": price_difference,
+        "amount": new_price,
+        "cashback_used": cashback_to_use,
+        "momo_amount": momo_amount,
         "from_card": current_card_type,
         "to_card": request.new_card_type,
+        "welcome_bonus": welcome_bonus,
         "test_mode": test_mode,
-        "message": f"Payment of GHS {price_difference} required for upgrade"
+        "message": f"MoMo payment of GHS {momo_amount:.2f} required for upgrade" + (f" (GHS {cashback_to_use:.2f} paid with cashback)" if cashback_to_use > 0 else "")
     }
 
 

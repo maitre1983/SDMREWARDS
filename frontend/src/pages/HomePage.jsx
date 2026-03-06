@@ -130,7 +130,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
-      {/* SEO Meta Tags would be in index.html */}
       
       {/* ============== NAVIGATION ============== */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
