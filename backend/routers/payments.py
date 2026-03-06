@@ -342,14 +342,83 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
             "message": f"Payment initiated. Use /api/payments/test/confirm/{payment_record['id']} to complete."
         }
     
-    # Production: Call BulkClix (similar to card payment)
-    # ... same API call logic as above
-    return {
-        "success": True,
-        "payment_id": payment_record["id"],
-        "reference": payment_ref,
-        "status": "processing"
-    }
+    # Production: Call BulkClix MoMo API
+    callback_url = f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else None
+    
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
+            # Format phone for BulkClix (0XXXXXXXXX format)
+            bulkclix_phone = request.client_phone
+            if request.client_phone.startswith("+233"):
+                bulkclix_phone = "0" + request.client_phone[4:]
+            elif request.client_phone.startswith("233"):
+                bulkclix_phone = "0" + request.client_phone[3:]
+            
+            payload = {
+                "amount": request.amount,
+                "phone_number": bulkclix_phone,
+                "network": network.upper(),
+                "transaction_id": payment_ref,
+                "reference": "SDM REWARDS",
+                "callback_url": callback_url or "https://sdmrewards.com/api/payments/callback"
+            }
+            
+            response = await http_client.post(
+                f"{BULKCLIX_BASE_URL}/payment-api/momopay",
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "x-api-key": BULKCLIX_API_KEY
+                },
+                json=payload,
+                timeout=30.0
+            )
+            
+            logger.info(f"BulkClix merchant payment response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
+            
+            result = response.json() if response.text else {}
+            
+            # BulkClix returns "Payment Initiated Successful" on success
+            if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
+                payment_data = result.get("data", {})
+                await db.momo_payments.update_one(
+                    {"id": payment_record["id"]},
+                    {
+                        "$set": {
+                            "status": "processing",
+                            "provider_reference": payment_data.get("ext_transaction_id"),
+                            "provider_message": result.get("message"),
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }
+                    }
+                )
+                
+                return {
+                    "success": True,
+                    "payment_id": payment_record["id"],
+                    "reference": payment_ref,
+                    "amount": request.amount,
+                    "merchant": merchant["business_name"],
+                    "expected_cashback": expected_cashback,
+                    "status": "processing",
+                    "test_mode": False,
+                    "message": "Please approve the MoMo prompt on your phone"
+                }
+            else:
+                # Payment initiation failed
+                await db.momo_payments.update_one(
+                    {"id": payment_record["id"]},
+                    {"$set": {"status": "failed", "provider_message": result.get("message", "Payment initiation failed")}}
+                )
+                raise HTTPException(status_code=400, detail=result.get("message", "Payment initiation failed"))
+                
+    except httpx.RequestError as e:
+        logger.error(f"BulkClix API error: {e}")
+        await db.momo_payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {"status": "failed", "provider_message": str(e)}}
+        )
+        raise HTTPException(status_code=500, detail="Payment service unavailable")
 
 
 @router.get("/status/{payment_id}")
