@@ -193,13 +193,17 @@ async def initiate_card_payment(request: CardPaymentRequest):
                 f"{BULKCLIX_BASE_URL}/payment-api/momopay",
                 headers={
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
                     "x-api-key": BULKCLIX_API_KEY
                 },
                 json=payload,
                 timeout=30.0
             )
             
-            result = response.json()
+            # Log raw response for debugging
+            logger.info(f"BulkClix raw response: status={response.status_code}, content-type={response.headers.get('content-type')}, body={response.text[:500] if response.text else 'EMPTY'}")
+            
+            result = response.json() if response.text else {}
             logger.info(f"BulkClix card payment response: {result}")
             
             # BulkClix returns "Payment Initiated Successful" message on success
