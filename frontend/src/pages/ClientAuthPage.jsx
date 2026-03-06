@@ -140,8 +140,15 @@ export default function ClientAuthPage() {
       toast.error('Please enter the OTP code');
       return;
     }
+    
+    if (otpCode.length < 6) {
+      toast.error('OTP code must be 6 digits');
+      return;
+    }
 
     setIsLoading(true);
+    toast.loading('Verifying code...', { id: 'otp-verify' });
+    
     try {
       const response = await axios.post(`${API_URL}/api/auth/otp/verify`, {
         phone: normalizePhone(phone),
@@ -149,17 +156,23 @@ export default function ClientAuthPage() {
         request_id: requestId
       });
 
+      toast.dismiss('otp-verify');
       console.log('OTP verification response:', response.data);
-      setOtpVerified(true);
-      toast.success('Phone verified! Completing registration...');
       
-      // Automatically go back to registration form after short delay
-      setTimeout(() => {
-        setMode('register');
-      }, 1500);
+      if (response.data.success) {
+        setOtpVerified(true);
+        toast.success('Phone verified successfully!');
+        
+        // Automatically go back to registration form after short delay
+        setTimeout(() => {
+          setMode('register');
+        }, 1000);
+      }
     } catch (error) {
+      toast.dismiss('otp-verify');
       console.error('OTP verification error:', error.response?.data);
-      toast.error(error.response?.data?.detail || 'Invalid OTP code');
+      const errorMsg = error.response?.data?.detail || 'Invalid OTP code. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }

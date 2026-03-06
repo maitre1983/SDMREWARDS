@@ -135,17 +135,30 @@ export default function MerchantAuthPage() {
     }
 
     setIsLoading(true);
+    toast.loading('Verifying code...', { id: 'otp-verify' });
+    
     try {
-      await axios.post(`${API_URL}/api/auth/otp/verify`, {
+      const response = await axios.post(`${API_URL}/api/auth/otp/verify`, {
         phone: normalizePhone(phone),
         otp_code: otpCode,
         request_id: requestId
       });
 
-      setOtpVerified(true);
-      toast.success('Phone verified!');
+      toast.dismiss('otp-verify');
+      
+      if (response.data.success) {
+        setOtpVerified(true);
+        toast.success('Phone verified successfully!');
+        
+        // Auto redirect to registration form
+        setTimeout(() => {
+          setMode('register');
+        }, 1000);
+      }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid OTP code');
+      toast.dismiss('otp-verify');
+      const errorMsg = error.response?.data?.detail || 'Invalid OTP code. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }

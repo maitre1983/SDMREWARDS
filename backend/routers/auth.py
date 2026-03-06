@@ -307,6 +307,8 @@ async def verify_otp(request: VerifyOTPRequest):
     phone = normalize_phone(request.phone)
     phone_clean = phone.replace("+233", "0")
     
+    logger.info(f"OTP verify attempt: phone={phone}, request_id={request.request_id}")
+    
     # Test mode
     if request.request_id.startswith("TEST_"):
         if request.otp_code == "123456":
@@ -314,15 +316,15 @@ async def verify_otp(request: VerifyOTPRequest):
         else:
             raise HTTPException(status_code=400, detail="Invalid OTP code")
     
-    # Find OTP record
+    # Find OTP record - flexible phone matching
     otp_record = await db.otp_records.find_one({
         "request_id": request.request_id,
-        "phone": phone,
         "verified": False
     })
     
     if not otp_record:
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP request")
+        logger.warning(f"OTP record not found for request_id: {request.request_id}")
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP request. Please request a new code.")
     
     # Check expiry
     expires_at = datetime.fromisoformat(otp_record["expires_at"].replace("Z", "+00:00"))
