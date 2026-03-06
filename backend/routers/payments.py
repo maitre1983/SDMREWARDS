@@ -171,7 +171,7 @@ async def initiate_card_payment(request: CardPaymentRequest):
         # Build callback URL
         callback_url = f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else None
         
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
             # Format phone for BulkClix (0XXXXXXXXX format)
             bulkclix_phone = request.phone
             if request.phone.startswith("+233"):
@@ -201,7 +201,7 @@ async def initiate_card_payment(request: CardPaymentRequest):
             )
             
             # Log raw response for debugging
-            logger.info(f"BulkClix raw response: status={response.status_code}, content-type={response.headers.get('content-type')}, body={response.text[:500] if response.text else 'EMPTY'}")
+            logger.info(f"BulkClix raw response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
             
             result = response.json() if response.text else {}
             logger.info(f"BulkClix card payment response: {result}")
@@ -921,12 +921,13 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
         elif request.phone.startswith("233"):
             bulkclix_phone = "0" + request.phone[3:]
         
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
             response = await http_client.post(
                 f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
                 headers={
                     "x-api-key": BULKCLIX_API_KEY,
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
                 },
                 json={
                     "amount": str(request.amount),

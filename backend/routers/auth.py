@@ -225,12 +225,13 @@ async def send_otp(request: SendOTPRequest):
         }
     
     try:
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
             # Use BulkClix native OTP API
             response = await http_client.post(
                 f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
                 headers={
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
                     "x-api-key": BULKCLIX_API_KEY
                 },
                 json={
@@ -305,11 +306,12 @@ async def verify_otp(request: VerifyOTPRequest):
     
     # Verify via BulkClix API
     try:
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
             response = await http_client.post(
                 f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
                 headers={
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
                     "x-api-key": BULKCLIX_API_KEY
                 },
                 json={
