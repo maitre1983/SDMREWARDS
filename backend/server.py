@@ -242,42 +242,111 @@ async def health_check():
 # ============== PUBLIC CARD TYPES ENDPOINT ==============
 @app.get("/api/public/card-types")
 async def get_public_card_types():
-    """Get all active card types for landing page and client registration"""
+    """
+    Get all active card types for landing page and client registration.
+    This endpoint returns ALL data configured in Admin Dashboard.
+    Auto-synchronized with Admin changes.
+    """
     
     # Get platform config for default cards
     config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
     
     cards = []
     if config:
-        card_prices = config.get("card_prices", {})
+        # Get all card configuration from platform_config
+        card_prices = config.get("card_prices", {"silver": 25, "gold": 50, "platinum": 100})
         card_benefits = config.get("card_benefits", {})
         card_durations = config.get("card_durations", {"silver": 365, "gold": 365, "platinum": 730})
+        welcome_bonuses = config.get("welcome_bonuses", {"silver": 1, "gold": 2, "platinum": 3})
+        card_cashback_rates = config.get("card_cashback_rates", {"silver": 5, "gold": 7, "platinum": 10})
+        card_status = config.get("card_status", {"silver": True, "gold": True, "platinum": True})
+        
+        # Card colors
+        card_colors = {
+            "silver": "#94a3b8",
+            "gold": "#f59e0b", 
+            "platinum": "#6366f1"
+        }
+        
+        # Default benefits if not configured
+        default_benefits = {
+            "silver": [
+                "Access to SDM cashback network",
+                "Up to 10% cashback at partner merchants",
+                "Referral rewards program",
+                "Merchant promotions access",
+                f"Welcome bonus: GHS {welcome_bonuses.get('silver', 1)}"
+            ],
+            "gold": [
+                "Higher cashback opportunities",
+                "Priority access to promotions",
+                "Special birthday bonus",
+                "Premium merchant access",
+                "Enhanced referral visibility",
+                f"Welcome bonus: GHS {welcome_bonuses.get('gold', 2)}"
+            ],
+            "platinum": [
+                "Maximum cashback at all partners",
+                "VIP promotions & exclusive offers",
+                "Priority support",
+                "Exclusive merchant offers",
+                "Higher promotional bonuses",
+                "Special campaign invitations",
+                f"Welcome bonus: GHS {welcome_bonuses.get('platinum', 3)}"
+            ]
+        }
         
         for card_type in ["silver", "gold", "platinum"]:
+            # Skip inactive cards
+            if not card_status.get(card_type, True):
+                continue
+                
             cards.append({
                 "slug": card_type,
-                "name": card_type.capitalize(),
+                "type": card_type,
+                "name": card_type.capitalize() + " Card",
                 "price": card_prices.get(card_type, 0),
                 "duration_days": card_durations.get(card_type, 365),
                 "duration_label": format_duration(card_durations.get(card_type, 365)),
-                "benefits": card_benefits.get(card_type, ""),
-                "color": {"silver": "#94a3b8", "gold": "#f59e0b", "platinum": "#6366f1"}.get(card_type, "#6366f1"),
+                "welcome_bonus": welcome_bonuses.get(card_type, 1),
+                "cashback_rate": card_cashback_rates.get(card_type, 5),
+                "benefits": card_benefits.get(card_type, default_benefits.get(card_type, [])),
+                "color": card_colors.get(card_type, "#6366f1"),
                 "icon": "credit-card",
-                "is_default": True
+                "is_default": True,
+                "is_active": card_status.get(card_type, True)
             })
     
     # Get active custom card types
     custom_cards = await db.card_types.find(
         {"is_active": True},
-        {"_id": 0, "id": 0, "created_at": 0, "updated_at": 0}
+        {"_id": 0, "created_at": 0, "updated_at": 0}
     ).sort("sort_order", 1).to_list(100)
     
     for card in custom_cards:
         card["is_default"] = False
+        card["type"] = card.get("slug", card.get("name", "custom").lower())
         card["duration_label"] = format_duration(card.get("duration_days", 365))
+        if not card.get("welcome_bonus"):
+            card["welcome_bonus"] = 1
+        if not card.get("cashback_rate"):
+            card["cashback_rate"] = 5
     
     all_cards = cards + custom_cards
-    return {"card_types": all_cards}
+    
+    # Also return platform info for landing page
+    platform_info = {
+        "referral_bonus": config.get("referral_bonus", 3) if config else 3,
+        "min_withdrawal": config.get("min_withdrawal", 5) if config else 5,
+        "contact_email": config.get("contact_email", "support@sdmrewards.com") if config else "support@sdmrewards.com",
+        "contact_phone": config.get("contact_phone", "") if config else ""
+    }
+    
+    return {
+        "card_types": all_cards,
+        "platform_info": platform_info,
+        "last_updated": datetime.now(timezone.utc).isoformat()
+    }
 
 
 def format_duration(days: int) -> str:

@@ -124,6 +124,12 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-06)
+- **✅ Admin Dashboard ↔ Landing Page Synchronization:**
+  - Enhanced `/api/public/card-types` endpoint with complete card data
+  - Landing Page now dynamically renders cards from API (prices, bonuses, benefits, durations)
+  - Custom cards created in Admin Dashboard auto-appear on Landing Page
+  - Auto-refresh every 5 minutes to catch Admin changes
+  - Platform info (referral bonus, contact) also synced
 - **✅ Membership Upgrade Feature - Enhanced:**
   - Clients now pay FULL PRICE for upgrades (not difference)
   - Added cashback payment option (full or partial)

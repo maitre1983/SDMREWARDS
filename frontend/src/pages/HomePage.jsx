@@ -66,19 +66,26 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch card types from API
+  // Fetch card types and platform info from API (Auto-synced with Admin Dashboard)
   const [cardTypes, setCardTypes] = useState([]);
+  const [platformInfo, setPlatformInfo] = useState({});
+  
   useEffect(() => {
     const fetchCards = async () => {
       try {
         const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/public/card-types`);
         const data = await res.json();
         setCardTypes(data.card_types || []);
+        setPlatformInfo(data.platform_info || {});
       } catch (error) {
         console.error('Error fetching card types:', error);
       }
     };
     fetchCards();
+    
+    // Auto-refresh every 5 minutes to catch Admin changes
+    const refreshInterval = setInterval(fetchCards, 5 * 60 * 1000);
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // Stats counter animation
@@ -374,121 +381,124 @@ export default function HomePage() {
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">{t('cards_subtitle')}</p>
           </div>
           
+          {/* Dynamic Cards Grid - Synced with Admin Dashboard */}
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Silver Card */}
-            <div className="relative bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 rounded-3xl overflow-hidden hover:border-slate-500 transition-all group">
-              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-slate-400 to-slate-300" />
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-2xl font-bold">{t('card_silver_name')}</h3>
-                    <p className="text-3xl font-bold text-slate-300 mt-2">
-                      {cardTypes.find(c => c.slug === 'silver')?.price 
-                        ? `GHS ${cardTypes.find(c => c.slug === 'silver')?.price}` 
-                        : t('card_silver_price')}
-                    </p>
-                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
-                      <Clock size={14} />
-                      {cardTypes.find(c => c.slug === 'silver')?.duration_label || '1 an'}
-                    </p>
+            {cardTypes.filter(card => card.is_active !== false).map((card, index) => {
+              // Determine card styling based on type
+              const isGold = card.slug === 'gold' || card.type === 'gold';
+              const isPlatinum = card.slug === 'platinum' || card.type === 'platinum';
+              const isSilver = card.slug === 'silver' || card.type === 'silver';
+              
+              // Get benefits - handle both array and string formats
+              let benefits = [];
+              if (Array.isArray(card.benefits)) {
+                benefits = card.benefits;
+              } else if (typeof card.benefits === 'string' && card.benefits) {
+                // Split string benefits by comma or newline
+                benefits = card.benefits.split(/[,\n]/).map(b => b.trim()).filter(Boolean);
+              }
+              
+              // Add welcome bonus as last benefit if not already included
+              const welcomeBonusText = `Welcome bonus: GHS ${card.welcome_bonus || 1}`;
+              if (!benefits.some(b => b.toLowerCase().includes('welcome bonus'))) {
+                benefits.push(welcomeBonusText);
+              }
+              
+              // If still no benefits, use fallback based on card type
+              if (benefits.length === 0) {
+                benefits = isSilver 
+                  ? [t('card_silver_benefit1'), t('card_silver_benefit2'), t('card_silver_benefit3'), welcomeBonusText]
+                  : isGold
+                    ? [t('card_gold_benefit1'), t('card_gold_benefit2'), t('card_gold_benefit3'), welcomeBonusText]
+                    : isPlatinum
+                      ? [t('card_platinum_benefit1'), t('card_platinum_benefit2'), t('card_platinum_benefit3'), welcomeBonusText]
+                      : [welcomeBonusText];
+              }
+              
+              // Card styling classes
+              const cardClasses = isGold 
+                ? "relative bg-gradient-to-br from-amber-900/50 to-amber-950/50 border-2 border-amber-500/50 rounded-3xl overflow-hidden transform lg:-translate-y-4 shadow-xl shadow-amber-500/10"
+                : isPlatinum
+                  ? "relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-500 rounded-3xl overflow-hidden hover:border-slate-400 transition-all"
+                  : "relative bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 rounded-3xl overflow-hidden hover:border-slate-500 transition-all group";
+              
+              const headerGradient = isGold 
+                ? "bg-gradient-to-r from-amber-400 to-yellow-500"
+                : isPlatinum
+                  ? "bg-gradient-to-r from-slate-300 to-white"
+                  : "bg-gradient-to-r from-slate-400 to-slate-300";
+              
+              const priceColor = isGold ? "text-amber-400" : isPlatinum ? "text-slate-200" : "text-slate-300";
+              const titleColor = isGold ? "text-amber-300" : "text-white";
+              const checkColor = isGold ? "text-amber-400" : isPlatinum ? "text-slate-300" : "text-slate-400";
+              
+              const buttonClasses = isGold 
+                ? "w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 py-6"
+                : isPlatinum
+                  ? "w-full bg-slate-700 hover:bg-slate-600 py-6"
+                  : "w-full bg-slate-600 hover:bg-slate-500 py-6";
+              
+              return (
+                <div key={card.slug || card.id || index} className={cardClasses}>
+                  <div className={`absolute top-0 left-0 right-0 h-2 ${headerGradient}`} />
+                  
+                  {/* Badge */}
+                  {isGold && (
+                    <div className="absolute top-4 right-4">
+                      <span className="bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full">{t('card_popular')}</span>
+                    </div>
+                  )}
+                  {isPlatinum && (
+                    <div className="absolute top-4 right-4">
+                      <span className="bg-slate-500 text-white text-xs font-bold px-3 py-1 rounded-full">{t('card_premium')}</span>
+                    </div>
+                  )}
+                  
+                  <div className="p-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className={`text-2xl font-bold ${titleColor}`}>
+                          {card.name || `${card.slug?.charAt(0).toUpperCase()}${card.slug?.slice(1)} Card`}
+                        </h3>
+                        <p className={`text-3xl font-bold ${priceColor} mt-2`}>
+                          GHS {card.price || 0}
+                        </p>
+                        <p className={`${isGold ? 'text-amber-300/70' : 'text-slate-400'} text-sm mt-1 flex items-center gap-1`}>
+                          <Clock size={14} />
+                          {card.duration_label || '1 year'}
+                        </p>
+                      </div>
+                      <img src={SDM_LOGO_URL} alt="SDM" className={`w-16 h-16 object-contain ${isGold ? '' : 'opacity-50'}`} />
+                    </div>
+                    
+                    <ul className="space-y-3 mb-8">
+                      {benefits.slice(0, 7).map((benefit, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <CheckCircle className={`${checkColor} shrink-0 mt-0.5`} size={18} />
+                          <span className={`${isGold ? 'text-slate-200' : 'text-slate-300'} text-sm`}>{benefit}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    
+                    <Button 
+                      onClick={() => navigate('/client')}
+                      className={buttonClasses}
+                      data-testid={`get-${card.slug || card.type}-card-btn`}
+                    >
+                      {t('card_cta')} <ArrowRight className="ml-2" size={18} />
+                    </Button>
                   </div>
-                  <img src={SDM_LOGO_URL} alt="SDM" className="w-16 h-16 object-contain opacity-50" />
                 </div>
-                <ul className="space-y-3 mb-8">
-                  {[t('card_silver_benefit1'), t('card_silver_benefit2'), t('card_silver_benefit3'), t('card_silver_benefit4'), t('card_silver_benefit5')].map((b, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle className="text-slate-400 shrink-0 mt-0.5" size={18} />
-                      <span className="text-slate-300 text-sm">{b}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button 
-                  onClick={() => navigate('/client')}
-                  className="w-full bg-slate-600 hover:bg-slate-500 py-6"
-                >
-                  {t('card_cta')} <ArrowRight className="ml-2" size={18} />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Gold Card - Popular */}
-            <div className="relative bg-gradient-to-br from-amber-900/50 to-amber-950/50 border-2 border-amber-500/50 rounded-3xl overflow-hidden transform lg:-translate-y-4 shadow-xl shadow-amber-500/10">
-              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 to-yellow-500" />
-              <div className="absolute top-4 right-4">
-                <span className="bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full">{t('card_popular')}</span>
-              </div>
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-2xl font-bold text-amber-300">{t('card_gold_name')}</h3>
-                    <p className="text-3xl font-bold text-amber-400 mt-2">
-                      {cardTypes.find(c => c.slug === 'gold')?.price 
-                        ? `GHS ${cardTypes.find(c => c.slug === 'gold')?.price}` 
-                        : t('card_gold_price')}
-                    </p>
-                    <p className="text-amber-300/70 text-sm mt-1 flex items-center gap-1">
-                      <Clock size={14} />
-                      {cardTypes.find(c => c.slug === 'gold')?.duration_label || '1 an'}
-                    </p>
-                  </div>
-                  <img src={SDM_LOGO_URL} alt="SDM" className="w-16 h-16 object-contain" />
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {[t('card_gold_benefit1'), t('card_gold_benefit2'), t('card_gold_benefit3'), t('card_gold_benefit4'), t('card_gold_benefit5'), t('card_gold_benefit6')].map((b, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle className="text-amber-400 shrink-0 mt-0.5" size={18} />
-                      <span className="text-slate-200 text-sm">{b}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button 
-                  onClick={() => navigate('/client')}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 py-6"
-                >
-                  {t('card_cta')} <ArrowRight className="ml-2" size={18} />
-                </Button>
-              </div>
-            </div>
-            
-            {/* Platinum Card */}
-            <div className="relative bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-500 rounded-3xl overflow-hidden hover:border-slate-400 transition-all">
-              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-slate-300 to-white" />
-              <div className="absolute top-4 right-4">
-                <span className="bg-slate-500 text-white text-xs font-bold px-3 py-1 rounded-full">{t('card_premium')}</span>
-              </div>
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-2xl font-bold">{t('card_platinum_name')}</h3>
-                    <p className="text-3xl font-bold text-slate-200 mt-2">
-                      {cardTypes.find(c => c.slug === 'platinum')?.price 
-                        ? `GHS ${cardTypes.find(c => c.slug === 'platinum')?.price}` 
-                        : t('card_platinum_price')}
-                    </p>
-                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
-                      <Clock size={14} />
-                      {cardTypes.find(c => c.slug === 'platinum')?.duration_label || '2 ans'}
-                    </p>
-                  </div>
-                  <img src={SDM_LOGO_URL} alt="SDM" className="w-16 h-16 object-contain opacity-70" />
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {[t('card_platinum_benefit1'), t('card_platinum_benefit2'), t('card_platinum_benefit3'), t('card_platinum_benefit4'), t('card_platinum_benefit5'), t('card_platinum_benefit6'), t('card_platinum_benefit7')].map((b, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle className="text-slate-300 shrink-0 mt-0.5" size={18} />
-                      <span className="text-slate-300 text-sm">{b}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button 
-                  onClick={() => navigate('/client')}
-                  className="w-full bg-slate-700 hover:bg-slate-600 py-6"
-                >
-                  {t('card_cta')} <ArrowRight className="ml-2" size={18} />
-                </Button>
-              </div>
-            </div>
+              );
+            })}
           </div>
+          
+          {/* Show message if no cards available */}
+          {cardTypes.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-slate-400">Loading membership cards...</p>
+            </div>
+          )}
         </div>
       </section>
 
