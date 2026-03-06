@@ -40,12 +40,12 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Partial refactoring (Overview, Clients, Merchants tabs extracted)
 - [ ] Settings tab sub-components extraction (IN PROGRESS)
 
-### Merchant Dashboard (90%)
+### Merchant Dashboard (100%)
 - [x] Sales statistics and charts
 - [x] PIN management
 - [x] Cashier CRUD operations
 - [x] Business info editing
-- [ ] Transaction history page (UPCOMING)
+- [x] Transaction history page with filters, pagination, and export
 
 ### Client Dashboard (100%)
 - [x] Card validity display (status, days remaining)
@@ -84,10 +84,16 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Upcoming Tasks (Priority Order)
 
-### P1 - Merchant History Page
-- Filterable transaction history
-- Searchable by date, amount, type
-- Export functionality (CSV/Excel) - deferred
+### P1 - Services Feature Completion
+- Complete UI for Airtime, Data, ECG, Merchant Payments
+- Implement backend logic with BulkClix APIs (waiting for documentation)
+
+### P1 - AdminDashboard.jsx Refactoring (Settings)
+- Extract Settings > Cards → `AdminSettingsCards.jsx`
+- Extract Settings > Commissions → `AdminSettingsCommissions.jsx`
+- Extract Settings > SMS → `AdminSettingsSMS.jsx`
+- Extract Settings > Security → `AdminSettingsSecurity.jsx`
+- Extract Settings > Users → `AdminSettingsUsers.jsx`
 
 ### P2 - Backend Refactoring
 - Split `admin.py` (>2400 lines) into:
@@ -117,7 +123,13 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ---
 
-## Recent Changes (2025-03-06)
+## Recent Changes (2026-03-06)
+- **✅ Added Merchant Transaction History Page:**
+  - New page: `/merchant/history` with full transaction history
+  - Features: Pagination, date filters, amount filters, search
+  - Export: CSV and JSON formats
+  - Summary stats: Total volume, cashback, transaction count
+  - Backend endpoints: `GET /api/merchants/transactions/history`, `GET /api/merchants/transactions/export`
 - **✅ Added all Ghana Mobile Networks to payment forms:**
   - Updated dropdowns: MTN MoMo, Telecel (ex-Vodafone), AirtelTigo (AT)
   - Files modified: `ClientDashboard.jsx`, `ServicesPage.jsx`, `MerchantDashboard.jsx`

@@ -377,16 +377,27 @@ export default function MerchantDashboard() {
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-semibold flex items-center gap-2">
-                <History size={18} /> Transaction History
+                <History size={18} /> Recent Transactions
               </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchTransactions}
-                className="text-slate-400"
-              >
-                <RefreshCw size={16} />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchTransactions}
+                  className="text-slate-400"
+                >
+                  <RefreshCw size={16} />
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => navigate('/merchant/history')}
+                  className="bg-amber-500 hover:bg-amber-600 text-sm"
+                  data-testid="view-all-history-btn"
+                >
+                  View All
+                  <ChevronRight size={16} />
+                </Button>
+              </div>
             </div>
             {transactions.length > 0 ? (
               <div className="space-y-3">

@@ -481,6 +481,212 @@ async def get_chart_data(
     }
 
 
+# ============== TRANSACTION HISTORY ==============
+
+@router.get("/transactions/history")
+async def get_transaction_history(
+    page: int = 1,
+    limit: int = 20,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    search: Optional[str] = None,
+    sort_by: str = "date",  # date, amount, cashback
+    sort_order: str = "desc",  # asc, desc
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Get paginated transaction history with filters
+    """
+    merchant_id = current_merchant["id"]
+    
+    # Build query
+    query = {"merchant_id": merchant_id}
+    
+    # Date filter
+    if date_from:
+        try:
+            from_date = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            query["created_at"] = query.get("created_at", {})
+            query["created_at"]["$gte"] = from_date.isoformat()
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_date = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            # Add 1 day to include the full end date
+            to_date = to_date + timedelta(days=1)
+            query["created_at"] = query.get("created_at", {})
+            query["created_at"]["$lt"] = to_date.isoformat()
+        except ValueError:
+            pass
+    
+    # Amount filter
+    if min_amount is not None:
+        query["amount"] = query.get("amount", {})
+        query["amount"]["$gte"] = min_amount
+    
+    if max_amount is not None:
+        query["amount"] = query.get("amount", {})
+        query["amount"]["$lte"] = max_amount
+    
+    # Search filter (client name or reference)
+    if search:
+        query["$or"] = [
+            {"description": {"$regex": search, "$options": "i"}},
+            {"payment_reference": {"$regex": search, "$options": "i"}}
+        ]
+    
+    # Sorting
+    sort_field = {
+        "date": "created_at",
+        "amount": "amount",
+        "cashback": "cashback_amount"
+    }.get(sort_by, "created_at")
+    
+    sort_direction = -1 if sort_order == "desc" else 1
+    
+    # Pagination
+    skip = (page - 1) * limit
+    
+    # Get total count
+    total_count = await db.transactions.count_documents(query)
+    
+    # Get transactions
+    transactions = await db.transactions.find(
+        query,
+        {"_id": 0}
+    ).sort(sort_field, sort_direction).skip(skip).limit(limit).to_list(limit)
+    
+    # Enrich with client names
+    enriched_transactions = []
+    for txn in transactions:
+        client_id = txn.get("client_id")
+        client_name = "Client"
+        if client_id:
+            client = await db.clients.find_one({"id": client_id}, {"_id": 0, "full_name": 1, "phone": 1})
+            if client:
+                client_name = client.get("full_name", "Client")
+        
+        enriched_transactions.append({
+            "id": txn.get("id"),
+            "date": txn.get("created_at"),
+            "amount": txn.get("amount", 0),
+            "cashback": txn.get("cashback_amount", 0),
+            "client_name": client_name,
+            "description": txn.get("description", ""),
+            "reference": txn.get("payment_reference", ""),
+            "status": txn.get("status", "completed"),
+            "type": txn.get("type", "merchant_payment")
+        })
+    
+    # Calculate summary stats
+    all_matching = await db.transactions.find(query, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(10000)
+    total_volume = sum(t.get("amount", 0) for t in all_matching)
+    total_cashback = sum(t.get("cashback_amount", 0) for t in all_matching)
+    
+    return {
+        "transactions": enriched_transactions,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": (total_count + limit - 1) // limit
+        },
+        "summary": {
+            "total_volume": round(total_volume, 2),
+            "total_cashback": round(total_cashback, 2),
+            "transaction_count": total_count
+        }
+    }
+
+
+@router.get("/transactions/export")
+async def export_transactions(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    format: str = "json",  # json or csv
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Export all transactions for a date range (for accounting)
+    """
+    merchant_id = current_merchant["id"]
+    
+    # Build query
+    query = {"merchant_id": merchant_id}
+    
+    if date_from:
+        try:
+            from_date = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+            query["created_at"] = query.get("created_at", {})
+            query["created_at"]["$gte"] = from_date.isoformat()
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            to_date = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+            to_date = to_date + timedelta(days=1)
+            query["created_at"] = query.get("created_at", {})
+            query["created_at"]["$lt"] = to_date.isoformat()
+        except ValueError:
+            pass
+    
+    # Get all transactions
+    transactions = await db.transactions.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).to_list(50000)
+    
+    # Enrich with client names
+    enriched = []
+    for txn in transactions:
+        client_id = txn.get("client_id")
+        client_name = "Client"
+        if client_id:
+            client = await db.clients.find_one({"id": client_id}, {"_id": 0, "full_name": 1})
+            if client:
+                client_name = client.get("full_name", "Client")
+        
+        enriched.append({
+            "date": txn.get("created_at", ""),
+            "amount": txn.get("amount", 0),
+            "cashback": txn.get("cashback_amount", 0),
+            "client": client_name,
+            "reference": txn.get("payment_reference", ""),
+            "status": txn.get("status", "completed")
+        })
+    
+    # Calculate totals
+    total_volume = sum(t["amount"] for t in enriched)
+    total_cashback = sum(t["cashback"] for t in enriched)
+    
+    if format == "csv":
+        # Return CSV formatted string
+        csv_lines = ["Date,Amount (GHS),Cashback (GHS),Client,Reference,Status"]
+        for t in enriched:
+            csv_lines.append(f"{t['date']},{t['amount']},{t['cashback']},{t['client']},{t['reference']},{t['status']}")
+        csv_lines.append(f"\nTotal,{total_volume},{total_cashback},,,")
+        
+        return {
+            "format": "csv",
+            "data": "\n".join(csv_lines),
+            "filename": f"sdm_transactions_{date_from or 'all'}_{date_to or 'now'}.csv"
+        }
+    
+    return {
+        "format": "json",
+        "transactions": enriched,
+        "totals": {
+            "volume": round(total_volume, 2),
+            "cashback": round(total_cashback, 2),
+            "count": len(enriched)
+        }
+    }
+
+
 # ============== SETTINGS ==============
 
 @router.get("/settings")

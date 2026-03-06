@@ -11,6 +11,7 @@ import ClientProfilePage from "./pages/ClientProfilePage";
 import PartnersPage from "./pages/PartnersPage";
 import MerchantAuthPage from "./pages/MerchantAuthPage";
 import MerchantDashboard from "./pages/MerchantDashboard";
+import MerchantHistoryPage from "./pages/MerchantHistoryPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFoundPage from "./pages/NotFoundPage";
 
@@ -75,6 +76,7 @@ function App() {
             {/* Merchant Routes */}
             <Route path="/merchant" element={<MerchantAuthPage />} />
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
+            <Route path="/merchant/history" element={<MerchantHistoryPage />} />
             
             {/* Legal Pages */}
             <Route path="/terms" element={<TermsOfServicePage />} />
