@@ -184,10 +184,9 @@ async def initiate_card_payment(request: CardPaymentRequest):
                 "phone_number": bulkclix_phone,
                 "network": network.upper(),  # MTN, TELECEL, AIRTELTIGO
                 "transaction_id": payment_ref,
-                "reference": "SDM REWARDS"
+                "reference": "SDM REWARDS",
+                "callback_url": callback_url or "https://sdmrewards.com/api/payments/callback"
             }
-            if callback_url:
-                payload["callback_url"] = callback_url
                 
             response = await http_client.post(
                 f"{BULKCLIX_BASE_URL}/payment-api/momopay",
