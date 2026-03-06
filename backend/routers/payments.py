@@ -42,27 +42,48 @@ def get_sms():
 
 # ============== HELPERS ==============
 def detect_network(phone: str) -> Optional[str]:
-    """Detect network provider from phone number"""
+    """Detect network provider from phone number (Ghana networks)"""
     phone = phone.replace(" ", "").replace("-", "")
     if phone.startswith("+233"):
         phone = "0" + phone[4:]
     elif phone.startswith("233"):
         phone = "0" + phone[3:]
     
+    # Ghana Mobile Network Prefixes (2024 updated)
+    # MTN Ghana - largest operator
     mtn_prefixes = ["024", "054", "055", "059"]
-    vodafone_prefixes = ["020", "050"]
+    # Telecel Ghana (formerly Vodafone Ghana)
+    telecel_prefixes = ["020", "050"]
+    # AirtelTigo (AT) - merger of Airtel and Tigo
     airteltigo_prefixes = ["026", "027", "056", "057"]
     
     prefix = phone[:3] if len(phone) >= 3 else ""
     
     if prefix in mtn_prefixes:
         return "MTN"
-    elif prefix in vodafone_prefixes:
-        return "VODAFONE"
+    elif prefix in telecel_prefixes:
+        return "TELECEL"  # Updated from VODAFONE to TELECEL
     elif prefix in airteltigo_prefixes:
         return "AIRTELTIGO"
     
     return None
+
+
+def normalize_network(network: str) -> str:
+    """Normalize network name for BulkClix API compatibility"""
+    if not network:
+        return network
+    network_upper = network.upper()
+    # Map TELECEL back to VODAFONE for BulkClix API if needed
+    # (BulkClix may still use VODAFONE internally)
+    network_mapping = {
+        "TELECEL": "TELECEL",  # Use TELECEL for BulkClix
+        "VODAFONE": "TELECEL",  # Legacy support
+        "MTN": "MTN",
+        "AIRTELTIGO": "AIRTELTIGO",
+        "AT": "AIRTELTIGO"  # Alias support
+    }
+    return network_mapping.get(network_upper, network_upper)
 
 
 def is_test_mode() -> bool:

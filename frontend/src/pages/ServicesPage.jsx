@@ -219,9 +219,9 @@ const ServicesPage = ({ balance, onBack, onRefresh }) => {
                   <SelectValue placeholder="Select network" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="MTN">MTN</SelectItem>
-                  <SelectItem value="TELECEL">Telecel (Vodafone)</SelectItem>
-                  <SelectItem value="AIRTELTIGO">AirtelTigo</SelectItem>
+                  <SelectItem value="MTN">MTN MoMo</SelectItem>
+                  <SelectItem value="TELECEL">Telecel (ex-Vodafone)</SelectItem>
+                  <SelectItem value="AIRTELTIGO">AirtelTigo (AT)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -96,8 +96,8 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
   - `admin_users.py`
 
 ### P2 - Minor Issues
-- Fix bcrypt version warning in logs
-- Admin UI for payment provider logos
+- [x] Fix datetime timezone error in admin.py (settings PIN lock)
+- [ ] Admin UI for payment provider logos
 
 ---
 
@@ -116,6 +116,16 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - `/app/frontend/src/components/admin/` - Extracted admin components
 
 ---
+
+## Recent Changes (2025-03-06)
+- **✅ Added all Ghana Mobile Networks to payment forms:**
+  - Updated dropdowns: MTN MoMo, Telecel (ex-Vodafone), AirtelTigo (AT)
+  - Files modified: `ClientDashboard.jsx`, `ServicesPage.jsx`, `MerchantDashboard.jsx`
+  - Backend: Added `normalize_network()` function, updated `detect_network()` to return TELECEL
+  - FAQ updated to reflect correct network names
+  - Homepage payment logos updated to use Telecel naming
+- **✅ Fixed datetime timezone error in admin.py:**
+  - `locked_until` comparison now handles timezone-naive datetimes correctly
 
 ## Recent Changes (2025-03-05)
 - Fixed OTP bug: Added missing `BULKCLIX_OTP_SENDER_ID` env variable loading in auth.py

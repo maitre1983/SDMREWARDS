@@ -2264,6 +2264,9 @@ async def get_pin_status(current_admin: dict = Depends(get_current_admin)):
         locked_until = security["locked_until"]
         if isinstance(locked_until, str):
             locked_until = datetime.fromisoformat(locked_until.replace('Z', '+00:00'))
+        # Ensure locked_until is timezone-aware
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
         if datetime.now(timezone.utc) < locked_until:
             is_locked = True
     
@@ -2289,6 +2292,9 @@ async def verify_settings_pin(
         locked_until = security["locked_until"]
         if isinstance(locked_until, str):
             locked_until = datetime.fromisoformat(locked_until.replace('Z', '+00:00'))
+        # Ensure locked_until is timezone-aware
+        if locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
         if datetime.now(timezone.utc) < locked_until:
             remaining = int((locked_until - datetime.now(timezone.utc)).total_seconds())
             raise HTTPException(status_code=423, detail=f"Locked. Try again in {remaining} seconds")

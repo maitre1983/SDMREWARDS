@@ -49,7 +49,7 @@ const PAYMENT_LOGOS = {
   visa: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png",
   mastercard: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png",
   mtn: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/New-mtn-logo.svg/200px-New-mtn-logo.svg.png",
-  vodafone: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Vodafone_icon.svg/200px-Vodafone_icon.svg.png",
+  telecel: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Vodafone_icon.svg/200px-Vodafone_icon.svg.png", // Using existing icon until Telecel logo available
 };
 
 export default function HomePage() {
@@ -674,7 +674,7 @@ export default function HomePage() {
               <img src={PAYMENT_LOGOS.visa} alt="Visa" className="h-8 opacity-60 hover:opacity-100 transition-opacity" />
               <img src={PAYMENT_LOGOS.mastercard} alt="Mastercard" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
               <img src={PAYMENT_LOGOS.mtn} alt="MTN MoMo" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
-              <img src={PAYMENT_LOGOS.vodafone} alt="Vodafone Cash" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
+              <img src={PAYMENT_LOGOS.telecel} alt="Telecel" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
               <span className="text-slate-400 font-semibold">BulkClix</span>
             </div>
           </div>

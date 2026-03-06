@@ -1727,8 +1727,8 @@ export default function ClientDashboard() {
                   >
                     <option value="">Auto-detect</option>
                     <option value="MTN">MTN MoMo</option>
-                    <option value="VODAFONE">Vodafone Cash</option>
-                    <option value="AIRTELTIGO">AirtelTigo Money</option>
+                    <option value="TELECEL">Telecel (ex-Vodafone)</option>
+                    <option value="AIRTELTIGO">AirtelTigo (AT)</option>
                   </select>
                 </div>
                 

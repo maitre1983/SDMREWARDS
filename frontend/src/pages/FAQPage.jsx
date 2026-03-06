@@ -136,8 +136,8 @@ const faqCategories = [
       {
         q: "What payment methods are accepted?",
         qFr: "Quels modes de paiement sont acceptés ?",
-        a: "We accept Mobile Money payments from all major networks: MTN MoMo, Vodafone Cash, and AirtelTigo Money.",
-        aFr: "Nous acceptons les paiements Mobile Money de tous les principaux réseaux : MTN MoMo, Vodafone Cash et AirtelTigo Money."
+        a: "We accept Mobile Money payments from all major Ghana networks: MTN MoMo, Telecel (ex-Vodafone), and AirtelTigo (AT) Money.",
+        aFr: "Nous acceptons les paiements Mobile Money de tous les principaux réseaux du Ghana : MTN MoMo, Telecel (ex-Vodafone) et AirtelTigo (AT) Money."
       },
       {
         q: "Are there withdrawal fees?",

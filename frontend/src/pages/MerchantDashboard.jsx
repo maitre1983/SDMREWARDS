@@ -517,9 +517,9 @@ export default function MerchantDashboard() {
                         className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
                       >
                         <option value="">Sélectionner</option>
-                        <option value="MTN">MTN</option>
-                        <option value="Vodafone">Vodafone</option>
-                        <option value="AirtelTigo">AirtelTigo</option>
+                        <option value="MTN">MTN MoMo</option>
+                        <option value="TELECEL">Telecel (ex-Vodafone)</option>
+                        <option value="AIRTELTIGO">AirtelTigo (AT)</option>
                       </select>
                     </div>
                   </div>
