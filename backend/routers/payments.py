@@ -731,31 +731,44 @@ async def process_card_purchase(payment: Dict):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Get bonus config
+    # Get referral bonus config
     config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
-    welcome_bonus = 1.0
-    referrer_bonus = 3.0
+    referrer_bonus = 3.0  # Fixed 3 GHS for referrer
     
     if config:
-        welcome_bonus = config.get("welcome_bonus", 1.0)
         referrer_bonus = config.get("referrer_bonus", 3.0)
     
-    # Credit welcome bonus
+    # Welcome bonus based on card type
+    # 25 GHS card (silver) → 1 GHS
+    # 50 GHS card (gold) → 2 GHS
+    # 100 GHS card (platinum) → 3 GHS
+    welcome_bonus_map = {
+        "silver": 1.0,
+        "gold": 2.0,
+        "platinum": 3.0
+    }
+    welcome_bonus = welcome_bonus_map.get(card_type.lower(), 1.0)
+    
+    logger.info(f"Processing card purchase: client={client_id}, card={card_type}, welcome_bonus={welcome_bonus}, referrer_id={referrer_id}")
+    
+    # Credit welcome bonus to the new user
     await db.clients.update_one(
         {"id": client_id},
         {"$inc": {"cashback_balance": welcome_bonus}}
     )
     
-    # Record welcome bonus
+    # Record welcome bonus transaction
     await db.transactions.insert_one({
         "id": str(uuid.uuid4()),
         "type": "welcome_bonus",
         "client_id": client_id,
         "amount": welcome_bonus,
-        "description": "Welcome Bonus - Card Activation",
+        "description": f"Welcome Bonus - {card_type.capitalize()} Card Activation",
         "status": "completed",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    logger.info(f"Welcome bonus of GHS {welcome_bonus} credited to client {client_id}")
     
     # Send SMS notification for card purchase
     try:
@@ -765,51 +778,58 @@ async def process_card_purchase(payment: Dict):
     except Exception as e:
         logger.error(f"Card purchase SMS error: {e}")
     
-    # Process referral if exists
+    # Process referral bonus if referrer exists
     if referrer_id:
+        logger.info(f"Processing referral bonus: referrer={referrer_id}, bonus={referrer_bonus}")
+        
         # Get referrer info
         referrer = await db.clients.find_one({"id": referrer_id}, {"_id": 0})
         
-        # Credit referrer
-        await db.clients.update_one(
-            {"id": referrer_id},
-            {"$inc": {"cashback_balance": referrer_bonus}}
-        )
-        
-        # Record referral bonus
-        await db.transactions.insert_one({
-            "id": str(uuid.uuid4()),
-            "type": "referral_bonus",
-            "client_id": referrer_id,
-            "referred_id": client_id,
-            "amount": referrer_bonus,
-            "description": "Referral Bonus",
-            "status": "completed",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        
-        # Update/create referral record
-        await db.referrals.update_one(
-            {"referrer_id": referrer_id, "referred_id": client_id},
-            {
-                "$set": {
-                    "status": "completed",
-                    "bonus_paid": True,
-                    "bonus_amount": referrer_bonus,
-                    "completed_at": datetime.now(timezone.utc).isoformat()
-                }
-            },
-            upsert=True
-        )
-        
-        # Send SMS to referrer
-        try:
-            if referrer and referrer.get("phone"):
+        if referrer:
+            # Credit referrer with 3 GHS
+            await db.clients.update_one(
+                {"id": referrer_id},
+                {"$inc": {"cashback_balance": referrer_bonus}}
+            )
+            
+            # Record referral bonus transaction
+            referred_name = client.get("full_name", "New User") if client else "New User"
+            await db.transactions.insert_one({
+                "id": str(uuid.uuid4()),
+                "type": "referral_bonus",
+                "client_id": referrer_id,
+                "referred_id": client_id,
+                "amount": referrer_bonus,
+                "description": f"Referral Bonus - {referred_name} joined",
+                "status": "completed",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            })
+            
+            # Update/create referral record
+            await db.referrals.update_one(
+                {"referrer_id": referrer_id, "referred_id": client_id},
+                {
+                    "$set": {
+                        "status": "completed",
+                        "bonus_paid": True,
+                        "bonus_amount": referrer_bonus,
+                        "completed_at": datetime.now(timezone.utc).isoformat()
+                    }
+                },
+                upsert=True
+            )
+            
+            logger.info(f"Referral bonus of GHS {referrer_bonus} credited to referrer {referrer_id}")
+            
+            # Send SMS to referrer
+            try:
                 sms = get_sms()
-                referred_name = client.get("full_name", "A friend") if client else "A friend"
-                await sms.notify_referral_bonus(referrer["phone"], referrer_bonus, referred_name)
-        except Exception as e:
-            logger.error(f"Referral SMS error: {e}")
+                if referrer.get("phone"):
+                    await sms.notify_referral_bonus(referrer["phone"], referrer_bonus, referred_name)
+            except Exception as e:
+                logger.error(f"Referral SMS error: {e}")
+        else:
+            logger.warning(f"Referrer not found: {referrer_id}")
 
 
 async def process_merchant_payment(payment: Dict):
