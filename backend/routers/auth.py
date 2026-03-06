@@ -250,12 +250,14 @@ async def send_otp(request: SendOTPRequest):
             if response.status_code == 200 and result.get("message") == "OTP sent":
                 otp_data = result.get("data", {}).get("otp", {})
                 request_id = otp_data.get("requestId", f"OTP-{uuid.uuid4()}")
+                ussd_code = otp_data.get("ussd_code", "")
                 
                 # Store OTP record for tracking
                 await db.otp_records.insert_one({
                     "phone": phone,
                     "request_id": request_id,
                     "bulkclix_prefix": otp_data.get("prefix"),
+                    "ussd_code": ussd_code,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
                     "verified": False
@@ -264,6 +266,7 @@ async def send_otp(request: SendOTPRequest):
                 return {
                     "success": True,
                     "request_id": request_id,
+                    "ussd_code": ussd_code,
                     "message": "OTP sent successfully"
                 }
             else:

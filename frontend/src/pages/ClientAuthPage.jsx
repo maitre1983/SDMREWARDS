@@ -48,6 +48,7 @@ export default function ClientAuthPage() {
   const [otpCode, setOtpCode] = useState('');
   const [requestId, setRequestId] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
+  const [ussdCode, setUssdCode] = useState('');
 
   useEffect(() => {
     // Check for referral code in URL
@@ -115,6 +116,7 @@ export default function ClientAuthPage() {
       });
 
       setRequestId(response.data.request_id);
+      setUssdCode(response.data.ussd_code || '');
       setMode('otp');
       toast.success('OTP sent to your phone!');
       
@@ -377,6 +379,16 @@ export default function ClientAuthPage() {
                     >
                       {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Verify Code'}
                     </Button>
+
+                    {/* USSD Code fallback */}
+                    {ussdCode && (
+                      <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                        <p className="text-blue-400 text-sm text-center">
+                          <span className="font-medium">Didn't receive the OTP?</span><br />
+                          Dial <span className="font-bold text-white">{ussdCode}</span> to get your code
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-4">

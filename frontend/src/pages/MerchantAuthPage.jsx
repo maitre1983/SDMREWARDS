@@ -48,6 +48,7 @@ export default function MerchantAuthPage() {
   const [otpCode, setOtpCode] = useState('');
   const [requestId, setRequestId] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
+  const [ussdCode, setUssdCode] = useState('');
 
   useEffect(() => {
     // Check if already logged in
@@ -108,6 +109,7 @@ export default function MerchantAuthPage() {
       });
 
       setRequestId(response.data.request_id);
+      setUssdCode(response.data.ussd_code || '');
       setMode('otp');
       toast.success('OTP sent to your phone!');
       
@@ -373,6 +375,16 @@ export default function MerchantAuthPage() {
                     >
                       {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Verify Code'}
                     </Button>
+
+                    {/* USSD Code fallback */}
+                    {ussdCode && (
+                      <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                        <p className="text-emerald-400 text-sm text-center">
+                          <span className="font-medium">Didn't receive the OTP?</span><br />
+                          Dial <span className="font-bold text-white">{ussdCode}</span> to get your code
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-4">
