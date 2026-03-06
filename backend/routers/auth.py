@@ -237,7 +237,7 @@ async def send_otp(request: SendOTPRequest):
                 json={
                     "phoneNumber": phone_clean,
                     "senderId": BULKCLIX_OTP_SENDER_ID,
-                    "message": "SDM Rewards: Your verification code is <%otp_code%>. Valid for 10 minutes.",
+                    "message": "Your SDM access code is <%otp_code%>",
                     "expiry": 10,
                     "length": 6
                 },
