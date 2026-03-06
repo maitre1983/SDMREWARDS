@@ -440,6 +440,84 @@ async def payment_callback(request: Request):
     return {"success": True, "message": "Callback processed"}
 
 
+@router.post("/check-status/{payment_id}")
+async def check_payment_status(payment_id: str):
+    """Check payment status with BulkClix API - 'I have paid' button"""
+    payment = await db.momo_payments.find_one({"id": payment_id}, {"_id": 0})
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # If already completed or failed, return current status
+    if payment.get("status") in ["completed", "failed"]:
+        return {
+            "success": True,
+            "status": payment["status"],
+            "message": f"Payment is {payment['status']}"
+        }
+    
+    # Get the ext_transaction_id (BulkClix reference)
+    ext_ref = payment.get("provider_reference")
+    
+    if not ext_ref:
+        raise HTTPException(status_code=400, detail="Payment reference not found. Please wait for payment to process.")
+    
+    # Check status with BulkClix API
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
+            response = await http_client.get(
+                f"{BULKCLIX_BASE_URL}/payment-api/checkstatus/{ext_ref}",
+                headers={
+                    "Accept": "application/json",
+                    "x-api-key": BULKCLIX_API_KEY
+                },
+                timeout=30.0
+            )
+            
+            logger.info(f"BulkClix check status response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
+            
+            if response.status_code == 200 and response.text:
+                result = response.json()
+                # Status is inside data object: {"message": "...", "data": {"status": "success", ...}}
+                data = result.get("data", {})
+                status = (data.get("status") or result.get("status") or "").lower()
+                
+                if status in ["success", "successful", "completed", "approved"]:
+                    # Complete the payment
+                    await complete_payment(payment_id)
+                    return {
+                        "success": True,
+                        "status": "completed",
+                        "message": "Payment confirmed successfully!"
+                    }
+                elif status in ["failed", "cancelled", "declined", "rejected"]:
+                    await db.momo_payments.update_one(
+                        {"id": payment_id},
+                        {"$set": {"status": "failed", "updated_at": datetime.now(timezone.utc).isoformat()}}
+                    )
+                    return {
+                        "success": False,
+                        "status": "failed",
+                        "message": result.get("message", "Payment failed")
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "status": "pending",
+                        "message": "Payment is still processing. Please approve on your phone or wait."
+                    }
+            else:
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "message": "Payment status check pending. Please try again."
+                }
+                
+    except Exception as e:
+        logger.error(f"Check status error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to check payment status")
+
+
 # ============== TEST MODE ENDPOINTS ==============
 
 @router.post("/test/confirm/{payment_id}")

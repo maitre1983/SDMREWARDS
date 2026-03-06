@@ -295,6 +295,33 @@ export default function ClientDashboard() {
       setIsProcessingPayment(false);
     }
   };
+
+  // Check payment status - "I have paid" button
+  const checkPaymentStatus = async () => {
+    if (!paymentId) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/check-status/${paymentId}`);
+      if (res.data.status === 'completed') {
+        setPaymentStatus('success');
+        toast.success('Payment confirmed! Your card is now active.');
+        setTimeout(() => {
+          setShowPaymentModal(false);
+          fetchDashboardData();
+        }, 2000);
+      } else if (res.data.status === 'failed') {
+        setPaymentStatus('failed');
+        toast.error(res.data.message || 'Payment failed');
+      } else {
+        toast.info(res.data.message || 'Payment is still processing');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to check status');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
   
   const closePaymentModal = () => {
     if (pollingRef.current) {
@@ -412,6 +439,33 @@ export default function ClientDashboard() {
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Confirmation failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Check merchant payment status - "I have paid" button
+  const checkMerchantPaymentStatus = async () => {
+    if (!merchantPaymentId) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/check-status/${merchantPaymentId}`);
+      if (res.data.status === 'completed') {
+        setMerchantPayStatus('success');
+        toast.success('Payment confirmed! Cashback credited.');
+        setTimeout(() => {
+          setShowMerchantPayModal(false);
+          fetchDashboardData();
+        }, 2000);
+      } else if (res.data.status === 'failed') {
+        setMerchantPayStatus('failed');
+        toast.error(res.data.message || 'Payment failed');
+      } else {
+        toast.info(res.data.message || 'Payment is still processing');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to check status');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -1276,9 +1330,27 @@ export default function ClientDashboard() {
                   <span className="text-sm">Waiting for confirmation...</span>
                 </div>
                 
+                {/* I Have Paid Button */}
+                <div className="mt-6 pt-4 border-t border-slate-700">
+                  <Button
+                    onClick={checkPaymentStatus}
+                    disabled={isProcessingPayment}
+                    variant="outline"
+                    className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                    data-testid="check-payment-status-btn"
+                  >
+                    {isProcessingPayment ? (
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                    ) : (
+                      <CheckCircle className="mr-2" size={16} />
+                    )}
+                    I Have Paid - Check Status
+                  </Button>
+                </div>
+                
                 {/* Test Mode Confirm Button - Only show in test mode */}
                 {isPaymentTestMode && (
-                  <div className="mt-6 pt-4 border-t border-slate-700">
+                  <div className="mt-4">
                     <p className="text-slate-500 text-xs mb-3">Test Mode</p>
                     <Button
                       onClick={confirmTestPayment}
@@ -1433,10 +1505,28 @@ export default function ClientDashboard() {
                     +GHS {(parseFloat(merchantPayAmount) * (selectedMerchant.cashback_rate || 5) / 100 * 0.95).toFixed(2)}
                   </p>
                 </div>
+
+                {/* I Have Paid Button */}
+                <div className="mt-6 pt-4 border-t border-slate-700">
+                  <Button
+                    onClick={checkMerchantPaymentStatus}
+                    disabled={isProcessingPayment}
+                    variant="outline"
+                    className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                    data-testid="check-merchant-status-btn"
+                  >
+                    {isProcessingPayment ? (
+                      <Loader2 className="animate-spin mr-2" size={16} />
+                    ) : (
+                      <CheckCircle className="mr-2" size={16} />
+                    )}
+                    I Have Paid - Check Status
+                  </Button>
+                </div>
                 
                 {/* Test Mode Confirm - Only show in test mode */}
                 {isMerchantPayTestMode && (
-                  <div className="mt-6 pt-4 border-t border-slate-700">
+                  <div className="mt-4">
                     <p className="text-slate-500 text-xs mb-3">Test Mode</p>
                     <Button
                       onClick={confirmMerchantTestPayment}
