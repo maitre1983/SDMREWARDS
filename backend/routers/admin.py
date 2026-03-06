@@ -146,6 +146,7 @@ class CreateMerchantManualRequest(BaseModel):
     cashback_rate: float = 5.0
     city: Optional[str] = None
     address: Optional[str] = None
+    google_maps_url: Optional[str] = None
 
 
 class BulkSMSRequest(BaseModel):
@@ -1785,7 +1786,8 @@ async def create_merchant_manual(
         "status": "active",  # Pre-approved by admin
         "cashback_rate": request.cashback_rate,
         "city": request.city,
-        "address": request.address,
+        "business_address": request.address,
+        "google_maps_url": request.google_maps_url,
         "qr_code": f"SDM-MERCHANT-{merchant_id.upper()}",
         "total_transactions": 0,
         "total_revenue": 0,

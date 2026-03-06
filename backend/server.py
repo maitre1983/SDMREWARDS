@@ -9,6 +9,7 @@ import os
 import logging
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -347,6 +348,97 @@ async def get_public_card_types():
         "platform_info": platform_info,
         "last_updated": datetime.now(timezone.utc).isoformat()
     }
+
+
+# ============== PUBLIC MERCHANTS ENDPOINT ==============
+@app.get("/api/public/merchants")
+async def get_public_merchants(
+    city: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50
+):
+    """
+    Get list of active merchants with public info for clients.
+    Includes: business name, city, address, phone, google maps link.
+    """
+    query = {"status": "active"}
+    
+    # City filter
+    if city:
+        query["city"] = {"$regex": city, "$options": "i"}
+    
+    # Search filter
+    if search:
+        query["$or"] = [
+            {"business_name": {"$regex": search, "$options": "i"}},
+            {"business_type": {"$regex": search, "$options": "i"}},
+            {"city": {"$regex": search, "$options": "i"}}
+        ]
+    
+    # Pagination
+    skip = (page - 1) * limit
+    
+    # Get total count
+    total_count = await db.merchants.count_documents(query)
+    
+    # Get merchants with public fields only
+    merchants = await db.merchants.find(
+        query,
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "business_type": 1,
+            "city": 1,
+            "business_address": 1,
+            "phone": 1,
+            "google_maps_url": 1,
+            "gps_coordinates": 1,
+            "qr_code": 1,
+            "cashback_rate": 1,
+            "business_description": 1
+        }
+    ).sort("business_name", 1).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "merchants": merchants,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": (total_count + limit - 1) // limit
+        }
+    }
+
+
+@app.get("/api/public/merchants/{merchant_id}")
+async def get_public_merchant_detail(merchant_id: str):
+    """
+    Get detailed public info for a single merchant.
+    """
+    merchant = await db.merchants.find_one(
+        {"$or": [{"id": merchant_id}, {"qr_code": merchant_id}], "status": "active"},
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "business_type": 1,
+            "city": 1,
+            "business_address": 1,
+            "phone": 1,
+            "google_maps_url": 1,
+            "gps_coordinates": 1,
+            "qr_code": 1,
+            "cashback_rate": 1,
+            "business_description": 1
+        }
+    )
+    
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    return merchant
 
 
 def format_duration(days: int) -> str:

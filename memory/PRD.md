@@ -124,6 +124,18 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-06)
+- **✅ Partner Merchant Visibility for Clients:**
+  - New "Partners" tab in Client Dashboard shows all active merchants
+  - Displays: business name, address, phone (clickable), Google Maps link
+  - Search functionality to find specific merchants
+  - New public API endpoints: `GET /api/public/merchants`, `GET /api/public/merchants/{id}`
+- **✅ Google Maps Location for Merchants:**
+  - Merchants can add Google Maps URL in Settings → Business Info
+  - Admin Dashboard "Add Merchant Manually" now includes Google Maps URL field
+  - Location syncs automatically to Client Dashboard
+- **✅ English Language Priority:**
+  - Updated `BusinessInfoEditor.jsx` to English (previously French)
+  - All dashboards now display in English by default
 - **✅ Admin Dashboard ↔ Landing Page Synchronization:**
   - Enhanced `/api/public/card-types` endpoint with complete card data
   - Landing Page now dynamically renders cards from API (prices, bonuses, benefits, durations)

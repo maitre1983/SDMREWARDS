@@ -41,7 +41,11 @@ import {
   Send,
   Crown,
   ArrowUp,
-  Zap
+  Zap,
+  Building,
+  ExternalLink,
+  Navigation,
+  Search
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -60,6 +64,9 @@ export default function ClientDashboard() {
   const [transactions, setTransactions] = useState([]);
   const [referrals, setReferrals] = useState(null);
   const [availableCards, setAvailableCards] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [partnersLoading, setPartnersLoading] = useState(false);
+  const [partnerSearch, setPartnerSearch] = useState('');
   
   // Card Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -329,6 +336,22 @@ export default function ClientDashboard() {
       toast.error(error.response?.data?.detail || 'Failed to check status');
     } finally {
       setIsProcessingPayment(false);
+    }
+  };
+
+  // Fetch partner merchants
+  const fetchPartners = async (search = '') => {
+    setPartnersLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '100' });
+      if (search) params.append('search', search);
+      
+      const res = await axios.get(`${API_URL}/api/public/merchants?${params.toString()}`);
+      setPartners(res.data.merchants || []);
+    } catch (error) {
+      console.error('Error fetching partners:', error);
+    } finally {
+      setPartnersLoading(false);
     }
   };
   
@@ -1311,6 +1334,127 @@ export default function ClientDashboard() {
             </div>
           </div>
         )}
+
+        {/* Partners Tab */}
+        {activeTab === 'partners' && (
+          <div className="space-y-4">
+            {/* Search */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <Input
+                    type="text"
+                    placeholder="Search merchants..."
+                    value={partnerSearch}
+                    onChange={(e) => setPartnerSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && fetchPartners(partnerSearch)}
+                    className="pl-10 bg-slate-900 border-slate-700 text-white"
+                    data-testid="partner-search-input"
+                  />
+                </div>
+                <Button
+                  onClick={() => fetchPartners(partnerSearch)}
+                  size="sm"
+                  className="bg-amber-500 hover:bg-amber-600"
+                  data-testid="partner-search-btn"
+                >
+                  <Search size={16} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Partners List */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <Store className="text-amber-400" size={18} />
+                Partner Merchants ({partners.length})
+              </h3>
+              
+              {partnersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="animate-spin text-amber-400" size={32} />
+                </div>
+              ) : partners.length > 0 ? (
+                <div className="space-y-3">
+                  {partners.map((merchant) => (
+                    <div 
+                      key={merchant.id} 
+                      className="bg-slate-900 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-colors"
+                      data-testid={`partner-card-${merchant.id}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Building className="text-amber-400" size={18} />
+                            <h4 className="text-white font-medium">{merchant.business_name}</h4>
+                          </div>
+                          
+                          {merchant.business_type && (
+                            <p className="text-slate-400 text-sm mt-1">{merchant.business_type}</p>
+                          )}
+                          
+                          {/* Location */}
+                          {(merchant.business_address || merchant.city) && (
+                            <div className="flex items-start gap-2 mt-2">
+                              <MapPin className="text-slate-500 mt-0.5" size={14} />
+                              <p className="text-slate-400 text-sm">
+                                {merchant.business_address || merchant.city}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Phone */}
+                          {merchant.phone && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Phone className="text-slate-500" size={14} />
+                              <a 
+                                href={`tel:${merchant.phone}`}
+                                className="text-amber-400 text-sm hover:underline"
+                              >
+                                {merchant.phone}
+                              </a>
+                            </div>
+                          )}
+                          
+                          {/* Cashback Rate */}
+                          {merchant.cashback_rate && (
+                            <div className="flex items-center gap-2 mt-2">
+                              <Percent className="text-emerald-400" size={14} />
+                              <span className="text-emerald-400 text-sm font-medium">
+                                Up to {merchant.cashback_rate}% cashback
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Google Maps Link */}
+                        {merchant.google_maps_url && (
+                          <a
+                            href={merchant.google_maps_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
+                            data-testid={`partner-maps-${merchant.id}`}
+                          >
+                            <Navigation size={16} />
+                            <span className="text-xs">Map</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Store className="text-slate-600 mx-auto mb-3" size={40} />
+                  <p className="text-slate-400">No merchants found</p>
+                  <p className="text-slate-500 text-sm mt-1">Try a different search term</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Bottom Navigation */}
@@ -1323,6 +1467,14 @@ export default function ClientDashboard() {
           >
             <Wallet size={22} />
             <span className="text-xs">Home</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('partners'); fetchPartners(); }}
+            className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-amber-400' : 'text-slate-500'}`}
+            data-testid="nav-partners"
+          >
+            <Store size={22} />
+            <span className="text-xs">Partners</span>
           </button>
           <button
             onClick={() => { setActiveTab('qr'); }}

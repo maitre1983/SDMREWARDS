@@ -125,7 +125,16 @@ export default function AdminDashboard() {
   });
   const [referralForm, setReferralForm] = useState({ welcome_bonus: 1, referrer_bonus: 3 });
   const [newClientForm, setNewClientForm] = useState({ full_name: '', phone: '', username: '', email: '', card_type: '' });
-  const [newMerchantForm, setNewMerchantForm] = useState({ business_name: '', owner_name: '', phone: '', email: '', cashback_rate: 5, city: '', address: '' });
+  const [newMerchantForm, setNewMerchantForm] = useState({ 
+    business_name: '', 
+    owner_name: '', 
+    phone: '', 
+    email: '', 
+    cashback_rate: 5, 
+    city: '', 
+    address: '',
+    google_maps_url: ''
+  });
 
   // Phase 2 & 3: Advanced features states
   const [smsHistory, setSmsHistory] = useState([]);
@@ -648,7 +657,16 @@ export default function AdminDashboard() {
       const res = await axios.post(`${API_URL}/api/admin/merchants/create-manual`, newMerchantForm, { headers });
       toast.success(`Merchant created! Temp password: ${res.data.temp_password}`);
       setShowCreateMerchantModal(false);
-      setNewMerchantForm({ business_name: '', owner_name: '', phone: '', email: '', cashback_rate: 5, city: '', address: '' });
+      setNewMerchantForm({ 
+        business_name: '', 
+        owner_name: '', 
+        phone: '', 
+        email: '', 
+        cashback_rate: 5, 
+        city: '', 
+        address: '',
+        google_maps_url: ''
+      });
       fetchDashboardData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to create merchant');
@@ -2622,6 +2640,26 @@ export default function AdminDashboard() {
                   onChange={(e) => setNewMerchantForm({...newMerchantForm, city: e.target.value})}
                   className="bg-slate-900 border-slate-700 text-white"
                   placeholder="Accra"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Business Address (optional)</Label>
+                <Input
+                  type="text"
+                  value={newMerchantForm.address}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, address: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="123 Main Street, Osu"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Google Maps URL (optional)</Label>
+                <Input
+                  type="url"
+                  value={newMerchantForm.google_maps_url}
+                  onChange={(e) => setNewMerchantForm({...newMerchantForm, google_maps_url: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="https://maps.google.com/..."
                 />
               </div>
             </div>
