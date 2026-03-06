@@ -456,17 +456,17 @@ async def check_payment_status(payment_id: str):
             "message": f"Payment is {payment['status']}"
         }
     
-    # Get the ext_transaction_id (BulkClix reference)
-    ext_ref = payment.get("provider_reference")
+    # Use our transaction_id (reference) for checkstatus - NOT ext_transaction_id
+    our_ref = payment.get("reference")
     
-    if not ext_ref:
+    if not our_ref:
         raise HTTPException(status_code=400, detail="Payment reference not found. Please wait for payment to process.")
     
-    # Check status with BulkClix API
+    # Check status with BulkClix API using OUR transaction_id
     try:
         async with httpx.AsyncClient(follow_redirects=True) as http_client:
             response = await http_client.get(
-                f"{BULKCLIX_BASE_URL}/payment-api/checkstatus/{ext_ref}",
+                f"{BULKCLIX_BASE_URL}/payment-api/checkstatus/{our_ref}",
                 headers={
                     "Accept": "application/json",
                     "x-api-key": BULKCLIX_API_KEY
@@ -474,7 +474,7 @@ async def check_payment_status(payment_id: str):
                 timeout=30.0
             )
             
-            logger.info(f"BulkClix check status response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
+            logger.info(f"BulkClix check status response: ref={our_ref}, status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
             
             if response.status_code == 200 and response.text:
                 result = response.json()
