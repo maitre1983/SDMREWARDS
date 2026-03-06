@@ -11,6 +11,7 @@ import httpx
 import uuid
 import logging
 import random
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -224,59 +225,80 @@ async def send_otp(request: SendOTPRequest):
             "test_mode": True
         }
     
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            # Use BulkClix native OTP API
-            response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "x-api-key": BULKCLIX_API_KEY
-                },
-                json={
-                    "phoneNumber": phone_clean,
-                    "senderId": BULKCLIX_OTP_SENDER_ID,
-                    "message": "Your SDM access code is <%otp_code%>",
-                    "expiry": 10,
-                    "length": 6
-                },
-                timeout=30.0
-            )
-            
-            result = response.json()
-            logger.info(f"BulkClix OTP response: {result}")
-            
-            if response.status_code == 200 and result.get("message") == "OTP sent":
-                otp_data = result.get("data", {}).get("otp", {})
-                request_id = otp_data.get("requestId", f"OTP-{uuid.uuid4()}")
-                ussd_code = otp_data.get("ussd_code", "")
+    # Retry logic for better reliability
+    max_retries = 2
+    last_error = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as http_client:
+                # Use BulkClix native OTP API
+                response = await http_client.post(
+                    f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "x-api-key": BULKCLIX_API_KEY
+                    },
+                    json={
+                        "phoneNumber": phone_clean,
+                        "senderId": BULKCLIX_OTP_SENDER_ID,
+                        "message": "Your SDM access code is <%otp_code%>",
+                        "expiry": 10,
+                        "length": 6
+                    },
+                    timeout=15.0  # Reduced timeout for faster response
+                )
                 
-                # Store OTP record for tracking
-                await db.otp_records.insert_one({
-                    "phone": phone,
-                    "request_id": request_id,
-                    "bulkclix_prefix": otp_data.get("prefix"),
-                    "ussd_code": ussd_code,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
-                    "verified": False
-                })
+                logger.info(f"BulkClix OTP response (attempt {attempt+1}): status={response.status_code}, body={response.text[:300] if response.text else 'EMPTY'}")
                 
-                return {
-                    "success": True,
-                    "request_id": request_id,
-                    "ussd_code": ussd_code,
-                    "message": "OTP sent successfully"
-                }
-            else:
-                error_msg = result.get("message", "Failed to send OTP")
-                logger.error(f"BulkClix OTP error: {error_msg}")
-                raise HTTPException(status_code=400, detail=error_msg)
-                
-    except httpx.RequestError as e:
-        logger.error(f"BulkClix OTP request error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to send OTP")
+                if response.status_code == 200 and response.text:
+                    result = response.json()
+                    
+                    if result.get("message") == "OTP sent":
+                        otp_data = result.get("data", {}).get("otp", {})
+                        request_id = otp_data.get("requestId", f"OTP-{uuid.uuid4()}")
+                        ussd_code = otp_data.get("ussd_code", "")
+                        
+                        # Store OTP record for tracking
+                        await db.otp_records.insert_one({
+                            "phone": phone,
+                            "request_id": request_id,
+                            "bulkclix_prefix": otp_data.get("prefix"),
+                            "ussd_code": ussd_code,
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                            "verified": False
+                        })
+                        
+                        return {
+                            "success": True,
+                            "request_id": request_id,
+                            "ussd_code": ussd_code,
+                            "message": "OTP sent successfully"
+                        }
+                    else:
+                        last_error = result.get("message", "OTP service error")
+                else:
+                    last_error = f"Service returned status {response.status_code}"
+                    
+        except httpx.TimeoutException:
+            logger.warning(f"BulkClix OTP timeout (attempt {attempt+1})")
+            last_error = "Service timeout - please try again"
+        except httpx.RequestError as e:
+            logger.error(f"BulkClix OTP request error (attempt {attempt+1}): {e}")
+            last_error = "Network error - please try again"
+        except Exception as e:
+            logger.error(f"BulkClix OTP unexpected error (attempt {attempt+1}): {e}")
+            last_error = "Service temporarily unavailable"
+        
+        # Wait before retry
+        if attempt < max_retries:
+            await asyncio.sleep(1)
+    
+    # All retries failed
+    logger.error(f"BulkClix OTP failed after {max_retries+1} attempts: {last_error}")
+    raise HTTPException(status_code=503, detail=f"Unable to send OTP: {last_error}. Please try again in a moment.")
 
 
 @router.post("/otp/verify")

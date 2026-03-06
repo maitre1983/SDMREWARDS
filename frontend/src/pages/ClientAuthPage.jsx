@@ -104,27 +104,32 @@ export default function ClientAuthPage() {
   };
 
   const handleSendOTP = async () => {
-    if (!phone) {
-      toast.error('Please enter your phone number');
+    if (!phone || phone.length < 10) {
+      toast.error('Please enter a valid phone number');
       return;
     }
 
     setIsLoading(true);
+    toast.loading('Sending OTP...', { id: 'otp-send' });
+    
     try {
       const response = await axios.post(`${API_URL}/api/auth/otp/send`, {
         phone: normalizePhone(phone)
       });
 
+      toast.dismiss('otp-send');
       setRequestId(response.data.request_id);
       setUssdCode(response.data.ussd_code || '');
       setMode('otp');
-      toast.success('OTP sent to your phone!');
+      toast.success('OTP sent! Check your phone for the code.');
       
       if (response.data.test_mode) {
         toast.info('Test mode: Use code 123456');
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to send OTP');
+      toast.dismiss('otp-send');
+      const errorMsg = error.response?.data?.detail || 'Unable to send OTP. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -420,7 +425,8 @@ export default function ClientAuthPage() {
                 {/* Phone & OTP Status */}
                 <div>
                   <Label className="text-slate-300 text-sm">Phone Number</Label>
-                  <div className="relative mt-1.5">
+                  <p className="text-slate-500 text-xs mt-0.5 mb-1">You will receive an OTP code via SMS</p>
+                  <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                     <Input
                       type="tel"
@@ -428,7 +434,7 @@ export default function ClientAuthPage() {
                       value={phone}
                       onChange={(e) => { setPhone(e.target.value); setOtpVerified(false); }}
                       disabled={otpVerified}
-                      className="pl-11 pr-24 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
+                      className="pl-11 pr-28 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
                       data-testid="register-phone"
                     />
                     {otpVerified ? (
@@ -439,10 +445,10 @@ export default function ClientAuthPage() {
                       <button
                         type="button"
                         onClick={handleSendOTP}
-                        disabled={isLoading || !phone}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 hover:text-amber-300 text-sm font-medium px-2 py-1"
+                        disabled={isLoading || !phone || phone.length < 10}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 hover:text-amber-300 text-sm font-medium px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {isLoading ? '...' : 'Get OTP'}
+                        {isLoading ? 'Sending...' : 'Send OTP'}
                       </button>
                     )}
                   </div>

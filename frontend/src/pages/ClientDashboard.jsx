@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import QRScanner from '../components/QRScanner';
 import ReferralQRCode from '../components/client/ReferralQRCode';
 import { QRCodeSVG } from 'qrcode.react';
+import ServicesPage from './ServicesPage';
 import { 
   Sparkles, 
   CreditCard, 
@@ -33,6 +34,8 @@ import {
   AlertCircle,
   Camera,
   Percent,
+  Smartphone,
+  Grid3X3,
   MapPin,
   Banknote,
   Send,
@@ -95,6 +98,9 @@ export default function ClientDashboard() {
   const [upgradeStatus, setUpgradeStatus] = useState(null);
   const [upgradePaymentId, setUpgradePaymentId] = useState(null);
   const [isUpgradeTestMode, setIsUpgradeTestMode] = useState(false);
+  
+  // Services page
+  const [showServices, setShowServices] = useState(false);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -739,6 +745,17 @@ export default function ClientDashboard() {
 
   const isActive = client?.status === 'active';
 
+  // Show Services Page
+  if (showServices) {
+    return (
+      <ServicesPage 
+        balance={client?.cashback_balance || 0}
+        onBack={() => setShowServices(false)}
+        onRefresh={fetchDashboardData}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
@@ -793,16 +810,31 @@ export default function ClientDashboard() {
             </div>
           </div>
           
-          {/* Withdraw Button */}
-          {isActive && (client?.cashback_balance || 0) >= 5 && (
-            <Button
-              onClick={openWithdrawalModal}
-              className="mt-4 w-full bg-white/20 hover:bg-white/30 text-white"
-              data-testid="withdraw-btn"
-            >
-              <Banknote size={18} className="mr-2" />
-              Withdraw to MoMo
-            </Button>
+          {/* Action Buttons */}
+          {isActive && (
+            <div className="mt-4 flex gap-3">
+              {/* Services Button */}
+              <Button
+                onClick={() => setShowServices(true)}
+                className="flex-1 bg-white/20 hover:bg-white/30 text-white"
+                data-testid="services-btn"
+              >
+                <Grid3X3 size={18} className="mr-2" />
+                Services
+              </Button>
+              
+              {/* Withdraw Button */}
+              {(client?.cashback_balance || 0) >= 2 && (
+                <Button
+                  onClick={openWithdrawalModal}
+                  className="flex-1 bg-white/20 hover:bg-white/30 text-white"
+                  data-testid="withdraw-btn"
+                >
+                  <Banknote size={18} className="mr-2" />
+                  Withdraw
+                </Button>
+              )}
+            </div>
           )}
         </div>
 

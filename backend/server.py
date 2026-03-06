@@ -300,6 +300,7 @@ from routers.merchants import router as merchants_router
 from routers.transactions import router as transactions_router
 from routers.admin import router as admin_router
 from routers import payments as payments_router_module
+from routers.services import router as services_router
 
 # Set database for payments router
 payments_router_module.set_db(db)
@@ -311,6 +312,7 @@ app.include_router(merchants_router, prefix="/api/merchants", tags=["Merchants"]
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(payments_router_module.router, prefix="/api/payments", tags=["Payments"])
+app.include_router(services_router, prefix="/api/services", tags=["Services"])
 
 # ============== ERROR HANDLERS ==============
 from fastapi.responses import JSONResponse
