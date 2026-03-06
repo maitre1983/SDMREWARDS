@@ -208,12 +208,13 @@ async def initiate_card_payment(request: CardPaymentRequest):
             # BulkClix returns "Payment Initiated Successful" message on success
             if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
                 payment_data = result.get("data", {})
+                # Store ext_transaction_id as provider_reference for callback matching
                 await db.momo_payments.update_one(
                     {"id": payment_record["id"]},
                     {
                         "$set": {
                             "status": "processing",
-                            "provider_reference": payment_data.get("transaction_id") or payment_data.get("ext_transaction_id") or result.get("reference") or result.get("transactionId"),
+                            "provider_reference": payment_data.get("ext_transaction_id"),
                             "provider_message": result.get("message"),
                             "updated_at": datetime.now(timezone.utc).isoformat()
                         }
@@ -381,24 +382,27 @@ async def payment_callback(request: Request):
     
     logger.info(f"Payment callback received: {data}")
     
-    reference = data.get("reference") or data.get("transactionId") or data.get("transaction_id")
+    # BulkClix sends: transaction_id (our ref), ext_transaction_id (their ref)
+    our_ref = data.get("transaction_id")
+    ext_ref = data.get("ext_transaction_id")
     status = (data.get("status") or "").lower()
     
-    if not reference:
-        logger.warning("Callback missing reference")
+    if not our_ref and not ext_ref:
+        logger.warning("Callback missing transaction references")
         return {"success": False, "message": "Missing reference"}
     
-    # Find payment by provider reference or our reference
+    # Find payment by our reference or provider reference
     payment = await db.momo_payments.find_one(
         {"$or": [
-            {"provider_reference": reference},
-            {"reference": reference}
+            {"reference": our_ref},
+            {"provider_reference": ext_ref},
+            {"provider_reference": our_ref}
         ]},
         {"_id": 0}
     )
     
     if not payment:
-        logger.warning(f"Payment not found for reference: {reference}")
+        logger.warning(f"Payment not found for refs: our={our_ref}, ext={ext_ref}")
         return {"success": False, "message": "Payment not found"}
     
     logger.info(f"Processing callback for payment {payment['id']}, status: {status}")
