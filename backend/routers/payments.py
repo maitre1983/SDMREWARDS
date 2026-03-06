@@ -738,16 +738,15 @@ async def process_card_purchase(payment: Dict):
     if config:
         referrer_bonus = config.get("referrer_bonus", 3.0)
     
-    # Welcome bonus based on card type
-    # 25 GHS card (silver) → 1 GHS
-    # 50 GHS card (gold) → 2 GHS
-    # 100 GHS card (platinum) → 3 GHS
-    welcome_bonus_map = {
-        "silver": 1.0,
-        "gold": 2.0,
-        "platinum": 3.0
-    }
-    welcome_bonus = welcome_bonus_map.get(card_type.lower(), 1.0)
+    # Welcome bonus based on card type - configurable from admin
+    # Default: 25 GHS card (silver) → 1 GHS, 50 GHS (gold) → 2 GHS, 100 GHS (platinum) → 3 GHS
+    welcome_bonus_defaults = {"silver": 1.0, "gold": 2.0, "platinum": 3.0}
+    
+    if config and config.get("welcome_bonuses"):
+        welcome_bonuses = config.get("welcome_bonuses")
+        welcome_bonus = welcome_bonuses.get(card_type.lower(), welcome_bonus_defaults.get(card_type.lower(), 1.0))
+    else:
+        welcome_bonus = welcome_bonus_defaults.get(card_type.lower(), 1.0)
     
     logger.info(f"Processing card purchase: client={client_id}, card={card_type}, welcome_bonus={welcome_bonus}, referrer_id={referrer_id}")
     

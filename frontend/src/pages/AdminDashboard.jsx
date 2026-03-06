@@ -111,7 +111,8 @@ export default function AdminDashboard() {
     silver_benefits: '3% cashback on all purchases', 
     gold_benefits: '5% cashback + Priority support',
     platinum_benefits: '7% cashback + VIP benefits + Exclusive offers',
-    silver_duration: 365, gold_duration: 365, platinum_duration: 730
+    silver_duration: 365, gold_duration: 365, platinum_duration: 730,
+    silver_welcome_bonus: 1, gold_welcome_bonus: 2, platinum_welcome_bonus: 3
   });
   const [commissionsForm, setCommissionsForm] = useState({
     platform_commission_rate: 5, min_cashback: 1, max_cashback: 20
@@ -292,6 +293,14 @@ export default function AdminDashboard() {
               silver_duration: configRes.data.config.card_durations.silver || 365,
               gold_duration: configRes.data.config.card_durations.gold || 365,
               platinum_duration: configRes.data.config.card_durations.platinum || 730
+            }));
+          }
+          if (configRes.data.config.welcome_bonuses) {
+            setCardPricesForm(prev => ({
+              ...prev,
+              silver_welcome_bonus: configRes.data.config.welcome_bonuses.silver || 1,
+              gold_welcome_bonus: configRes.data.config.welcome_bonuses.gold || 2,
+              platinum_welcome_bonus: configRes.data.config.welcome_bonuses.platinum || 3
             }));
           }
           if (configRes.data.config.platform_commission_rate) {
@@ -1289,6 +1298,17 @@ export default function AdminDashboard() {
                                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
                               />
                             </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Welcome Bonus (GHS)</Label>
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={cardPricesForm.silver_welcome_bonus}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, silver_welcome_bonus: parseFloat(e.target.value)})}
+                                className="bg-slate-800 border-slate-700 text-white mt-1"
+                              />
+                            </div>
                           </div>
                         </div>
 
@@ -1328,6 +1348,17 @@ export default function AdminDashboard() {
                                 value={cardPricesForm.gold_benefits}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, gold_benefits: e.target.value})}
                                 className="w-full bg-slate-800 border border-amber-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Welcome Bonus (GHS)</Label>
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={cardPricesForm.gold_welcome_bonus}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, gold_welcome_bonus: parseFloat(e.target.value)})}
+                                className="bg-slate-800 border-amber-700/50 text-white mt-1"
                               />
                             </div>
                           </div>
@@ -1370,6 +1401,17 @@ export default function AdminDashboard() {
                                 value={cardPricesForm.platinum_benefits}
                                 onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_benefits: e.target.value})}
                                 className="w-full bg-slate-800 border border-purple-700/50 rounded-lg p-2 text-white text-sm mt-1 min-h-[60px]"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-400 text-sm">Welcome Bonus (GHS)</Label>
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={cardPricesForm.platinum_welcome_bonus}
+                                onChange={(e) => setCardPricesForm({...cardPricesForm, platinum_welcome_bonus: parseFloat(e.target.value)})}
+                                className="bg-slate-800 border-purple-700/50 text-white mt-1"
                               />
                             </div>
                           </div>

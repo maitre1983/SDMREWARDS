@@ -86,6 +86,9 @@ class UpdateCardPricesRequest(BaseModel):
     silver_duration: Optional[int] = None  # Duration in days
     gold_duration: Optional[int] = None
     platinum_duration: Optional[int] = None
+    silver_welcome_bonus: Optional[float] = None
+    gold_welcome_bonus: Optional[float] = None
+    platinum_welcome_bonus: Optional[float] = None
 
 
 class CreateCardTypeRequest(BaseModel):
@@ -1442,6 +1445,14 @@ async def update_card_prices(
     if request.platinum_duration is not None:
         updates["card_durations.platinum"] = request.platinum_duration
     
+    # Welcome Bonuses
+    if request.silver_welcome_bonus is not None:
+        updates["welcome_bonuses.silver"] = request.silver_welcome_bonus
+    if request.gold_welcome_bonus is not None:
+        updates["welcome_bonuses.gold"] = request.gold_welcome_bonus
+    if request.platinum_welcome_bonus is not None:
+        updates["welcome_bonuses.platinum"] = request.platinum_welcome_bonus
+    
     await db.platform_config.update_one({"key": "main"}, {"$set": updates})
     
     await db.admin_logs.insert_one({
@@ -1469,6 +1480,7 @@ async def get_card_types(current_admin: dict = Depends(get_current_admin)):
         card_prices = config.get("card_prices", {})
         card_benefits = config.get("card_benefits", {})
         card_durations = config.get("card_durations", {"silver": 365, "gold": 365, "platinum": 730})
+        welcome_bonuses = config.get("welcome_bonuses", {"silver": 1, "gold": 2, "platinum": 3})
         
         for card_type in ["silver", "gold", "platinum"]:
             default_cards.append({
@@ -1478,6 +1490,7 @@ async def get_card_types(current_admin: dict = Depends(get_current_admin)):
                 "price": card_prices.get(card_type, 0),
                 "duration_days": card_durations.get(card_type, 365),
                 "benefits": card_benefits.get(card_type, ""),
+                "welcome_bonus": welcome_bonuses.get(card_type, 1),
                 "color": {"silver": "#94a3b8", "gold": "#f59e0b", "platinum": "#6366f1"}.get(card_type, "#6366f1"),
                 "icon": "credit-card",
                 "is_default": True,
