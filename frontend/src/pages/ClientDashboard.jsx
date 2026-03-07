@@ -1302,25 +1302,39 @@ export default function ClientDashboard() {
                   {referrals.referrals.map((ref) => (
                     <div key={ref.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center">
-                          <User className="text-slate-400" size={18} />
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          ref.display_status === 'active' || ref.card_purchased
+                            ? 'bg-emerald-500/20'
+                            : 'bg-slate-700'
+                        }`}>
+                          <User className={`${
+                            ref.display_status === 'active' || ref.card_purchased
+                              ? 'text-emerald-400'
+                              : 'text-slate-400'
+                          }`} size={18} />
                         </div>
                         <div>
-                          <p className="text-white text-sm">{ref.referred_client?.full_name || 'Utilisateur'}</p>
+                          <p className="text-white text-sm">{ref.referred_client?.full_name || 'User'}</p>
                           <p className="text-slate-500 text-xs">
-                            {new Date(ref.created_at).toLocaleDateString('fr-FR')}
+                            {new Date(ref.created_at).toLocaleDateString('en-GB')}
                           </p>
                         </div>
                       </div>
-                      {ref.bonuses_paid ? (
-                        <span className="text-emerald-400 text-sm flex items-center gap-1">
-                          <CheckCircle size={14} /> +GHS 3
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-sm flex items-center gap-1">
-                          <Clock size={14} /> Pending
-                        </span>
-                      )}
+                      <div className="text-right">
+                        {ref.bonuses_paid ? (
+                          <span className="text-emerald-400 text-sm flex items-center gap-1">
+                            <CheckCircle size={14} /> +GHS {ref.referrer_bonus || 3}
+                          </span>
+                        ) : ref.display_status === 'active' || ref.card_purchased ? (
+                          <span className="text-amber-400 text-sm flex items-center gap-1">
+                            <CheckCircle size={14} /> Active
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 text-sm flex items-center gap-1">
+                            <Clock size={14} /> Pending
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

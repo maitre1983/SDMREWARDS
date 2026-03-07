@@ -750,18 +750,33 @@ async def get_referrals(current_client: dict = Depends(get_current_client)):
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
     
-    # Enrich with referred client info
+    # Enrich with referred client info and sync status
     for ref in referrals:
         referred = await db.clients.find_one(
             {"id": ref["referred_id"]},
-            {"_id": 0, "full_name": 1, "phone": 1, "status": 1, "created_at": 1}
+            {"_id": 0, "full_name": 1, "phone": 1, "status": 1, "card_type": 1, "created_at": 1}
         )
         if referred:
             ref["referred_client"] = referred
+            
+            # Sync card_purchased status with actual client status
+            # A client is "active" if they have a card_type
+            client_is_active = referred.get("status") == "active" and referred.get("card_type") is not None
+            
+            # If client bought card but referral record not updated, update it now
+            if client_is_active and not ref.get("card_purchased"):
+                await db.referrals.update_one(
+                    {"id": ref["id"]},
+                    {"$set": {"card_purchased": True}}
+                )
+                ref["card_purchased"] = True
+            
+            # Determine display status
+            ref["display_status"] = "active" if client_is_active else "pending"
     
     # Stats
     total_referrals = len(referrals)
-    active_referrals = sum(1 for r in referrals if r.get("card_purchased"))
+    active_referrals = sum(1 for r in referrals if r.get("card_purchased") or r.get("display_status") == "active")
     total_bonus_earned = sum(r.get("referrer_bonus", 0) for r in referrals if r.get("bonuses_paid"))
     
     return {

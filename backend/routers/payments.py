@@ -138,12 +138,34 @@ async def initiate_card_payment(request: CardPaymentRequest):
     if not network:
         raise HTTPException(status_code=400, detail="Invalid phone number or unsupported network")
     
-    # Handle referrer
+    # Handle referrer - check both request and client record
     referrer_id = None
+    
+    # First check if referrer_code provided in request
     if request.referrer_code:
         referrer = await db.clients.find_one({"referral_code": request.referrer_code}, {"_id": 0})
         if referrer and referrer["id"] != client["id"]:
             referrer_id = referrer["id"]
+    
+    # If no referrer from request, check if client was referred during registration
+    if not referrer_id:
+        # Check referrals collection for this client as referred
+        existing_referral = await db.referrals.find_one(
+            {"referred_id": client["id"], "bonuses_paid": {"$ne": True}},
+            {"_id": 0, "referrer_id": 1}
+        )
+        if existing_referral:
+            referrer_id = existing_referral.get("referrer_id")
+        
+        # Also check client's referred_by field (which stores referral_code)
+        if not referrer_id and client.get("referred_by"):
+            # referred_by contains the referral_code, find the referrer by code
+            referrer = await db.clients.find_one(
+                {"referral_code": client.get("referred_by")},
+                {"_id": 0, "id": 1}
+            )
+            if referrer:
+                referrer_id = referrer["id"]
     
     # Generate payment reference
     payment_ref = f"SDM-CARD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
@@ -825,15 +847,15 @@ async def process_card_purchase(payment: Dict):
                 "created_at": datetime.now(timezone.utc).isoformat()
             })
             
-            # Update/create referral record
+            # Update/create referral record - mark as completed
             await db.referrals.update_one(
                 {"referrer_id": referrer_id, "referred_id": client_id},
                 {
                     "$set": {
-                        "status": "completed",
-                        "bonus_paid": True,
-                        "bonus_amount": referrer_bonus,
-                        "completed_at": datetime.now(timezone.utc).isoformat()
+                        "card_purchased": True,
+                        "bonuses_paid": True,
+                        "referrer_bonus": referrer_bonus,
+                        "bonus_paid_at": datetime.now(timezone.utc).isoformat()
                     }
                 },
                 upsert=True

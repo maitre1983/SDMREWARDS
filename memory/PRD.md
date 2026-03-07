@@ -123,6 +123,18 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ---
 
+## Recent Changes (2026-03-07)
+- **✅ Fixed Referral Bonus System:**
+  - Fixed: Referrer now receives 3 GHS bonus when referred user buys a card
+  - Fixed: Referral status now shows "Active" instead of "Pending" when referred user has bought a card
+  - Backend: Updated `payments.py` to look up referrer by `referral_code` stored in `referred_by` field
+  - Backend: Updated `clients.py` `/referrals` endpoint to sync and return `display_status`
+  - Frontend: Updated referral list to show proper status (Pending/Active/Bonus credited)
+- **✅ Fixed SMS Sending:**
+  - Corrected import from `bulkclix_service` to `sms_service`
+  - Added `get_sms()` alias function
+  - Fixed BulkClix response parsing to detect `campaignId` for success
+
 ## Recent Changes (2026-03-06)
 - **✅ Partner Merchant Visibility for Clients:**
   - New "Partners" tab in Client Dashboard shows all active merchants
