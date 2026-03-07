@@ -124,6 +124,10 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-07)
+- **✅ Added All Mobile Networks to Merchant Payment Form:**
+  - Added phone number input field with placeholder showing registered number
+  - Added network selector dropdown with MTN, Telecel, AirtelTigo options
+  - Form accessible via QR Code → Browse Partner Merchants → Pay This Merchant
 - **✅ Fixed Membership Card Statistics in Admin Dashboard:**
   - Card counts by category (Silver, Gold, Platinum, Diamond) now accurately reflect active clients
   - Changed counting logic from transactions to clients collection for accurate real-time data

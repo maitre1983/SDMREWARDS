@@ -85,6 +85,8 @@ export default function ClientDashboard() {
   const [showMerchantPayModal, setShowMerchantPayModal] = useState(false);
   const [selectedMerchant, setSelectedMerchant] = useState(null);
   const [merchantPayAmount, setMerchantPayAmount] = useState('');
+  const [merchantPayPhone, setMerchantPayPhone] = useState('');
+  const [merchantPayNetwork, setMerchantPayNetwork] = useState('MTN');
   const [merchantPayStatus, setMerchantPayStatus] = useState(null);
   const [merchantPaymentId, setMerchantPaymentId] = useState(null);
   const [isMerchantPayTestMode, setIsMerchantPayTestMode] = useState(false);
@@ -398,14 +400,22 @@ export default function ClientDashboard() {
       return;
     }
     
+    // Validate phone
+    const payPhone = merchantPayPhone || client?.phone;
+    if (!payPhone || payPhone.length < 10) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    
     setIsProcessingPayment(true);
     setMerchantPayStatus('processing');
     
     try {
       const res = await axios.post(`${API_URL}/api/payments/merchant/initiate`, {
-        client_phone: client?.phone,
+        client_phone: payPhone,
         merchant_qr_code: selectedMerchant?.payment_qr_code,
-        amount: amount
+        amount: amount,
+        network: merchantPayNetwork
       });
       
       if (res.data.success) {
@@ -510,6 +520,8 @@ export default function ClientDashboard() {
     setMerchantPayStatus(null);
     setMerchantPaymentId(null);
     setMerchantPayAmount('');
+    setMerchantPayPhone('');
+    setMerchantPayNetwork('MTN');
   };
 
   // ============== REFERRAL SHARING ==============
@@ -1793,7 +1805,7 @@ export default function ClientDashboard() {
             ) : (
               <>
                 {/* Amount Input */}
-                <div className="mb-6">
+                <div className="mb-4">
                   <label className="text-slate-300 text-sm block mb-2">
                     Payment Amount (GHS)
                   </label>
@@ -1807,6 +1819,41 @@ export default function ClientDashboard() {
                     className="bg-slate-900 border-slate-700 text-white text-2xl text-center py-6"
                     data-testid="merchant-pay-amount"
                   />
+                </div>
+                
+                {/* Phone Number Input */}
+                <div className="mb-4">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    MoMo Phone Number
+                  </label>
+                  <Input
+                    type="tel"
+                    placeholder={client?.phone || "0XX XXX XXXX"}
+                    value={merchantPayPhone}
+                    onChange={(e) => setMerchantPayPhone(e.target.value)}
+                    className="bg-slate-900 border-slate-700 text-white"
+                    data-testid="merchant-pay-phone"
+                  />
+                  <p className="text-slate-500 text-xs mt-1">
+                    Leave empty to use your registered number
+                  </p>
+                </div>
+                
+                {/* Network Selection */}
+                <div className="mb-6">
+                  <label className="text-slate-300 text-sm block mb-2">
+                    Mobile Network
+                  </label>
+                  <select
+                    value={merchantPayNetwork}
+                    onChange={(e) => setMerchantPayNetwork(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3"
+                    data-testid="merchant-pay-network"
+                  >
+                    <option value="MTN">MTN MoMo</option>
+                    <option value="TELECEL">Telecel (ex-Vodafone)</option>
+                    <option value="AIRTELTIGO">AirtelTigo (AT)</option>
+                  </select>
                 </div>
                 
                 {/* Cashback Preview */}
