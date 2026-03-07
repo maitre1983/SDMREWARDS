@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -838,6 +838,61 @@ async def update_profile(
     )
     
     return {"success": True, "message": "Profile updated"}
+
+
+@router.put("/payment-settings")
+async def update_payment_settings(
+    request: Request,
+    current_client: dict = Depends(get_current_client)
+):
+    """Update client payment settings (MoMo and Bank account)"""
+    data = await request.json()
+    
+    updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    # MoMo settings
+    if "momo_number" in data:
+        updates["momo_number"] = data["momo_number"]
+    if "momo_network" in data:
+        updates["momo_network"] = data["momo_network"]
+    
+    # Bank settings
+    if "bank_name" in data:
+        updates["bank_name"] = data["bank_name"]
+    if "bank_account" in data:
+        updates["bank_account"] = data["bank_account"]
+    if "bank_branch" in data:
+        updates["bank_branch"] = data["bank_branch"]
+    
+    # Preferred withdrawal method
+    if "preferred_withdrawal_method" in data:
+        if data["preferred_withdrawal_method"] in ["momo", "bank"]:
+            updates["preferred_withdrawal_method"] = data["preferred_withdrawal_method"]
+    
+    await db.clients.update_one(
+        {"id": current_client["id"]},
+        {"$set": updates}
+    )
+    
+    return {"success": True, "message": "Payment settings updated"}
+
+
+@router.get("/payment-settings")
+async def get_payment_settings(current_client: dict = Depends(get_current_client)):
+    """Get client payment settings"""
+    client = await db.clients.find_one(
+        {"id": current_client["id"]},
+        {"_id": 0, "momo_number": 1, "momo_network": 1, "bank_name": 1, "bank_account": 1, "bank_branch": 1, "preferred_withdrawal_method": 1}
+    )
+    
+    return {
+        "momo_number": client.get("momo_number", ""),
+        "momo_network": client.get("momo_network", ""),
+        "bank_name": client.get("bank_name", ""),
+        "bank_account": client.get("bank_account", ""),
+        "bank_branch": client.get("bank_branch", ""),
+        "preferred_withdrawal_method": client.get("preferred_withdrawal_method", "momo")
+    }
 
 
 # ============== WITHDRAWALS ==============

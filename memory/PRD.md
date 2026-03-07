@@ -124,6 +124,12 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-07)
+- **✅ Client Withdrawal Method Choice (MoMo or Bank):**
+  - Added "Payment Settings" modal where clients configure their MoMo and Bank account details
+  - Withdrawal modal now offers choice between "Mobile Money" (Instant) and "Bank Account" (1-3 days)
+  - Clients can set their preferred default withdrawal method
+  - Settings button added next to Withdraw button on dashboard
+  - Backend endpoints: GET/PUT `/api/clients/payment-settings`
 - **✅ Auto-Pay Merchant on Customer Payment:**
   - When a customer pays a merchant, the merchant's share is automatically transferred to their configured MoMo account
   - Uses BulkClix disbursement API (`/payment-api/send/mobilemoney`)

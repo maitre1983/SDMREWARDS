@@ -43,6 +43,7 @@ import {
   ArrowUp,
   Zap,
   Building,
+  Building2,
   ExternalLink,
   Navigation,
   Search
@@ -96,9 +97,22 @@ export default function ClientDashboard() {
   const [withdrawalPhone, setWithdrawalPhone] = useState('');
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [withdrawalNetwork, setWithdrawalNetwork] = useState('');
+  const [withdrawalMethod, setWithdrawalMethod] = useState('momo'); // 'momo' or 'bank'
   const [withdrawalStatus, setWithdrawalStatus] = useState(null);
   const [withdrawalId, setWithdrawalId] = useState(null);
   const [isWithdrawalTestMode, setIsWithdrawalTestMode] = useState(false);
+  
+  // Payment Settings state
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState({
+    momo_number: '',
+    momo_network: 'MTN',
+    bank_name: '',
+    bank_account: '',
+    bank_branch: '',
+    preferred_withdrawal_method: 'momo'
+  });
+  const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
 
   // Card Upgrade modal state
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -122,6 +136,7 @@ export default function ClientDashboard() {
       return;
     }
     fetchDashboardData();
+    fetchPaymentSettings();
     
     // Check if navigated from Partners page with merchant to pay
     if (location.state?.payMerchant && location.state?.merchantQR) {
@@ -206,6 +221,37 @@ export default function ClientDashboard() {
       setReferrals(res.data);
     } catch (error) {
       console.error('Referrals fetch error:', error);
+    }
+  };
+
+  const fetchPaymentSettings = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${API_URL}/api/clients/payment-settings`, { headers });
+      setPaymentSettings({
+        momo_number: res.data.momo_number || '',
+        momo_network: res.data.momo_network || 'MTN',
+        bank_name: res.data.bank_name || '',
+        bank_account: res.data.bank_account || '',
+        bank_branch: res.data.bank_branch || '',
+        preferred_withdrawal_method: res.data.preferred_withdrawal_method || 'momo'
+      });
+    } catch (error) {
+      console.error('Payment settings fetch error:', error);
+    }
+  };
+
+  const savePaymentSettings = async () => {
+    setSavingPaymentSettings(true);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.put(`${API_URL}/api/clients/payment-settings`, paymentSettings, { headers });
+      toast.success('Payment settings saved successfully');
+      setShowPaymentSettings(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save settings');
+    } finally {
+      setSavingPaymentSettings(false);
     }
   };
 
@@ -567,9 +613,11 @@ export default function ClientDashboard() {
   // ============== WITHDRAWAL FUNCTIONS ==============
 
   const openWithdrawalModal = () => {
-    setWithdrawalPhone(client?.phone || '');
+    // Initialize with saved payment settings
+    setWithdrawalPhone(paymentSettings.momo_number || client?.phone || '');
+    setWithdrawalNetwork(paymentSettings.momo_network || 'MTN');
+    setWithdrawalMethod(paymentSettings.preferred_withdrawal_method || 'momo');
     setWithdrawalAmount('');
-    setWithdrawalNetwork('');
     setWithdrawalStatus(null);
     setWithdrawalId(null);
     setShowWithdrawalModal(true);
@@ -587,20 +635,42 @@ export default function ClientDashboard() {
       return;
     }
 
-    if (!withdrawalPhone) {
-      toast.error('Please enter phone number');
-      return;
+    // Validate based on withdrawal method
+    if (withdrawalMethod === 'momo') {
+      if (!withdrawalPhone) {
+        toast.error('Please enter phone number');
+        return;
+      }
+      if (!withdrawalNetwork) {
+        toast.error('Please select a network');
+        return;
+      }
+    } else if (withdrawalMethod === 'bank') {
+      if (!paymentSettings.bank_name || !paymentSettings.bank_account) {
+        toast.error('Please configure your bank account in Payment Settings first');
+        return;
+      }
     }
 
     setIsProcessingPayment(true);
     setWithdrawalStatus('processing');
     
     try {
-      const res = await axios.post(`${API_URL}/api/payments/withdrawal/initiate`, {
-        phone: withdrawalPhone,
+      const payload = {
         amount: amount,
-        network: withdrawalNetwork || null
-      }, {
+        method: withdrawalMethod
+      };
+      
+      if (withdrawalMethod === 'momo') {
+        payload.phone = withdrawalPhone;
+        payload.network = withdrawalNetwork;
+      } else {
+        payload.bank_name = paymentSettings.bank_name;
+        payload.bank_account = paymentSettings.bank_account;
+        payload.bank_branch = paymentSettings.bank_branch;
+      }
+      
+      const res = await axios.post(`${API_URL}/api/payments/withdrawal/initiate`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -917,6 +987,16 @@ export default function ClientDashboard() {
                   Withdraw
                 </Button>
               )}
+              
+              {/* Payment Settings Button */}
+              <Button
+                onClick={() => setShowPaymentSettings(true)}
+                variant="outline"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                data-testid="payment-settings-btn"
+              >
+                <Settings size={18} />
+              </Button>
             </div>
           )}
         </div>
@@ -1892,7 +1972,7 @@ export default function ClientDashboard() {
       {/* ============== WITHDRAWAL MODAL ============== */}
       {showWithdrawalModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={closeWithdrawalModal}
@@ -1908,7 +1988,7 @@ export default function ClientDashboard() {
               </div>
               <h3 className="text-xl font-bold text-white">Withdraw Cashback</h3>
               <p className="text-slate-400 text-sm mt-1">
-                Send your cashback to Mobile Money
+                Choose where to receive your money
               </p>
             </div>
             
@@ -1924,7 +2004,12 @@ export default function ClientDashboard() {
               <div className="text-center py-6">
                 <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
                 <p className="text-emerald-400 text-xl font-bold">Withdrawal Successful!</p>
-                <p className="text-slate-400 mt-2">Funds sent to {withdrawalPhone}</p>
+                <p className="text-slate-400 mt-2">
+                  {withdrawalMethod === 'momo' 
+                    ? `Funds sent to ${withdrawalPhone}`
+                    : `Funds sent to ${paymentSettings.bank_name} - ${paymentSettings.bank_account}`
+                  }
+                </p>
               </div>
             ) : withdrawalStatus === 'pending' ? (
               <div className="text-center py-4">
@@ -1932,7 +2017,10 @@ export default function ClientDashboard() {
                 <p className="text-white font-medium mb-2">Withdrawal Pending</p>
                 <p className="text-slate-400 text-sm mb-4">
                   Amount: GHS {parseFloat(withdrawalAmount).toFixed(2)}<br />
-                  To: {withdrawalPhone}
+                  {withdrawalMethod === 'momo' 
+                    ? `To: ${withdrawalPhone} (${withdrawalNetwork})`
+                    : `To: ${paymentSettings.bank_name} - ${paymentSettings.bank_account}`
+                  }
                 </p>
                 
                 {/* Test Mode Confirm - Only show in test mode */}
@@ -1957,41 +2045,124 @@ export default function ClientDashboard() {
               </div>
             ) : (
               <>
-                {/* Phone Number */}
-                <div className="mb-4">
-                  <label className="text-slate-300 text-sm block mb-2">
-                    MoMo Phone Number
+                {/* Withdrawal Method Selection */}
+                <div className="mb-6">
+                  <label className="text-slate-300 text-sm block mb-3">
+                    Choose Withdrawal Method
                   </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    <Input
-                      type="tel"
-                      placeholder="0XX XXX XXXX"
-                      value={withdrawalPhone}
-                      onChange={(e) => setWithdrawalPhone(e.target.value)}
-                      className="pl-10 bg-slate-900 border-slate-700 text-white"
-                      data-testid="withdrawal-phone"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawalMethod('momo')}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        withdrawalMethod === 'momo'
+                          ? 'border-amber-500 bg-amber-500/10'
+                          : 'border-slate-700 bg-slate-900 hover:border-slate-600'
+                      }`}
+                      data-testid="withdrawal-method-momo"
+                    >
+                      <Phone className={`mx-auto mb-2 ${withdrawalMethod === 'momo' ? 'text-amber-400' : 'text-slate-400'}`} size={24} />
+                      <p className={`text-sm font-medium ${withdrawalMethod === 'momo' ? 'text-white' : 'text-slate-400'}`}>
+                        Mobile Money
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">Instant</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawalMethod('bank')}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        withdrawalMethod === 'bank'
+                          ? 'border-blue-500 bg-blue-500/10'
+                          : 'border-slate-700 bg-slate-900 hover:border-slate-600'
+                      }`}
+                      data-testid="withdrawal-method-bank"
+                    >
+                      <Building2 className={`mx-auto mb-2 ${withdrawalMethod === 'bank' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                      <p className={`text-sm font-medium ${withdrawalMethod === 'bank' ? 'text-white' : 'text-slate-400'}`}>
+                        Bank Account
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">1-3 days</p>
+                    </button>
                   </div>
                 </div>
                 
-                {/* Network (Optional) */}
-                <div className="mb-4">
-                  <label className="text-slate-300 text-sm block mb-2">
-                    Network (Optional)
-                  </label>
-                  <select
-                    value={withdrawalNetwork}
-                    onChange={(e) => setWithdrawalNetwork(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2"
-                    data-testid="withdrawal-network"
-                  >
-                    <option value="">Auto-detect</option>
-                    <option value="MTN">MTN MoMo</option>
-                    <option value="TELECEL">Telecel (ex-Vodafone)</option>
-                    <option value="AIRTELTIGO">AirtelTigo (AT)</option>
-                  </select>
-                </div>
+                {/* MoMo Details */}
+                {withdrawalMethod === 'momo' && (
+                  <>
+                    <div className="mb-4">
+                      <label className="text-slate-300 text-sm block mb-2">
+                        MoMo Phone Number
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <Input
+                          type="tel"
+                          placeholder="0XX XXX XXXX"
+                          value={withdrawalPhone}
+                          onChange={(e) => setWithdrawalPhone(e.target.value)}
+                          className="pl-10 bg-slate-900 border-slate-700 text-white"
+                          data-testid="withdrawal-phone"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <label className="text-slate-300 text-sm block mb-2">
+                        Network
+                      </label>
+                      <select
+                        value={withdrawalNetwork}
+                        onChange={(e) => setWithdrawalNetwork(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2"
+                        data-testid="withdrawal-network"
+                      >
+                        <option value="">Select Network</option>
+                        <option value="MTN">MTN MoMo</option>
+                        <option value="TELECEL">Telecel (ex-Vodafone)</option>
+                        <option value="AIRTELTIGO">AirtelTigo (AT)</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                
+                {/* Bank Details Display */}
+                {withdrawalMethod === 'bank' && (
+                  <div className="mb-4 bg-slate-900 rounded-xl p-4">
+                    {paymentSettings.bank_name && paymentSettings.bank_account ? (
+                      <>
+                        <div className="flex items-center gap-3 mb-3">
+                          <Building2 className="text-blue-400" size={20} />
+                          <div>
+                            <p className="text-white font-medium">{paymentSettings.bank_name}</p>
+                            <p className="text-slate-400 text-sm">{paymentSettings.bank_account}</p>
+                            {paymentSettings.bank_branch && (
+                              <p className="text-slate-500 text-xs">{paymentSettings.bank_branch}</p>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPaymentSettings(true)}
+                          className="text-amber-400 text-sm hover:underline"
+                        >
+                          Change bank account
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center py-2">
+                        <p className="text-slate-400 text-sm mb-3">No bank account configured</p>
+                        <Button
+                          onClick={() => setShowPaymentSettings(true)}
+                          variant="outline"
+                          className="border-amber-500/50 text-amber-400"
+                        >
+                          <Settings className="mr-2" size={16} />
+                          Configure Bank Account
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {/* Amount */}
                 <div className="mb-6">
@@ -2290,6 +2461,159 @@ export default function ClientDashboard() {
                 })()}
               </>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* Payment Settings Modal */}
+      {showPaymentSettings && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowPaymentSettings(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+            
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Settings className="text-amber-400" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-white">Payment Settings</h3>
+              <p className="text-slate-400 text-sm mt-1">
+                Configure where you receive your withdrawals
+              </p>
+            </div>
+            
+            {/* Mobile Money Section */}
+            <div className="mb-6">
+              <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                <Phone size={18} className="text-amber-400" />
+                Mobile Money
+              </h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-slate-400 text-xs block mb-1">Phone Number</label>
+                  <Input
+                    type="tel"
+                    placeholder="0XX XXX XXXX"
+                    value={paymentSettings.momo_number}
+                    onChange={(e) => setPaymentSettings({...paymentSettings, momo_number: e.target.value})}
+                    className="bg-slate-900 border-slate-700 text-white"
+                    data-testid="settings-momo-number"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs block mb-1">Network</label>
+                  <select
+                    value={paymentSettings.momo_network}
+                    onChange={(e) => setPaymentSettings({...paymentSettings, momo_network: e.target.value})}
+                    className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2"
+                    data-testid="settings-momo-network"
+                  >
+                    <option value="MTN">MTN MoMo</option>
+                    <option value="TELECEL">Telecel (ex-Vodafone)</option>
+                    <option value="AIRTELTIGO">AirtelTigo (AT)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            {/* Bank Account Section */}
+            <div className="mb-6">
+              <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                <Building2 size={18} className="text-blue-400" />
+                Bank Account
+              </h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-slate-400 text-xs block mb-1">Bank Name</label>
+                  <Input
+                    type="text"
+                    placeholder="E.g. GCB Bank, Ecobank..."
+                    value={paymentSettings.bank_name}
+                    onChange={(e) => setPaymentSettings({...paymentSettings, bank_name: e.target.value})}
+                    className="bg-slate-900 border-slate-700 text-white"
+                    data-testid="settings-bank-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs block mb-1">Account Number</label>
+                  <Input
+                    type="text"
+                    placeholder="Your account number"
+                    value={paymentSettings.bank_account}
+                    onChange={(e) => setPaymentSettings({...paymentSettings, bank_account: e.target.value})}
+                    className="bg-slate-900 border-slate-700 text-white"
+                    data-testid="settings-bank-account"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs block mb-1">Branch (Optional)</label>
+                  <Input
+                    type="text"
+                    placeholder="E.g. Accra Main Branch"
+                    value={paymentSettings.bank_branch}
+                    onChange={(e) => setPaymentSettings({...paymentSettings, bank_branch: e.target.value})}
+                    className="bg-slate-900 border-slate-700 text-white"
+                    data-testid="settings-bank-branch"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Default Method */}
+            <div className="mb-6">
+              <h4 className="text-white font-medium mb-3">Default Withdrawal Method</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentSettings({...paymentSettings, preferred_withdrawal_method: 'momo'})}
+                  className={`p-3 rounded-xl border-2 transition-all ${
+                    paymentSettings.preferred_withdrawal_method === 'momo'
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-slate-700 bg-slate-900'
+                  }`}
+                >
+                  <Phone className={`mx-auto mb-1 ${paymentSettings.preferred_withdrawal_method === 'momo' ? 'text-amber-400' : 'text-slate-400'}`} size={20} />
+                  <p className={`text-sm ${paymentSettings.preferred_withdrawal_method === 'momo' ? 'text-white' : 'text-slate-400'}`}>
+                    Mobile Money
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentSettings({...paymentSettings, preferred_withdrawal_method: 'bank'})}
+                  className={`p-3 rounded-xl border-2 transition-all ${
+                    paymentSettings.preferred_withdrawal_method === 'bank'
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-slate-700 bg-slate-900'
+                  }`}
+                >
+                  <Building2 className={`mx-auto mb-1 ${paymentSettings.preferred_withdrawal_method === 'bank' ? 'text-blue-400' : 'text-slate-400'}`} size={20} />
+                  <p className={`text-sm ${paymentSettings.preferred_withdrawal_method === 'bank' ? 'text-white' : 'text-slate-400'}`}>
+                    Bank Account
+                  </p>
+                </button>
+              </div>
+            </div>
+            
+            {/* Save Button */}
+            <Button
+              onClick={savePaymentSettings}
+              disabled={savingPaymentSettings}
+              className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+              data-testid="save-payment-settings"
+            >
+              {savingPaymentSettings ? (
+                <Loader2 className="animate-spin mr-2" size={18} />
+              ) : (
+                <CheckCircle className="mr-2" size={18} />
+              )}
+              Save Settings
+            </Button>
           </div>
         </div>
       )}
