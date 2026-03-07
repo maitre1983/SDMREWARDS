@@ -124,6 +124,13 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-07)
+- **✅ Card Upgrade in Services Page:**
+  - Added Card Upgrade functionality to Services menu (`ServicesPage.jsx`)
+  - Clients can upgrade from Silver → Gold → Platinum → Diamond
+  - Full payment options: MoMo, Cashback, or combination
+  - Payment summary shows breakdown (card price, cashback applied, MoMo amount)
+  - Welcome bonus automatically credited upon successful upgrade
+  - Tested with 100% pass rate (14/14 backend tests, all frontend features)
 - **✅ Fixed Referral Bonus System:**
   - Fixed: Referrer now receives 3 GHS bonus when referred user buys a card
   - Fixed: Referral status now shows "Active" instead of "Pending" when referred user has bought a card
