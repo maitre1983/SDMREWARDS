@@ -285,19 +285,27 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
     """Get advanced dashboard statistics for Overview page"""
     
     # ============== 1. MEMBERSHIP CARD STATISTICS ==============
-    card_sales = await db.transactions.find(
-        {"type": "card_purchase"},
-        {"_id": 0}
-    ).to_list(100000)
-    
-    # Count by card type
-    silver_cards = sum(1 for c in card_sales if c.get("metadata", {}).get("card_type") == "silver")
-    gold_cards = sum(1 for c in card_sales if c.get("metadata", {}).get("card_type") == "gold")
-    platinum_cards = sum(1 for c in card_sales if c.get("metadata", {}).get("card_type") == "platinum")
-    total_cards = len(card_sales)
+    # Count active cards directly from clients collection (more accurate)
+    silver_cards = await db.clients.count_documents({"status": "active", "card_type": "silver"})
+    gold_cards = await db.clients.count_documents({"status": "active", "card_type": "gold"})
+    platinum_cards = await db.clients.count_documents({"status": "active", "card_type": "platinum"})
+    diamond_cards = await db.clients.count_documents({"status": "active", "card_type": "diamond"})
+    total_cards = silver_cards + gold_cards + platinum_cards + diamond_cards
     
     # ============== 2. REVENUE FROM MEMBERSHIP CARDS ==============
-    card_revenue = sum(t.get("amount", 0) for t in card_sales)
+    # Get all card purchase transactions for revenue
+    card_purchases = await db.transactions.find(
+        {"type": "card_purchase"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    
+    # Also include card upgrades as revenue
+    card_upgrades = await db.transactions.find(
+        {"type": "card_upgrade"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    
+    card_revenue = sum(t.get("amount", 0) for t in card_purchases) + sum(t.get("amount", 0) for t in card_upgrades)
     
     # ============== 3. TOTAL TRANSACTION VOLUME (GMV) ==============
     all_payments = await db.transactions.find(
@@ -535,6 +543,7 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
             "silver": silver_cards,
             "gold": gold_cards,
             "platinum": platinum_cards,
+            "diamond": diamond_cards,
             "total": total_cards,
             "revenue": card_revenue
         },

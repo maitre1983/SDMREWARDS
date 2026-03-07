@@ -55,7 +55,7 @@ export default function AdminOverview({
           <CreditCard size={20} className="text-amber-400" />
           Membership Card Statistics
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-xl p-4 text-center">
             <Medal className="text-slate-300 mx-auto mb-2" size={28} />
             <p className="text-slate-300 text-sm">Silver Cards</p>
@@ -70,6 +70,11 @@ export default function AdminOverview({
             <Crown className="text-purple-300 mx-auto mb-2" size={28} />
             <p className="text-purple-200 text-sm">Platinum Cards</p>
             <p className="text-white text-2xl font-bold">{advancedStats?.card_stats?.platinum || 0}</p>
+          </div>
+          <div className="bg-gradient-to-br from-cyan-700 to-cyan-800 rounded-xl p-4 text-center">
+            <Star className="text-cyan-300 mx-auto mb-2" size={28} />
+            <p className="text-cyan-200 text-sm">Diamond Cards</p>
+            <p className="text-white text-2xl font-bold">{advancedStats?.card_stats?.diamond || 0}</p>
           </div>
           <div className="bg-gradient-to-br from-blue-700 to-blue-800 rounded-xl p-4 text-center">
             <CreditCard className="text-blue-300 mx-auto mb-2" size={28} />

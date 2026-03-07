@@ -124,6 +124,12 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-07)
+- **✅ Fixed Membership Card Statistics in Admin Dashboard:**
+  - Card counts by category (Silver, Gold, Platinum, Diamond) now accurately reflect active clients
+  - Changed counting logic from transactions to clients collection for accurate real-time data
+  - Added Diamond card category display
+  - Revenue now includes both card purchases and upgrades
+  - Total = Silver + Gold + Platinum + Diamond (properly synchronized)
 - **✅ Fixed Card Upgrade Polling in Services Page:**
   - Added automatic polling (every 3 seconds) to detect payment confirmation
   - Added "I Have Paid - Check Status" button for manual verification
