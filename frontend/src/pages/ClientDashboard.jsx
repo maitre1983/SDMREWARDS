@@ -822,6 +822,7 @@ export default function ClientDashboard() {
         balance={client?.cashback_balance || 0}
         onBack={() => setShowServices(false)}
         onRefresh={fetchDashboardData}
+        client={client}
       />
     );
   }

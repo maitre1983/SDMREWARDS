@@ -16,7 +16,8 @@ import {
   Crown,
   ArrowUp,
   CreditCard,
-  Phone
+  Phone,
+  Gift
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -315,7 +316,265 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
     setBundleCode('');
   };
   
+  // Render the card upgrade form
+  const renderUpgradeForm = () => {
+    const upgradeOptions = getUpgradeOptions();
+    const payment = calculateUpgradePayment();
+    
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              setActiveService(null);
+              setSelectedUpgradeCard(null);
+              setUpgradeStatus(null);
+              setUseUpgradeCashback(false);
+              setUpgradeCashbackAmount('');
+            }}
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <ChevronLeft className="text-slate-400" size={20} />
+          </button>
+          <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500">
+            <Crown className="text-white" size={24} />
+          </div>
+          <div>
+            <h3 className="text-white font-semibold text-lg">Upgrade Card</h3>
+            <p className="text-slate-400 text-sm">
+              Current: {client?.card_type?.toUpperCase() || 'None'}
+            </p>
+          </div>
+        </div>
+        
+        {/* Success State */}
+        {upgradeStatus === 'success' && (
+          <div className="text-center py-8">
+            <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
+            <p className="text-white text-lg font-semibold">Upgrade Successful!</p>
+            <p className="text-slate-400 mt-2">Your new card is now active</p>
+          </div>
+        )}
+        
+        {/* Failed State */}
+        {upgradeStatus === 'failed' && (
+          <div className="text-center py-8">
+            <AlertCircle className="text-red-400 mx-auto mb-4" size={64} />
+            <p className="text-white text-lg font-semibold">Upgrade Failed</p>
+            <p className="text-slate-400 mt-2">Please try again</p>
+            <Button
+              onClick={() => setUpgradeStatus(null)}
+              className="mt-4 bg-amber-500 hover:bg-amber-600"
+            >
+              Try Again
+            </Button>
+          </div>
+        )}
+        
+        {/* Pending/Processing State */}
+        {(upgradeStatus === 'pending' || upgradeStatus === 'processing') && (
+          <div className="text-center py-6">
+            <div className="relative inline-block">
+              <Phone className="text-amber-400 mx-auto mb-4" size={48} />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
+            </div>
+            <p className="text-white text-lg font-semibold">
+              {upgradeStatus === 'processing' ? 'Processing...' : 'Waiting for Payment'}
+            </p>
+            <p className="text-slate-400 mt-2 text-sm">
+              Please approve the MoMo prompt on your phone
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
+              <Loader2 className="animate-spin" size={16} />
+              <span className="text-sm">Waiting for confirmation...</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Main Form - Only show if not in terminal state */}
+        {!upgradeStatus && (
+          <>
+            {/* No upgrade available */}
+            {upgradeOptions.length === 0 ? (
+              <div className="text-center py-8">
+                <Crown className="text-slate-600 mx-auto mb-4" size={48} />
+                <p className="text-white text-lg font-semibold">Already at Top Tier!</p>
+                <p className="text-slate-400 mt-2">
+                  You already have the highest membership card available.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Card Selection */}
+                <div className="space-y-3">
+                  <Label className="text-slate-300 text-sm">Select New Card</Label>
+                  {upgradeOptions.map((cardOption) => (
+                    <button
+                      key={cardOption.type}
+                      onClick={() => setSelectedUpgradeCard(cardOption)}
+                      className={`w-full p-4 rounded-xl border transition-all text-left ${
+                        selectedUpgradeCard?.type === cardOption.type
+                          ? 'bg-amber-500/20 border-amber-500'
+                          : 'bg-slate-900/50 border-slate-700/50 hover:border-slate-600'
+                      }`}
+                      data-testid={`select-upgrade-${cardOption.type}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-10 h-10 rounded-lg flex items-center justify-center"
+                            style={{ background: cardOption.color }}
+                          >
+                            <ArrowUp className="text-white" size={18} />
+                          </div>
+                          <div>
+                            <p className="text-white font-medium">{cardOption.name}</p>
+                            <p className="text-emerald-400 text-sm">
+                              +GHS {cardOption.welcomeBonus} welcome bonus
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-amber-400 font-bold text-lg">
+                            GHS {cardOption.fullPrice}
+                          </p>
+                          <p className="text-slate-500 text-xs">full price</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Payment Options - Show only when card selected */}
+                {selectedUpgradeCard && (
+                  <>
+                    {/* Use Cashback Option */}
+                    {balance > 0 && (
+                      <div className="space-y-3">
+                        <div 
+                          className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                            useUpgradeCashback
+                              ? 'bg-emerald-500/20 border-emerald-500'
+                              : 'bg-slate-900/50 border-slate-700/50'
+                          }`}
+                          onClick={() => setUseUpgradeCashback(!useUpgradeCashback)}
+                          data-testid="use-cashback-toggle"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <Wallet className={useUpgradeCashback ? 'text-emerald-400' : 'text-slate-400'} size={20} />
+                              <div>
+                                <p className="text-white font-medium">Use Cashback Balance</p>
+                                <p className="text-slate-400 text-sm">
+                                  Available: GHS {balance?.toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              useUpgradeCashback 
+                                ? 'border-emerald-400 bg-emerald-400' 
+                                : 'border-slate-500'
+                            }`}>
+                              {useUpgradeCashback && (
+                                <CheckCircle className="text-white" size={12} />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Cashback Amount Input */}
+                        {useUpgradeCashback && (
+                          <div>
+                            <Label className="text-slate-300 text-sm">
+                              Cashback Amount (optional - leave empty to use max)
+                            </Label>
+                            <Input
+                              type="number"
+                              placeholder={`Max: GHS ${Math.min(balance, selectedUpgradeCard.fullPrice).toFixed(2)}`}
+                              value={upgradeCashbackAmount}
+                              onChange={(e) => setUpgradeCashbackAmount(e.target.value)}
+                              max={Math.min(balance, selectedUpgradeCard.fullPrice)}
+                              min="0"
+                              step="0.01"
+                              className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
+                              data-testid="cashback-amount-input"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* MoMo Phone - Show if MoMo payment needed */}
+                    {payment.momo > 0 && (
+                      <div>
+                        <Label className="text-slate-300 text-sm">MoMo Phone Number</Label>
+                        <Input
+                          type="tel"
+                          placeholder="0XX XXX XXXX"
+                          value={upgradePaymentPhone}
+                          onChange={(e) => setUpgradePaymentPhone(e.target.value)}
+                          className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
+                          data-testid="upgrade-phone-input"
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Payment Summary */}
+                    <div className="bg-slate-800/50 rounded-xl p-4 space-y-2">
+                      <div className="flex justify-between text-slate-400 text-sm">
+                        <span>Card Price</span>
+                        <span>GHS {selectedUpgradeCard.fullPrice.toFixed(2)}</span>
+                      </div>
+                      {useUpgradeCashback && payment.cashback > 0 && (
+                        <div className="flex justify-between text-emerald-400 text-sm">
+                          <span>Cashback Applied</span>
+                          <span>- GHS {payment.cashback.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-slate-700 pt-2 flex justify-between text-white font-semibold">
+                        <span>MoMo Payment</span>
+                        <span>GHS {payment.momo.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-emerald-400 text-sm mt-2">
+                        <Gift size={14} />
+                        <span>You'll receive GHS {selectedUpgradeCard.welcomeBonus} welcome bonus!</span>
+                      </div>
+                    </div>
+                    
+                    {/* Submit Button */}
+                    <Button
+                      onClick={handleUpgrade}
+                      disabled={isLoading || !selectedUpgradeCard || (payment.momo > 0 && (!upgradePaymentPhone || upgradePaymentPhone.length < 10))}
+                      className="w-full h-12 bg-gradient-to-r from-amber-500 to-yellow-500 hover:opacity-90 rounded-xl font-semibold"
+                      data-testid="confirm-upgrade-btn"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="animate-spin mr-2" size={18} />
+                      ) : (
+                        <Crown className="mr-2" size={18} />
+                      )}
+                      {isLoading ? 'Processing...' : payment.momo > 0 
+                        ? `Pay GHS ${payment.momo.toFixed(2)} & Upgrade`
+                        : 'Upgrade with Cashback'
+                      }
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
   const renderServiceForm = () => {
+    // Handle upgrade service separately
+    if (activeService === 'upgrade') {
+      return renderUpgradeForm();
+    }
+    
     const service = services.find(s => s.id === activeService);
     if (!service) return null;
     
@@ -517,8 +776,14 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             {services.map(service => (
               <button
                 key={service.id}
-                onClick={() => setActiveService(service.id)}
-                disabled={balance < 2}
+                onClick={() => {
+                  setActiveService(service.id);
+                  // Initialize upgrade phone with client's phone
+                  if (service.id === 'upgrade' && client?.phone) {
+                    setUpgradePaymentPhone(client.phone);
+                  }
+                }}
+                disabled={balance < 2 && service.id !== 'upgrade'}
                 className={`p-4 bg-slate-900/50 border border-slate-700/50 rounded-2xl text-left hover:border-slate-600 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed`}
                 data-testid={`service-${service.id}`}
               >
@@ -528,7 +793,11 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
                 <h3 className="text-white font-semibold">{service.name}</h3>
                 <p className="text-slate-400 text-sm">{service.description}</p>
                 <div className="flex items-center gap-1 mt-2 text-slate-500 text-xs">
-                  <span>{service.fee}% fee</span>
+                  {service.id === 'upgrade' ? (
+                    <span>Pay full price</span>
+                  ) : (
+                    <span>{service.fee}% fee</span>
+                  )}
                   <ArrowRight size={12} />
                 </div>
               </button>
