@@ -504,21 +504,24 @@ async def payment_callback(request: Request):
         logger.warning("Callback missing transaction references")
         return {"success": False, "message": "Missing reference"}
     
-    # Find payment by our reference or provider reference
-    payment = await db.momo_payments.find_one(
-        {"$or": [
-            {"reference": our_ref},
-            {"provider_reference": ext_ref},
-            {"provider_reference": our_ref}
-        ]},
-        {"_id": 0}
-    )
+    # Find payment - try our reference first (exact match)
+    payment = None
+    if our_ref:
+        payment = await db.momo_payments.find_one({"reference": our_ref}, {"_id": 0})
+        if payment:
+            logger.info(f"Found payment by our reference: {our_ref}")
+    
+    # If not found by our ref, try provider reference
+    if not payment and ext_ref:
+        payment = await db.momo_payments.find_one({"provider_reference": ext_ref}, {"_id": 0})
+        if payment:
+            logger.info(f"Found payment by provider reference: {ext_ref}")
     
     if not payment:
         logger.warning(f"Payment not found for refs: our={our_ref}, ext={ext_ref}")
         return {"success": False, "message": "Payment not found"}
     
-    logger.info(f"Processing callback for payment {payment['id']}, status: {status}")
+    logger.info(f"Processing callback for payment {payment['id']} (ref: {payment.get('reference')}), status: {status}")
     
     if status in ["success", "successful", "completed", "approved"]:
         await complete_payment(payment["id"])
@@ -1027,6 +1030,19 @@ async def process_merchant_payment(payment: Dict):
                                 "completed_at": datetime.now(timezone.utc).isoformat()
                             }}
                         )
+                    elif response.status_code == 403:
+                        # IP not whitelisted - mark as pending for manual processing
+                        logger.warning(f"BulkClix IP not whitelisted - payout marked as pending_manual")
+                        await db.merchant_payouts.update_one(
+                            {"id": payout_record["id"]},
+                            {"$set": {
+                                "status": "pending_manual",
+                                "provider_message": "IP not whitelisted - requires manual processing or IP whitelist update",
+                                "error_details": response.text
+                            }}
+                        )
+                        # Still consider this a success for the payment flow, but payout needs manual handling
+                        payout_success = False
                     else:
                         logger.error(f"Merchant payout failed: {response.status_code} - {response.text}")
                         await db.merchant_payouts.update_one(
