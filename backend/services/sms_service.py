@@ -103,8 +103,18 @@ class SMSService:
                 )
                 
                 result = response.json()
+                logger.info(f"BulkClix SMS response: {result}")
                 
-                if response.status_code == 200 and result.get("status") == "success":
+                # Check for success - BulkClix returns campaignId on success
+                data = result.get("data", {})
+                is_success = (
+                    response.status_code == 200 and 
+                    result.get("message") == "Request Sent" and
+                    data.get("campaignId") is not None and
+                    data.get("sms_status") != "failed"
+                )
+                
+                if is_success:
                     if self.db is not None:
                         await self.db.sms_logs.update_one(
                             {"id": sms_record["id"]},
@@ -118,10 +128,10 @@ class SMSService:
                         )
                     return {
                         "success": True,
-                        "message_id": result.get("message_id", sms_record["id"])
+                        "message_id": data.get("campaignId", sms_record["id"])
                     }
                 else:
-                    error = result.get("message", "SMS sending failed")
+                    error = data.get("sms_status", result.get("message", "SMS sending failed"))
                     if self.db is not None:
                         await self.db.sms_logs.update_one(
                             {"id": sms_record["id"]},
@@ -233,3 +243,8 @@ def get_sms_service(db=None) -> SMSService:
     if _sms_service is None or db is not None:
         _sms_service = SMSService(db)
     return _sms_service
+
+# Alias for backward compatibility
+def get_sms(db=None) -> SMSService:
+    """Alias for get_sms_service"""
+    return get_sms_service(db)

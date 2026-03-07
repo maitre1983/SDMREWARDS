@@ -999,9 +999,9 @@ async def send_sms_to_client(
         raise HTTPException(status_code=400, detail="Client has no phone number")
     
     # Import SMS service
-    from services.bulkclix_service import send_sms
-    
-    result = await send_sms(phone, request.message)
+    from services.sms_service import get_sms
+    sms = get_sms()
+    result = await sms.send_sms(phone, request.message)
     
     # Log the SMS
     await db.sms_logs.insert_one({
@@ -1313,9 +1313,9 @@ async def send_sms_to_merchant(
         raise HTTPException(status_code=400, detail="Merchant has no phone number")
     
     # Import SMS service
-    from services.bulkclix_service import send_sms
-    
-    result = await send_sms(phone, request.message)
+    from services.sms_service import get_sms
+    sms = get_sms()
+    result = await sms.send_sms(phone, request.message)
     
     # Log the SMS
     await db.sms_logs.insert_one({
@@ -1825,7 +1825,8 @@ async def send_bulk_sms_clients(
     if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
-    from services.bulkclix_service import send_sms
+    from services.sms_service import get_sms
+    sms_service = get_sms()
     
     # Build query based on filter
     query = {"status": {"$ne": "deleted"}}
@@ -1858,7 +1859,7 @@ async def send_bulk_sms_clients(
     
     for client in clients:
         if client.get("phone"):
-            result = await send_sms(client["phone"], request.message)
+            result = await sms_service.send_sms(client["phone"], request.message)
             if result.get("success"):
                 sent_count += 1
             else:
@@ -1893,7 +1894,8 @@ async def send_bulk_sms_merchants(
     if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
-    from services.bulkclix_service import send_sms
+    from services.sms_service import get_sms
+    sms_service = get_sms()
     
     # Build query based on filter
     query = {"status": {"$ne": "deleted"}}
@@ -1921,7 +1923,7 @@ async def send_bulk_sms_merchants(
     
     for merchant in merchants:
         if merchant.get("phone"):
-            result = await send_sms(merchant["phone"], request.message)
+            result = await sms_service.send_sms(merchant["phone"], request.message)
             if result.get("success"):
                 sent_count += 1
             else:
@@ -2387,7 +2389,7 @@ async def request_password_change_otp(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Request OTP for password change"""
-    from services.bulkclix_service import send_sms
+    from services.sms_service import get_sms
     import random
     
     # Generate 6-digit OTP
@@ -2410,8 +2412,9 @@ async def request_password_change_otp(
     
     if phone:
         # Send via SMS
+        sms_service = get_sms()
         message = f"SDM REWARDS: Your password change OTP is {otp_code}. Valid for 10 minutes."
-        await send_sms(phone, message)
+        await sms_service.send_sms(phone, message)
     
     return {
         "success": True,
