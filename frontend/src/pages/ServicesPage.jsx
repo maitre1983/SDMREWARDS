@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { 
@@ -51,12 +51,21 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   const [upgradeCashbackAmount, setUpgradeCashbackAmount] = useState('');
   const [upgradePaymentPhone, setUpgradePaymentPhone] = useState('');
   const [upgradeStatus, setUpgradeStatus] = useState(null); // null, 'processing', 'pending', 'success', 'failed'
+  const [upgradePaymentId, setUpgradePaymentId] = useState(null);
+  const pollingRef = useRef(null);
   
   const token = localStorage.getItem('sdm_client_token');
   
   useEffect(() => {
     fetchFees();
     fetchAvailableCards();
+    
+    // Cleanup polling on unmount
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
   }, []);
   
   const fetchFees = async () => {
@@ -194,7 +203,90 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       total: total
     };
   };
-  
+
+  // Start polling for payment status
+  const startUpgradePolling = (paymentId) => {
+    // Clear any existing polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+    
+    // Poll every 3 seconds for payment status
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/payments/status/${paymentId}`);
+        console.log('Polling upgrade status:', res.data);
+        
+        if (res.data.status === 'success' || res.data.status === 'completed') {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setUpgradeStatus('success');
+          toast.success('Upgrade successful! Your new card is now active.');
+          
+          // Wait 2 seconds then refresh and go back
+          setTimeout(() => {
+            setActiveService(null);
+            setSelectedUpgradeCard(null);
+            setUpgradeStatus(null);
+            setUpgradePaymentId(null);
+            if (onRefresh) onRefresh();
+          }, 2000);
+        } else if (res.data.status === 'failed') {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setUpgradeStatus('failed');
+          toast.error('Payment failed. Please try again.');
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 3000);
+    
+    // Stop polling after 2 minutes
+    setTimeout(() => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }, 120000);
+  };
+
+  // Check payment status manually ("I have paid" button)
+  const checkUpgradePaymentStatus = async () => {
+    if (!upgradePaymentId) return;
+    
+    setIsLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/check-status/${upgradePaymentId}`);
+      console.log('Check status response:', res.data);
+      
+      if (res.data.status === 'completed' || res.data.status === 'success') {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setUpgradeStatus('success');
+        toast.success('Upgrade successful! Your new card is now active.');
+        setTimeout(() => {
+          setActiveService(null);
+          setSelectedUpgradeCard(null);
+          setUpgradeStatus(null);
+          setUpgradePaymentId(null);
+          if (onRefresh) onRefresh();
+        }, 2000);
+      } else if (res.data.status === 'failed') {
+        setUpgradeStatus('failed');
+        toast.error(res.data.message || 'Payment failed');
+      } else {
+        toast.info(res.data.message || 'Payment is still processing...');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to check status');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Handle card upgrade
   const handleUpgrade = async () => {
     if (!selectedUpgradeCard) {
@@ -222,7 +314,14 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         cashback_amount: useUpgradeCashback ? (upgradeCashbackAmount ? parseFloat(upgradeCashbackAmount) : null) : null
       }, { headers });
       
+      console.log('Upgrade response:', res.data);
+      
       if (res.data.success) {
+        // Store the payment ID
+        if (res.data.payment_id) {
+          setUpgradePaymentId(res.data.payment_id);
+        }
+        
         // If fully paid with cashback
         if (res.data.status === 'completed') {
           setUpgradeStatus('success');
@@ -231,15 +330,22 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             setActiveService(null);
             setSelectedUpgradeCard(null);
             setUpgradeStatus(null);
+            setUpgradePaymentId(null);
             if (onRefresh) onRefresh();
           }, 2000);
         } else {
-          // MoMo payment needed
+          // MoMo payment needed - start polling
           setUpgradeStatus('pending');
+          
           if (res.data.test_mode) {
             toast.info('Test mode: Waiting for confirmation');
           } else {
-            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount}! Approve on your phone.`);
+            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount || payment.momo}! Approve on your phone.`);
+          }
+          
+          // Start polling for payment status
+          if (res.data.payment_id) {
+            startUpgradePolling(res.data.payment_id);
           }
         }
       }
@@ -389,6 +495,26 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
               <Loader2 className="animate-spin" size={16} />
               <span className="text-sm">Waiting for confirmation...</span>
             </div>
+            
+            {/* I Have Paid Button - Only show when pending */}
+            {upgradeStatus === 'pending' && upgradePaymentId && (
+              <div className="mt-6 pt-4 border-t border-slate-700">
+                <Button
+                  onClick={checkUpgradePaymentStatus}
+                  disabled={isLoading}
+                  variant="outline"
+                  className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                  data-testid="check-upgrade-status-btn"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin mr-2" size={16} />
+                  ) : (
+                    <CheckCircle className="mr-2" size={16} />
+                  )}
+                  I Have Paid - Check Status
+                </Button>
+              </div>
+            )}
           </div>
         )}
         

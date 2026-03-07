@@ -124,6 +124,15 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-07)
+- **✅ Fixed Card Upgrade Polling in Services Page:**
+  - Added automatic polling (every 3 seconds) to detect payment confirmation
+  - Added "I Have Paid - Check Status" button for manual verification
+  - Fixed payment status detection so upgrade completes automatically after MoMo confirmation
+  - Card level updates immediately after payment is confirmed
+- **✅ Integrated BulkClix Airtime API:**
+  - Updated `/api/services/airtime/purchase` to use correct BulkClix endpoint `/airtime-api/sendAirtime`
+  - Added proper network ID mapping (MTN, Telecel, AirtelTigo)
+  - Tested and confirmed airtime delivery works
 - **✅ Card Upgrade in Services Page:**
   - Added Card Upgrade functionality to Services menu (`ServicesPage.jsx`)
   - Clients can upgrade from Silver → Gold → Platinum → Diamond

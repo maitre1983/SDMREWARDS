@@ -695,6 +695,7 @@ async def upgrade_card(
     
     return {
         "success": True,
+        "status": "pending",
         "payment_id": payment_id,
         "amount": new_price,
         "cashback_used": cashback_to_use,
