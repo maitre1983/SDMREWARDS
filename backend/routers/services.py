@@ -31,6 +31,13 @@ db = client[DB_NAME]
 BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
 BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
 
+# BulkClix Network IDs for Airtime
+BULKCLIX_NETWORK_IDS = {
+    "MTN": "eed55cbe-ed76-4200-865b-45a80a7bb8e9",
+    "TELECEL": "1f4d8c1a-e5e2-4954-8b2a-6843d33181c7",
+    "AIRTELTIGO": "6a2c7586-bf4d-42d4-ace1-2a3386eb4bb2"
+}
+
 # Minimum amounts
 MIN_CASHBACK_BALANCE = 2.0
 MIN_TRANSACTION_AMOUNT = 2.0
@@ -182,6 +189,11 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
     if request.amount < MIN_TRANSACTION_AMOUNT:
         raise HTTPException(status_code=400, detail=f"Minimum amount is GHS {MIN_TRANSACTION_AMOUNT}")
     
+    # Validate network
+    network_upper = request.network.upper()
+    if network_upper not in BULKCLIX_NETWORK_IDS:
+        raise HTTPException(status_code=400, detail="Invalid network. Supported: MTN, TELECEL, AIRTELTIGO")
+    
     # Calculate fee
     fee_info = await get_service_fee("airtime", request.amount)
     total_cost = fee_info["total"]
@@ -205,16 +217,20 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
     elif request.phone.startswith("233"):
         bulkclix_phone = "0" + request.phone[3:]
     
+    # Generate unique transaction ID
+    transaction_id = f"SDM-AIR-{uuid.uuid4().hex[:12].upper()}"
+    
     # Create service transaction record
     service_tx = {
         "id": str(uuid.uuid4()),
         "type": "airtime",
         "client_id": current_client["id"],
         "phone": request.phone,
-        "network": request.network.upper(),
+        "network": network_upper,
         "amount": request.amount,
         "service_fee": fee_info["fee_amount"],
         "total_deducted": total_cost,
+        "transaction_id": transaction_id,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -229,17 +245,20 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
     if BULKCLIX_API_KEY:
         try:
             async with httpx.AsyncClient(follow_redirects=True) as http_client:
+                # Get network ID for BulkClix
+                network_id = BULKCLIX_NETWORK_IDS.get(network_upper)
+                
                 payload = {
-                    "phone": bulkclix_phone,
                     "amount": request.amount,
-                    "network": request.network.upper(),
-                    "reference": f"SDM-AIR-{service_tx['id'][:8].upper()}"
+                    "network_id": network_id,
+                    "phone_number": bulkclix_phone,
+                    "transaction_id": transaction_id
                 }
                 
                 logger.info(f"BulkClix Airtime Request: {payload}")
                 
                 response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/airtime-api/buy",
+                    f"{BULKCLIX_BASE_URL}/airtime-api/sendAirtime",
                     headers={
                         "Content-Type": "application/json",
                         "Accept": "application/json",
@@ -253,12 +272,15 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
                 
                 result = response.json() if response.text else {}
                 
-                # Check for success - BulkClix returns status="success" or message containing "successful"
+                # Check for success - BulkClix returns success messages
                 if response.status_code == 200:
-                    if result.get("status") == "success" or "success" in result.get("message", "").lower():
+                    message_lower = result.get("message", "").lower()
+                    if result.get("status") == "success" or "success" in message_lower or "sent" in message_lower:
                         api_success = True
                         api_message = result.get("message", "Airtime sent successfully")
-                        provider_reference = result.get("reference") or result.get("transaction_id") or result.get("data", {}).get("reference")
+                        # Get reference from data object if available
+                        data = result.get("data", {})
+                        provider_reference = data.get("reference") or data.get("transaction_id") or result.get("reference") or transaction_id
                     else:
                         api_message = result.get("message", "Unknown response from provider")
                         logger.warning(f"BulkClix airtime returned non-success: {result}")
@@ -276,7 +298,7 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
         logger.warning("BULKCLIX_API_KEY not configured - simulating airtime purchase")
         api_success = True  # Simulate success in test mode
         api_message = "Airtime sent (simulated - API not configured)"
-        provider_reference = f"SIM-{service_tx['id'][:8].upper()}"
+        provider_reference = f"SIM-{transaction_id}"
     
     if not api_success:
         # Update transaction as failed
