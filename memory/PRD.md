@@ -124,6 +124,13 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ---
 
 ## Recent Changes (2026-03-07)
+- **✅ Auto-Pay Merchant on Customer Payment:**
+  - When a customer pays a merchant, the merchant's share is automatically transferred to their configured MoMo account
+  - Uses BulkClix disbursement API (`/payment-api/send/mobilemoney`)
+  - Merchant share = Payment Amount - Cashback (e.g., on GHS 100 with 5% cashback, merchant receives GHS 95)
+  - SMS notification sent to merchant with payout details
+  - Payout records stored in `merchant_payouts` collection for tracking
+  - Works with all networks: MTN, Telecel, AirtelTigo
 - **✅ Added All Mobile Networks to Merchant Payment Form:**
   - Added phone number input field with placeholder showing registered number
   - Added network selector dropdown with MTN, Telecel, AirtelTigo options

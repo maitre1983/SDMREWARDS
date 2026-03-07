@@ -875,7 +875,7 @@ async def process_card_purchase(payment: Dict):
 
 
 async def process_merchant_payment(payment: Dict):
-    """Process completed merchant payment - credit cashback"""
+    """Process completed merchant payment - credit cashback and pay merchant"""
     client_id = payment["client_id"]
     metadata = payment.get("metadata", {})
     merchant_id = metadata.get("merchant_id")
@@ -903,6 +903,9 @@ async def process_merchant_payment(payment: Dict):
     commission = round(gross_cashback * platform_commission_rate, 2)
     net_cashback = gross_cashback - commission
     
+    # Calculate merchant's share (payment amount minus cashback)
+    merchant_share = round(payment["amount"] - gross_cashback, 2)
+    
     # Credit cashback to client
     await db.clients.update_one(
         {"id": client_id},
@@ -916,14 +919,16 @@ async def process_merchant_payment(payment: Dict):
             "$inc": {
                 "total_volume": payment["amount"],
                 "total_transactions": 1,
-                "total_cashback_given": gross_cashback
+                "total_cashback_given": gross_cashback,
+                "pending_balance": merchant_share
             }
         }
     )
     
     # Record transaction
+    transaction_id = str(uuid.uuid4())
     await db.transactions.insert_one({
-        "id": str(uuid.uuid4()),
+        "id": transaction_id,
         "type": "merchant_payment",
         "client_id": client_id,
         "merchant_id": merchant_id,
@@ -931,12 +936,110 @@ async def process_merchant_payment(payment: Dict):
         "cashback_amount": gross_cashback,
         "commission_amount": commission,
         "net_cashback": net_cashback,
+        "merchant_share": merchant_share,
         "description": f"Payment at {merchant.get('business_name', 'Merchant')}",
         "payment_method": "momo",
         "payment_reference": payment["reference"],
         "status": "completed",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    # ============== AUTO-PAY MERCHANT ==============
+    # If merchant has configured MoMo number, transfer their share immediately
+    merchant_momo = merchant.get("momo_number")
+    merchant_network = merchant.get("momo_network", "MTN").upper()
+    
+    if merchant_momo and merchant_share > 0:
+        payout_success = False
+        payout_ref = f"SDM-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
+        
+        # Format phone for BulkClix (0XXXXXXXXX format)
+        bulkclix_phone = merchant_momo
+        if merchant_momo.startswith("+233"):
+            bulkclix_phone = "0" + merchant_momo[4:]
+        elif merchant_momo.startswith("233"):
+            bulkclix_phone = "0" + merchant_momo[3:]
+        
+        # Create payout record
+        payout_record = {
+            "id": str(uuid.uuid4()),
+            "type": "merchant_payout",
+            "merchant_id": merchant_id,
+            "transaction_id": transaction_id,
+            "amount": merchant_share,
+            "phone": merchant_momo,
+            "network": merchant_network,
+            "reference": payout_ref,
+            "status": "pending",
+            "test_mode": is_test_mode(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.merchant_payouts.insert_one(payout_record)
+        
+        if is_test_mode():
+            # In test mode, auto-approve payout simulation
+            payout_success = True
+            logger.info(f"TEST MODE: Simulating merchant payout of GHS {merchant_share} to {bulkclix_phone}")
+            await db.merchant_payouts.update_one(
+                {"id": payout_record["id"]},
+                {"$set": {"status": "completed", "provider_message": "Test mode - simulated"}}
+            )
+        else:
+            # Production: Call BulkClix Disbursement API
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as http_client:
+                    response = await http_client.post(
+                        f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
+                        headers={
+                            "x-api-key": BULKCLIX_API_KEY,
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        json={
+                            "amount": str(merchant_share),
+                            "account_number": bulkclix_phone,
+                            "channel": merchant_network,
+                            "account_name": merchant.get("business_name", ""),
+                            "client_reference": payout_ref
+                        },
+                        timeout=30.0
+                    )
+                    
+                    logger.info(f"Merchant payout response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
+                    
+                    if response.status_code == 200:
+                        data = response.json() if response.text else {}
+                        payout_success = True
+                        await db.merchant_payouts.update_one(
+                            {"id": payout_record["id"]},
+                            {"$set": {
+                                "status": "completed",
+                                "provider_reference": data.get("transactionId"),
+                                "provider_message": data.get("message", "Success"),
+                                "completed_at": datetime.now(timezone.utc).isoformat()
+                            }}
+                        )
+                    else:
+                        logger.error(f"Merchant payout failed: {response.status_code} - {response.text}")
+                        await db.merchant_payouts.update_one(
+                            {"id": payout_record["id"]},
+                            {"$set": {"status": "failed", "provider_message": response.text}}
+                        )
+            except Exception as e:
+                logger.error(f"Merchant payout error: {e}")
+                await db.merchant_payouts.update_one(
+                    {"id": payout_record["id"]},
+                    {"$set": {"status": "failed", "provider_message": str(e)}}
+                )
+        
+        # Update merchant pending balance if payout was successful
+        if payout_success:
+            await db.merchants.update_one(
+                {"id": merchant_id},
+                {
+                    "$inc": {"pending_balance": -merchant_share, "total_paid_out": merchant_share}
+                }
+            )
     
     # Send SMS notifications
     try:
@@ -951,10 +1054,17 @@ async def process_merchant_payment(payment: Dict):
                 net_cashback
             )
         
-        # Notify merchant of payment
+        # Notify merchant of payment received
         if merchant.get("phone"):
             client_name = client.get("full_name", "A customer") if client else "A customer"
-            await sms.notify_merchant_payment(merchant["phone"], payment["amount"], client_name)
+            # Enhanced message with payout info
+            if merchant_momo and merchant_share > 0:
+                await sms.send_sms(
+                    merchant["phone"],
+                    f"SDM REWARDS: You received GHS {payment['amount']:.2f} from {client_name}. Your share of GHS {merchant_share:.2f} has been sent to {merchant_momo}."
+                )
+            else:
+                await sms.notify_merchant_payment(merchant["phone"], payment["amount"], client_name)
             
     except Exception as e:
         logger.error(f"Merchant payment SMS error: {e}")

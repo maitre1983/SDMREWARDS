@@ -508,7 +508,7 @@ export default function MerchantDashboard() {
                   <h4 className="text-slate-300 text-sm font-medium">Mobile Money</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-slate-400 text-xs">Numéro MoMo</Label>
+                      <Label className="text-slate-400 text-xs">MoMo Number (for receiving payments)</Label>
                       <div className="relative mt-1">
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                         <Input
@@ -521,13 +521,13 @@ export default function MerchantDashboard() {
                       </div>
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Réseau</Label>
+                      <Label className="text-slate-400 text-xs">Network</Label>
                       <select
                         value={settings.momo_network}
                         onChange={(e) => setSettings({...settings, momo_network: e.target.value})}
                         className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
                       >
-                        <option value="">Sélectionner</option>
+                        <option value="">Select Network</option>
                         <option value="MTN">MTN MoMo</option>
                         <option value="TELECEL">Telecel (ex-Vodafone)</option>
                         <option value="AIRTELTIGO">AirtelTigo (AT)</option>
@@ -538,23 +538,23 @@ export default function MerchantDashboard() {
 
                 {/* Bank */}
                 <div className="space-y-4">
-                  <h4 className="text-slate-300 text-sm font-medium">Compte Bancaire</h4>
+                  <h4 className="text-slate-300 text-sm font-medium">Bank Account</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-slate-400 text-xs">Nom de la Banque</Label>
+                      <Label className="text-slate-400 text-xs">Bank Name</Label>
                       <Input
                         type="text"
-                        placeholder="Ex: GCB Bank"
+                        placeholder="E.g. GCB Bank"
                         value={settings.bank_name}
                         onChange={(e) => setSettings({...settings, bank_name: e.target.value})}
                         className="mt-1 bg-slate-900 border-slate-700 text-white"
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Numéro de Compte</Label>
+                      <Label className="text-slate-400 text-xs">Account Number</Label>
                       <Input
                         type="text"
-                        placeholder="Numéro de compte"
+                        placeholder="Account number"
                         value={settings.bank_account}
                         onChange={(e) => setSettings({...settings, bank_account: e.target.value})}
                         className="mt-1 bg-slate-900 border-slate-700 text-white"
