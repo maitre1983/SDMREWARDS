@@ -1380,6 +1380,64 @@ async def list_all_transactions(
     }
 
 
+@router.get("/merchant-payouts")
+async def list_merchant_payouts(
+    limit: int = 50,
+    offset: int = 0,
+    status: Optional[str] = None,
+    merchant_id: Optional[str] = None,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """List all merchant payouts (auto-payments to merchants)"""
+    query = {}
+    
+    if status:
+        query["status"] = status
+    if merchant_id:
+        query["merchant_id"] = merchant_id
+    
+    payouts = await db.merchant_payouts.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+    
+    # Enrich with merchant names
+    enriched = []
+    for payout in payouts:
+        merchant = await db.merchants.find_one(
+            {"id": payout.get("merchant_id")},
+            {"_id": 0, "business_name": 1}
+        )
+        payout["merchant_name"] = merchant.get("business_name", "Unknown") if merchant else "Unknown"
+        enriched.append(payout)
+    
+    total = await db.merchant_payouts.count_documents(query)
+    
+    # Calculate totals
+    completed_payouts = await db.merchant_payouts.find(
+        {"status": "completed"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    total_paid = sum(p.get("amount", 0) for p in completed_payouts)
+    
+    pending_payouts = await db.merchant_payouts.find(
+        {"status": "pending"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    total_pending = sum(p.get("amount", 0) for p in pending_payouts)
+    
+    return {
+        "payouts": enriched,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "summary": {
+            "total_paid": round(total_paid, 2),
+            "total_pending": round(total_pending, 2)
+        }
+    }
+
+
 # ============== PLATFORM SETTINGS ==============
 
 @router.get("/settings")

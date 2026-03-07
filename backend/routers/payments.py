@@ -102,6 +102,7 @@ class MerchantPaymentRequest(BaseModel):
     client_phone: str
     merchant_qr_code: str
     amount: float
+    network: Optional[str] = None  # Client can specify network
 
 
 # ============== ENDPOINTS ==============
@@ -336,10 +337,10 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
     cashback_rate = merchant.get("cashback_rate", 5) / 100
     expected_cashback = round(request.amount * cashback_rate, 2)
     
-    # Detect network
-    network = detect_network(request.client_phone)
+    # Use specified network or detect from phone
+    network = request.network.upper() if request.network else detect_network(request.client_phone)
     if not network:
-        raise HTTPException(status_code=400, detail="Invalid phone number")
+        raise HTTPException(status_code=400, detail="Invalid phone number or network not specified")
     
     # Generate payment reference
     payment_ref = f"SDM-PAY-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
@@ -876,12 +877,17 @@ async def process_card_purchase(payment: Dict):
 
 async def process_merchant_payment(payment: Dict):
     """Process completed merchant payment - credit cashback and pay merchant"""
+    logger.info(f"Processing merchant payment: {payment.get('id')}")
+    
     client_id = payment["client_id"]
     metadata = payment.get("metadata", {})
-    merchant_id = metadata.get("merchant_id")
+    merchant_id = metadata.get("merchant_id") or payment.get("merchant_id")
     
     if not merchant_id:
+        logger.error(f"No merchant_id found in payment {payment.get('id')}")
         return
+    
+    logger.info(f"Merchant payment: client={client_id}, merchant={merchant_id}, amount={payment.get('amount')}")
     
     # Get client and merchant
     client = await db.clients.find_one({"id": client_id}, {"_id": 0})
@@ -948,6 +954,8 @@ async def process_merchant_payment(payment: Dict):
     # If merchant has configured MoMo number, transfer their share immediately
     merchant_momo = merchant.get("momo_number")
     merchant_network = merchant.get("momo_network", "MTN").upper()
+    
+    logger.info(f"Merchant payout check: momo={merchant_momo}, network={merchant_network}, share={merchant_share}")
     
     if merchant_momo and merchant_share > 0:
         payout_success = False

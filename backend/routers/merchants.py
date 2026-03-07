@@ -687,6 +687,46 @@ async def export_transactions(
     }
 
 
+@router.get("/payouts")
+async def get_merchant_payouts(
+    page: int = 1,
+    limit: int = 20,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get merchant payout history - money received from customer payments"""
+    merchant_id = current_merchant["id"]
+    
+    skip = (page - 1) * limit
+    
+    # Get payouts
+    payouts = await db.merchant_payouts.find(
+        {"merchant_id": merchant_id},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Get total count
+    total_count = await db.merchant_payouts.count_documents({"merchant_id": merchant_id})
+    
+    # Calculate totals
+    all_payouts = await db.merchant_payouts.find(
+        {"merchant_id": merchant_id, "status": "completed"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    
+    total_received = sum(p.get("amount", 0) for p in all_payouts)
+    
+    return {
+        "payouts": payouts,
+        "total_received": round(total_received, 2),
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total": total_count,
+            "pages": (total_count + limit - 1) // limit
+        }
+    }
+
+
 # ============== SETTINGS ==============
 
 @router.get("/settings")
