@@ -12,7 +12,11 @@ import {
   CheckCircle,
   AlertCircle,
   Wallet,
-  ChevronLeft
+  ChevronLeft,
+  Crown,
+  ArrowUp,
+  CreditCard,
+  Phone
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -27,10 +31,11 @@ import {
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
-const ServicesPage = ({ balance, onBack, onRefresh }) => {
+const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   const [activeService, setActiveService] = useState(null);
   const [fees, setFees] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [availableCards, setAvailableCards] = useState([]);
   
   // Form states
   const [phone, setPhone] = useState('');
@@ -39,10 +44,18 @@ const ServicesPage = ({ balance, onBack, onRefresh }) => {
   const [meterNumber, setMeterNumber] = useState('');
   const [bundleCode, setBundleCode] = useState('');
   
+  // Upgrade states
+  const [selectedUpgradeCard, setSelectedUpgradeCard] = useState(null);
+  const [useUpgradeCashback, setUseUpgradeCashback] = useState(false);
+  const [upgradeCashbackAmount, setUpgradeCashbackAmount] = useState('');
+  const [upgradePaymentPhone, setUpgradePaymentPhone] = useState('');
+  const [upgradeStatus, setUpgradeStatus] = useState(null); // null, 'processing', 'pending', 'success', 'failed'
+  
   const token = localStorage.getItem('sdm_client_token');
   
   useEffect(() => {
     fetchFees();
+    fetchAvailableCards();
   }, []);
   
   const fetchFees = async () => {
@@ -52,6 +65,36 @@ const ServicesPage = ({ balance, onBack, onRefresh }) => {
     } catch (error) {
       console.error('Failed to fetch fees:', error);
     }
+  };
+  
+  const fetchAvailableCards = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/public/card-types`);
+      setAvailableCards(res.data.card_types || []);
+    } catch (error) {
+      console.error('Failed to fetch cards:', error);
+    }
+  };
+  
+  // Get upgrade options based on current card
+  const getUpgradeOptions = () => {
+    if (!client?.card_type || !availableCards.length) return [];
+    
+    const cardOrder = ['silver', 'gold', 'platinum', 'diamond', 'business'];
+    const currentIndex = cardOrder.indexOf(client.card_type);
+    
+    return availableCards
+      .filter(card => {
+        const cardIndex = cardOrder.indexOf(card.type || card.slug);
+        return cardIndex > currentIndex && card.is_active !== false;
+      })
+      .map(card => ({
+        ...card,
+        type: card.type || card.slug,
+        fullPrice: card.price,
+        welcomeBonus: card.welcome_bonus || (card.type === 'gold' ? 2 : card.type === 'platinum' ? 3 : 1)
+      }))
+      .sort((a, b) => a.price - b.price);
   };
   
   const services = [
@@ -86,6 +129,14 @@ const ServicesPage = ({ balance, onBack, onRefresh }) => {
       icon: Banknote,
       color: 'from-emerald-500 to-teal-500',
       fee: fees.withdrawal || 1
+    },
+    {
+      id: 'upgrade',
+      name: 'Upgrade Card',
+      description: 'Upgrade to a higher tier',
+      icon: Crown,
+      color: 'from-amber-500 to-yellow-500',
+      fee: 0
     }
   ];
   
@@ -116,6 +167,87 @@ const ServicesPage = ({ balance, onBack, onRefresh }) => {
       fee: Math.round(fee * 100) / 100,
       total: Math.round((amt + fee) * 100) / 100
     };
+  };
+  
+  // Calculate upgrade payment breakdown
+  const calculateUpgradePayment = () => {
+    if (!selectedUpgradeCard) return { cashback: 0, momo: 0, total: 0 };
+    
+    const total = selectedUpgradeCard.fullPrice;
+    const maxCashback = balance || 0;
+    
+    let cashbackToUse = 0;
+    if (useUpgradeCashback) {
+      if (upgradeCashbackAmount && parseFloat(upgradeCashbackAmount) > 0) {
+        cashbackToUse = Math.min(parseFloat(upgradeCashbackAmount), maxCashback, total);
+      } else {
+        cashbackToUse = Math.min(maxCashback, total);
+      }
+    }
+    
+    const momoAmount = total - cashbackToUse;
+    
+    return {
+      cashback: cashbackToUse,
+      momo: momoAmount,
+      total: total
+    };
+  };
+  
+  // Handle card upgrade
+  const handleUpgrade = async () => {
+    if (!selectedUpgradeCard) {
+      toast.error('Please select a card to upgrade to');
+      return;
+    }
+    
+    const payment = calculateUpgradePayment();
+    
+    // Validate phone if MoMo payment needed
+    if (payment.momo > 0 && (!upgradePaymentPhone || upgradePaymentPhone.length < 10)) {
+      toast.error('Please enter a valid phone number for MoMo payment');
+      return;
+    }
+    
+    setIsLoading(true);
+    setUpgradeStatus('processing');
+    
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(`${API_URL}/api/clients/cards/upgrade`, {
+        new_card_type: selectedUpgradeCard.type,
+        payment_phone: upgradePaymentPhone || null,
+        use_cashback: useUpgradeCashback,
+        cashback_amount: useUpgradeCashback ? (upgradeCashbackAmount ? parseFloat(upgradeCashbackAmount) : null) : null
+      }, { headers });
+      
+      if (res.data.success) {
+        // If fully paid with cashback
+        if (res.data.status === 'completed') {
+          setUpgradeStatus('success');
+          toast.success(res.data.message || 'Upgrade successful!');
+          setTimeout(() => {
+            setActiveService(null);
+            setSelectedUpgradeCard(null);
+            setUpgradeStatus(null);
+            if (onRefresh) onRefresh();
+          }, 2000);
+        } else {
+          // MoMo payment needed
+          setUpgradeStatus('pending');
+          if (res.data.test_mode) {
+            toast.info('Test mode: Waiting for confirmation');
+          } else {
+            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount}! Approve on your phone.`);
+          }
+        }
+      }
+    } catch (error) {
+      setUpgradeStatus('failed');
+      toast.error(error.response?.data?.detail || 'Upgrade failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handlePurchase = async () => {
