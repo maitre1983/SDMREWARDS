@@ -30,8 +30,10 @@ import {
   Shield,
   UserCog,
   Building,
-  ChevronRight
+  ChevronRight,
+  Info
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Merchant Components
 import PinModal from '../components/merchant/PinModal';
@@ -313,61 +315,149 @@ export default function MerchantDashboard() {
 
         {/* QR Codes Tab */}
         {activeTab === 'qr' && (
-          <div className="space-y-6">
-            {/* Payment QR */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <CreditCard size={18} /> Payment QR Code
-              </h3>
-              <div className="text-center">
-                <div className="bg-white rounded-xl p-4 inline-block mb-4">
-                  <QrCode size={160} className="text-slate-900" />
+          <div className="space-y-8">
+            {/* Payment QR Code - Green/Emerald Theme */}
+            <div className="bg-gradient-to-br from-emerald-900/50 to-slate-800 border-2 border-emerald-500/50 rounded-2xl p-6 relative overflow-hidden">
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-400/10 rounded-full blur-2xl" />
+              
+              <div className="relative">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                    <CreditCard size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-lg">Payment QR Code</h3>
+                    <p className="text-emerald-300 text-sm">Receive payments from customers</p>
+                  </div>
                 </div>
-                <p className="text-slate-400 text-sm mb-2">
-                  Customers scan this to pay you
-                </p>
-                <div className="flex items-center gap-2 justify-center">
-                  <code className="text-amber-400 bg-slate-900 px-3 py-1 rounded text-sm">
-                    {merchant?.payment_qr_code}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyQRCode(merchant?.payment_qr_code)}
-                    className="text-slate-400"
-                  >
-                    <Copy size={16} />
-                  </Button>
+                
+                {/* QR Code Container */}
+                <div className="text-center">
+                  <div className="relative inline-block">
+                    {/* QR Code with green border */}
+                    <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-emerald-500/20 border-4 border-emerald-500">
+                      <QRCodeSVG 
+                        value={`https://web-boost-seo.preview.emergentagent.com/pay/${merchant?.payment_qr_code || 'DEMO'}`}
+                        size={200}
+                        level="H"
+                        includeMargin={false}
+                        fgColor="#059669"
+                        bgColor="#ffffff"
+                      />
+                    </div>
+                    {/* Badge */}
+                    <div className="absolute -top-3 -right-3 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                      PAY
+                    </div>
+                  </div>
+                  
+                  {/* Instructions */}
+                  <div className="mt-6 space-y-3">
+                    <p className="text-emerald-100 font-medium">
+                      Customers scan to pay you instantly
+                    </p>
+                    <div className="flex items-center gap-2 justify-center flex-wrap">
+                      <code className="text-emerald-400 bg-slate-900/80 px-4 py-2 rounded-lg text-base font-mono border border-emerald-500/30">
+                        {merchant?.payment_qr_code}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyQRCode(merchant?.payment_qr_code)}
+                        className="text-emerald-400 hover:bg-emerald-500/20"
+                      >
+                        <Copy size={18} />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Recruitment QR */}
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                <Users size={18} /> Recruitment QR Code
-              </h3>
-              <div className="text-center">
-                <div className="bg-white rounded-xl p-4 inline-block mb-4">
-                  <QrCode size={160} className="text-slate-900" />
+            {/* Recruitment QR Code - Purple/Blue Theme */}
+            <div className="bg-gradient-to-br from-purple-900/50 to-slate-800 border-2 border-purple-500/50 rounded-2xl p-6 relative overflow-hidden">
+              {/* Background decoration */}
+              <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 right-0 w-24 h-24 bg-blue-400/10 rounded-full blur-2xl" />
+              
+              <div className="relative">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                    <Users size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-lg">Recruitment QR Code</h3>
+                    <p className="text-purple-300 text-sm">Invite new customers & earn bonuses</p>
+                  </div>
                 </div>
-                <p className="text-slate-400 text-sm mb-2">
-                  New customers scan this to register via your referral
-                </p>
-                <div className="flex items-center gap-2 justify-center">
-                  <code className="text-emerald-400 bg-slate-900 px-3 py-1 rounded text-sm">
-                    {merchant?.recruitment_qr_code}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyQRCode(merchant?.recruitment_qr_code)}
-                    className="text-slate-400"
-                  >
-                    <Copy size={16} />
-                  </Button>
+                
+                {/* QR Code Container */}
+                <div className="text-center">
+                  <div className="relative inline-block">
+                    {/* QR Code with purple border */}
+                    <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-purple-500/20 border-4 border-purple-500">
+                      <QRCodeSVG 
+                        value={`https://web-boost-seo.preview.emergentagent.com/register?ref=${merchant?.recruitment_qr_code || 'DEMO'}`}
+                        size={200}
+                        level="H"
+                        includeMargin={false}
+                        fgColor="#7c3aed"
+                        bgColor="#ffffff"
+                      />
+                    </div>
+                    {/* Badge */}
+                    <div className="absolute -top-3 -right-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                      REFER
+                    </div>
+                  </div>
+                  
+                  {/* Instructions */}
+                  <div className="mt-6 space-y-3">
+                    <p className="text-purple-100 font-medium">
+                      New customers scan to register via your referral
+                    </p>
+                    <div className="flex items-center gap-2 justify-center flex-wrap">
+                      <code className="text-purple-400 bg-slate-900/80 px-4 py-2 rounded-lg text-base font-mono border border-purple-500/30">
+                        {merchant?.recruitment_qr_code}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyQRCode(merchant?.recruitment_qr_code)}
+                        className="text-purple-400 hover:bg-purple-500/20"
+                      >
+                        <Copy size={18} />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+            
+            {/* Tips Section */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+              <h4 className="text-amber-400 font-medium mb-3 flex items-center gap-2">
+                <Info size={18} />
+                Tips for better scanning
+              </h4>
+              <ul className="text-slate-400 text-sm space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400">•</span>
+                  Print QR codes in high quality for best results
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-purple-400">•</span>
+                  Place QR codes in well-lit areas
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-400">•</span>
+                  Minimum recommended size: 3cm x 3cm
+                </li>
+              </ul>
             </div>
           </div>
         )}
