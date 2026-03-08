@@ -54,6 +54,9 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Payout status tracking (pending, completed, failed)
 - [x] Admin view of all merchant payouts
 - [x] Merchant view of own payout history
+- [x] Bank transfer payout option (COMPLETED 2026-03-08)
+- [x] Bank account verification via BulkClix API
+- [x] Preferred payout method toggle (MoMo vs Bank)
 
 ### Merchant Dashboard (100%)
 - [x] Sales statistics and charts
