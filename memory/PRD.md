@@ -17,7 +17,7 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ## Tech Stack
 - **Backend:** FastAPI, MongoDB (motor), JWT, Pydantic
 - **Frontend:** React, Tailwind CSS, Shadcn/UI, recharts, qrcode.react
-- **3rd Party:** BulkClix (payments, SMS, OTP)
+- **3rd Party:** BulkClix (payments, SMS, OTP, Airtime, Data Bundles)
 
 ---
 
@@ -38,7 +38,22 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Monthly analytics with month picker
 - [x] Super admin PIN change functionality
 - [x] Partial refactoring (Overview, Clients, Merchants tabs extracted)
+- [x] Merchant payouts management (view payout history)
 - [ ] Settings tab sub-components extraction (IN PROGRESS)
+
+### Services Hub (100% for implemented services)
+- [x] **Airtime Purchase** - BulkClix API integration (MTN, Telecel, AirtelTigo)
+- [x] **Data Bundle Purchase** - Real BulkClix API with recipient validation (COMPLETED 2026-03-08)
+- [x] **Card Upgrade** - Upgrade membership with MoMo + cashback options
+- [x] **MoMo Withdrawal** - Withdraw cashback to mobile money
+- [ ] ECG Payment - Waiting for API documentation
+
+### Merchant Auto-Payout System (100%)
+- [x] Automatic payout to merchant MoMo on customer payment
+- [x] IP whitelist configured (34.170.12.145)
+- [x] Payout status tracking (pending, completed, failed)
+- [x] Admin view of all merchant payouts
+- [x] Merchant view of own payout history
 
 ### Merchant Dashboard (100%)
 - [x] Sales statistics and charts
@@ -85,8 +100,9 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ## Upcoming Tasks (Priority Order)
 
 ### P1 - Services Feature Completion
-- Complete UI for Airtime, Data, ECG, Merchant Payments
-- Implement backend logic with BulkClix APIs (waiting for documentation)
+- [x] Airtime purchase with BulkClix API - COMPLETED
+- [x] Data Bundle purchase with BulkClix API - COMPLETED 2026-03-08
+- [ ] ECG Payment - Waiting for API documentation from user
 
 ### P1 - AdminDashboard.jsx Refactoring (Settings)
 - Extract Settings > Cards → `AdminSettingsCards.jsx`
