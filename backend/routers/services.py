@@ -38,6 +38,14 @@ BULKCLIX_NETWORK_IDS = {
     "AIRTELTIGO": "6a2c7586-bf4d-42d4-ace1-2a3386eb4bb2"
 }
 
+# BulkClix Service IDs for Data Bundles
+BULKCLIX_DATA_SERVICE_IDS = {
+    "MTN": "4a1d6ab2-df53-44fd-b42b-97753ba77508",
+    "TELECEL": "205cb30a-f67c-4d4d-983a-19c3da2ebeef",
+    "TELECEL_BROADBAND": "14e35989-2341-4be8-b5f4-63a2f31fa745",
+    "AIRTELTIGO": "442424ef-3eac-4d88-a596-65b5ec7a345f"
+}
+
 # Minimum amounts
 MIN_CASHBACK_BALANCE = 2.0
 MIN_TRANSACTION_AMOUNT = 2.0
@@ -53,8 +61,11 @@ class AirtimeRequest(BaseModel):
 
 class DataBundleRequest(BaseModel):
     phone: str
-    bundle_code: str
-    network: str
+    package_id: str  # BulkClix package ID
+    service_id: str  # BulkClix service ID
+    network: str  # MTN, TELECEL, AIRTELTIGO
+    amount: float  # Price of the bundle
+    display_name: str  # e.g. "1.37GB"
 
 
 class ECGPaymentRequest(BaseModel):
@@ -180,6 +191,77 @@ async def get_service_fees():
         "min_transaction": MIN_TRANSACTION_AMOUNT,
         "min_balance": MIN_CASHBACK_BALANCE
     }
+
+
+@router.get("/data/services")
+async def get_data_services():
+    """Get available data bundle services/networks"""
+    return {
+        "success": True,
+        "services": [
+            {"id": "4a1d6ab2-df53-44fd-b42b-97753ba77508", "name": "MTN Data", "network": "MTN"},
+            {"id": "205cb30a-f67c-4d4d-983a-19c3da2ebeef", "name": "Telecel Data", "network": "TELECEL"},
+            {"id": "442424ef-3eac-4d88-a596-65b5ec7a345f", "name": "AirtelTigo Data", "network": "AIRTELTIGO"}
+        ]
+    }
+
+
+@router.get("/data/bundles/{service_id}/{phone}")
+async def get_data_bundles(service_id: str, phone: str):
+    """Get available data bundles for a specific service and phone number"""
+    
+    # Format phone for BulkClix (must start with 0)
+    bulkclix_phone = phone
+    if phone.startswith("+233"):
+        bulkclix_phone = "0" + phone[4:]
+    elif phone.startswith("233"):
+        bulkclix_phone = "0" + phone[3:]
+    
+    if not BULKCLIX_API_KEY:
+        raise HTTPException(status_code=500, detail="BulkClix API not configured")
+    
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
+            response = await http_client.get(
+                f"{BULKCLIX_BASE_URL}/databundle-api-v2/offers/{service_id}/{bulkclix_phone}",
+                headers={
+                    "Accept": "application/json",
+                    "x-api-key": BULKCLIX_API_KEY
+                },
+                timeout=30.0
+            )
+            
+            logger.info(f"BulkClix Data Bundles Response: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                packages = data.get("data", {}).get("packages", {}).get("data", [])
+                user_name = data.get("data", {}).get("user", {}).get("name", "")
+                
+                # Format packages for frontend
+                formatted_packages = []
+                for pkg in packages:
+                    formatted_packages.append({
+                        "id": pkg.get("id"),
+                        "display": pkg.get("Display"),
+                        "value": pkg.get("Value"),
+                        "amount": pkg.get("Amount"),
+                        "service_id": service_id
+                    })
+                
+                return {
+                    "success": True,
+                    "packages": formatted_packages,
+                    "user_name": user_name,
+                    "phone": bulkclix_phone
+                }
+            else:
+                logger.error(f"BulkClix data bundles error: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=400, detail="Failed to fetch data bundles")
+                
+    except httpx.RequestError as e:
+        logger.error(f"BulkClix data bundles network error: {e}")
+        raise HTTPException(status_code=500, detail="Network error - please try again")
 
 
 @router.post("/airtime/purchase")
@@ -347,25 +429,8 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
 async def purchase_data(request: DataBundleRequest, current_client: dict = Depends(get_current_client)):
     """Purchase data bundle using cashback balance via BulkClix API"""
     
-    # Data bundle prices by network and bundle code
-    bundle_prices = {
-        "MTN_1GB": 10.0,
-        "MTN_2GB": 18.0,
-        "MTN_5GB": 40.0,
-        "TELECEL_1GB": 9.0,
-        "TELECEL_2GB": 16.0,
-        "AIRTELTIGO_1GB": 8.0,
-        "AIRTELTIGO_2GB": 15.0
-    }
-    
-    bundle_key = f"{request.network.upper()}_{request.bundle_code}"
-    bundle_price = bundle_prices.get(bundle_key, 0)
-    
-    if bundle_price == 0:
-        raise HTTPException(status_code=400, detail="Invalid data bundle selected")
-    
-    # Calculate fee
-    fee_info = await get_service_fee("data_bundle", bundle_price)
+    # Calculate fee based on the bundle price
+    fee_info = await get_service_fee("data_bundle", request.amount)
     total_cost = fee_info["total"]
     
     # Check balance
@@ -377,7 +442,7 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
     if balance < total_cost:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient balance. Required: GHS {total_cost:.2f}"
+            detail=f"Insufficient balance. Required: GHS {total_cost:.2f} (GHS {request.amount:.2f} + GHS {fee_info['fee_amount']:.2f} fee)"
         )
     
     # Format phone number for BulkClix (must start with 0)
@@ -387,6 +452,9 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
     elif request.phone.startswith("233"):
         bulkclix_phone = "0" + request.phone[3:]
     
+    # Generate unique transaction ID
+    transaction_id = f"SDM-DATA-{uuid.uuid4().hex[:12].upper()}"
+    
     # Create service transaction record
     service_tx = {
         "id": str(uuid.uuid4()),
@@ -394,10 +462,13 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
         "client_id": current_client["id"],
         "phone": request.phone,
         "network": request.network.upper(),
-        "bundle_code": request.bundle_code,
-        "amount": bundle_price,
+        "package_id": request.package_id,
+        "service_id": request.service_id,
+        "display_name": request.display_name,
+        "amount": request.amount,
         "service_fee": fee_info["fee_amount"],
         "total_deducted": total_cost,
+        "transaction_id": transaction_id,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -413,16 +484,19 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
         try:
             async with httpx.AsyncClient(follow_redirects=True) as http_client:
                 payload = {
-                    "phone": bulkclix_phone,
-                    "bundle_id": request.bundle_code,
+                    "phone_number": bulkclix_phone,
                     "network": request.network.upper(),
-                    "reference": f"SDM-DATA-{service_tx['id'][:8].upper()}"
+                    "amount": request.amount,
+                    "service_id": request.service_id,
+                    "type": "momo",
+                    "package_id": request.package_id,
+                    "name": client_record.get("full_name", "Customer")
                 }
                 
                 logger.info(f"BulkClix Data Request: {payload}")
                 
                 response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/data-api/buy",
+                    f"{BULKCLIX_BASE_URL}/databundle-api-v2/buy",
                     headers={
                         "Content-Type": "application/json",
                         "Accept": "application/json",
@@ -438,10 +512,12 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
                 
                 # Check for success
                 if response.status_code == 200:
-                    if result.get("status") == "success" or "success" in result.get("message", "").lower():
+                    message_lower = result.get("message", "").lower()
+                    if result.get("status") == "success" or "success" in message_lower:
                         api_success = True
                         api_message = result.get("message", "Data bundle sent successfully")
-                        provider_reference = result.get("reference") or result.get("transaction_id") or result.get("data", {}).get("reference")
+                        data = result.get("data", {})
+                        provider_reference = data.get("reference") or data.get("transaction_id") or result.get("reference") or transaction_id
                     else:
                         api_message = result.get("message", "Unknown response from provider")
                         logger.warning(f"BulkClix data returned non-success: {result}")
@@ -459,7 +535,7 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
         logger.warning("BULKCLIX_API_KEY not configured - simulating data purchase")
         api_success = True  # Simulate success in test mode
         api_message = "Data bundle sent (simulated - API not configured)"
-        provider_reference = f"SIM-{service_tx['id'][:8].upper()}"
+        provider_reference = f"SIM-{transaction_id}"
     
     if not api_success:
         # Update transaction as failed
@@ -477,7 +553,7 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
     debit_result = await debit_cashback(
         current_client["id"],
         total_cost,
-        f"Data bundle: {request.bundle_code} to {request.phone}",
+        f"Data bundle: {request.display_name} to {request.phone}",
         "data_bundle"
     )
     
@@ -494,10 +570,10 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
     
     return {
         "success": True,
-        "message": f"Data bundle {request.bundle_code} sent to {request.phone}",
+        "message": f"Data bundle {request.display_name} sent to {request.phone}",
         "transaction_id": service_tx["id"],
         "provider_reference": provider_reference,
-        "amount": bundle_price,
+        "amount": request.amount,
         "fee": fee_info["fee_amount"],
         "total_deducted": total_cost,
         "new_balance": debit_result["balance_after"]
