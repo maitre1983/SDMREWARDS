@@ -17,7 +17,8 @@ import {
   ArrowUp,
   CreditCard,
   Phone,
-  Gift
+  Gift,
+  Search
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -45,6 +46,14 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   const [meterNumber, setMeterNumber] = useState('');
   const [bundleCode, setBundleCode] = useState('');
   
+  // Data bundle states
+  const [dataServices, setDataServices] = useState([]);
+  const [selectedDataService, setSelectedDataService] = useState(null);
+  const [dataBundlesApi, setDataBundlesApi] = useState([]);
+  const [selectedBundle, setSelectedBundle] = useState(null);
+  const [fetchingBundles, setFetchingBundles] = useState(false);
+  const [bundleUserName, setBundleUserName] = useState('');
+  
   // Upgrade states
   const [selectedUpgradeCard, setSelectedUpgradeCard] = useState(null);
   const [useUpgradeCashback, setUseUpgradeCashback] = useState(false);
@@ -59,6 +68,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   useEffect(() => {
     fetchFees();
     fetchAvailableCards();
+    fetchDataServices();
     
     // Cleanup polling on unmount
     return () => {
@@ -83,6 +93,43 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       setAvailableCards(res.data.card_types || []);
     } catch (error) {
       console.error('Failed to fetch cards:', error);
+    }
+  };
+  
+  const fetchDataServices = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/services/data/services`);
+      setDataServices(res.data.services || []);
+    } catch (error) {
+      console.error('Failed to fetch data services:', error);
+    }
+  };
+  
+  const fetchDataBundles = async (serviceId, phoneNumber) => {
+    if (!serviceId || !phoneNumber || phoneNumber.length < 10) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    
+    setFetchingBundles(true);
+    setDataBundlesApi([]);
+    setSelectedBundle(null);
+    setBundleUserName('');
+    
+    try {
+      const res = await axios.get(`${API_URL}/api/services/data/bundles/${serviceId}/${phoneNumber}`);
+      if (res.data.success) {
+        setDataBundlesApi(res.data.packages || []);
+        setBundleUserName(res.data.user_name || '');
+        if (res.data.packages?.length === 0) {
+          toast.info('No data bundles available for this number');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch bundles:', error);
+      toast.error(error.response?.data?.detail || 'Failed to fetch data bundles');
+    } finally {
+      setFetchingBundles(false);
     }
   };
   
@@ -150,24 +197,21 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
     }
   ];
   
-  const dataBundles = {
-    MTN: [
-      { code: '1GB', name: '1GB Data', price: 10 },
-      { code: '2GB', name: '2GB Data', price: 18 },
-      { code: '5GB', name: '5GB Data', price: 40 },
-    ],
-    TELECEL: [
-      { code: '1GB', name: '1GB Data', price: 9 },
-      { code: '2GB', name: '2GB Data', price: 16 },
-    ],
-    AIRTELTIGO: [
-      { code: '1GB', name: '1GB Data', price: 8 },
-      { code: '2GB', name: '2GB Data', price: 15 },
-    ]
+  // Network to service ID mapping for data bundles
+  const networkToServiceId = {
+    'MTN': '4a1d6ab2-df53-44fd-b42b-97753ba77508',
+    'TELECEL': '205cb30a-f67c-4d4d-983a-19c3da2ebeef',
+    'AIRTELTIGO': '442424ef-3eac-4d88-a596-65b5ec7a345f'
   };
   
   const calculateTotal = () => {
-    const amt = parseFloat(amount) || 0;
+    let amt = parseFloat(amount) || 0;
+    
+    // For data bundles, use selected bundle amount
+    if (activeService === 'data' && selectedBundle) {
+      amt = selectedBundle.amount;
+    }
+    
     const service = services.find(s => s.id === activeService);
     if (!service) return { amount: amt, fee: 0, total: amt };
     
@@ -382,8 +426,20 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
           payload = { phone, amount: parseFloat(amount), network };
           break;
         case 'data':
+          if (!selectedBundle) {
+            toast.error('Please select a data bundle');
+            setIsLoading(false);
+            return;
+          }
           endpoint = '/api/services/data/purchase';
-          payload = { phone, bundle_code: bundleCode, network };
+          payload = { 
+            phone, 
+            package_id: selectedBundle.id,
+            service_id: selectedBundle.service_id,
+            network,
+            amount: selectedBundle.amount,
+            display_name: selectedBundle.display
+          };
           break;
         case 'ecg':
           endpoint = '/api/services/ecg/pay';
@@ -420,6 +476,9 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
     setNetwork('MTN');
     setMeterNumber('');
     setBundleCode('');
+    setSelectedBundle(null);
+    setDataBundlesApi([]);
+    setBundleUserName('');
   };
   
   // Render the card upgrade form
@@ -776,24 +835,105 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
           
           {/* Data Bundle Selection */}
           {activeService === 'data' && (
-            <div>
-              <Label className="text-slate-300 text-sm">Data Bundle</Label>
-              <Select value={bundleCode} onValueChange={(val) => {
-                setBundleCode(val);
-                const bundle = dataBundles[network]?.find(b => b.code === val);
-                if (bundle) setAmount(bundle.price.toString());
-              }}>
-                <SelectTrigger className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl">
-                  <SelectValue placeholder="Select bundle" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  {dataBundles[network]?.map(bundle => (
-                    <SelectItem key={bundle.code} value={bundle.code}>
-                      {bundle.name} - GHS {bundle.price}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              {/* Step 1: Fetch Bundles Button */}
+              {dataBundlesApi.length === 0 && (
+                <div>
+                  <Button
+                    onClick={() => fetchDataBundles(networkToServiceId[network], phone)}
+                    disabled={fetchingBundles || !phone || phone.length < 10}
+                    className="w-full h-12 bg-purple-600 hover:bg-purple-700 rounded-xl"
+                    data-testid="fetch-bundles-btn"
+                  >
+                    {fetchingBundles ? (
+                      <>
+                        <Loader2 className="animate-spin mr-2" size={18} />
+                        Fetching Bundles...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2" size={18} />
+                        Fetch Available Bundles
+                      </>
+                    )}
+                  </Button>
+                  {phone && phone.length < 10 && (
+                    <p className="text-amber-400 text-xs mt-2">Enter a complete phone number to fetch bundles</p>
+                  )}
+                </div>
+              )}
+              
+              {/* Step 2: Show User Name if found */}
+              {bundleUserName && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3">
+                  <p className="text-emerald-400 text-sm">
+                    <CheckCircle className="inline mr-2" size={14} />
+                    Recipient: <span className="font-semibold">{bundleUserName}</span>
+                  </p>
+                </div>
+              )}
+              
+              {/* Step 3: Bundle List */}
+              {dataBundlesApi.length > 0 && (
+                <div>
+                  <Label className="text-slate-300 text-sm mb-2 block">Select Data Bundle</Label>
+                  <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                    {dataBundlesApi.map(bundle => {
+                      const isSelected = selectedBundle?.id === bundle.id;
+                      const canAfford = bundle.amount * (1 + (fees.data_bundle || 3) / 100) <= balance;
+                      
+                      return (
+                        <button
+                          key={bundle.id}
+                          onClick={() => {
+                            setSelectedBundle(bundle);
+                            setAmount(bundle.amount.toString());
+                          }}
+                          disabled={!canAfford}
+                          className={`w-full p-3 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'bg-purple-500/20 border-purple-500'
+                              : canAfford
+                                ? 'bg-slate-900/50 border-slate-700/50 hover:border-slate-600'
+                                : 'bg-slate-900/30 border-slate-800/50 opacity-50 cursor-not-allowed'
+                          }`}
+                          data-testid={`bundle-${bundle.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-white font-medium text-sm">{bundle.display}</p>
+                              {!canAfford && (
+                                <p className="text-red-400 text-xs mt-0.5">Insufficient balance</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className={`font-bold ${isSelected ? 'text-purple-400' : 'text-amber-400'}`}>
+                                GHS {bundle.amount.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Reset Bundles Button */}
+                  <Button
+                    onClick={() => {
+                      setDataBundlesApi([]);
+                      setSelectedBundle(null);
+                      setBundleUserName('');
+                      setAmount('');
+                    }}
+                    variant="ghost"
+                    className="mt-2 text-slate-400 hover:text-white text-sm"
+                    data-testid="reset-bundles-btn"
+                  >
+                    <ChevronLeft size={14} className="mr-1" />
+                    Change Number / Network
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           
@@ -816,7 +956,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         </div>
         
         {/* Cost Summary */}
-        {(amount || bundleCode) && (
+        {(amount || selectedBundle) && (
           <div className="bg-slate-800/50 rounded-xl p-4 space-y-2">
             <div className="flex justify-between text-slate-400 text-sm">
               <span>Amount</span>
@@ -843,10 +983,10 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         {/* Submit Button */}
         <Button
           onClick={handlePurchase}
-          disabled={isLoading || !amount || calc.total > balance || 
-            (['airtime', 'data', 'withdrawal'].includes(activeService) && !phone) ||
-            (activeService === 'ecg' && !meterNumber) ||
-            (activeService === 'data' && !bundleCode)
+          disabled={isLoading || calc.total > balance || 
+            (['airtime', 'withdrawal'].includes(activeService) && (!phone || !amount)) ||
+            (activeService === 'ecg' && (!meterNumber || !amount)) ||
+            (activeService === 'data' && (!phone || !selectedBundle))
           }
           className={`w-full h-12 bg-gradient-to-r ${service.color} hover:opacity-90 rounded-xl font-semibold`}
           data-testid="service-submit"
