@@ -6,6 +6,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import QRScanner from '../components/QRScanner';
 import ReferralQRCode from '../components/client/ReferralQRCode';
+import MerchantPayModal from '../components/client/MerchantPayModal';
+import WithdrawalModal from '../components/client/WithdrawalModal';
+import PaymentSettingsModal from '../components/client/PaymentSettingsModal';
 import { QRCodeSVG } from 'qrcode.react';
 import ServicesPage from './ServicesPage';
 import { 
@@ -51,6 +54,9 @@ import {
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
+
+// Feature flag - set to true to use new refactored components
+const USE_REFACTORED_MODALS = true;
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -1776,7 +1782,26 @@ export default function ClientDashboard() {
       )}
       
       {/* Merchant Payment Modal */}
-      {showMerchantPayModal && selectedMerchant && (
+      {showMerchantPayModal && selectedMerchant && USE_REFACTORED_MODALS && (
+        <MerchantPayModal
+          merchant={selectedMerchant}
+          amount={merchantPayAmount}
+          setAmount={setMerchantPayAmount}
+          phone={merchantPayPhone || client?.phone || ''}
+          setPhone={setMerchantPayPhone}
+          network={merchantPayNetwork}
+          setNetwork={setMerchantPayNetwork}
+          status={merchantPayStatus}
+          setStatus={setMerchantPayStatus}
+          isProcessing={isProcessingPayment}
+          isTestMode={isMerchantPayTestMode}
+          onClose={closeMerchantPayModal}
+          onInitiatePayment={initiateMerchantPayment}
+          onCheckStatus={checkMerchantPaymentStatus}
+          onConfirmTest={confirmMerchantTestPayment}
+        />
+      )}
+      {showMerchantPayModal && selectedMerchant && !USE_REFACTORED_MODALS && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative">
             {/* Close Button */}
