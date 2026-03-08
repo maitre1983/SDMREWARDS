@@ -95,7 +95,17 @@ export default function ClientAuthPage() {
       localStorage.setItem('sdm_client_data', JSON.stringify(response.data.client));
       
       toast.success('Welcome back!');
-      navigate('/client/dashboard');
+      
+      // Check if there's a pending merchant payment from QR scan
+      const pendingMerchant = sessionStorage.getItem('pending_merchant_payment');
+      if (pendingMerchant) {
+        sessionStorage.removeItem('pending_merchant_payment');
+        navigate('/client/dashboard', { 
+          state: { payMerchant: true, merchantQR: pendingMerchant }
+        });
+      } else {
+        navigate('/client/dashboard');
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Login failed');
     } finally {
@@ -209,7 +219,17 @@ export default function ClientAuthPage() {
       localStorage.setItem('sdm_client_data', JSON.stringify(response.data.client));
       
       toast.success(response.data.message || 'Registration successful!');
-      navigate('/client/dashboard');
+      
+      // Check if there's a pending merchant payment from QR scan
+      const pendingMerchant = sessionStorage.getItem('pending_merchant_payment');
+      if (pendingMerchant) {
+        sessionStorage.removeItem('pending_merchant_payment');
+        navigate('/client/dashboard', { 
+          state: { payMerchant: true, merchantQR: pendingMerchant }
+        });
+      } else {
+        navigate('/client/dashboard');
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Registration failed');
     } finally {

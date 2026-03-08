@@ -10,6 +10,30 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
   const [facingMode, setFacingMode] = useState('environment'); // 'environment' = back camera
   const html5QrCodeRef = useRef(null);
 
+  // Extract merchant QR code from various formats
+  const extractQRCode = (decodedText) => {
+    let qrCode = decodedText;
+    
+    // Handle URL format: https://xxx/pay/SDM-M-XXXX
+    if (decodedText.includes('/pay/')) {
+      const match = decodedText.match(/\/pay\/([A-Z0-9-]+)/i);
+      if (match) {
+        qrCode = match[1];
+      }
+    }
+    // Handle SDM: prefix format
+    else if (decodedText.startsWith('SDM:')) {
+      qrCode = decodedText.replace('SDM:', '');
+    }
+    // Handle full URL with ref parameter
+    else if (decodedText.includes('ref=')) {
+      const url = new URL(decodedText);
+      qrCode = url.searchParams.get('ref') || decodedText;
+    }
+    
+    return qrCode;
+  };
+
   const startScanner = async () => {
     setError(null);
     setIsScanning(true);
@@ -28,11 +52,9 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
         { facingMode },
         config,
         (decodedText) => {
-          // Extract QR code from SDM format
-          let qrCode = decodedText;
-          if (decodedText.startsWith('SDM:')) {
-            qrCode = decodedText.replace('SDM:', '');
-          }
+          // Extract QR code from decoded text
+          const qrCode = extractQRCode(decodedText);
+          console.log('QR Scanned:', decodedText, '→ Extracted:', qrCode);
           
           // Stop scanner and return result
           stopScanner();

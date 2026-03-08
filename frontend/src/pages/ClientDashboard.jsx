@@ -138,7 +138,7 @@ export default function ClientDashboard() {
     fetchDashboardData();
     fetchPaymentSettings();
     
-    // Check if navigated from Partners page with merchant to pay
+    // Check if navigated from Partners page or PayPage with merchant to pay
     if (location.state?.payMerchant && location.state?.merchantQR) {
       handleMerchantFromPartners(location.state);
       // Clear the location state

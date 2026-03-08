@@ -9,6 +9,7 @@ import ClientAuthPage from "./pages/ClientAuthPage";
 import ClientDashboard from "./pages/ClientDashboard";
 import ClientProfilePage from "./pages/ClientProfilePage";
 import PartnersPage from "./pages/PartnersPage";
+import PayPage from "./pages/PayPage";
 import MerchantAuthPage from "./pages/MerchantAuthPage";
 import MerchantDashboard from "./pages/MerchantDashboard";
 import MerchantHistoryPage from "./pages/MerchantHistoryPage";
@@ -72,6 +73,12 @@ function App() {
             <Route path="/client/dashboard" element={<ClientDashboard />} />
             <Route path="/client/profile" element={<ClientProfilePage />} />
             <Route path="/client/partners" element={<PartnersPage />} />
+            
+            {/* Pay Route - Dedicated page for QR scan payments */}
+            <Route path="/pay/:merchantCode" element={<PayPage />} />
+            
+            {/* Registration with referral */}
+            <Route path="/register" element={<ClientAuthPage />} />
             
             {/* Merchant Routes */}
             <Route path="/merchant" element={<MerchantAuthPage />} />
