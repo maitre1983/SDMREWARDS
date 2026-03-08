@@ -114,6 +114,14 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - Extract Settings > Security → `AdminSettingsSecurity.jsx`
 - Extract Settings > Users → `AdminSettingsUsers.jsx`
 
+### P1 - ClientDashboard.jsx Refactoring (COMPLETED 2026-03-08)
+- [x] MerchantPayModal extracted and wired
+- [x] WithdrawalModal extracted and wired
+- [x] PaymentSettingsModal extracted and wired
+- [x] Feature flag USE_REFACTORED_MODALS for gradual rollout
+- [ ] Remove old inline modal code (cleanup)
+- [ ] Extract Home, QR, History, Referrals tabs as components
+
 ### P2 - Backend Refactoring
 - Split `admin.py` (>2400 lines) into:
   - `admin_analytics.py`
