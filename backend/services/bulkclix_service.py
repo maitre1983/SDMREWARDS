@@ -9,10 +9,14 @@ import os
 import httpx
 import uuid
 import hashlib
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 from enum import Enum
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 # Configuration
 BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")
@@ -1153,3 +1157,168 @@ class BulkClixService:
         ).sort("created_at", -1).limit(limit).to_list(limit)
         
         return transactions
+
+
+# ============== BANK SERVICES ==============
+
+class BankTransferService:
+    """
+    Service for handling bank transfers via BulkClix API
+    """
+    
+    def __init__(self, db=None):
+        self.api_key = BULKCLIX_API_KEY
+        self.base_url = BULKCLIX_BASE_URL
+        self.db = db
+    
+    async def get_bank_list(self) -> Dict[str, Any]:
+        """
+        Get list of supported banks from BulkClix
+        GET /payment-api/banks/list
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/payment-api/banks/list",
+                    headers={
+                        "x-api-key": self.api_key,
+                        "Accept": "application/json"
+                    }
+                )
+                
+                logger.info(f"BulkClix get banks response: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "banks": data.get("data", data) if isinstance(data, dict) else data
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"API error: {response.status_code}",
+                        "banks": []
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error fetching bank list: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "banks": []
+            }
+    
+    async def verify_bank_account(self, account_number: str, bank_id: str) -> Dict[str, Any]:
+        """
+        Verify bank account and get account holder name
+        GET /payment-api/bankNameQuery?account_number=XXX&bank_id=XXX
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/payment-api/bankNameQuery",
+                    params={
+                        "account_number": account_number,
+                        "bank_id": bank_id
+                    },
+                    headers={
+                        "x-api-key": self.api_key,
+                        "Accept": "application/json"
+                    }
+                )
+                
+                logger.info(f"BulkClix verify bank account response: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "account_name": data.get("account_name", data.get("data", {}).get("account_name", "")),
+                        "data": data
+                    }
+                else:
+                    error_data = response.json() if response.text else {}
+                    return {
+                        "success": False,
+                        "error": error_data.get("message", f"API error: {response.status_code}"),
+                        "account_name": None
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error verifying bank account: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "account_name": None
+            }
+    
+    async def send_to_bank(
+        self,
+        amount: float,
+        account_number: str,
+        account_name: str,
+        bank_id: str,
+        client_reference: str = None
+    ) -> Dict[str, Any]:
+        """
+        Send money to a bank account
+        POST /payment-api/send/bank
+        """
+        if not client_reference:
+            client_reference = f"SDM-BANK-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
+        
+        try:
+            payload = {
+                "amount": str(amount),
+                "account_number": account_number,
+                "account_name": account_name,
+                "bank_id": bank_id,
+                "client_reference": client_reference
+            }
+            
+            logger.info(f"Sending bank transfer: {amount} GHS to {account_name}")
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self.base_url}/payment-api/send/bank",
+                    json=payload,
+                    headers={
+                        "x-api-key": self.api_key,
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                logger.info(f"BulkClix bank transfer response: {response.status_code} - {response.text[:500]}")
+                
+                data = response.json() if response.text else {}
+                
+                if response.status_code == 200:
+                    return {
+                        "success": True,
+                        "reference": client_reference,
+                        "transaction_id": data.get("transaction_id", data.get("data", {}).get("transaction_id")),
+                        "message": data.get("message", "Transfer initiated"),
+                        "data": data
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": data.get("message", f"API error: {response.status_code}"),
+                        "reference": client_reference,
+                        "data": data
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error sending bank transfer: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "reference": client_reference
+            }
+
+
+# Create singleton instance for bank service
+bank_transfer_service = BankTransferService()
+

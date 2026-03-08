@@ -61,8 +61,17 @@ export default function MerchantDashboard() {
     momo_number: '',
     momo_network: '',
     bank_name: '',
-    bank_account: ''
+    bank_account: '',
+    bank_id: '',
+    bank_account_name: '',
+    preferred_payout_method: 'momo'
   });
+  
+  // Bank settings
+  const [bankList, setBankList] = useState([]);
+  const [isFetchingBanks, setIsFetchingBanks] = useState(false);
+  const [isVerifyingBank, setIsVerifyingBank] = useState(false);
+  const [bankVerified, setBankVerified] = useState(false);
 
   // Settings sub-tabs
   const [settingsTab, setSettingsTab] = useState('cashback');
@@ -114,9 +123,19 @@ export default function MerchantDashboard() {
           momo_number: dashRes.data.merchant.momo_number || '',
           momo_network: dashRes.data.merchant.momo_network || '',
           bank_name: dashRes.data.merchant.bank_name || '',
-          bank_account: dashRes.data.merchant.bank_account || ''
+          bank_account: dashRes.data.merchant.bank_account || '',
+          bank_id: dashRes.data.merchant.bank_id || '',
+          bank_account_name: dashRes.data.merchant.bank_account_name || '',
+          preferred_payout_method: dashRes.data.merchant.preferred_payout_method || 'momo'
         });
+        // Mark bank as verified if already has account name
+        if (dashRes.data.merchant.bank_account_name) {
+          setBankVerified(true);
+        }
       }
+      
+      // Fetch bank list
+      fetchBankList();
     } catch (error) {
       console.error('Dashboard fetch error:', error);
       if (error.response?.status === 401) {
@@ -168,7 +187,10 @@ export default function MerchantDashboard() {
         momo_number: settings.momo_number,
         momo_network: settings.momo_network,
         bank_name: settings.bank_name,
-        bank_account: settings.bank_account
+        bank_account: settings.bank_account,
+        bank_id: settings.bank_id,
+        bank_account_name: settings.bank_account_name,
+        preferred_payout_method: settings.preferred_payout_method
       }, { headers });
       
       toast.success('Payment info updated!');
@@ -177,6 +199,61 @@ export default function MerchantDashboard() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const fetchBankList = async () => {
+    setIsFetchingBanks(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/public/banks`);
+      setBankList(res.data.banks || []);
+    } catch (error) {
+      console.error('Failed to fetch banks:', error);
+    } finally {
+      setIsFetchingBanks(false);
+    }
+  };
+
+  const handleVerifyBankAccount = async () => {
+    if (!settings.bank_id || !settings.bank_account) {
+      toast.error('Please select a bank and enter account number');
+      return;
+    }
+
+    setIsVerifyingBank(true);
+    setBankVerified(false);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(
+        `${API_URL}/api/merchants/banks/verify-account?account_number=${settings.bank_account}&bank_id=${settings.bank_id}`,
+        {},
+        { headers }
+      );
+      
+      if (res.data.success) {
+        setSettings(prev => ({
+          ...prev,
+          bank_account_name: res.data.account_name
+        }));
+        setBankVerified(true);
+        toast.success(`Account verified: ${res.data.account_name}`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to verify account');
+      setBankVerified(false);
+    } finally {
+      setIsVerifyingBank(false);
+    }
+  };
+
+  const handleBankChange = (bankId) => {
+    const selectedBank = bankList.find(b => b.id === bankId);
+    setSettings(prev => ({
+      ...prev,
+      bank_id: bankId,
+      bank_name: selectedBank?.name || '',
+      bank_account_name: '' // Reset verification when bank changes
+    }));
+    setBankVerified(false);
   };
 
   const copyQRCode = (code) => {
@@ -590,15 +667,49 @@ export default function MerchantDashboard() {
             {settingsTab === 'payment' && (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
                 <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                  <Wallet size={18} /> Informations de Paiement
+                  <Wallet size={18} /> Payout Settings
                 </h3>
                 
-                {/* MoMo */}
+                {/* Preferred Payout Method */}
+                <div className="mb-6 p-4 bg-slate-900/50 rounded-xl border border-slate-700">
+                  <h4 className="text-slate-300 text-sm font-medium mb-3">Preferred Payout Method</h4>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setSettings({...settings, preferred_payout_method: 'momo'})}
+                      className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                        settings.preferred_payout_method === 'momo' 
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                          : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
+                      }`}
+                    >
+                      <Phone className="mx-auto mb-1" size={20} />
+                      <span className="text-sm">Mobile Money</span>
+                    </button>
+                    <button
+                      onClick={() => setSettings({...settings, preferred_payout_method: 'bank'})}
+                      className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                        settings.preferred_payout_method === 'bank' 
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
+                          : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
+                      }`}
+                    >
+                      <Building className="mx-auto mb-1" size={20} />
+                      <span className="text-sm">Bank Transfer</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* MoMo Settings */}
                 <div className="space-y-4 mb-6">
-                  <h4 className="text-slate-300 text-sm font-medium">Mobile Money</h4>
+                  <h4 className="text-slate-300 text-sm font-medium flex items-center gap-2">
+                    <Phone size={16} /> Mobile Money
+                    {settings.preferred_payout_method === 'momo' && (
+                      <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">Primary</span>
+                    )}
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-slate-400 text-xs">MoMo Number (for receiving payments)</Label>
+                      <Label className="text-slate-400 text-xs">MoMo Number</Label>
                       <div className="relative mt-1">
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                         <Input
@@ -626,41 +737,96 @@ export default function MerchantDashboard() {
                   </div>
                 </div>
 
-                {/* Bank */}
+                {/* Bank Settings */}
                 <div className="space-y-4">
-                  <h4 className="text-slate-300 text-sm font-medium">Bank Account</h4>
+                  <h4 className="text-slate-300 text-sm font-medium flex items-center gap-2">
+                    <Building size={16} /> Bank Account
+                    {settings.preferred_payout_method === 'bank' && (
+                      <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">Primary</span>
+                    )}
+                  </h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-slate-400 text-xs">Bank Name</Label>
-                      <Input
-                        type="text"
-                        placeholder="E.g. GCB Bank"
-                        value={settings.bank_name}
-                        onChange={(e) => setSettings({...settings, bank_name: e.target.value})}
-                        className="mt-1 bg-slate-900 border-slate-700 text-white"
-                      />
+                      <Label className="text-slate-400 text-xs">Select Bank</Label>
+                      <select
+                        value={settings.bank_id}
+                        onChange={(e) => handleBankChange(e.target.value)}
+                        className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
+                        disabled={isFetchingBanks}
+                      >
+                        <option value="">Select Bank</option>
+                        {bankList.map(bank => (
+                          <option key={bank.id} value={bank.id}>{bank.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <Label className="text-slate-400 text-xs">Account Number</Label>
                       <Input
                         type="text"
-                        placeholder="Account number"
+                        placeholder="Enter account number"
                         value={settings.bank_account}
-                        onChange={(e) => setSettings({...settings, bank_account: e.target.value})}
+                        onChange={(e) => {
+                          setSettings({...settings, bank_account: e.target.value, bank_account_name: ''});
+                          setBankVerified(false);
+                        }}
                         className="mt-1 bg-slate-900 border-slate-700 text-white"
                       />
                     </div>
                   </div>
+                  
+                  {/* Bank Verification */}
+                  {settings.bank_id && settings.bank_account && (
+                    <div className="mt-4">
+                      {!bankVerified ? (
+                        <Button
+                          onClick={handleVerifyBankAccount}
+                          disabled={isVerifyingBank}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          data-testid="verify-bank-btn"
+                        >
+                          {isVerifyingBank ? (
+                            <>
+                              <Loader2 className="animate-spin mr-2" size={16} />
+                              Verifying...
+                            </>
+                          ) : (
+                            <>
+                              <Shield className="mr-2" size={16} />
+                              Verify Bank Account
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="text-emerald-400" size={18} />
+                            <div>
+                              <p className="text-emerald-400 text-sm font-medium">Account Verified</p>
+                              <p className="text-white text-sm">{settings.bank_account_name}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <Button
                   onClick={handleSavePaymentInfo}
-                  disabled={isSaving}
+                  disabled={isSaving || (settings.preferred_payout_method === 'bank' && settings.bank_account && !bankVerified)}
                   className="mt-6 w-full bg-emerald-500 hover:bg-emerald-600"
+                  data-testid="save-payment-info-btn"
                 >
                   {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : <Save className="mr-2" size={18} />}
-                  Sauvegarder
+                  Save Payout Settings
                 </Button>
+                
+                {settings.preferred_payout_method === 'bank' && settings.bank_account && !bankVerified && (
+                  <p className="text-amber-400 text-xs text-center mt-2">
+                    Please verify your bank account before saving
+                  </p>
+                )}
               </div>
             )}
 

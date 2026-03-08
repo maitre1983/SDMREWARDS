@@ -954,69 +954,110 @@ async def process_merchant_payment(payment: Dict):
     })
     
     # ============== AUTO-PAY MERCHANT ==============
-    # If merchant has configured MoMo number, transfer their share immediately
+    # If merchant has configured payout method, transfer their share immediately
+    preferred_payout_method = merchant.get("preferred_payout_method", "momo")
     merchant_momo = merchant.get("momo_number")
     merchant_network = merchant.get("momo_network", "MTN").upper()
+    merchant_bank_id = merchant.get("bank_id")
+    merchant_bank_account = merchant.get("bank_account")
+    merchant_bank_name = merchant.get("bank_account_name")
     
-    logger.info(f"Merchant payout check: momo={merchant_momo}, network={merchant_network}, share={merchant_share}")
+    logger.info(f"Merchant payout check: method={preferred_payout_method}, momo={merchant_momo}, bank={merchant_bank_account}, share={merchant_share}")
     
-    if merchant_momo and merchant_share > 0:
+    # Determine if we can do a payout
+    can_payout_momo = merchant_momo and merchant_share > 0
+    can_payout_bank = merchant_bank_id and merchant_bank_account and merchant_bank_name and merchant_share > 0
+    
+    # Use preferred method if available, otherwise fallback
+    use_bank = (preferred_payout_method == "bank" and can_payout_bank) or (not can_payout_momo and can_payout_bank)
+    use_momo = (preferred_payout_method == "momo" and can_payout_momo) or (not can_payout_bank and can_payout_momo)
+    
+    if (use_bank or use_momo) and merchant_share > 0:
         payout_success = False
         payout_ref = f"SDM-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
-        
-        # Format phone for BulkClix (0XXXXXXXXX format)
-        bulkclix_phone = merchant_momo
-        if merchant_momo.startswith("+233"):
-            bulkclix_phone = "0" + merchant_momo[4:]
-        elif merchant_momo.startswith("233"):
-            bulkclix_phone = "0" + merchant_momo[3:]
+        payout_method = "bank" if use_bank else "momo"
         
         # Create payout record
         payout_record = {
             "id": str(uuid.uuid4()),
             "type": "merchant_payout",
+            "payout_method": payout_method,
             "merchant_id": merchant_id,
             "transaction_id": transaction_id,
             "amount": merchant_share,
-            "phone": merchant_momo,
-            "network": merchant_network,
             "reference": payout_ref,
             "status": "pending",
             "test_mode": is_test_mode(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
+        
+        if use_bank:
+            payout_record["bank_id"] = merchant_bank_id
+            payout_record["bank_account"] = merchant_bank_account
+            payout_record["bank_account_name"] = merchant_bank_name
+            payout_record["bank_name"] = merchant.get("bank_name", "")
+        else:
+            payout_record["phone"] = merchant_momo
+            payout_record["network"] = merchant_network
+        
         await db.merchant_payouts.insert_one(payout_record)
         
         if is_test_mode():
             # In test mode, auto-approve payout simulation
             payout_success = True
-            logger.info(f"TEST MODE: Simulating merchant payout of GHS {merchant_share} to {bulkclix_phone}")
+            logger.info(f"TEST MODE: Simulating merchant payout ({payout_method}) of GHS {merchant_share}")
             await db.merchant_payouts.update_one(
                 {"id": payout_record["id"]},
                 {"$set": {"status": "completed", "provider_message": "Test mode - simulated"}}
             )
         else:
-            # Production: Call BulkClix Disbursement API
+            # Production: Call BulkClix API
             try:
                 async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                    response = await http_client.post(
-                        f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
-                        headers={
-                            "x-api-key": BULKCLIX_API_KEY,
-                            "Content-Type": "application/json",
-                            "Accept": "application/json"
-                        },
-                        json={
-                            "amount": str(merchant_share),
-                            "account_number": bulkclix_phone,
-                            "channel": merchant_network,
-                            "account_name": merchant.get("business_name", ""),
-                            "client_reference": payout_ref
-                        },
-                        timeout=30.0
-                    )
-                    
-                    logger.info(f"Merchant payout response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
+                    if use_bank:
+                        # Bank transfer
+                        response = await http_client.post(
+                            f"{BULKCLIX_BASE_URL}/payment-api/send/bank",
+                            headers={
+                                "x-api-key": BULKCLIX_API_KEY,
+                                "Content-Type": "application/json",
+                                "Accept": "application/json"
+                            },
+                            json={
+                                "amount": str(merchant_share),
+                                "account_number": merchant_bank_account,
+                                "account_name": merchant_bank_name,
+                                "bank_id": merchant_bank_id,
+                                "client_reference": payout_ref
+                            },
+                            timeout=60.0
+                        )
+                        logger.info(f"Merchant BANK payout response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
+                    else:
+                        # MoMo transfer
+                        bulkclix_phone = merchant_momo
+                        if merchant_momo.startswith("+233"):
+                            bulkclix_phone = "0" + merchant_momo[4:]
+                        elif merchant_momo.startswith("233"):
+                            bulkclix_phone = "0" + merchant_momo[3:]
+                        
+                        response = await http_client.post(
+                            f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
+                            headers={
+                                "x-api-key": BULKCLIX_API_KEY,
+                                "Content-Type": "application/json",
+                                "Accept": "application/json"
+                            },
+                            json={
+                                "amount": str(merchant_share),
+                                "account_number": bulkclix_phone,
+                                "channel": merchant_network,
+                                "account_name": merchant.get("business_name", ""),
+                                "client_reference": payout_ref
+                            },
+                            timeout=30.0
+                        )
+                        logger.info(f"Merchant MOMO payout response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
                     
                     if response.status_code == 200:
                         data = response.json() if response.text else {}
@@ -1025,14 +1066,14 @@ async def process_merchant_payment(payment: Dict):
                             {"id": payout_record["id"]},
                             {"$set": {
                                 "status": "completed",
-                                "provider_reference": data.get("transactionId"),
+                                "provider_reference": data.get("transactionId") or data.get("transaction_id"),
                                 "provider_message": data.get("message", "Success"),
                                 "completed_at": datetime.now(timezone.utc).isoformat()
                             }}
                         )
                     elif response.status_code == 403:
                         # IP not whitelisted - mark as pending for manual processing
-                        logger.warning(f"BulkClix IP not whitelisted - payout marked as pending_manual")
+                        logger.warning("BulkClix IP not whitelisted - payout marked as pending_manual")
                         await db.merchant_payouts.update_one(
                             {"id": payout_record["id"]},
                             {"$set": {
@@ -1041,7 +1082,6 @@ async def process_merchant_payment(payment: Dict):
                                 "error_details": response.text
                             }}
                         )
-                        # Still consider this a success for the payment flow, but payout needs manual handling
                         payout_success = False
                     else:
                         logger.error(f"Merchant payout failed: {response.status_code} - {response.text}")

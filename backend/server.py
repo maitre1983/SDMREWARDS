@@ -240,6 +240,26 @@ async def health_check():
     }
 
 
+# ============== PUBLIC BANKS ENDPOINT ==============
+@app.get("/api/public/banks")
+async def get_public_banks():
+    """
+    Get list of supported banks from BulkClix.
+    Used by merchants to configure bank payouts.
+    """
+    from services.bulkclix_service import bank_transfer_service
+    
+    result = await bank_transfer_service.get_bank_list()
+    
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch banks"))
+    
+    return {
+        "success": True,
+        "banks": result["banks"]
+    }
+
+
 # ============== PUBLIC CARD TYPES ENDPOINT ==============
 @app.get("/api/public/card-types")
 async def get_public_card_types():

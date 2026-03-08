@@ -44,6 +44,9 @@ class UpdatePaymentInfoRequest(BaseModel):
     momo_network: Optional[str] = None
     bank_name: Optional[str] = None
     bank_account: Optional[str] = None
+    bank_id: Optional[str] = None  # BulkClix bank ID
+    bank_account_name: Optional[str] = None  # Verified account holder name
+    preferred_payout_method: Optional[str] = None  # 'momo' or 'bank'
 
 
 class UpdateBusinessInfoRequest(BaseModel):
@@ -1538,3 +1541,121 @@ async def update_business_info_extended(
     )
     
     return {"success": True, "message": "Business info updated", "merchant": updated}
+
+
+# ============== BANK SERVICES FOR MERCHANTS ==============
+
+@router.get("/banks/list")
+async def get_bank_list():
+    """Get list of supported banks for transfers"""
+    from services.bulkclix_service import bank_transfer_service
+    
+    result = await bank_transfer_service.get_bank_list()
+    
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch banks"))
+    
+    return {
+        "success": True,
+        "banks": result["banks"]
+    }
+
+
+@router.post("/banks/verify-account")
+async def verify_bank_account(
+    account_number: str,
+    bank_id: str,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Verify bank account and get account holder name"""
+    from services.bulkclix_service import bank_transfer_service
+    
+    result = await bank_transfer_service.verify_bank_account(account_number, bank_id)
+    
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to verify account"))
+    
+    return {
+        "success": True,
+        "account_name": result["account_name"],
+        "account_number": account_number,
+        "bank_id": bank_id
+    }
+
+
+@router.put("/settings/bank-info")
+async def update_bank_info(
+    bank_name: str,
+    bank_id: str,
+    bank_account: str,
+    bank_account_name: str,
+    preferred_payout_method: str = "bank",
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Update merchant bank information for payouts"""
+    
+    # Validate preferred method
+    if preferred_payout_method not in ["momo", "bank"]:
+        raise HTTPException(status_code=400, detail="Invalid payout method. Must be 'momo' or 'bank'")
+    
+    updates = {
+        "bank_name": bank_name,
+        "bank_id": bank_id,
+        "bank_account": bank_account,
+        "bank_account_name": bank_account_name,
+        "preferred_payout_method": preferred_payout_method,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.merchants.update_one(
+        {"id": current_merchant["id"]},
+        {"$set": updates}
+    )
+    
+    logger.info(f"Merchant {current_merchant['id']} updated bank info: {bank_name} - {bank_account}")
+    
+    return {
+        "success": True,
+        "message": "Bank information updated successfully",
+        "bank_name": bank_name,
+        "bank_account": bank_account,
+        "bank_account_name": bank_account_name,
+        "preferred_payout_method": preferred_payout_method
+    }
+
+
+@router.get("/settings/payout-info")
+async def get_payout_info(current_merchant: dict = Depends(get_current_merchant)):
+    """Get merchant's payout configuration (MoMo and Bank)"""
+    
+    merchant = await db.merchants.find_one(
+        {"id": current_merchant["id"]},
+        {
+            "_id": 0,
+            "momo_number": 1,
+            "momo_network": 1,
+            "bank_name": 1,
+            "bank_id": 1,
+            "bank_account": 1,
+            "bank_account_name": 1,
+            "preferred_payout_method": 1
+        }
+    )
+    
+    return {
+        "success": True,
+        "payout_info": {
+            "momo": {
+                "number": merchant.get("momo_number"),
+                "network": merchant.get("momo_network")
+            },
+            "bank": {
+                "name": merchant.get("bank_name"),
+                "bank_id": merchant.get("bank_id"),
+                "account_number": merchant.get("bank_account"),
+                "account_name": merchant.get("bank_account_name")
+            },
+            "preferred_method": merchant.get("preferred_payout_method", "momo")
+        }
+    }
+

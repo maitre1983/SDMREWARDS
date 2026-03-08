@@ -1,0 +1,92 @@
+{
+  "summary": "Bank Withdrawal Feature for Merchants - Full Implementation Verified. All 13 backend tests passed (100%). Frontend UI tested successfully showing Payout Settings with Mobile Money and Bank Transfer toggle, bank dropdown populated from BulkClix API, account verification flow, and save functionality.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/bank_withdrawal_feature_results.xml",
+    "/app/backend/tests/test_bank_withdrawal_feature.py",
+    ".screenshots/merchant_dashboard.png",
+    ".screenshots/merchant_payout_settings.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "BankTransferService class in bulkclix_service.py properly implements get_bank_list, verify_bank_account, send_to_bank methods",
+    "Public endpoint /api/public/banks correctly fetches bank list from BulkClix API (35 banks returned)",
+    "Merchant endpoints /api/merchants/banks/verify-account and /api/merchants/settings/bank-info handle authentication properly",
+    "MerchantDashboard.jsx Paiement tab shows complete payout settings with proper state management",
+    "Bank verification flow: select bank → enter account → verify → shows account holder name",
+    "preferred_payout_method field correctly toggles between 'momo' and 'bank'"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_bank_withdrawal_feature.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100% (All UI elements present and functional)"
+  },
+  "test_credentials": {
+    "test_merchant": {
+      "phone": "+233509876543",
+      "password": "Test123456!"
+    },
+    "test_merchant_business": "Test Shop"
+  },
+  "seed_data_creation": "Backend tests updated merchant bank settings (AFFINITY S&L, account: TEST1234567890, holder: TEST ACCOUNT HOLDER)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bank withdrawal feature fully implemented and tested. GET /api/public/banks returns 35+ banks from BulkClix. Merchant can select bank, verify account, and set preferred payout method (momo or bank). The payment system in payments.py checks preferred_payout_method and routes payouts accordingly.",
+  "mocked_apis": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "features_tested": {
+    "backend_endpoints": {
+      "GET /api/public/banks": {
+        "status": "PASS",
+        "response": "200 OK - Returns 35 banks from BulkClix (GCB, Ecobank, Fidelity, Absa, Stanbic, etc.)"
+      },
+      "POST /api/merchants/banks/verify-account": {
+        "status": "PASS",
+        "notes": "Requires authentication, validates account_number and bank_id params"
+      },
+      "PUT /api/merchants/settings/bank-info": {
+        "status": "PASS",
+        "notes": "Updates bank_name, bank_id, bank_account, bank_account_name, preferred_payout_method"
+      },
+      "GET /api/merchants/settings/payout-info": {
+        "status": "PASS",
+        "response": "Returns momo and bank payout configuration with preferred_method"
+      }
+    },
+    "frontend_ui": {
+      "payout_settings_page": "PASS - Shows complete payout configuration UI",
+      "preferred_method_toggle": "PASS - Mobile Money and Bank Transfer buttons work",
+      "bank_dropdown": "PASS - Populated from /api/public/banks API (35 banks)",
+      "account_number_input": "PASS - User can enter bank account number",
+      "verify_button": "PASS - Appears when bank and account entered, triggers verification",
+      "verification_display": "PASS - Shows 'Account Verified' with account holder name",
+      "save_button": "PASS - 'Save Payout Settings' button enabled after verification"
+    }
+  },
+  "api_verification_results": {
+    "GET /api/public/banks": "200 OK - 35 banks including GCB, Ecobank, Fidelity, Absa, Stanbic, Cal Bank, etc.",
+    "GET /api/health": "200 OK",
+    "POST /api/auth/merchant/login": "200 OK - Returns access_token and merchant data",
+    "GET /api/merchants/me": "200 OK - Includes bank_name, bank_account, bank_id, bank_account_name, preferred_payout_method fields",
+    "PUT /api/merchants/settings/bank-info": "200 OK - Successfully updates bank settings"
+  },
+  "bank_list_sample": [
+    {"name": "GCB Bank Limited", "id": "abddfa3d-e849-4b79-93b0-36bc1393c860"},
+    {"name": "Ecobank Ghana Ltd", "id": "8b739771-f3c8-4fbb-a3ea-7b7840d80a2f"},
+    {"name": "Fidelity Bank Limited", "id": "c359c2de-be90-4c9c-b9dc-f66bcae72594"},
+    {"name": "Absa Bank Ghana Limited", "id": "bb344271-bfe9-400c-bd86-d98c6357aa5a"},
+    {"name": "Access Bank Limited", "id": "820bc25b-3ddb-47be-a2f6-ce8678e3dc70"}
+  ]
+}
