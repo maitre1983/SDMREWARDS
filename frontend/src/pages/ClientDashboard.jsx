@@ -1995,7 +1995,31 @@ export default function ClientDashboard() {
       )}
 
       {/* ============== WITHDRAWAL MODAL ============== */}
-      {showWithdrawalModal && (
+      {showWithdrawalModal && USE_REFACTORED_MODALS && (
+        <WithdrawalModal
+          isOpen={showWithdrawalModal}
+          balance={client?.cashback_balance || 0}
+          phone={withdrawalPhone}
+          setPhone={setWithdrawalPhone}
+          amount={withdrawalAmount}
+          setAmount={setWithdrawalAmount}
+          network={withdrawalNetwork}
+          setNetwork={setWithdrawalNetwork}
+          method={withdrawalMethod}
+          setMethod={setWithdrawalMethod}
+          status={withdrawalStatus}
+          setStatus={setWithdrawalStatus}
+          isProcessing={isProcessingPayment}
+          isTestMode={isWithdrawalTestMode}
+          paymentSettings={paymentSettings}
+          onClose={closeWithdrawalModal}
+          onInitiate={initiateWithdrawal}
+          onCheckStatus={() => {}} 
+          onConfirmTest={confirmTestWithdrawal}
+          onOpenPaymentSettings={() => setShowPaymentSettings(true)}
+        />
+      )}
+      {showWithdrawalModal && !USE_REFACTORED_MODALS && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
@@ -2491,7 +2515,19 @@ export default function ClientDashboard() {
       )}
       
       {/* Payment Settings Modal */}
-      {showPaymentSettings && (
+      {showPaymentSettings && USE_REFACTORED_MODALS && (
+        <PaymentSettingsModal
+          isOpen={showPaymentSettings}
+          settings={paymentSettings}
+          setSettings={setPaymentSettings}
+          defaultMethod={paymentSettings.preferred_withdrawal_method || 'momo'}
+          setDefaultMethod={(method) => setPaymentSettings({...paymentSettings, preferred_withdrawal_method: method})}
+          isSaving={isProcessingPayment}
+          onClose={() => setShowPaymentSettings(false)}
+          onSave={savePaymentSettings}
+        />
+      )}
+      {showPaymentSettings && !USE_REFACTORED_MODALS && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
