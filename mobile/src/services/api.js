@@ -4,7 +4,7 @@
  */
 
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // API Base URL - Change this to your production URL
 const API_BASE_URL = 'https://web-boost-seo.preview.emergentagent.com/api';
@@ -17,16 +17,44 @@ const api = axios.create({
   },
 });
 
+// Storage helper for web/native compatibility
+const storage = {
+  async setItem(key, value) {
+    if (Platform.OS === 'web') {
+      localStorage.setItem(key, value);
+    } else {
+      const SecureStore = require('expo-secure-store');
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  async getItem(key) {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      const SecureStore = require('expo-secure-store');
+      return await SecureStore.getItemAsync(key);
+    }
+  },
+  async removeItem(key) {
+    if (Platform.OS === 'web') {
+      localStorage.removeItem(key);
+    } else {
+      const SecureStore = require('expo-secure-store');
+      await SecureStore.deleteItemAsync(key);
+    }
+  },
+};
+
 // Token management
 export const setAuthToken = async (token) => {
   if (token) {
-    await SecureStore.setItemAsync('auth_token', token);
+    await storage.setItem('auth_token', token);
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
 };
 
 export const getAuthToken = async () => {
-  const token = await SecureStore.getItemAsync('auth_token');
+  const token = await storage.getItem('auth_token');
   if (token) {
     api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   }
@@ -34,27 +62,27 @@ export const getAuthToken = async () => {
 };
 
 export const clearAuthToken = async () => {
-  await SecureStore.deleteItemAsync('auth_token');
-  await SecureStore.deleteItemAsync('user_type');
-  await SecureStore.deleteItemAsync('user_data');
+  await storage.removeItem('auth_token');
+  await storage.removeItem('user_type');
+  await storage.removeItem('user_data');
   delete api.defaults.headers.common['Authorization'];
 };
 
 // User type management (client or merchant)
 export const setUserType = async (type) => {
-  await SecureStore.setItemAsync('user_type', type);
+  await storage.setItem('user_type', type);
 };
 
 export const getUserType = async () => {
-  return await SecureStore.getItemAsync('user_type');
+  return await storage.getItem('user_type');
 };
 
 export const setUserData = async (data) => {
-  await SecureStore.setItemAsync('user_data', JSON.stringify(data));
+  await storage.setItem('user_data', JSON.stringify(data));
 };
 
 export const getUserData = async () => {
-  const data = await SecureStore.getItemAsync('user_data');
+  const data = await storage.getItem('user_data');
   return data ? JSON.parse(data) : null;
 };
 

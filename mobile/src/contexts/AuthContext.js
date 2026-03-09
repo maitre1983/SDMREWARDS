@@ -85,8 +85,8 @@ export const AuthProvider = ({ children }) => {
   const loginClient = async (phone, password) => {
     try {
       const response = await authAPI.loginClient(phone, password);
-      if (response.token) {
-        await setAuthToken(response.token);
+      if (response.access_token || response.token) {
+        await setAuthToken(response.access_token || response.token);
         await setUserType('client');
         setUserTypeState('client');
         setUser(response.client);
@@ -107,8 +107,8 @@ export const AuthProvider = ({ children }) => {
   const loginMerchant = async (phone, password) => {
     try {
       const response = await authAPI.loginMerchant(phone, password);
-      if (response.token) {
-        await setAuthToken(response.token);
+      if (response.access_token || response.token) {
+        await setAuthToken(response.access_token || response.token);
         await setUserType('merchant');
         setUserTypeState('merchant');
         setUser(response.merchant);
