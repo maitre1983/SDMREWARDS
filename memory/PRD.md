@@ -102,6 +102,17 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Upcoming Tasks (Priority Order)
 
+### P0 - Mobile App Feature Parity (IN PROGRESS)
+- [x] Client Dashboard matching web design - COMPLETED 2026-03-09
+- [x] Partners Screen (merchant list) - COMPLETED 2026-03-09
+- [x] QR Scanner with payment flow - COMPLETED 2026-03-09
+- [ ] History Screen - Transaction history
+- [ ] Referrals Screen - Share code, view referrals
+- [ ] Services Screen - Airtime, Data, ECG
+- [ ] Withdrawal Screen - Cashback withdrawal
+- [ ] Profile Screen - User settings
+- [ ] Merchant Dashboard - Sales, QR display
+
 ### P1 - Services Feature Completion
 - [x] Airtime purchase with BulkClix API - COMPLETED
 - [x] Data Bundle purchase with BulkClix API - COMPLETED 2026-03-08
@@ -157,20 +168,42 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ### Overview
 SDM Rewards mobile app built with **Expo/React Native** for iOS and Android.
+Web preview accessible at: `/mobile` path on the main domain.
 
 ### Implemented Features
 - **Authentication Flow**
-  - Welcome screen with Client/Merchant selection
-  - Login screen with phone/password
+  - Welcome screen with animated logo, particles, staggered feature list
+  - Login screen with animated form and gradient buttons
   - Registration with OTP verification
-  - Secure token storage (expo-secure-store)
+  - Secure token storage (expo-secure-store for native, localStorage for web)
 
-- **Client Features**
-  - Home dashboard with balance, stats, transactions
-  - QR Code scanner for merchant payments
-  - Payment flow with MoMo integration
-  - Quick actions (Scan, Airtime, Data, Referrals)
-  - Bottom tab navigation
+- **Client Dashboard (COMPLETED 2026-03-09)**
+  - Header with animated logo, greeting message, profile/logout icons
+  - Main balance card with gradient, member badge, Total Earned/Spent
+  - Action buttons: Services, Withdraw, Settings
+  - Stats cards: Referrals count, Bonus Earned (with animations)
+  - Recent Activity list with transaction icons
+  - Custom bottom navigation: Home, Partners, QR (elevated), History, Referrals
+
+- **Partners Screen (NEW - 2026-03-09)**
+  - Search bar with instant filtering
+  - City filter chips (All, Accra, Kumasi, Tamale, Takoradi, Cape Coast)
+  - Merchant cards with:
+    - Business name and type
+    - Cashback rate badge
+    - Address and phone (clickable to call)
+    - "Directions" button (opens Google Maps)
+    - "Pay" button (navigates to payment flow)
+  - Animated card entrance effects
+  - Pull-to-refresh support
+
+- **QR Scanner Screen (ENHANCED 2026-03-09)**
+  - Camera-based QR scanning with permission handling
+  - Direct payment modal when merchant passed from Partners
+  - Payment form: phone, network selector, amount
+  - Cashback preview calculation
+  - Payment status tracking (pending, success, failed)
+  - Test mode support for development
 
 - **Merchant Features**
   - Home dashboard with QR code display
@@ -181,10 +214,13 @@ SDM Rewards mobile app built with **Expo/React Native** for iOS and Android.
 ### Technical Stack
 - Expo SDK 55
 - React Navigation (Stack + Bottom Tabs)
-- expo-camera/expo-barcode-scanner for QR
+- expo-camera for QR scanning
 - react-native-qrcode-svg for QR generation
-- expo-secure-store for secure storage
+- expo-linear-gradient for gradient backgrounds
+- expo-secure-store for secure storage (native)
+- localStorage fallback for web
 - axios for API calls
+- Animated API for smooth transitions
 
 ### Project Structure
 ```
@@ -194,10 +230,15 @@ SDM Rewards mobile app built with **Expo/React Native** for iOS and Android.
 ├── src/
 │   ├── components/Common.js  # Reusable UI components
 │   ├── contexts/AuthContext.js
-│   ├── services/api.js       # API service layer
+│   ├── services/api.js       # API service layer (with publicAPI)
 │   ├── utils/constants.js    # Theme & helpers
 │   └── screens/
 │       ├── auth/             # Welcome, Login, Register
+│       ├── client/
+│       │   ├── HomeScreen.js      # Dashboard (animated)
+│       │   ├── PartnersScreen.js  # Merchant list (NEW)
+│       │   └── QRScannerScreen.js # Scanner + payment modal
+│       └── merchant/         # Merchant screens
 │       ├── client/           # Home, QRScanner
 │       └── merchant/         # Home
 ```

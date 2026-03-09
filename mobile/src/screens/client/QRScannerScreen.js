@@ -22,11 +22,11 @@ import { COLORS, SPACING, BORDER_RADIUS, FONTS, NETWORKS, formatCurrency } from 
 const { width, height } = Dimensions.get('window');
 const SCAN_AREA_SIZE = width * 0.7;
 
-export default function QRScannerScreen({ navigation }) {
+export default function QRScannerScreen({ navigation, route }) {
   const { user, refreshDashboard } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [merchant, setMerchant] = useState(null);
+  const [merchant, setMerchant] = useState(route.params?.merchant || null);
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState(user?.phone || '');
   const [network, setNetwork] = useState('MTN');
@@ -36,10 +36,16 @@ export default function QRScannerScreen({ navigation }) {
   const [isTestMode, setIsTestMode] = useState(false);
 
   useEffect(() => {
-    if (!permission?.granted) {
+    // If merchant passed via route, skip camera
+    if (route.params?.merchant) {
+      setMerchant(route.params.merchant);
+      setScanned(true);
+    }
+    
+    if (!permission?.granted && !route.params?.merchant) {
       requestPermission();
     }
-  }, [permission]);
+  }, [permission, route.params]);
 
   const extractMerchantCode = (data) => {
     // Handle different QR formats
@@ -148,7 +154,20 @@ export default function QRScannerScreen({ navigation }) {
     setAmount('');
     setPaymentStatus(null);
     setPaymentId(null);
+    // If came from partners, go back
+    if (route.params?.merchant) {
+      navigation.goBack();
+    }
   };
+
+  // If merchant passed via route, show payment modal directly
+  if (route.params?.merchant && merchant) {
+    return (
+      <View style={styles.container}>
+        {renderPaymentModal()}
+      </View>
+    );
+  }
 
   if (!permission) {
     return (

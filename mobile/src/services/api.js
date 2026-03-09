@@ -257,6 +257,22 @@ export const paymentsAPI = {
   },
 };
 
+// ============== PUBLIC API ==============
+
+export const publicAPI = {
+  // Get partner merchants
+  getMerchants: async (params = {}) => {
+    const response = await api.get('/public/merchants', { params });
+    return response.data;
+  },
+
+  // Get merchant detail
+  getMerchantDetail: async (merchantId) => {
+    const response = await api.get(`/public/merchants/${merchantId}`);
+    return response.data;
+  },
+};
+
 // ============== SERVICES API ==============
 
 export const servicesAPI = {

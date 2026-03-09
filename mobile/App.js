@@ -22,6 +22,7 @@ import RegisterScreen from './src/screens/auth/RegisterScreen';
 // Client Screens
 import ClientHomeScreen from './src/screens/client/HomeScreen';
 import QRScannerScreen from './src/screens/client/QRScannerScreen';
+import PartnersScreen from './src/screens/client/PartnersScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
@@ -51,9 +52,9 @@ function ClientMainNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Home" component={ClientHomeScreen} />
       <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+      <Stack.Screen name="Partners" component={PartnersScreen} />
       <Stack.Screen name="History" component={HistoryScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="Partners" component={PlaceholderScreen} />
       <Stack.Screen name="Services" component={ServicesScreen} />
       <Stack.Screen name="Referrals" component={ReferralsScreen} />
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
