@@ -183,6 +183,10 @@ class ChangePasswordRequest(BaseModel):
     otp_method: str = "sms"  # sms or email
 
 
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str
+
+
 class CreateAdminRoleRequest(BaseModel):
     email: str
     password: str
@@ -994,6 +998,54 @@ async def update_client_limits(
     return {"success": True, "message": "Client limits updated"}
 
 
+@router.post("/clients/{client_id}/reset-password")
+async def admin_reset_client_password(
+    client_id: str,
+    request: AdminResetPasswordRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Admin: Reset client password (Super Admin only)"""
+    # Only super admin can reset passwords
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Only super admin can reset passwords")
+    
+    client_doc = await db.clients.find_one({"id": client_id})
+    if not client_doc:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Validate new password
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Hash and update password
+    password_hash = bcrypt.hashpw(request.new_password.encode(), bcrypt.gensalt()).decode()
+    
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {
+            "password_hash": password_hash,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "admin_email": current_admin.get("email"),
+        "action": "reset_client_password",
+        "target_id": client_id,
+        "target_phone": client_doc.get("phone"),
+        "target_name": client_doc.get("full_name"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "message": f"Password reset successfully for {client_doc.get('full_name', 'client')}"
+    }
+
+
 @router.post("/clients/{client_id}/send-sms")
 async def send_sms_to_client(
     client_id: str,
@@ -1306,6 +1358,54 @@ async def update_merchant_location(
     })
     
     return {"success": True, "message": "Merchant location updated"}
+
+
+@router.post("/merchants/{merchant_id}/reset-password")
+async def admin_reset_merchant_password(
+    merchant_id: str,
+    request: AdminResetPasswordRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Admin: Reset merchant password (Super Admin only)"""
+    # Only super admin can reset passwords
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Only super admin can reset passwords")
+    
+    merchant_doc = await db.merchants.find_one({"id": merchant_id})
+    if not merchant_doc:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    # Validate new password
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Hash and update password
+    password_hash = bcrypt.hashpw(request.new_password.encode(), bcrypt.gensalt()).decode()
+    
+    await db.merchants.update_one(
+        {"id": merchant_id},
+        {"$set": {
+            "password_hash": password_hash,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "admin_email": current_admin.get("email"),
+        "action": "reset_merchant_password",
+        "target_id": merchant_id,
+        "target_phone": merchant_doc.get("phone"),
+        "target_name": merchant_doc.get("business_name"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "message": f"Password reset successfully for {merchant_doc.get('business_name', 'merchant')}"
+    }
 
 
 @router.post("/merchants/{merchant_id}/send-sms")

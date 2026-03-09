@@ -43,7 +43,8 @@ import {
   Sliders,
   History,
   Phone,
-  Banknote
+  Banknote,
+  Key
 } from 'lucide-react';
 
 // Admin Components
@@ -156,6 +157,11 @@ export default function AdminDashboard() {
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '', otp_code: '' });
   const [otpSent, setOtpSent] = useState(false);
   const [otpPreview, setOtpPreview] = useState('');
+  
+  // Reset Password Modal states
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState(null); // { type: 'client' | 'merchant', data: {...} }
+  const [resetPasswordForm, setResetPasswordForm] = useState({ new_password: '', confirm_password: '' });
 
   // Monthly analytics state
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -564,6 +570,47 @@ export default function AdminDashboard() {
       setShowMerchantModal(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to delete merchant');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ============== PASSWORD RESET FUNCTIONS ==============
+  
+  const handleOpenResetPassword = (type, data) => {
+    setResetPasswordTarget({ type, data });
+    setResetPasswordForm({ new_password: '', confirm_password: '' });
+    setShowResetPasswordModal(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordTarget) return;
+    
+    if (resetPasswordForm.new_password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (resetPasswordForm.new_password !== resetPasswordForm.confirm_password) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    
+    try {
+      setActionLoading(true);
+      const headers = getHeaders();
+      const endpoint = resetPasswordTarget.type === 'client' 
+        ? `/api/admin/clients/${resetPasswordTarget.data.id}/reset-password`
+        : `/api/admin/merchants/${resetPasswordTarget.data.id}/reset-password`;
+      
+      await axios.post(`${API_URL}${endpoint}`, {
+        new_password: resetPasswordForm.new_password
+      }, { headers });
+      
+      toast.success(`Password reset successfully for ${resetPasswordTarget.data.full_name || resetPasswordTarget.data.business_name}`);
+      setShowResetPasswordModal(false);
+      setResetPasswordTarget(null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reset password');
     } finally {
       setActionLoading(false);
     }
@@ -1223,6 +1270,7 @@ export default function AdminDashboard() {
             handleUpdateClientStatus={handleUpdateClientStatus}
             handleBlockClient={handleBlockClient}
             handleDeleteClient={handleDeleteClient}
+            handleOpenResetPassword={handleOpenResetPassword}
           />
         )}
 
@@ -1244,6 +1292,7 @@ export default function AdminDashboard() {
             handleRejectMerchant={handleRejectMerchant}
             handleBlockMerchant={handleBlockMerchant}
             handleDeleteMerchant={handleDeleteMerchant}
+            handleOpenResetPassword={handleOpenResetPassword}
           />
         )}
 
@@ -2539,6 +2588,71 @@ export default function AdminDashboard() {
               <Button onClick={handleUpdateLocation} className="flex-1 bg-cyan-600 hover:bg-cyan-700" disabled={actionLoading}>
                 {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
                 Save Location
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESET PASSWORD MODAL */}
+      {showResetPasswordModal && resetPasswordTarget && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Key className="text-cyan-400" size={20} />
+              Reset Password
+            </h3>
+            <p className="text-slate-400 mb-4">
+              Reset password for{' '}
+              <span className="text-white font-medium">
+                {resetPasswordTarget.data.full_name || resetPasswordTarget.data.business_name}
+              </span>
+              {' '}({resetPasswordTarget.type})
+            </p>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">New Password *</Label>
+                <Input
+                  type="password"
+                  value={resetPasswordForm.new_password}
+                  onChange={(e) => setResetPasswordForm({...resetPasswordForm, new_password: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Enter new password (min 6 characters)"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Confirm Password *</Label>
+                <Input
+                  type="password"
+                  value={resetPasswordForm.confirm_password}
+                  onChange={(e) => setResetPasswordForm({...resetPasswordForm, confirm_password: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Confirm new password"
+                />
+              </div>
+              {resetPasswordForm.new_password && resetPasswordForm.confirm_password && (
+                <div className={`text-sm ${resetPasswordForm.new_password === resetPasswordForm.confirm_password ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {resetPasswordForm.new_password === resetPasswordForm.confirm_password 
+                    ? '✓ Passwords match' 
+                    : '✗ Passwords do not match'}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => { setShowResetPasswordModal(false); setResetPasswordTarget(null); }}
+                className="flex-1 border-slate-600 text-slate-300"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleResetPassword}
+                disabled={actionLoading || !resetPasswordForm.new_password || resetPasswordForm.new_password !== resetPasswordForm.confirm_password}
+                className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+              >
+                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Key size={16} className="mr-2" />}
+                Reset Password
               </Button>
             </div>
           </div>

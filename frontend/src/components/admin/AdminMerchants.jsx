@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Eye, MessageSquare, MapPin, CheckCircle, Ban, XCircle, UserCheck, Trash2 } from 'lucide-react';
+import { Search, Eye, MessageSquare, MapPin, CheckCircle, Ban, XCircle, UserCheck, Trash2, Key } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -18,7 +18,8 @@ export default function AdminMerchants({
   handleUpdateMerchantStatus,
   handleRejectMerchant,
   handleBlockMerchant,
-  handleDeleteMerchant
+  handleDeleteMerchant,
+  handleOpenResetPassword
 }) {
   return (
     <div className="space-y-4">
@@ -93,6 +94,15 @@ export default function AdminMerchants({
                         title="Edit Location"
                       >
                         <MapPin size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenResetPassword('merchant', merchant)}
+                        className="text-teal-400 hover:bg-teal-500/10"
+                        title="Reset Password"
+                      >
+                        <Key size={14} />
                       </Button>
                       {merchant.status === 'pending' && (
                         <>

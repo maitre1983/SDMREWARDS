@@ -295,6 +295,19 @@ npx expo start
     - Help & Support link
     - Logout with confirmation
 
+- **✅ Admin Password Reset Feature (COMPLETED):**
+  - Backend endpoints added in `/app/backend/routers/admin.py`:
+    - `POST /api/admin/clients/{client_id}/reset-password` - Reset client password
+    - `POST /api/admin/merchants/{merchant_id}/reset-password` - Reset merchant password
+  - Only Super Admin can reset passwords
+  - Action is logged in `admin_logs` collection
+  - Frontend UI added:
+    - Key icon (🔑) button in Clients list actions
+    - Key icon (🔑) button in Merchants list actions
+    - Reset Password modal with confirmation
+    - Password validation (min 6 characters, match confirmation)
+  - Tested: Admin can reset client/merchant passwords successfully
+
 - **✅ Forgot Password Feature (COMPLETED):**
   - Created `/app/mobile/src/screens/auth/ForgotPasswordScreen.js`
   - 3-step flow: Phone → OTP → New Password
