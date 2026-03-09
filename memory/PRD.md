@@ -130,6 +130,7 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ### P2 - Minor Issues
 - [x] Fix datetime timezone error in admin.py (settings PIN lock)
+- [x] Fix bcrypt attribute error (downgraded to 3.2.2) - COMPLETED 2026-03-09
 - [ ] Admin UI for payment provider logos
 
 ---
@@ -150,7 +151,26 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ---
 
-## Recent Changes (2026-03-07)
+## Recent Changes (2026-03-09)
+- **✅ SMS Bulk Sending - Verified Working:**
+  - Tested bulk SMS to clients endpoint - 12/13 messages sent successfully
+  - BulkClix returns campaignId confirming acceptance
+  - Failed messages are due to invalid phone numbers in DB (test data)
+- **✅ bcrypt Error Fixed:**
+  - Downgraded bcrypt from 4.1.3 to 3.2.2
+  - No more `AttributeError: module 'bcrypt' has no attribute '__about__'` in logs
+- **✅ MoMo Withdrawal Fee Configuration:**
+  - Admin Dashboard Service Fees shows all 5 services: Airtime, Data, ECG, Merchant Payment, MoMo Withdrawal
+  - Admin can set withdrawal fee type (percentage or fixed) and rate
+  - Backend reads fee from platform_config.service_commissions.withdrawal
+  - New endpoint: GET /api/payments/withdrawal/fee
+  - Withdrawal API now calculates and deducts fee, sends net amount to user
+  - WithdrawalModal displays fee breakdown before confirming
+- **✅ Service Commissions Loading Fixed:**
+  - AdminDashboard now loads service_commissions from config on startup
+  - Ensures saved values are displayed correctly when reopening settings
+
+## Recent Changes (2026-03-08)
 - **✅ Merchant Auto-Payout System Verified & Enhanced:**
   - Confirmed merchant receives money immediately when customer pays (via BulkClix disbursement API)
   - Added `merchant_payouts` collection to track all payouts
