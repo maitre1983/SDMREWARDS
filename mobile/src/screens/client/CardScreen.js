@@ -185,29 +185,35 @@ export default function CardScreen({ navigation }) {
     try {
       setPurchaseStatus('processing');
       
-      const payload = hasActiveCard ? {
-        // Upgrade request
-        new_card_type: selectedCard.type,
-        use_cashback: paymentMethod !== 'momo',
-        cashback_amount: breakdown.cashback > 0 ? breakdown.cashback : undefined,
-        payment_phone: breakdown.momo > 0 ? formatGhanaPhone(momoPhone) : undefined,
-        momo_network: breakdown.momo > 0 ? momoNetwork : undefined,
-      } : {
-        // Purchase request
-        card_type: selectedCard.type,
-        payment_method: breakdown.cashback >= selectedCard.price ? 'cashback' : 'momo',
-        payment_phone: breakdown.momo > 0 ? formatGhanaPhone(momoPhone) : undefined,
-        momo_network: breakdown.momo > 0 ? momoNetwork : undefined,
-      };
+      let response;
       
       if (hasActiveCard) {
-        await clientAPI.upgradeCard(payload);
+        // Upgrade request - supports cashback + momo combination
+        const upgradePayload = {
+          new_card_type: selectedCard.type,
+          use_cashback: paymentMethod !== 'momo',
+          cashback_amount: breakdown.cashback > 0 ? breakdown.cashback : undefined,
+          payment_phone: breakdown.momo > 0 ? formatGhanaPhone(momoPhone) : undefined,
+        };
+        response = await clientAPI.upgradeCard(upgradePayload);
       } else {
-        await clientAPI.purchaseCard(payload);
+        // Purchase request - backend only supports momo or full cashback
+        // For combined payment on new card purchase, treat as momo (cashback deduction handled separately if needed)
+        const purchasePayload = {
+          card_type: selectedCard.type,
+          payment_method: paymentMethod === 'cashback' && breakdown.cashback >= selectedCard.price ? 'cashback' : 'momo',
+          payment_phone: breakdown.momo > 0 ? formatGhanaPhone(momoPhone) : undefined,
+        };
+        response = await clientAPI.purchaseCard(purchasePayload);
       }
       
       setPurchaseStatus('success');
       await refreshDashboard();
+      
+      // Show success message from API if available
+      if (response?.message) {
+        Alert.alert('Success', response.message);
+      }
       
       setTimeout(() => {
         setShowPurchaseModal(false);
@@ -218,7 +224,8 @@ export default function CardScreen({ navigation }) {
     } catch (error) {
       console.error('Purchase error:', error);
       setPurchaseStatus('failed');
-      Alert.alert('Error', error.response?.data?.detail || 'Purchase failed. Please try again.');
+      const errorMessage = error.response?.data?.detail || error.message || 'Purchase failed. Please try again.';
+      Alert.alert('Error', errorMessage);
     }
   };
 

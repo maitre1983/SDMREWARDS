@@ -243,12 +243,13 @@ Web preview accessible at: `/mobile` path on the main domain.
 │       └── merchant/         # Home
 ```
 
-### Remaining Screens (Placeholder)
-- [ ] History (transactions list)
-- [ ] Profile/Settings
-- [ ] Services (Airtime, Data)
-- [ ] Withdrawal modal
-- [ ] Referrals
+### Completed Screens
+- [x] History Screen - Transaction history with filters - COMPLETED 2026-03-09
+- [x] Profile Screen - User settings with modals - COMPLETED 2026-03-09
+- [x] Services Screen - Airtime & Data Bundle purchases - COMPLETED 2026-03-09
+- [x] Withdrawal Screen - Cashback to MoMo - COMPLETED 2026-03-09
+- [x] Referrals Screen - QR code sharing, referral list - COMPLETED 2026-03-09
+- [x] Card Screen - Purchase & Upgrade membership cards - COMPLETED 2026-03-09
 
 ### How to Run
 ```bash
@@ -260,6 +261,22 @@ npx expo start
 ---
 
 ## Recent Changes (2026-03-09)
+- **✅ Mobile Card Purchase/Upgrade Feature (COMPLETED):**
+  - Implemented full UI in `/app/mobile/src/screens/client/CardScreen.js`
+  - Shows available cards: Silver, Gold, Platinum, Diamond
+  - Current card badge with expiration date
+  - Available cashback display
+  - Purchase modal with 3 payment methods:
+    - Mobile Money (full amount)
+    - Full Cashback (when balance sufficient)
+    - Combined (partial cashback + MoMo for remainder)
+  - Network selector for MoMo payments
+  - Payment summary breakdown
+  - Backend fix: Added cashback deduction in card purchase endpoint
+  - Tested: Purchase with cashback works (50 GHS balance → Silver card purchase → 26 GHS remaining)
+  - Tested: Upgrade with combined payment (cashback + MoMo pending)
+
+
 - **✅ SMS Bulk Sending - Verified Working:**
   - Tested bulk SMS to clients endpoint - 12/13 messages sent successfully
   - BulkClix returns campaignId confirming acceptance

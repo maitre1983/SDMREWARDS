@@ -222,6 +222,21 @@ async def purchase_card(
         # For now, simulate success
         card.payment_reference = f"MOMO_{uuid.uuid4().hex[:10].upper()}"
     
+    # For cashback payment, verify and deduct balance
+    if request.payment_method == PaymentMethod.CASHBACK:
+        cashback_balance = current_client.get("cashback_balance", 0)
+        if cashback_balance < price:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Insufficient cashback balance. You have GHS {cashback_balance:.2f}, card costs GHS {price:.2f}"
+            )
+        # Deduct cashback from balance
+        await db.clients.update_one(
+            {"id": client_id},
+            {"$inc": {"cashback_balance": -price}}
+        )
+        card.payment_reference = f"CASHBACK_{uuid.uuid4().hex[:10].upper()}"
+    
     # Create transaction
     transaction = Transaction(
         type=TransactionType.CARD_PURCHASE,
