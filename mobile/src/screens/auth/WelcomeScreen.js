@@ -12,6 +12,9 @@ import { COLORS, SPACING, BORDER_RADIUS, FONTS } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
+// Company logo URL
+const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vc8llt43_WhatsApp%20Image%202026-03-04%20at%2020.16.26.jpeg";
+
 export default function WelcomeScreen({ navigation }) {
   return (
     <LinearGradient
@@ -20,9 +23,11 @@ export default function WelcomeScreen({ navigation }) {
     >
       {/* Logo */}
       <View style={styles.logoContainer}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>SDM</Text>
-        </View>
+        <Image 
+          source={{ uri: LOGO_URL }} 
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>SDM REWARDS</Text>
         <Text style={styles.subtitle}>Earn cashback on every purchase</Text>
       </View>
@@ -54,7 +59,7 @@ export default function WelcomeScreen({ navigation }) {
 
       {/* Footer */}
       <Text style={styles.footer}>
-        Powered by SDM Rewards Ghana
+        Powered by GIT NFT GHANA LTD
       </Text>
     </LinearGradient>
   );
@@ -79,19 +84,11 @@ const styles = StyleSheet.create({
     marginTop: 60,
     marginBottom: 40,
   },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     marginBottom: SPACING.lg,
-  },
-  logoText: {
-    color: COLORS.white,
-    fontSize: 28,
-    fontWeight: 'bold',
   },
   title: {
     color: COLORS.text,
