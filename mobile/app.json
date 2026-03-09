@@ -7,6 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "experiments": {
+      "baseUrl": "/mobile"
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -30,7 +33,8 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       [
@@ -46,11 +50,6 @@
         }
       ],
       "expo-secure-store"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "sdm-rewards-mobile"
-      }
-    }
+    ]
   }
 }

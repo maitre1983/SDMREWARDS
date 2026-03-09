@@ -13,6 +13,8 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from passlib.context import CryptContext
@@ -494,6 +496,24 @@ app.include_router(transactions_router, prefix="/api/transactions", tags=["Trans
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(payments_router_module.router, prefix="/api/payments", tags=["Payments"])
 app.include_router(services_router, prefix="/api/services", tags=["Services"])
+
+# ============== MOBILE APP STATIC FILES ==============
+import os
+mobile_static_path = os.path.join(os.path.dirname(__file__), "static", "mobile")
+if os.path.exists(mobile_static_path):
+    # Mount static assets for mobile app
+    app.mount("/mobile/_expo", StaticFiles(directory=os.path.join(mobile_static_path, "_expo")), name="mobile_expo")
+    app.mount("/mobile/assets", StaticFiles(directory=os.path.join(mobile_static_path, "assets")), name="mobile_assets")
+    
+    @app.get("/mobile")
+    @app.get("/mobile/{full_path:path}")
+    async def serve_mobile_app(full_path: str = ""):
+        """Serve the mobile web app"""
+        # For any route, serve index.html (SPA routing)
+        index_path = os.path.join(mobile_static_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path, media_type="text/html")
+        raise HTTPException(status_code=404, detail="Mobile app not found")
 
 # ============== ERROR HANDLERS ==============
 from fastapi.responses import JSONResponse
