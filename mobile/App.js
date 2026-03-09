@@ -45,46 +45,19 @@ const WithdrawalScreen = (props) => <PlaceholderScreen {...props} />;
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Client Tab Navigator
-function ClientTabNavigator() {
+// Client Stack Navigator (HomeScreen has its own bottom navigation)
+function ClientMainNavigator() {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textMuted,
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'QRScanner':
-              iconName = focused ? 'qr-code' : 'qr-code-outline';
-              break;
-            case 'History':
-              iconName = focused ? 'receipt' : 'receipt-outline';
-              break;
-            case 'Profile':
-              iconName = focused ? 'person' : 'person-outline';
-              break;
-            default:
-              iconName = 'ellipse';
-          }
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-      })}
-    >
-      <Tab.Screen name="Home" component={ClientHomeScreen} />
-      <Tab.Screen 
-        name="QRScanner" 
-        component={QRScannerScreen}
-        options={{ tabBarLabel: 'Scan' }}
-      />
-      <Tab.Screen name="History" component={HistoryScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
-    </Tab.Navigator>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Home" component={ClientHomeScreen} />
+      <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+      <Stack.Screen name="History" component={HistoryScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Partners" component={PlaceholderScreen} />
+      <Stack.Screen name="Services" component={ServicesScreen} />
+      <Stack.Screen name="Referrals" component={ReferralsScreen} />
+      <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
+    </Stack.Navigator>
   );
 }
 
@@ -138,10 +111,7 @@ function AuthStack() {
 function ClientStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="ClientTabs" component={ClientTabNavigator} />
-      <Stack.Screen name="Services" component={ServicesScreen} />
-      <Stack.Screen name="Referrals" component={ReferralsScreen} />
-      <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
+      <Stack.Screen name="ClientMain" component={ClientMainNavigator} />
     </Stack.Navigator>
   );
 }
