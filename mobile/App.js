@@ -25,6 +25,8 @@ import QRScannerScreen from './src/screens/client/QRScannerScreen';
 import PartnersScreen from './src/screens/client/PartnersScreen';
 import HistoryScreen from './src/screens/client/HistoryScreen';
 import ReferralsScreen from './src/screens/client/ReferralsScreen';
+import ServicesScreen from './src/screens/client/ServicesScreen';
+import WithdrawalScreen from './src/screens/client/WithdrawalScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
@@ -40,8 +42,6 @@ const PlaceholderScreen = ({ route }) => (
 
 // Shared Screens - Placeholders
 const ProfileScreen = (props) => <PlaceholderScreen {...props} />;
-const ServicesScreen = (props) => <PlaceholderScreen {...props} />;
-const WithdrawalScreen = (props) => <PlaceholderScreen {...props} />;
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();

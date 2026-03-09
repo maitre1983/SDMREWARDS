@@ -176,6 +176,12 @@ export const clientAPI = {
     const response = await api.put('/clients/payment-settings', settings);
     return response.data;
   },
+
+  // Get withdrawals history
+  getWithdrawals: async () => {
+    const response = await api.get('/clients/withdrawals');
+    return response.data;
+  },
 };
 
 // ============== MERCHANT API ==============
@@ -247,12 +253,8 @@ export const paymentsAPI = {
   },
 
   // Initiate withdrawal
-  initiateWithdrawal: async (phone, amount, network) => {
-    const response = await api.post('/payments/withdrawal/initiate', {
-      phone,
-      amount,
-      network,
-    });
+  initiateWithdrawal: async (data) => {
+    const response = await api.post('/payments/withdrawal/initiate', data);
     return response.data;
   },
 
@@ -282,42 +284,33 @@ export const publicAPI = {
 // ============== SERVICES API ==============
 
 export const servicesAPI = {
-  // Get service fees
-  getFees: async () => {
+  // Get service fees info
+  getFeeInfo: async () => {
     const response = await api.get('/services/fees');
     return response.data;
   },
 
-  // Get airtime networks
-  getAirtimeNetworks: async () => {
-    const response = await api.get('/services/airtime/networks');
+  // Get data services/networks
+  getDataServices: async () => {
+    const response = await api.get('/services/data/services');
+    return response.data;
+  },
+
+  // Get data bundles for a service and phone
+  getDataBundles: async (serviceId, phone) => {
+    const response = await api.get(`/services/data/bundles/${serviceId}/${phone}`);
     return response.data;
   },
 
   // Purchase airtime
-  purchaseAirtime: async (network, phone, amount) => {
-    const response = await api.post('/services/airtime/purchase', {
-      network,
-      phone,
-      amount,
-    });
-    return response.data;
-  },
-
-  // Get data bundles
-  getDataBundles: async (network) => {
-    const response = await api.get(`/services/data/bundles/${network}`);
+  purchaseAirtime: async (data) => {
+    const response = await api.post('/services/airtime/purchase', data);
     return response.data;
   },
 
   // Purchase data bundle
-  purchaseDataBundle: async (network, phone, bundleCode, amount) => {
-    const response = await api.post('/services/data/purchase', {
-      network,
-      phone,
-      bundle_code: bundleCode,
-      amount,
-    });
+  purchaseDataBundle: async (data) => {
+    const response = await api.post('/services/data/purchase', data);
     return response.data;
   },
 };

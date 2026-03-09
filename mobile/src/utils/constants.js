@@ -105,3 +105,17 @@ export const normalizePhone = (phone) => {
   }
   return '+233' + cleaned;
 };
+
+// Alias for formatGhanaPhone
+export const formatGhanaPhone = (phone) => {
+  if (!phone) return '';
+  let cleaned = phone.replace(/\D/g, '');
+  // Ensure it starts with +233
+  if (cleaned.startsWith('0')) {
+    cleaned = cleaned.substring(1);
+  }
+  if (!cleaned.startsWith('233')) {
+    cleaned = '233' + cleaned;
+  }
+  return '+' + cleaned;
+};
