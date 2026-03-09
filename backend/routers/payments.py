@@ -1413,6 +1413,16 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
                     }}
                 )
                 
+                # Send SMS notification with net amount
+                try:
+                    sms = get_sms()
+                    await sms.send_sms(
+                        client["phone"],
+                        f"SDM Rewards: Your withdrawal of GHS {net_amount:.2f} to {request.phone} is being processed. You will receive funds shortly."
+                    )
+                except Exception as e:
+                    logger.error(f"Withdrawal SMS error: {e}")
+                
                 return {
                     "success": True,
                     "withdrawal_id": withdrawal_record["id"],
@@ -1512,12 +1522,13 @@ async def confirm_test_withdrawal(withdrawal_id: str, req: Request):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Send SMS notification
+    # Send SMS notification with net amount
     try:
         sms = get_sms()
+        net_amount = withdrawal.get('net_amount', withdrawal['amount'])
         await sms.send_sms(
             client["phone"],
-            f"SDM Rewards: Your withdrawal of GHS {withdrawal['amount']:.2f} to {withdrawal['destination_phone']} was successful. New balance: GHS {new_balance:.2f}"
+            f"SDM Rewards: Your withdrawal of GHS {net_amount:.2f} to {withdrawal['destination_phone']} was successful. New balance: GHS {new_balance:.2f}"
         )
     except Exception as e:
         logger.error(f"Withdrawal SMS error: {e}")

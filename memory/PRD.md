@@ -169,6 +169,10 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - **✅ Service Commissions Loading Fixed:**
   - AdminDashboard now loads service_commissions from config on startup
   - Ensures saved values are displayed correctly when reopening settings
+- **✅ Withdrawal SMS Notification:**
+  - Automatic SMS sent after successful withdrawal
+  - Shows net amount received (without fee details)
+  - Works in both test mode and production mode
 
 ## Recent Changes (2026-03-08)
 - **✅ Merchant Auto-Payout System Verified & Enhanced:**
