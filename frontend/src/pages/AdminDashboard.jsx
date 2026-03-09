@@ -42,7 +42,8 @@ import {
   MapPin,
   Sliders,
   History,
-  Phone
+  Phone,
+  Banknote
 } from 'lucide-react';
 
 // Admin Components
@@ -121,7 +122,8 @@ export default function AdminDashboard() {
     airtime_type: 'percentage', airtime_rate: 2,
     data_type: 'percentage', data_rate: 2,
     ecg_type: 'fixed', ecg_rate: 1,
-    merchant_type: 'percentage', merchant_rate: 1
+    merchant_type: 'percentage', merchant_rate: 1,
+    withdrawal_type: 'percentage', withdrawal_rate: 1
   });
   const [referralForm, setReferralForm] = useState({ welcome_bonus: 1, referrer_bonus: 3 });
   const [newClientForm, setNewClientForm] = useState({ full_name: '', phone: '', username: '', email: '', card_type: '' });
@@ -598,7 +600,9 @@ export default function AdminDashboard() {
         ecg_commission_type: serviceCommissionsForm.ecg_type,
         ecg_commission_rate: serviceCommissionsForm.ecg_rate,
         merchant_payment_commission_type: serviceCommissionsForm.merchant_type,
-        merchant_payment_commission_rate: serviceCommissionsForm.merchant_rate
+        merchant_payment_commission_rate: serviceCommissionsForm.merchant_rate,
+        withdrawal_commission_type: serviceCommissionsForm.withdrawal_type,
+        withdrawal_commission_rate: serviceCommissionsForm.withdrawal_rate
       }, { headers });
       toast.success('Service commissions updated');
       fetchDashboardData();
@@ -1621,6 +1625,36 @@ export default function AdminDashboard() {
                           step="0.1"
                           value={serviceCommissionsForm.merchant_rate}
                           onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, merchant_rate: parseFloat(e.target.value)})}
+                          className="bg-slate-800 border-slate-700 text-white mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* MoMo Withdrawal */}
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                      <Banknote size={16} className="text-teal-400" /> MoMo Withdrawal
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-slate-400 text-xs">Type</Label>
+                        <select
+                          value={serviceCommissionsForm.withdrawal_type}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, withdrawal_type: e.target.value})}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-sm mt-1"
+                        >
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="fixed">Fixed (GHS)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-slate-400 text-xs">Rate</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={serviceCommissionsForm.withdrawal_rate}
+                          onChange={(e) => setServiceCommissionsForm({...serviceCommissionsForm, withdrawal_rate: parseFloat(e.target.value)})}
                           className="bg-slate-800 border-slate-700 text-white mt-1"
                         />
                       </div>

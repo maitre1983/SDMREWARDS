@@ -123,6 +123,8 @@ class UpdateServiceCommissionsRequest(BaseModel):
     ecg_commission_rate: Optional[float] = None
     merchant_payment_commission_type: Optional[str] = None
     merchant_payment_commission_rate: Optional[float] = None
+    withdrawal_commission_type: Optional[str] = None
+    withdrawal_commission_rate: Optional[float] = None
 
 
 class UpdateReferralBonusesRequest(BaseModel):
@@ -1737,6 +1739,10 @@ async def update_service_commissions(
         updates["service_commissions.merchant_payment.type"] = request.merchant_payment_commission_type
     if request.merchant_payment_commission_rate is not None:
         updates["service_commissions.merchant_payment.rate"] = request.merchant_payment_commission_rate
+    if request.withdrawal_commission_type is not None:
+        updates["service_commissions.withdrawal.type"] = request.withdrawal_commission_type
+    if request.withdrawal_commission_rate is not None:
+        updates["service_commissions.withdrawal.rate"] = request.withdrawal_commission_rate
     
     await db.platform_config.update_one({"key": "main"}, {"$set": updates})
     
