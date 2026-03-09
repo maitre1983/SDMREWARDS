@@ -114,19 +114,21 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - Extract Settings > Security → `AdminSettingsSecurity.jsx`
 - Extract Settings > Users → `AdminSettingsUsers.jsx`
 
-### P1 - ClientDashboard.jsx Refactoring (COMPLETED 2026-03-08)
+### P1 - ClientDashboard.jsx Refactoring (COMPLETED 2026-03-09)
 - [x] MerchantPayModal extracted and wired
 - [x] WithdrawalModal extracted and wired
 - [x] PaymentSettingsModal extracted and wired
-- [x] Feature flag USE_REFACTORED_MODALS for gradual rollout
-- [ ] Remove old inline modal code (cleanup)
-- [ ] Extract Home, QR, History, Referrals tabs as components
+- [x] **Old inline modal code REMOVED** - 842 lines deleted
+- [x] Feature flag USE_REFACTORED_MODALS removed
+- File reduced from 2696 lines to 1854 lines
 
 ### P2 - Backend Refactoring
-- Split `admin.py` (>2400 lines) into:
-  - `admin_analytics.py`
-  - `admin_settings.py`
-  - `admin_users.py`
+- [ ] Split `admin.py` (~2661 lines) into smaller files:
+  - `admin_clients.py` - Client management endpoints
+  - `admin_merchants.py` - Merchant management endpoints
+  - `admin_settings.py` - Platform settings endpoints
+  - `admin_analytics.py` - Dashboard and analytics endpoints
+  - NOTE: Kept as-is for stability. Can be done incrementally when adding new features.
 
 ### P2 - Minor Issues
 - [x] Fix datetime timezone error in admin.py (settings PIN lock)
