@@ -107,6 +107,7 @@ export default function ClientDashboard() {
   const [withdrawalStatus, setWithdrawalStatus] = useState(null);
   const [withdrawalId, setWithdrawalId] = useState(null);
   const [isWithdrawalTestMode, setIsWithdrawalTestMode] = useState(false);
+  const [withdrawalFee, setWithdrawalFee] = useState({ type: 'fixed', rate: 0 });
   
   // Payment Settings state
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
@@ -198,6 +199,16 @@ export default function ClientDashboard() {
       // Fetch available cards
       const cardsRes = await axios.get(`${API_URL}/api/clients/cards/available`);
       setAvailableCards(cardsRes.data.cards || []);
+      
+      // Fetch withdrawal fee
+      try {
+        const feeRes = await axios.get(`${API_URL}/api/payments/withdrawal/fee`);
+        if (feeRes.data.success) {
+          setWithdrawalFee(feeRes.data.fee);
+        }
+      } catch (e) {
+        console.error('Withdrawal fee fetch error:', e);
+      }
       
     } catch (error) {
       console.error('Dashboard fetch error:', error);
@@ -2012,6 +2023,7 @@ export default function ClientDashboard() {
           isProcessing={isProcessingPayment}
           isTestMode={isWithdrawalTestMode}
           paymentSettings={paymentSettings}
+          withdrawalFee={withdrawalFee}
           onClose={closeWithdrawalModal}
           onInitiate={initiateWithdrawal}
           onCheckStatus={() => {}} 

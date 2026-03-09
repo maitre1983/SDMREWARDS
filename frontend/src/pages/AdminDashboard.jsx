@@ -326,6 +326,22 @@ export default function AdminDashboard() {
               referrer_bonus: configRes.data.config.referral_bonuses.referrer || 3
             });
           }
+          // Load service commissions
+          if (configRes.data.config.service_commissions) {
+            const sc = configRes.data.config.service_commissions;
+            setServiceCommissionsForm({
+              airtime_type: sc.airtime?.type || 'percentage',
+              airtime_rate: sc.airtime?.rate || 2,
+              data_type: sc.data?.type || 'percentage',
+              data_rate: sc.data?.rate || 2,
+              ecg_type: sc.ecg?.type || 'fixed',
+              ecg_rate: sc.ecg?.rate || 1,
+              merchant_type: sc.merchant_payment?.type || 'percentage',
+              merchant_rate: sc.merchant_payment?.rate || 1,
+              withdrawal_type: sc.withdrawal?.type || 'percentage',
+              withdrawal_rate: sc.withdrawal?.rate || 1
+            });
+          }
         }
       } catch (configErr) {
         console.error('Config fetch error:', configErr);

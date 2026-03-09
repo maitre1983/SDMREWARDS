@@ -1248,6 +1248,27 @@ class WithdrawalRequest(BaseModel):
     network: Optional[str] = None  # MTN, VODAFONE, AIRTELTIGO
 
 
+
+@router.get("/withdrawal/fee")
+async def get_withdrawal_fee():
+    """
+    Get current withdrawal fee configuration
+    """
+    config = await db.platform_config.find_one({}, {"_id": 0, "service_commissions": 1})
+    withdrawal_config = {"type": "fixed", "rate": 0}
+    
+    if config and config.get("service_commissions", {}).get("withdrawal"):
+        withdrawal_config = config["service_commissions"]["withdrawal"]
+    
+    return {
+        "success": True,
+        "fee": {
+            "type": withdrawal_config.get("type", "fixed"),
+            "rate": withdrawal_config.get("rate", 0)
+        }
+    }
+
+
 @router.post("/withdrawal/initiate")
 async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
     """
@@ -1290,6 +1311,26 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
     if not network:
         raise HTTPException(status_code=400, detail="Invalid phone number or unsupported network. Please specify network.")
     
+    # Get withdrawal fee from platform config
+    config = await db.platform_config.find_one({}, {"_id": 0, "service_commissions": 1})
+    withdrawal_fee = 0.0
+    withdrawal_fee_type = "fixed"
+    if config and config.get("service_commissions", {}).get("withdrawal"):
+        withdrawal_config = config["service_commissions"]["withdrawal"]
+        withdrawal_fee_type = withdrawal_config.get("type", "fixed")
+        withdrawal_fee_rate = withdrawal_config.get("rate", 0)
+        if withdrawal_fee_type == "percentage":
+            withdrawal_fee = request.amount * (withdrawal_fee_rate / 100)
+        else:
+            withdrawal_fee = withdrawal_fee_rate
+    
+    # Calculate net amount (what client receives)
+    net_amount = request.amount - withdrawal_fee
+    
+    # Check if balance covers amount + fee (client pays from their balance)
+    if current_balance < request.amount:
+        raise HTTPException(status_code=400, detail=f"Insufficient balance. Available: GHS {current_balance:.2f}")
+    
     # Generate withdrawal reference
     withdrawal_ref = f"SDM-WD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
     
@@ -1303,8 +1344,9 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
         "destination_phone": request.phone,
         "network": network,
         "amount": request.amount,
-        "fee": 0,  # No withdrawal fee for now
-        "net_amount": request.amount,
+        "fee": withdrawal_fee,
+        "fee_type": withdrawal_fee_type,
+        "net_amount": net_amount,
         "status": "pending",
         "test_mode": is_test_mode(),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -1323,6 +1365,8 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
             "withdrawal_id": withdrawal_record["id"],
             "reference": withdrawal_ref,
             "amount": request.amount,
+            "fee": withdrawal_fee,
+            "net_amount": net_amount,
             "destination": request.phone,
             "network": network,
             "status": "pending",
@@ -1348,7 +1392,7 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
                     "Accept": "application/json"
                 },
                 json={
-                    "amount": str(request.amount),
+                    "amount": str(net_amount),  # Send net amount (after fee deduction)
                     "account_number": bulkclix_phone,
                     "channel": network.upper(),  # MTN, TELECEL, AIRTELTIGO
                     "account_name": "",  # Will be filled by BulkClix
@@ -1374,6 +1418,8 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
                     "withdrawal_id": withdrawal_record["id"],
                     "reference": withdrawal_ref,
                     "amount": request.amount,
+                    "fee": withdrawal_fee,
+                    "net_amount": net_amount,
                     "destination": request.phone,
                     "network": network,
                     "status": "processing",

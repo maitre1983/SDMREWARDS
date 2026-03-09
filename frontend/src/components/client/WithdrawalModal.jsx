@@ -22,6 +22,7 @@ export default function WithdrawalModal({
   isProcessing,
   isTestMode,
   paymentSettings,
+  withdrawalFee = { type: 'fixed', rate: 0 },
   onClose,
   onInitiate,
   onCheckStatus,
@@ -32,6 +33,13 @@ export default function WithdrawalModal({
 
   const maxAmount = Math.min(balance || 0, 1000);
   const quickAmounts = [5, 10, 20, 50].filter(a => a <= balance);
+  
+  // Calculate fee and net amount
+  const amountNum = parseFloat(amount) || 0;
+  const feeAmount = withdrawalFee.type === 'percentage' 
+    ? amountNum * (withdrawalFee.rate / 100) 
+    : withdrawalFee.rate;
+  const netAmount = Math.max(0, amountNum - feeAmount);
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -240,7 +248,7 @@ export default function WithdrawalModal({
             </div>
             
             {/* Quick Amounts */}
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-2 mb-4">
               {quickAmounts.map(amt => (
                 <button
                   key={amt}
@@ -259,6 +267,26 @@ export default function WithdrawalModal({
                 </button>
               )}
             </div>
+            
+            {/* Fee Display */}
+            {amountNum >= 5 && (withdrawalFee.rate > 0) && (
+              <div className="bg-slate-900 rounded-xl p-4 mb-4 space-y-2" data-testid="withdrawal-fee-display">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Amount</span>
+                  <span className="text-white">GHS {amountNum.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">
+                    Fee ({withdrawalFee.type === 'percentage' ? `${withdrawalFee.rate}%` : `GHS ${withdrawalFee.rate}`})
+                  </span>
+                  <span className="text-amber-400">- GHS {feeAmount.toFixed(2)}</span>
+                </div>
+                <div className="border-t border-slate-700 pt-2 flex justify-between">
+                  <span className="text-white font-medium">You Receive</span>
+                  <span className="text-emerald-400 font-bold">GHS {netAmount.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
             
             {/* Withdraw Button */}
             <Button
