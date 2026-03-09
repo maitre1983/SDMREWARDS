@@ -160,14 +160,10 @@ export default function QRScannerScreen({ navigation, route }) {
     }
   };
 
-  // If merchant passed via route, show payment modal directly
-  if (route.params?.merchant && merchant) {
-    return (
-      <View style={styles.container}>
-        {renderPaymentModal()}
-      </View>
-    );
-  }
+  // Handle back button press
+  const handleGoBack = () => {
+    navigation.goBack();
+  };
 
   if (!permission) {
     return (
@@ -186,7 +182,7 @@ export default function QRScannerScreen({ navigation, route }) {
     );
   }
 
-  // Payment Modal
+  // Payment Modal - used both for QR scan and direct merchant payment from Partners
   const renderPaymentModal = () => (
     <Modal visible={!!merchant} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
@@ -194,7 +190,7 @@ export default function QRScannerScreen({ navigation, route }) {
           <LoadingOverlay visible={loading} />
           
           {/* Close Button */}
-          <TouchableOpacity style={styles.closeButton} onPress={resetScanner}>
+          <TouchableOpacity style={styles.closeButton} onPress={handleGoBack} data-testid="payment-modal-close-btn">
             <Ionicons name="close" size={24} color={COLORS.text} />
           </TouchableOpacity>
 
@@ -315,6 +311,29 @@ export default function QRScannerScreen({ navigation, route }) {
     </Modal>
   );
 
+  // If merchant passed via route (from Partners screen), show payment modal directly
+  // This provides a direct payment experience without needing to scan QR
+  if (route.params?.merchant && merchant) {
+    return (
+      <View style={[styles.container, { backgroundColor: COLORS.background }]}>
+        {/* Header for direct payment */}
+        <View style={styles.directPaymentHeader}>
+          <TouchableOpacity 
+            onPress={handleGoBack} 
+            style={styles.backButton}
+            data-testid="direct-payment-back-btn"
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Pay Merchant</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        {renderPaymentModal()}
+        <LoadingOverlay visible={loading} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <CameraView
@@ -327,7 +346,11 @@ export default function QRScannerScreen({ navigation, route }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={handleGoBack} 
+          style={styles.backButton}
+          data-testid="qr-scanner-back-btn"
+        >
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scan Merchant QR</Text>
@@ -377,6 +400,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  directPaymentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    backgroundColor: COLORS.backgroundLight,
   },
   backButton: {
     padding: SPACING.sm,

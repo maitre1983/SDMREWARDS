@@ -266,6 +266,18 @@ npx expo start
 ---
 
 ## Recent Changes (2026-03-09)
+- **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
+  - Issue: Back button on QR Scanner screen was not navigating back
+  - Fix: Created centralized `handleGoBack()` function
+  - Added proper `data-testid` for testing
+
+- **✅ Bug Fix: Partner Payment Blank Page (FIXED 2026-03-09):**
+  - Issue: Clicking "Pay" button on Partners screen showed blank page instead of payment modal
+  - Root cause: `renderPaymentModal()` was being called before its definition in the render flow
+  - Fix: Moved the conditional render `if (route.params?.merchant)` AFTER the `renderPaymentModal` function definition
+  - Added dedicated header with back button for direct payment mode from Partners screen
+  - Payment modal now opens correctly when selecting a partner merchant
+
 - **✅ Mobile Card Purchase/Upgrade Feature (COMPLETED):**
   - Implemented full UI in `/app/mobile/src/screens/client/CardScreen.js`
   - Shows available cards: Silver, Gold, Platinum, Diamond
