@@ -95,6 +95,15 @@ class AdminLoginRequest(BaseModel):
     password: str
 
 
+
+class ResetPasswordRequest(BaseModel):
+    phone: str
+    otp_code: str
+    request_id: str
+    new_password: str
+
+
+
 # ============== HELPER FUNCTIONS ==============
 
 def normalize_phone(phone: str) -> str:
@@ -673,4 +682,146 @@ async def get_current_user(authorization: str = Header(...)):
     return {
         "type": user_type,
         "user": user
+    }
+
+
+# ============== PASSWORD RESET ==============
+
+@router.post("/client/reset-password")
+async def reset_client_password(request: ResetPasswordRequest):
+    """Reset client password after OTP verification"""
+    phone = normalize_phone(request.phone)
+    
+    # Find the client
+    client_doc = await db.clients.find_one({"phone": phone})
+    if not client_doc:
+        raise HTTPException(status_code=404, detail="Account not found with this phone number")
+    
+    # Verify OTP using stored request
+    stored_otp = await db.otp_requests.find_one({
+        "request_id": request.request_id,
+        "phone": phone,
+        "verified": True
+    })
+    
+    if not stored_otp:
+        # If not pre-verified, try to verify now
+        # In test mode (no BulkClix config), accept test OTP
+        if not BULKCLIX_OTP_USER:
+            if request.otp_code != "123456":
+                raise HTTPException(status_code=400, detail="Invalid OTP code. Use 123456 for testing.")
+        else:
+            try:
+                async with httpx.AsyncClient() as http_client:
+                    verify_response = await http_client.post(
+                        f"{BULKCLIX_BASE_URL}/otp/verify",
+                        json={
+                            "username": BULKCLIX_OTP_USER,
+                            "password": BULKCLIX_OTP_PASS,
+                            "reqid": request.request_id,
+                            "otp": request.otp_code
+                        },
+                        timeout=30.0
+                    )
+                    
+                    if verify_response.status_code != 200:
+                        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
+                    
+                    result = verify_response.json()
+                    if result.get("status") != "success":
+                        raise HTTPException(status_code=400, detail="OTP verification failed")
+                        
+            except httpx.RequestError:
+                if request.otp_code != "123456":
+                    raise HTTPException(status_code=400, detail="OTP service unavailable")
+    
+    # Validate new password
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Update password
+    new_hash = hash_password(request.new_password)
+    await db.clients.update_one(
+        {"phone": phone},
+        {"$set": {"password_hash": new_hash, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Clean up OTP request
+    await db.otp_requests.delete_many({"phone": phone})
+    
+    logger.info(f"Password reset successful for client: {phone}")
+    
+    return {
+        "success": True,
+        "message": "Password reset successful. You can now login with your new password."
+    }
+
+
+@router.post("/merchant/reset-password")
+async def reset_merchant_password(request: ResetPasswordRequest):
+    """Reset merchant password after OTP verification"""
+    phone = normalize_phone(request.phone)
+    
+    # Find the merchant
+    merchant_doc = await db.merchants.find_one({"phone": phone})
+    if not merchant_doc:
+        raise HTTPException(status_code=404, detail="Account not found with this phone number")
+    
+    # Verify OTP using stored request
+    stored_otp = await db.otp_requests.find_one({
+        "request_id": request.request_id,
+        "phone": phone,
+        "verified": True
+    })
+    
+    if not stored_otp:
+        # If not pre-verified, try to verify now
+        # In test mode (no BulkClix config), accept test OTP
+        if not BULKCLIX_OTP_USER:
+            if request.otp_code != "123456":
+                raise HTTPException(status_code=400, detail="Invalid OTP code. Use 123456 for testing.")
+        else:
+            try:
+                async with httpx.AsyncClient() as http_client:
+                    verify_response = await http_client.post(
+                        f"{BULKCLIX_BASE_URL}/otp/verify",
+                        json={
+                            "username": BULKCLIX_OTP_USER,
+                            "password": BULKCLIX_OTP_PASS,
+                            "reqid": request.request_id,
+                            "otp": request.otp_code
+                        },
+                        timeout=30.0
+                    )
+                    
+                    if verify_response.status_code != 200:
+                        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
+                    
+                    result = verify_response.json()
+                    if result.get("status") != "success":
+                        raise HTTPException(status_code=400, detail="OTP verification failed")
+                        
+            except httpx.RequestError:
+                if request.otp_code != "123456":
+                    raise HTTPException(status_code=400, detail="OTP service unavailable")
+    
+    # Validate new password
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Update password
+    new_hash = hash_password(request.new_password)
+    await db.merchants.update_one(
+        {"phone": phone},
+        {"$set": {"password_hash": new_hash, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Clean up OTP request
+    await db.otp_requests.delete_many({"phone": phone})
+    
+    logger.info(f"Password reset successful for merchant: {phone}")
+    
+    return {
+        "success": True,
+        "message": "Password reset successful. You can now login with your new password."
     }

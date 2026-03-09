@@ -116,6 +116,7 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Merchant History Screen - Full transaction history - COMPLETED 2026-03-09
 - [x] Merchant Settings Screen - Business info, cashback rate, payout - COMPLETED 2026-03-09
 - [x] Contacts Integration - Invite from phone contacts - COMPLETED 2026-03-09
+- [x] Forgot Password - Password reset with OTP for client & merchant - COMPLETED 2026-03-09
 
 ### P1 - Services Feature Completion
 - [x] Airtime purchase with BulkClix API - COMPLETED
@@ -293,6 +294,18 @@ npx expo start
     - PIN change placeholder
     - Help & Support link
     - Logout with confirmation
+
+- **✅ Forgot Password Feature (COMPLETED):**
+  - Created `/app/mobile/src/screens/auth/ForgotPasswordScreen.js`
+  - 3-step flow: Phone → OTP → New Password
+  - Progress bar showing current step
+  - Password validation with visual hints
+  - Success screen with navigation back to login
+  - Backend endpoints added in `/app/backend/routers/auth.py`:
+    - `POST /api/auth/client/reset-password`
+    - `POST /api/auth/merchant/reset-password`
+  - Test mode: Use OTP `123456` when BulkClix not configured
+  - "Forgot Password?" link added to LoginScreen
 
 - **✅ Contacts Integration for Referrals (COMPLETED):**
   - Created `/app/mobile/src/screens/client/ContactsScreen.js`
