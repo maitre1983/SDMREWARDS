@@ -40,7 +40,6 @@ export default function WelcomeScreen({ navigation }) {
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
-    new Animated.Value(0),
   ]).current;
 
   useEffect(() => {
@@ -140,7 +139,6 @@ export default function WelcomeScreen({ navigation }) {
     { icon: 'qr-code', text: 'Pay merchants with QR', color: '#10B981' },
     { icon: 'phone-portrait', text: 'Buy airtime & data', color: '#3B82F6' },
     { icon: 'flash', text: 'ECG Payment', color: '#EF4444' },
-    { icon: 'wallet', text: 'Withdraw to MoMo', color: '#8B5CF6' },
   ];
 
   const spin = logoRotate.interpolate({
