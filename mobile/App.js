@@ -23,6 +23,8 @@ import RegisterScreen from './src/screens/auth/RegisterScreen';
 import ClientHomeScreen from './src/screens/client/HomeScreen';
 import QRScannerScreen from './src/screens/client/QRScannerScreen';
 import PartnersScreen from './src/screens/client/PartnersScreen';
+import HistoryScreen from './src/screens/client/HistoryScreen';
+import ReferralsScreen from './src/screens/client/ReferralsScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
@@ -37,10 +39,8 @@ const PlaceholderScreen = ({ route }) => (
 );
 
 // Shared Screens - Placeholders
-const HistoryScreen = (props) => <PlaceholderScreen {...props} />;
 const ProfileScreen = (props) => <PlaceholderScreen {...props} />;
 const ServicesScreen = (props) => <PlaceholderScreen {...props} />;
-const ReferralsScreen = (props) => <PlaceholderScreen {...props} />;
 const WithdrawalScreen = (props) => <PlaceholderScreen {...props} />;
 
 const Stack = createNativeStackNavigator();
@@ -54,9 +54,9 @@ function ClientMainNavigator() {
       <Stack.Screen name="QRScanner" component={QRScannerScreen} />
       <Stack.Screen name="Partners" component={PartnersScreen} />
       <Stack.Screen name="History" component={HistoryScreen} />
+      <Stack.Screen name="Referrals" component={ReferralsScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Services" component={ServicesScreen} />
-      <Stack.Screen name="Referrals" component={ReferralsScreen} />
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
     </Stack.Navigator>
   );

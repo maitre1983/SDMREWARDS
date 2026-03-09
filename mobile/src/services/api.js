@@ -147,6 +147,12 @@ export const clientAPI = {
     return response.data;
   },
 
+  // Get referrals
+  getReferrals: async () => {
+    const response = await api.get('/clients/referrals');
+    return response.data;
+  },
+
   // Get available cards
   getAvailableCards: async () => {
     const response = await api.get('/clients/cards/available');
