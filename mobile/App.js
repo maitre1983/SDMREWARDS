@@ -28,6 +28,7 @@ import ReferralsScreen from './src/screens/client/ReferralsScreen';
 import ServicesScreen from './src/screens/client/ServicesScreen';
 import WithdrawalScreen from './src/screens/client/WithdrawalScreen';
 import ProfileScreen from './src/screens/client/ProfileScreen';
+import CardScreen from './src/screens/client/CardScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
@@ -41,8 +42,7 @@ const PlaceholderScreen = ({ route }) => (
   </View>
 );
 
-// Shared Screens - Placeholders
-const CardDetailsScreen = (props) => <PlaceholderScreen {...props} />;
+// Shared Screens - No more placeholders needed
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -59,7 +59,8 @@ function ClientMainNavigator() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Services" component={ServicesScreen} />
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
-      <Stack.Screen name="CardDetails" component={CardDetailsScreen} />
+      <Stack.Screen name="CardDetails" component={CardScreen} />
+      <Stack.Screen name="Cards" component={CardScreen} />
     </Stack.Navigator>
   );
 }

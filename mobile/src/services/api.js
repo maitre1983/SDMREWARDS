@@ -159,6 +159,24 @@ export const clientAPI = {
     return response.data;
   },
 
+  // Purchase card
+  purchaseCard: async (data) => {
+    const response = await api.post('/clients/cards/purchase', data);
+    return response.data;
+  },
+
+  // Upgrade card
+  upgradeCard: async (data) => {
+    const response = await api.post('/clients/cards/upgrade', data);
+    return response.data;
+  },
+
+  // Get card details
+  getCardDetails: async () => {
+    const response = await api.get('/clients/cards/details');
+    return response.data;
+  },
+
   // Get card validity
   getCardValidity: async () => {
     const response = await api.get('/clients/cards/my-card');
