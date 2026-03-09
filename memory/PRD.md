@@ -19,6 +19,16 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - **Frontend:** React, Tailwind CSS, Shadcn/UI, recharts, qrcode.react
 - **3rd Party:** BulkClix (payments, SMS, OTP, Airtime, Data Bundles)
 
+## Documentation (Updated 2026-03-09)
+- [x] `/app/README.md` - Documentation principale complète
+- [x] `/app/API_DOCUMENTATION.md` - Documentation API complète (50+ endpoints)
+- [x] `/app/backend/.env.example` - Exemple de configuration backend
+- [x] `/app/frontend/.env.example` - Exemple de configuration frontend
+- [x] `/app/mobile/README_COMPLET.md` - Guide d'installation mobile
+- [x] `/app/mobile/FULL_PROJECT_GUIDE.md` - Guide complet du projet mobile
+- [x] `/app/backend/ARCHITECTURE.md` - Architecture backend
+- [x] `/app/backend/CHANGELOG.md` - Historique des changements
+
 ---
 
 ## Completed Features
