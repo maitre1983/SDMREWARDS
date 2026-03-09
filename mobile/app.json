@@ -29,8 +29,10 @@
       },
       "package": "com.sdmrewards.app",
       "permissions": [
-        "android.permission.CAMERA"
-      ]
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS"
+      ],
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -49,7 +51,18 @@
           "cameraPermission": "SDM Rewards needs camera access to scan QR codes."
         }
       ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "SDM Rewards needs access to your contacts to invite friends and see who's already a member."
+        }
+      ],
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "sdm-rewards"
+      }
+    }
   }
 }
