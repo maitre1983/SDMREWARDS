@@ -153,6 +153,71 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ---
 
+## Mobile Application (NEW - 2026-03-09)
+
+### Overview
+SDM Rewards mobile app built with **Expo/React Native** for iOS and Android.
+
+### Implemented Features
+- **Authentication Flow**
+  - Welcome screen with Client/Merchant selection
+  - Login screen with phone/password
+  - Registration with OTP verification
+  - Secure token storage (expo-secure-store)
+
+- **Client Features**
+  - Home dashboard with balance, stats, transactions
+  - QR Code scanner for merchant payments
+  - Payment flow with MoMo integration
+  - Quick actions (Scan, Airtime, Data, Referrals)
+  - Bottom tab navigation
+
+- **Merchant Features**
+  - Home dashboard with QR code display
+  - Sales statistics and transaction list
+  - QR code sharing functionality
+  - Bottom tab navigation
+
+### Technical Stack
+- Expo SDK 55
+- React Navigation (Stack + Bottom Tabs)
+- expo-camera/expo-barcode-scanner for QR
+- react-native-qrcode-svg for QR generation
+- expo-secure-store for secure storage
+- axios for API calls
+
+### Project Structure
+```
+/app/mobile/
+├── App.js                    # Main entry + navigation
+├── app.json                  # Expo config
+├── src/
+│   ├── components/Common.js  # Reusable UI components
+│   ├── contexts/AuthContext.js
+│   ├── services/api.js       # API service layer
+│   ├── utils/constants.js    # Theme & helpers
+│   └── screens/
+│       ├── auth/             # Welcome, Login, Register
+│       ├── client/           # Home, QRScanner
+│       └── merchant/         # Home
+```
+
+### Remaining Screens (Placeholder)
+- [ ] History (transactions list)
+- [ ] Profile/Settings
+- [ ] Services (Airtime, Data)
+- [ ] Withdrawal modal
+- [ ] Referrals
+
+### How to Run
+```bash
+cd /app/mobile
+npm install
+npx expo start
+```
+
+---
+
 ## Recent Changes (2026-03-09)
 - **✅ SMS Bulk Sending - Verified Working:**
   - Tested bulk SMS to clients endpoint - 12/13 messages sent successfully

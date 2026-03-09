@@ -1,0 +1,275 @@
+/**
+ * SDM REWARDS Mobile - API Service
+ * Handles all API calls to the backend
+ */
+
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+
+// API Base URL - Change this to your production URL
+const API_BASE_URL = 'https://web-boost-seo.preview.emergentagent.com/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Token management
+export const setAuthToken = async (token) => {
+  if (token) {
+    await SecureStore.setItemAsync('auth_token', token);
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+};
+
+export const getAuthToken = async () => {
+  const token = await SecureStore.getItemAsync('auth_token');
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+  return token;
+};
+
+export const clearAuthToken = async () => {
+  await SecureStore.deleteItemAsync('auth_token');
+  await SecureStore.deleteItemAsync('user_type');
+  await SecureStore.deleteItemAsync('user_data');
+  delete api.defaults.headers.common['Authorization'];
+};
+
+// User type management (client or merchant)
+export const setUserType = async (type) => {
+  await SecureStore.setItemAsync('user_type', type);
+};
+
+export const getUserType = async () => {
+  return await SecureStore.getItemAsync('user_type');
+};
+
+export const setUserData = async (data) => {
+  await SecureStore.setItemAsync('user_data', JSON.stringify(data));
+};
+
+export const getUserData = async () => {
+  const data = await SecureStore.getItemAsync('user_data');
+  return data ? JSON.parse(data) : null;
+};
+
+// ============== AUTH API ==============
+
+export const authAPI = {
+  // Send OTP
+  sendOTP: async (phone, purpose = 'registration') => {
+    const response = await api.post('/auth/otp/send', { phone, purpose });
+    return response.data;
+  },
+
+  // Verify OTP
+  verifyOTP: async (phone, code) => {
+    const response = await api.post('/auth/otp/verify', { phone, code });
+    return response.data;
+  },
+
+  // Client Registration
+  registerClient: async (data) => {
+    const response = await api.post('/auth/client/register', data);
+    return response.data;
+  },
+
+  // Client Login
+  loginClient: async (phone, password) => {
+    const response = await api.post('/auth/client/login', { phone, password });
+    return response.data;
+  },
+
+  // Merchant Registration
+  registerMerchant: async (data) => {
+    const response = await api.post('/auth/merchant/register', data);
+    return response.data;
+  },
+
+  // Merchant Login
+  loginMerchant: async (phone, password) => {
+    const response = await api.post('/auth/merchant/login', { phone, password });
+    return response.data;
+  },
+
+  // Get current user
+  getMe: async () => {
+    const response = await api.get('/auth/me');
+    return response.data;
+  },
+};
+
+// ============== CLIENT API ==============
+
+export const clientAPI = {
+  // Get dashboard data
+  getDashboard: async () => {
+    const response = await api.get('/clients/me');
+    return response.data;
+  },
+
+  // Get transactions
+  getTransactions: async (limit = 50) => {
+    const response = await api.get(`/clients/transactions?limit=${limit}`);
+    return response.data;
+  },
+
+  // Get available cards
+  getAvailableCards: async () => {
+    const response = await api.get('/clients/cards/available');
+    return response.data;
+  },
+
+  // Get card validity
+  getCardValidity: async () => {
+    const response = await api.get('/clients/cards/my-card');
+    return response.data;
+  },
+
+  // Get payment settings
+  getPaymentSettings: async () => {
+    const response = await api.get('/clients/payment-settings');
+    return response.data;
+  },
+
+  // Update payment settings
+  updatePaymentSettings: async (settings) => {
+    const response = await api.put('/clients/payment-settings', settings);
+    return response.data;
+  },
+};
+
+// ============== MERCHANT API ==============
+
+export const merchantAPI = {
+  // Get dashboard data
+  getDashboard: async () => {
+    const response = await api.get('/merchants/me');
+    return response.data;
+  },
+
+  // Get transactions
+  getTransactions: async (params = {}) => {
+    const response = await api.get('/merchants/transactions', { params });
+    return response.data;
+  },
+
+  // Get payouts
+  getPayouts: async () => {
+    const response = await api.get('/merchants/payouts');
+    return response.data;
+  },
+
+  // Get merchant by QR code
+  getByQRCode: async (code) => {
+    const response = await api.get(`/merchants/by-qr/${code}`);
+    return response.data;
+  },
+
+  // Update business info
+  updateBusinessInfo: async (data) => {
+    const response = await api.put('/merchants/me', data);
+    return response.data;
+  },
+};
+
+// ============== PAYMENTS API ==============
+
+export const paymentsAPI = {
+  // Initiate merchant payment
+  initiateMerchantPayment: async (merchantId, amount, phone, network, useCashback = false, cashbackAmount = 0) => {
+    const response = await api.post('/payments/merchant/initiate', {
+      merchant_id: merchantId,
+      amount,
+      phone,
+      network,
+      use_cashback: useCashback,
+      cashback_amount: cashbackAmount,
+    });
+    return response.data;
+  },
+
+  // Check payment status
+  checkPaymentStatus: async (paymentId) => {
+    const response = await api.get(`/payments/merchant/status/${paymentId}`);
+    return response.data;
+  },
+
+  // Confirm test payment
+  confirmTestPayment: async (paymentId) => {
+    const response = await api.post(`/payments/merchant/test/confirm/${paymentId}`);
+    return response.data;
+  },
+
+  // Get withdrawal fee
+  getWithdrawalFee: async () => {
+    const response = await api.get('/payments/withdrawal/fee');
+    return response.data;
+  },
+
+  // Initiate withdrawal
+  initiateWithdrawal: async (phone, amount, network) => {
+    const response = await api.post('/payments/withdrawal/initiate', {
+      phone,
+      amount,
+      network,
+    });
+    return response.data;
+  },
+
+  // Confirm test withdrawal
+  confirmTestWithdrawal: async (withdrawalId) => {
+    const response = await api.post(`/payments/withdrawal/test/confirm/${withdrawalId}`);
+    return response.data;
+  },
+};
+
+// ============== SERVICES API ==============
+
+export const servicesAPI = {
+  // Get service fees
+  getFees: async () => {
+    const response = await api.get('/services/fees');
+    return response.data;
+  },
+
+  // Get airtime networks
+  getAirtimeNetworks: async () => {
+    const response = await api.get('/services/airtime/networks');
+    return response.data;
+  },
+
+  // Purchase airtime
+  purchaseAirtime: async (network, phone, amount) => {
+    const response = await api.post('/services/airtime/purchase', {
+      network,
+      phone,
+      amount,
+    });
+    return response.data;
+  },
+
+  // Get data bundles
+  getDataBundles: async (network) => {
+    const response = await api.get(`/services/data/bundles/${network}`);
+    return response.data;
+  },
+
+  // Purchase data bundle
+  purchaseDataBundle: async (network, phone, bundleCode, amount) => {
+    const response = await api.post('/services/data/purchase', {
+      network,
+      phone,
+      bundle_code: bundleCode,
+      amount,
+    });
+    return response.data;
+  },
+};
+
+export default api;
