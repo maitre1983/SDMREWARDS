@@ -2,6 +2,10 @@
 SDM REWARDS - Admin Router
 ==========================
 Admin dashboard, user management, platform settings
+
+Note: This file is being progressively refactored.
+Models are now in routers/admin/models.py
+Dependencies are in routers/admin/dependencies.py
 """
 
 import os
@@ -17,6 +21,34 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from routers.auth import get_current_admin
 
+# Import refactored models and utilities
+from routers.admin_modules import (
+    CreateAdminRequest,
+    UpdateClientRequest,
+    UpdateClientLimitsRequest,
+    SendSMSRequest,
+    UpdateMerchantRequest,
+    UpdateCommissionRequest,
+    UpdateCardPricesRequest,
+    CreateCardTypeRequest,
+    UpdateCardTypeRequest,
+    UpdateServiceCommissionsRequest,
+    UpdateReferralBonusesRequest,
+    CreateClientManualRequest,
+    CreateMerchantManualRequest,
+    BulkSMSRequest,
+    SMSTemplateRequest,
+    SetPINRequest,
+    VerifyPINRequest,
+    ChangePasswordRequest,
+    AdminResetPasswordRequest,
+    CreateAdminRoleRequest,
+    UpdateAdminRoleRequest,
+    PaymentLogoRequest,
+    ADMIN_ROLES,
+    check_is_super_admin
+)
+
 # Setup
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,202 +60,10 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
 
-# ============== HELPER FUNCTIONS ==============
+# ============== LOCAL REQUEST MODELS (for backwards compatibility) ==============
 
-def check_is_super_admin(admin: dict) -> bool:
-    """Check if admin is super admin - supports both is_super_admin field and role field"""
-    return admin.get("is_super_admin", False) or admin.get("role") == "super_admin"
-
-
-# ============== REQUEST MODELS ==============
-
-class CreateAdminRequest(BaseModel):
-    email: str
-    password: str
-    name: Optional[str] = None
-    is_super_admin: bool = False
-
-
-class UpdateClientRequest(BaseModel):
-    full_name: Optional[str] = None
-    email: Optional[str] = None
-    status: Optional[str] = None
-
-
-class UpdateClientLimitsRequest(BaseModel):
-    withdrawal_limit: Optional[float] = None
-    transaction_limit: Optional[float] = None
-    daily_limit: Optional[float] = None
-
-
-class SendSMSRequest(BaseModel):
-    message: str
-
-
-class UpdateMerchantRequest(BaseModel):
-    business_name: Optional[str] = None
-    owner_name: Optional[str] = None
-    status: Optional[str] = None
-    cashback_rate: Optional[float] = None
-    address: Optional[str] = None
-    google_maps_url: Optional[str] = None
-    city: Optional[str] = None
-
-
-class UpdateCommissionRequest(BaseModel):
-    platform_commission_rate: Optional[float] = None  # 1-10%
-    usage_commission_type: Optional[str] = None  # "percentage" or "fixed"
-    usage_commission_rate: Optional[float] = None
-
-
-class UpdateCardPricesRequest(BaseModel):
-    silver_price: Optional[float] = None
-    gold_price: Optional[float] = None
-    platinum_price: Optional[float] = None
-    silver_benefits: Optional[str] = None
-    gold_benefits: Optional[str] = None
-    platinum_benefits: Optional[str] = None
-    silver_duration: Optional[int] = None  # Duration in days
-    gold_duration: Optional[int] = None
-    platinum_duration: Optional[int] = None
-    silver_welcome_bonus: Optional[float] = None
-    gold_welcome_bonus: Optional[float] = None
-    platinum_welcome_bonus: Optional[float] = None
-
-
-class CreateCardTypeRequest(BaseModel):
-    name: str  # e.g., "Diamond", "Business", "Student"
-    slug: str  # e.g., "diamond", "business", "student"
-    price: float
-    duration_days: int  # Duration in days (30, 90, 365, 730, etc.)
-    benefits: str
-    color: Optional[str] = "#6366f1"  # Hex color for badge
-    icon: Optional[str] = "credit-card"  # Icon name
-    is_active: bool = True
-    sort_order: int = 0
-
-
-class UpdateCardTypeRequest(BaseModel):
-    name: Optional[str] = None
-    price: Optional[float] = None
-    duration_days: Optional[int] = None
-    benefits: Optional[str] = None
-    color: Optional[str] = None
-    icon: Optional[str] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
-
-
-class UpdateServiceCommissionsRequest(BaseModel):
-    airtime_commission_type: Optional[str] = None  # "percentage" or "fixed"
-    airtime_commission_rate: Optional[float] = None
-    data_commission_type: Optional[str] = None
-    data_commission_rate: Optional[float] = None
-    ecg_commission_type: Optional[str] = None
-    ecg_commission_rate: Optional[float] = None
-    merchant_payment_commission_type: Optional[str] = None
-    merchant_payment_commission_rate: Optional[float] = None
-    withdrawal_commission_type: Optional[str] = None
-    withdrawal_commission_rate: Optional[float] = None
-
-
-class UpdateReferralBonusesRequest(BaseModel):
-    welcome_bonus: Optional[float] = None
-    referrer_bonus: Optional[float] = None
-
-
-class CreateClientManualRequest(BaseModel):
-    full_name: str
-    phone: str
-    username: str
-    email: Optional[str] = None
-    card_type: Optional[str] = None
-
-
-class CreateMerchantManualRequest(BaseModel):
-    business_name: str
-    owner_name: str
-    phone: str
-    email: Optional[str] = None
-    cashback_rate: float = 5.0
-    city: Optional[str] = None
-    address: Optional[str] = None
-    google_maps_url: Optional[str] = None
-
-
-class BulkSMSRequest(BaseModel):
-    message: str
-    recipient_filter: str  # "all", "active", "inactive", "silver", "gold", "platinum", "pending", "top"
-    recipient_ids: Optional[List[str]] = None  # For custom selection
-    scheduled_at: Optional[str] = None  # ISO datetime for scheduled SMS
-    template_id: Optional[str] = None
-
-
-# ============== PHASE 2 & 3: ADVANCED FEATURES ==============
-
-class SMSTemplateRequest(BaseModel):
-    name: str
-    message: str
-    category: str = "general"  # general, promotion, notification, reminder
-
-
-class SetPINRequest(BaseModel):
-    pin: str  # 4-6 digits
-    otp_code: Optional[str] = None
-
-
-class VerifyPINRequest(BaseModel):
-    pin: str
-
-
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
-    otp_code: str
-    otp_method: str = "sms"  # sms or email
-
-
-class AdminResetPasswordRequest(BaseModel):
-    new_password: str
-
-
-class CreateAdminRoleRequest(BaseModel):
-    email: str
-    password: str
-    name: str
-    role: str  # super_admin, admin_support, admin_merchants, admin_finance, admin_readonly
-    permissions: Optional[List[str]] = None
-
-
-class UpdateAdminRoleRequest(BaseModel):
-    role: Optional[str] = None
-    permissions: Optional[List[str]] = None
-    is_active: Optional[bool] = None
-
-
-# Admin role definitions
-ADMIN_ROLES = {
-    "super_admin": {
-        "name": "Super Admin",
-        "permissions": ["all"]
-    },
-    "admin_support": {
-        "name": "Admin Support",
-        "permissions": ["view_clients", "edit_clients", "send_sms_clients", "view_stats"]
-    },
-    "admin_merchants": {
-        "name": "Admin Merchants", 
-        "permissions": ["view_merchants", "edit_merchants", "approve_merchants", "send_sms_merchants", "view_stats"]
-    },
-    "admin_finance": {
-        "name": "Admin Finance",
-        "permissions": ["view_stats", "view_transactions", "view_commissions"]
-    },
-    "admin_readonly": {
-        "name": "Read-only Admin",
-        "permissions": ["view_clients", "view_merchants", "view_stats"]
-    }
-}
+class StatusActionRequest(BaseModel):
+    action: str  # "activate", "suspend", "delete"
 
 
 # ============== DASHBOARD ==============
