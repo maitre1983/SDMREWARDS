@@ -29,9 +29,12 @@ import ServicesScreen from './src/screens/client/ServicesScreen';
 import WithdrawalScreen from './src/screens/client/WithdrawalScreen';
 import ProfileScreen from './src/screens/client/ProfileScreen';
 import CardScreen from './src/screens/client/CardScreen';
+import ContactsScreen from './src/screens/client/ContactsScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
+import MerchantHistoryScreen from './src/screens/merchant/HistoryScreen';
+import MerchantSettingsScreen from './src/screens/merchant/SettingsScreen';
 
 // Placeholder component for screens not yet implemented
 const PlaceholderScreen = ({ route }) => (
@@ -61,6 +64,7 @@ function ClientMainNavigator() {
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
       <Stack.Screen name="CardDetails" component={CardScreen} />
       <Stack.Screen name="Cards" component={CardScreen} />
+      <Stack.Screen name="Contacts" component={ContactsScreen} />
     </Stack.Navigator>
   );
 }
@@ -125,8 +129,8 @@ function MerchantMainNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Home" component={MerchantHomeScreen} />
-      <Stack.Screen name="MerchantTransactions" component={HistoryScreen} />
-      <Stack.Screen name="MerchantSettings" component={ProfileScreen} />
+      <Stack.Screen name="MerchantTransactions" component={MerchantHistoryScreen} />
+      <Stack.Screen name="MerchantSettings" component={MerchantSettingsScreen} />
     </Stack.Navigator>
   );
 }

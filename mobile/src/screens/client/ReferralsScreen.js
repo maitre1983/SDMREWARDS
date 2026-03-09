@@ -332,6 +332,21 @@ export default function ReferralsScreen({ navigation }) {
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+
+            {/* Invite from Contacts Button */}
+            <TouchableOpacity 
+              style={styles.contactsButton}
+              onPress={() => navigation.navigate('Contacts')}
+            >
+              <LinearGradient
+                colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']}
+                style={styles.contactsButtonGradient}
+              >
+                <Ionicons name="people" size={20} color={COLORS.secondary} />
+                <Text style={styles.contactsButtonText}>Invite from Contacts</Text>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.secondary} />
+              </LinearGradient>
+            </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
 
@@ -617,6 +632,28 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONTS.sizes.sm,
     fontWeight: '600',
+  },
+  contactsButton: {
+    width: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: SPACING.sm,
+  },
+  contactsButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: 12,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  contactsButtonText: {
+    color: COLORS.secondary,
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+    flex: 1,
   },
   statsContainer: {
     flexDirection: 'row',

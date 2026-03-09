@@ -112,6 +112,10 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Withdrawal Screen - Cashback to MoMo - COMPLETED 2026-03-09
 - [x] Profile Screen - User settings with modals - COMPLETED 2026-03-09
 - [x] Merchant Dashboard - QR code, sales stats - COMPLETED 2026-03-09
+- [x] Card Screen - Purchase & Upgrade cards - COMPLETED 2026-03-09
+- [x] Merchant History Screen - Full transaction history - COMPLETED 2026-03-09
+- [x] Merchant Settings Screen - Business info, cashback rate, payout - COMPLETED 2026-03-09
+- [x] Contacts Integration - Invite from phone contacts - COMPLETED 2026-03-09
 
 ### P1 - Services Feature Completion
 - [x] Airtime purchase with BulkClix API - COMPLETED
@@ -275,6 +279,34 @@ npx expo start
   - Backend fix: Added cashback deduction in card purchase endpoint
   - Tested: Purchase with cashback works (50 GHS balance → Silver card purchase → 26 GHS remaining)
   - Tested: Upgrade with combined payment (cashback + MoMo pending)
+
+- **✅ Merchant Mobile Features (COMPLETED):**
+  - Created dedicated `/app/mobile/src/screens/merchant/HistoryScreen.js`:
+    - Full transaction history with search and filters
+    - Date filters (All Time, Today, This Week, This Month)
+    - Stats summary (Total Sales, Transactions, Cashback Paid)
+    - Export transactions via share
+  - Created dedicated `/app/mobile/src/screens/merchant/SettingsScreen.js`:
+    - Business Information editing
+    - Cashback Rate management (0-50%)
+    - Payout Settings (MoMo network & number)
+    - PIN change placeholder
+    - Help & Support link
+    - Logout with confirmation
+
+- **✅ Contacts Integration for Referrals (COMPLETED):**
+  - Created `/app/mobile/src/screens/client/ContactsScreen.js`
+  - Permission request for contacts access
+  - Filters Ghana phone numbers only (+233)
+  - Synchronization with existing referrals:
+    - Shows "SDM Member" badge for contacts already registered
+    - Shows "Invited" badge for pending referrals
+    - Allows inviting non-member contacts
+  - Multiple selection with bulk invite
+  - WhatsApp and SMS quick invite buttons
+  - Alphabet index for quick navigation
+  - Search contacts by name or phone
+  - "Invite from Contacts" button added to Referrals screen
 
 
 - **✅ SMS Bulk Sending - Verified Working:**
