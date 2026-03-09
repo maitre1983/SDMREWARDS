@@ -154,6 +154,14 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       .sort((a, b) => a.price - b.price);
   };
   
+  // Helper to get fee info
+  const getFeeInfo = (serviceName) => {
+    const feeConfig = fees[serviceName];
+    if (!feeConfig) return { type: 'percentage', rate: 2 };
+    if (typeof feeConfig === 'number') return { type: 'percentage', rate: feeConfig };
+    return { type: feeConfig.type || 'percentage', rate: feeConfig.rate || 2 };
+  };
+
   const services = [
     {
       id: 'airtime',
@@ -161,7 +169,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       description: 'Buy mobile credit',
       icon: Smartphone,
       color: 'from-blue-500 to-cyan-500',
-      fee: fees.airtime || 2
+      ...getFeeInfo('airtime')
     },
     {
       id: 'data',
@@ -169,7 +177,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       description: 'Internet data packages',
       icon: Wifi,
       color: 'from-purple-500 to-pink-500',
-      fee: fees.data_bundle || 3
+      ...getFeeInfo('data_bundle')
     },
     {
       id: 'ecg',
@@ -177,7 +185,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       description: 'Pay electricity bill',
       icon: Zap,
       color: 'from-amber-500 to-orange-500',
-      fee: fees.ecg_payment || 1.5
+      ...getFeeInfo('ecg_payment')
     },
     {
       id: 'withdrawal',
@@ -185,7 +193,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       description: 'Withdraw to mobile money',
       icon: Banknote,
       color: 'from-emerald-500 to-teal-500',
-      fee: fees.withdrawal || 1
+      ...getFeeInfo('withdrawal')
     },
     {
       id: 'upgrade',
@@ -193,7 +201,8 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       description: 'Upgrade to a higher tier',
       icon: Crown,
       color: 'from-amber-500 to-yellow-500',
-      fee: 0
+      type: 'none',
+      rate: 0
     }
   ];
   
@@ -213,13 +222,22 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
     }
     
     const service = services.find(s => s.id === activeService);
-    if (!service) return { amount: amt, fee: 0, total: amt };
+    if (!service) return { amount: amt, fee: 0, total: amt, feeType: 'none' };
     
-    const fee = amt * service.fee / 100;
+    // Calculate fee based on type
+    let fee = 0;
+    if (service.type === 'fixed') {
+      fee = service.rate;  // Fixed GHS amount
+    } else if (service.type === 'percentage') {
+      fee = amt * service.rate / 100;  // Percentage
+    }
+    
     return {
       amount: amt,
       fee: Math.round(fee * 100) / 100,
-      total: Math.round((amt + fee) * 100) / 100
+      total: Math.round((amt + fee) * 100) / 100,
+      feeType: service.type,
+      feeRate: service.rate
     };
   };
   
@@ -780,7 +798,13 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
           </div>
           <div>
             <h3 className="text-white font-semibold text-lg">{service.name}</h3>
-            <p className="text-slate-400 text-sm">{service.fee}% service fee</p>
+            <p className="text-slate-400 text-sm">
+              {service.type === 'fixed' 
+                ? `GHS ${service.rate} service fee` 
+                : service.type === 'none' 
+                  ? 'No service fee'
+                  : `${service.rate}% service fee`}
+            </p>
           </div>
         </div>
         
@@ -963,7 +987,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
               <span>GHS {calc.amount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-slate-400 text-sm">
-              <span>Service Fee ({service.fee}%)</span>
+              <span>Service Fee {calc.feeType === 'fixed' ? '(Fixed)' : `(${calc.feeRate}%)`}</span>
               <span>GHS {calc.fee.toFixed(2)}</span>
             </div>
             <div className="border-t border-slate-700 pt-2 flex justify-between text-white font-semibold">
@@ -1061,8 +1085,10 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
                 <div className="flex items-center gap-1 mt-2 text-slate-500 text-xs">
                   {service.id === 'upgrade' ? (
                     <span>Pay full price</span>
+                  ) : service.type === 'fixed' ? (
+                    <span>GHS {service.rate} fee</span>
                   ) : (
-                    <span>{service.fee}% fee</span>
+                    <span>{service.rate}% fee</span>
                   )}
                   <ArrowRight size={12} />
                 </div>

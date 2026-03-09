@@ -87,23 +87,49 @@ async def get_platform_config():
     return config or {}
 
 
-async def get_service_fee(service_type: str, amount: float) -> dict:
-    """Calculate service fee based on config"""
+async def get_service_fee_config(service_type: str) -> dict:
+    """Get service fee configuration from settings"""
     config = await get_platform_config()
     
-    # Default fee structure
-    fee_rates = {
-        "airtime": config.get("airtime_fee_rate", 2.0),
-        "data_bundle": config.get("data_fee_rate", 3.0),
-        "ecg_payment": config.get("ecg_fee_rate", 1.5),
-        "withdrawal": config.get("withdrawal_fee_rate", 1.0)
+    # Map service types to their settings paths
+    service_map = {
+        "airtime": "airtime",
+        "data_bundle": "data",
+        "ecg_payment": "ecg",
+        "withdrawal": "withdrawal",
+        "merchant_payment": "merchant_payment"
     }
     
-    fee_rate = fee_rates.get(service_type, 1.0)
-    fee_amount = round(amount * fee_rate / 100, 2)
+    mapped_service = service_map.get(service_type, service_type)
+    service_config = config.get("service_commissions", {}).get(mapped_service, {})
+    
+    # Get type and rate from settings
+    fee_type = service_config.get("type", "percentage")  # percentage or fixed
+    fee_rate = service_config.get("rate", 2.0)  # default 2% or GHS 2
+    
+    return {
+        "type": fee_type,
+        "rate": fee_rate
+    }
+
+
+async def get_service_fee(service_type: str, amount: float) -> dict:
+    """Calculate service fee based on config"""
+    fee_config = await get_service_fee_config(service_type)
+    
+    fee_type = fee_config.get("type", "percentage")
+    fee_rate = fee_config.get("rate", 2.0)
+    
+    # Calculate fee based on type
+    if fee_type == "fixed":
+        fee_amount = fee_rate  # Fixed GHS amount
+    else:
+        fee_amount = round(amount * fee_rate / 100, 2)  # Percentage
+    
     total = round(amount + fee_amount, 2)
     
     return {
+        "fee_type": fee_type,
         "fee_rate": fee_rate,
         "fee_amount": fee_amount,
         "total": total
@@ -177,16 +203,32 @@ async def get_service_balance(current_client: dict = Depends(get_current_client)
 
 @router.get("/fees")
 async def get_service_fees():
-    """Get current service fees"""
-    config = await get_platform_config()
+    """Get current service fees from admin settings"""
+    # Get fee configs for each service
+    airtime_config = await get_service_fee_config("airtime")
+    data_config = await get_service_fee_config("data_bundle")
+    ecg_config = await get_service_fee_config("ecg_payment")
+    withdrawal_config = await get_service_fee_config("withdrawal")
     
     return {
         "success": True,
         "fees": {
-            "airtime": config.get("airtime_fee_rate", 2.0),
-            "data_bundle": config.get("data_fee_rate", 3.0),
-            "ecg_payment": config.get("ecg_fee_rate", 1.5),
-            "withdrawal": config.get("withdrawal_fee_rate", 1.0)
+            "airtime": {
+                "type": airtime_config.get("type", "percentage"),
+                "rate": airtime_config.get("rate", 2.0)
+            },
+            "data_bundle": {
+                "type": data_config.get("type", "percentage"),
+                "rate": data_config.get("rate", 3.0)
+            },
+            "ecg_payment": {
+                "type": ecg_config.get("type", "percentage"),
+                "rate": ecg_config.get("rate", 1.5)
+            },
+            "withdrawal": {
+                "type": withdrawal_config.get("type", "percentage"),
+                "rate": withdrawal_config.get("rate", 1.0)
+            }
         },
         "min_transaction": MIN_TRANSACTION_AMOUNT,
         "min_balance": MIN_CASHBACK_BALANCE
