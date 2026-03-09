@@ -182,6 +182,24 @@ export const clientAPI = {
     const response = await api.get('/clients/withdrawals');
     return response.data;
   },
+
+  // Update profile
+  updateProfile: async (data) => {
+    const response = await api.put('/clients/profile', data);
+    return response.data;
+  },
+
+  // Get payment settings
+  getPaymentSettings: async () => {
+    const response = await api.get('/clients/payment-settings');
+    return response.data;
+  },
+
+  // Update payment settings
+  updatePaymentSettings: async (settings) => {
+    const response = await api.put('/clients/payment-settings', settings);
+    return response.data;
+  },
 };
 
 // ============== MERCHANT API ==============
@@ -195,7 +213,7 @@ export const merchantAPI = {
 
   // Get transactions
   getTransactions: async (params = {}) => {
-    const response = await api.get('/merchants/transactions', { params });
+    const response = await api.get('/merchants/transactions/history', { params });
     return response.data;
   },
 
@@ -213,7 +231,19 @@ export const merchantAPI = {
 
   // Update business info
   updateBusinessInfo: async (data) => {
-    const response = await api.put('/merchants/me', data);
+    const response = await api.put('/merchants/settings/business', data);
+    return response.data;
+  },
+
+  // Get settings
+  getSettings: async () => {
+    const response = await api.get('/merchants/settings');
+    return response.data;
+  },
+
+  // Update cashback rate
+  updateCashbackRate: async (rate) => {
+    const response = await api.put('/merchants/settings/cashback', { cashback_rate: rate });
     return response.data;
   },
 };

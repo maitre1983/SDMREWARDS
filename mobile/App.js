@@ -27,6 +27,7 @@ import HistoryScreen from './src/screens/client/HistoryScreen';
 import ReferralsScreen from './src/screens/client/ReferralsScreen';
 import ServicesScreen from './src/screens/client/ServicesScreen';
 import WithdrawalScreen from './src/screens/client/WithdrawalScreen';
+import ProfileScreen from './src/screens/client/ProfileScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
@@ -41,7 +42,7 @@ const PlaceholderScreen = ({ route }) => (
 );
 
 // Shared Screens - Placeholders
-const ProfileScreen = (props) => <PlaceholderScreen {...props} />;
+const CardDetailsScreen = (props) => <PlaceholderScreen {...props} />;
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -58,6 +59,7 @@ function ClientMainNavigator() {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="Services" component={ServicesScreen} />
       <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
+      <Stack.Screen name="CardDetails" component={CardDetailsScreen} />
     </Stack.Navigator>
   );
 }
@@ -117,11 +119,22 @@ function ClientStack() {
   );
 }
 
+// Merchant Stack Navigator (HomeScreen has its own bottom navigation)
+function MerchantMainNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Home" component={MerchantHomeScreen} />
+      <Stack.Screen name="MerchantTransactions" component={HistoryScreen} />
+      <Stack.Screen name="MerchantSettings" component={ProfileScreen} />
+    </Stack.Navigator>
+  );
+}
+
 // Merchant Stack Navigator
 function MerchantStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MerchantTabs" component={MerchantTabNavigator} />
+      <Stack.Screen name="MerchantMain" component={MerchantMainNavigator} />
     </Stack.Navigator>
   );
 }

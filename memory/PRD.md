@@ -102,7 +102,7 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Upcoming Tasks (Priority Order)
 
-### P0 - Mobile App Feature Parity (IN PROGRESS)
+### P0 - Mobile App Feature Parity (COMPLETED)
 - [x] Client Dashboard matching web design - COMPLETED 2026-03-09
 - [x] Partners Screen (merchant list) - COMPLETED 2026-03-09
 - [x] QR Scanner with payment flow - COMPLETED 2026-03-09
@@ -110,8 +110,8 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Referrals Screen - QR code sharing, referral list - COMPLETED 2026-03-09
 - [x] Services Screen - Airtime & Data Bundle purchases - COMPLETED 2026-03-09
 - [x] Withdrawal Screen - Cashback to MoMo - COMPLETED 2026-03-09
-- [ ] Profile Screen - User settings
-- [ ] Merchant Dashboard - Sales, QR display
+- [x] Profile Screen - User settings with modals - COMPLETED 2026-03-09
+- [x] Merchant Dashboard - QR code, sales stats - COMPLETED 2026-03-09
 
 ### P1 - Services Feature Completion
 - [x] Airtime purchase with BulkClix API - COMPLETED
