@@ -84,6 +84,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ============== SECURITY HEADERS MIDDLEWARE ==============
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Add security headers to all HTTP responses.
+    Mitigates XSS, clickjacking, and other common web vulnerabilities.
+    """
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        
+        # Content Security Policy - Controls which resources the browser can load
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "img-src 'self' https: data: blob:; "
+            "script-src 'self' https: 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' https: 'unsafe-inline'; "
+            "font-src 'self' https: data:; "
+            "connect-src 'self' https:; "
+            "frame-ancestors 'self'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+        
+        # X-Frame-Options - Prevents clickjacking attacks
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        
+        # X-Content-Type-Options - Prevents MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Referrer-Policy - Controls referrer information sent with requests
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # Strict-Transport-Security (HSTS) - Forces HTTPS connections
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        
+        # X-XSS-Protection - Legacy XSS filter (for older browsers)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        
+        # Permissions-Policy - Controls browser features/APIs
+        response.headers["Permissions-Policy"] = (
+            "accelerometer=(), "
+            "camera=(), "
+            "geolocation=(self), "
+            "gyroscope=(), "
+            "magnetometer=(), "
+            "microphone=(), "
+            "payment=(self), "
+            "usb=()"
+        )
+        
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 # ============== DATABASE INDEXES ==============
 async def create_indexes():
     """Create database indexes for performance"""
