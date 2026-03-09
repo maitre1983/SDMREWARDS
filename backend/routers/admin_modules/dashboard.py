@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 
 from routers.auth import get_current_admin
-from routers.admin.dependencies import get_db
+from routers.admin_modules.dependencies import get_db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
