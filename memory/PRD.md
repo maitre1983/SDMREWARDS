@@ -371,6 +371,19 @@ npx expo start
   - **Fixed:** Configure modal uses `merchant_id` OR `id` to find merchant
   - **Tests:** 13/13 backend tests passing, 100% frontend UI verified
 
+- **✅ Settings Cleanup - Remove Duplicate Commission Menu (COMPLETED 2026-03-10):**
+  - **Removed:** "Commissions" tab (duplicate of Service Fees)
+  - **Kept:** "Service Fees" tab with Merchant Payments commission config
+  - Settings tabs: Card Prices, Service Fees, Referrals, Merchant Debit, Add Users, SMS Center, Security, Admin Users
+
+- **✅ SDM Cashback Commissions Dashboard Fixed (COMPLETED 2026-03-10):**
+  - **Fixed:** Commission calculation now sums BOTH `commission_amount` AND `sdm_commission` fields
+  - Overview dashboard now shows correct commission totals:
+    - Total (All Time): GHS 14.11
+    - Today: GHS 0.31
+    - This Month: GHS 6.92
+    - This Year: GHS 14.11
+
 - **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
   - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
   - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart

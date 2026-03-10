@@ -1434,7 +1434,6 @@ export default function AdminDashboard() {
                 <div className="flex flex-wrap gap-2 bg-slate-800 p-2 rounded-xl overflow-x-auto">
                   {[
                     { id: 'cards', label: 'Card Prices', icon: CreditCard },
-                    { id: 'commissions', label: 'Commissions', icon: Percent },
                     { id: 'services', label: 'Service Fees', icon: Sliders },
                     { id: 'referrals', label: 'Referrals', icon: Gift },
                     { id: 'debit', label: 'Merchant Debit', icon: Banknote },
@@ -1638,53 +1637,6 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
-
-            {/* Commission Settings */}
-            {settingsTab === 'commissions' && (
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-                  <Percent size={20} className="text-emerald-400" /> Platform Commission on Cashback
-                </h3>
-                <div className="bg-slate-900 rounded-xl p-6 max-w-md">
-                  <p className="text-slate-400 text-sm mb-4">
-                    SDM takes a percentage of each cashback distributed to clients. This is deducted from the merchant's cashback allocation.
-                  </p>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-slate-300">Platform Commission Rate (%)</Label>
-                      <div className="flex items-center gap-4 mt-2">
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={commissionsForm.platform_commission_rate}
-                          onChange={(e) => setCommissionsForm({...commissionsForm, platform_commission_rate: parseFloat(e.target.value)})}
-                          className="flex-1"
-                        />
-                        <span className="text-emerald-400 text-2xl font-bold w-16 text-center">
-                          {commissionsForm.platform_commission_rate}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="bg-slate-800 rounded-lg p-4 mt-4">
-                      <p className="text-slate-400 text-sm mb-2">Example Calculation:</p>
-                      <div className="text-sm space-y-1">
-                        <p className="text-white">Client Purchase: <span className="text-emerald-400">GHS 1,000</span></p>
-                        <p className="text-white">Merchant Cashback (10%): <span className="text-amber-400">GHS 100</span></p>
-                        <p className="text-white">Client Receives: <span className="text-emerald-400">GHS {(100 - 100 * commissionsForm.platform_commission_rate / 100).toFixed(0)}</span></p>
-                        <p className="text-white">SDM Commission: <span className="text-purple-400">GHS {(100 * commissionsForm.platform_commission_rate / 100).toFixed(0)}</span></p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 flex justify-end">
-                  <Button onClick={handleSaveCommissions} className="bg-emerald-600 hover:bg-emerald-700" disabled={actionLoading}>
-                    {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
-                    Save Commission Settings
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {/* Service Commissions */}
             {settingsTab === 'services' && (

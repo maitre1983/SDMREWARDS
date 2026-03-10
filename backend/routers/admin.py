@@ -314,13 +314,23 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
         })
     
     # ============== 9. SDM CASHBACK COMMISSIONS ==============
-    # Commission on cashback (5% default) - already stored in transactions
+    # Commission on cashback (5% default) - stored as commission_amount or sdm_commission
     all_transactions_with_commission = await db.transactions.find(
-        {"type": "payment", "commission_amount": {"$exists": True}},
-        {"_id": 0, "commission_amount": 1, "created_at": 1}
+        {
+            "type": "payment",
+            "$or": [
+                {"commission_amount": {"$exists": True, "$gt": 0}},
+                {"sdm_commission": {"$exists": True, "$gt": 0}}
+            ]
+        },
+        {"_id": 0, "commission_amount": 1, "sdm_commission": 1, "created_at": 1}
     ).to_list(100000)
     
-    total_sdm_commissions = sum(t.get("commission_amount", 0) for t in all_transactions_with_commission)
+    # Sum both fields (some transactions use commission_amount, others use sdm_commission)
+    total_sdm_commissions = sum(
+        t.get("commission_amount", 0) + t.get("sdm_commission", 0) 
+        for t in all_transactions_with_commission
+    )
     
     # Commission by period
     sdm_commission_by_period = {
@@ -337,7 +347,7 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
     
     for t in all_transactions_with_commission:
         created_at = t.get("created_at", "")
-        commission = t.get("commission_amount", 0)
+        commission = t.get("commission_amount", 0) + t.get("sdm_commission", 0)
         if created_at >= day_start.isoformat():
             sdm_commission_by_period["day"] += commission
         if created_at >= week_start.isoformat():
