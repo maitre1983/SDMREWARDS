@@ -141,6 +141,14 @@ class Merchant(BaseModel):
     total_volume: float = 0.0
     total_cashback_given: float = 0.0
     
+    # Debit Account for Cash Payments (default limit = 0, admin must configure)
+    debit_account: dict = Field(default_factory=lambda: {
+        "balance": 0,
+        "limit": 0,
+        "settlement_period_days": 30,
+        "is_blocked": False
+    })
+    
     # API Integration
     api_key: Optional[str] = None
     api_enabled: bool = False

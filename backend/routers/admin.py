@@ -2105,6 +2105,12 @@ async def create_merchant_manual(
         "qr_code": f"SDM-MERCHANT-{merchant_id.upper()}",
         "total_transactions": 0,
         "total_revenue": 0,
+        "debit_account": {
+            "balance": 0,
+            "limit": 0,
+            "settlement_period_days": 30,
+            "is_blocked": False
+        },
         "created_by_admin": current_admin["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
