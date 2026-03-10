@@ -55,29 +55,35 @@ async def send_bulk_sms_clients(
     else:
         clients = await db.clients.find(query, {"_id": 0, "phone": 1, "id": 1, "full_name": 1}).to_list(10000)
     
-    sent_count = 0
-    failed_count = 0
+    # Collect all phone numbers
+    phones = [c.get("phone") for c in clients if c.get("phone")]
     
-    for client in clients:
-        if client.get("phone"):
-            result = await sms_service.send_sms(client["phone"], request.message)
-            if result.get("success"):
-                sent_count += 1
-            else:
-                failed_count += 1
+    if not phones:
+        return {"success": False, "error": "No valid recipients found", "total_recipients": 0, "sent": 0, "failed": 0}
+    
+    # Send bulk SMS in a single API call
+    result = await sms_service.send_bulk_sms(phones, request.message, "bulk_clients")
     
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
         "admin_id": current_admin["id"],
         "action": "bulk_sms_clients",
         "filter": request.recipient_filter,
-        "total_recipients": len(clients),
-        "sent": sent_count,
-        "failed": failed_count,
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "campaign_id": result.get("campaign_id"),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    return {"success": True, "total_recipients": len(clients), "sent": sent_count, "failed": failed_count}
+    return {
+        "success": result.get("success", False),
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "campaign_id": result.get("campaign_id"),
+        "error": result.get("error")
+    }
 
 
 @router.post("/bulk-sms/merchants")
@@ -111,29 +117,35 @@ async def send_bulk_sms_merchants(
     else:
         merchants = await db.merchants.find(query, {"_id": 0, "phone": 1, "id": 1, "business_name": 1}).to_list(10000)
     
-    sent_count = 0
-    failed_count = 0
+    # Collect all phone numbers
+    phones = [m.get("phone") for m in merchants if m.get("phone")]
     
-    for merchant in merchants:
-        if merchant.get("phone"):
-            result = await sms_service.send_sms(merchant["phone"], request.message)
-            if result.get("success"):
-                sent_count += 1
-            else:
-                failed_count += 1
+    if not phones:
+        return {"success": False, "error": "No valid recipients found", "total_recipients": 0, "sent": 0, "failed": 0}
+    
+    # Send bulk SMS in a single API call
+    result = await sms_service.send_bulk_sms(phones, request.message, "bulk_merchants")
     
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
         "admin_id": current_admin["id"],
         "action": "bulk_sms_merchants",
         "filter": request.recipient_filter,
-        "total_recipients": len(merchants),
-        "sent": sent_count,
-        "failed": failed_count,
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "campaign_id": result.get("campaign_id"),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    return {"success": True, "total_recipients": len(merchants), "sent": sent_count, "failed": failed_count}
+    return {
+        "success": result.get("success", False),
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "campaign_id": result.get("campaign_id"),
+        "error": result.get("error")
+    }
 
 
 @router.get("/sms/history")

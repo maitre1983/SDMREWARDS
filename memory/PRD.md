@@ -275,6 +275,15 @@ npx expo start
 
 ---
 
+## Recent Changes (2026-03-10)
+- **✅ BulkClix SMS API Fixed (2026-03-10):**
+  - Updated SMS service to use correct BulkClix API format
+  - Added `Accept: application/json` header
+  - Fixed phone number formatting to local format (0XXXXXXXXX)
+  - Added new `send_bulk_sms()` method for efficient bulk SMS
+  - Bulk SMS now sends all recipients in a single API call
+  - Tested and confirmed working with real SMS delivery
+
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
   - Issue: Back button on QR Scanner screen was not navigating back
