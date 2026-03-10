@@ -972,48 +972,68 @@ async def get_debit_account(current_merchant: dict = Depends(get_current_merchan
     """
     Get merchant's debit account information
     Shows current balance, limit, and status
+    Reads from merchants.debit_account subdocument (set by admin)
     """
     merchant_id = current_merchant["id"]
     
-    # Get or create debit account
-    debit_account = await db.merchant_debit_accounts.find_one(
-        {"merchant_id": merchant_id},
-        {"_id": 0}
+    # Get fresh merchant data from database to ensure sync with admin changes
+    merchant = await db.merchants.find_one(
+        {"id": merchant_id},
+        {"_id": 0, "debit_account": 1}
     )
     
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    # Get debit account from merchant document (set by admin)
+    debit_account = merchant.get("debit_account", {})
+    
+    # If no debit_account exists, return defaults
     if not debit_account:
-        # Create default debit account
         debit_account = {
-            "id": str(uuid.uuid4()),
-            "merchant_id": merchant_id,
-            "balance": 0.0,  # Positive = credit, Negative = debit
-            "debit_limit": 0.0,  # Set by admin, 0 = no limit configured
-            "settlement_days": 0,  # Set by admin, 0 = no deadline
-            "status": "active",  # active, blocked, warning
-            "last_alert_sent": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "balance": 0.0,
+            "limit": 0.0,
+            "settlement_period_days": 30,
+            "is_blocked": False
         }
-        await db.merchant_debit_accounts.insert_one(debit_account)
-        debit_account.pop("_id", None)
+    
+    # Extract values
+    balance = debit_account.get("balance", 0)
+    debit_limit = debit_account.get("limit", 0)
+    is_blocked = debit_account.get("is_blocked", False)
+    settlement_days = debit_account.get("settlement_period_days", 30)
     
     # Calculate usage percentage
-    debit_limit = debit_account.get("debit_limit", 0)
-    balance = debit_account.get("balance", 0)
-    
     usage_percentage = 0
-    if debit_limit > 0 and balance < 0:
+    if debit_limit > 0:
         usage_percentage = min(100, abs(balance) / debit_limit * 100)
     
+    # Determine status
+    status = "not_configured"
+    if debit_limit > 0:
+        if is_blocked:
+            status = "blocked"
+        elif usage_percentage >= 75:
+            status = "warning"
+        else:
+            status = "active"
+    
     return {
-        "debit_account": debit_account,
+        "debit_account": {
+            "merchant_id": merchant_id,
+            "balance": round(balance, 2),
+            "debit_limit": round(debit_limit, 2),
+            "settlement_days": settlement_days,
+            "status": status,
+            "is_blocked": is_blocked
+        },
         "stats": {
             "current_balance": round(balance, 2),
             "debit_limit": round(debit_limit, 2),
-            "available_credit": round(max(0, debit_limit + balance), 2) if debit_limit > 0 else None,
+            "available_credit": round(max(0, debit_limit - abs(balance)), 2) if debit_limit > 0 else 0,
             "usage_percentage": round(usage_percentage, 1),
-            "status": debit_account.get("status", "active"),
-            "is_blocked": debit_account.get("status") == "blocked"
+            "status": status,
+            "is_blocked": is_blocked
         }
     }
 
@@ -1026,18 +1046,19 @@ async def get_debit_history(
 ):
     """
     Get merchant's debit account transaction history
+    Reads from debit_ledger collection
     """
     merchant_id = current_merchant["id"]
     
     skip = (page - 1) * limit
     
-    # Get debit transactions (ledger entries)
-    transactions = await db.merchant_debit_ledger.find(
+    # Get debit transactions from debit_ledger collection
+    transactions = await db.debit_ledger.find(
         {"merchant_id": merchant_id},
         {"_id": 0}
     ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
-    total_count = await db.merchant_debit_ledger.count_documents({"merchant_id": merchant_id})
+    total_count = await db.debit_ledger.count_documents({"merchant_id": merchant_id})
     
     return {
         "transactions": transactions,
