@@ -352,6 +352,14 @@ npx expo start
     - Warning message shown explaining why
     - Auto-selects MoMo when Cash unavailable
 
+- **✅ Admin Debit Limit Configuration (COMPLETED 2026-03-10):**
+  - Added "Debit Account" section in Merchant Details modal
+  - Shows: Current Balance, Debit Limit, Usage %, Status
+  - Visual usage bar (green < 75%, amber 75-99%, red 100%)
+  - "Configure Debit Limit" button opens settings modal
+  - "Unblock Account" button for blocked merchants
+  - Admin can set debit limit per merchant
+
 - **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
   - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
   - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart

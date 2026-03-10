@@ -2605,6 +2605,88 @@ export default function AdminDashboard() {
               )}
             </div>
 
+            {/* Debit Account Section */}
+            <div className="p-4 border-b border-slate-700">
+              <h3 className="text-white font-medium mb-3 flex items-center gap-2">
+                <Wallet size={18} className="text-amber-400" /> Debit Account (Cash Payments)
+              </h3>
+              <div className="bg-gradient-to-br from-amber-900/20 to-slate-900 border border-amber-500/30 rounded-lg p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <p className="text-slate-400 text-xs">Current Balance</p>
+                    <p className={`text-xl font-bold ${(selectedMerchant.debit_account?.balance || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      GHS {(selectedMerchant.debit_account?.balance || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs">Debit Limit</p>
+                    <p className="text-amber-400 text-xl font-bold">
+                      GHS {(selectedMerchant.debit_account?.limit || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs">Usage</p>
+                    <p className="text-white text-xl font-bold">
+                      {selectedMerchant.debit_account?.limit > 0 
+                        ? ((Math.abs(selectedMerchant.debit_account?.balance || 0) / selectedMerchant.debit_account.limit) * 100).toFixed(1)
+                        : 0}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-xs">Status</p>
+                    {selectedMerchant.debit_account?.is_blocked ? (
+                      <span className="text-red-400 font-semibold">Blocked</span>
+                    ) : selectedMerchant.debit_account?.limit > 0 ? (
+                      <span className="text-emerald-400 font-semibold">Active</span>
+                    ) : (
+                      <span className="text-slate-500 font-semibold">Not Configured</span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Usage Bar */}
+                {(selectedMerchant.debit_account?.limit || 0) > 0 && (
+                  <div className="mb-4">
+                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all ${
+                          (Math.abs(selectedMerchant.debit_account?.balance || 0) / selectedMerchant.debit_account.limit) >= 1 ? 'bg-red-500' :
+                          (Math.abs(selectedMerchant.debit_account?.balance || 0) / selectedMerchant.debit_account.limit) >= 0.75 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, (Math.abs(selectedMerchant.debit_account?.balance || 0) / selectedMerchant.debit_account.limit) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Configure Button */}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      setSelectedMerchantDebit(selectedMerchant);
+                      setDebitSettingsForm({
+                        debit_limit: selectedMerchant.debit_account?.limit || 0,
+                        settlement_days: selectedMerchant.debit_account?.settlement_period_days || 30
+                      });
+                      setShowDebitSettingsModal(true);
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700"
+                  >
+                    <Settings size={16} className="mr-2" /> Configure Debit Limit
+                  </Button>
+                  {selectedMerchant.debit_account?.is_blocked && (
+                    <Button
+                      onClick={() => handleUnblockMerchantDebit(selectedMerchant.id)}
+                      disabled={actionLoading}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <CheckCircle size={16} className="mr-2" /> Unblock Account
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Transaction Summary */}
             {transactionSummary && (
               <div className="p-4 border-b border-slate-700">
