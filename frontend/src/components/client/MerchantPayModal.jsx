@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, Store, MapPin, Percent, CheckCircle, AlertCircle, 
-  Phone, Loader2, CreditCard, Banknote, Wallet
+  Phone, Loader2, CreditCard, Banknote, Wallet, AlertTriangle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -24,7 +24,20 @@ export default function MerchantPayModal({
   onConfirmTest,
   onCashPayment
 }) {
-  const [paymentMethod, setPaymentMethod] = useState('momo'); // 'momo' or 'cash'
+  // Check if cash payment is available for this merchant
+  const cashPaymentInfo = merchant?.cash_payment || {};
+  const isCashAvailable = cashPaymentInfo.available !== false; // Default to true if not specified
+  const cashUnavailableReason = cashPaymentInfo.reason;
+  
+  // Default to 'momo' if cash is not available
+  const [paymentMethod, setPaymentMethod] = useState(isCashAvailable ? 'momo' : 'momo');
+  
+  // Reset to momo if cash becomes unavailable
+  useEffect(() => {
+    if (!isCashAvailable && paymentMethod === 'cash') {
+      setPaymentMethod('momo');
+    }
+  }, [isCashAvailable, paymentMethod]);
   
   if (!merchant) return null;
 
@@ -160,11 +173,14 @@ export default function MerchantPayModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('cash')}
+                  onClick={() => isCashAvailable && setPaymentMethod('cash')}
+                  disabled={!isCashAvailable}
                   className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                    paymentMethod === 'cash'
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
+                    !isCashAvailable
+                      ? 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+                      : paymentMethod === 'cash'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
                   }`}
                   data-testid="payment-method-cash"
                 >
@@ -172,6 +188,16 @@ export default function MerchantPayModal({
                   <span className="font-medium">Cash</span>
                 </button>
               </div>
+              
+              {/* Cash unavailable warning */}
+              {!isCashAvailable && (
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={16} />
+                  <p className="text-amber-400 text-xs">
+                    {cashUnavailableReason || "Cash payment not available for this merchant"}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Amount Input */}

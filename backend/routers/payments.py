@@ -513,19 +513,29 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
     # SDM commission (5% of cashback)
     sdm_commission = round(request.amount * cashback_rate * 0.05, 2)
     
-    # Check if merchant can afford this cashback via debit account
+    # IMPORTANT: If no debit limit configured, cash payments are not allowed
+    if debit_limit <= 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cash payments not available. This merchant has no debit limit configured. Please pay with MoMo."
+        )
+    
+    # Check if merchant's debit account is blocked
+    if is_blocked:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cash payments blocked. Merchant's debit limit has been reached. Please pay with MoMo."
+        )
+    
+    # Calculate new balance after this transaction
     new_balance = current_balance - cashback_amount
-    if debit_limit > 0:
-        if is_blocked:
-            raise HTTPException(
-                status_code=400, 
-                detail="Merchant's debit account is blocked. Cash payments unavailable."
-            )
-        if abs(new_balance) > debit_limit:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Merchant's debit limit reached. Cash payment unavailable. Please pay with MoMo."
-            )
+    
+    # Check if this transaction would exceed the debit limit
+    if abs(new_balance) > debit_limit:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Cash payment would exceed merchant's debit limit (GHS {debit_limit}). Please pay with MoMo or use a smaller amount."
+        )
     
     now = datetime.now(timezone.utc).isoformat()
     transaction_id = str(uuid.uuid4())

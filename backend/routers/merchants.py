@@ -148,6 +148,7 @@ async def get_merchant_by_qr(qr_code: str):
     """
     Get merchant details by QR code
     Used when client scans merchant QR
+    Includes cash payment availability status
     """
     # Try payment QR code first
     merchant = await db.merchants.find_one(
@@ -160,7 +161,8 @@ async def get_merchant_by_qr(qr_code: str):
             "business_address": 1,
             "cashback_rate": 1,
             "payment_qr_code": 1,
-            "status": 1
+            "status": 1,
+            "debit_account": 1
         }
     )
     
@@ -177,7 +179,8 @@ async def get_merchant_by_qr(qr_code: str):
                 "cashback_rate": 1,
                 "payment_qr_code": 1,
                 "recruitment_qr_code": 1,
-                "status": 1
+                "status": 1,
+                "debit_account": 1
             }
         )
     
@@ -186,6 +189,38 @@ async def get_merchant_by_qr(qr_code: str):
     
     if merchant.get("status") != "active":
         raise HTTPException(status_code=400, detail="Merchant is not active")
+    
+    # Check cash payment availability
+    debit_account = merchant.get("debit_account", {})
+    debit_limit = debit_account.get("limit", 0)
+    current_balance = debit_account.get("balance", 0)
+    is_blocked = debit_account.get("is_blocked", False)
+    
+    cash_available = True
+    cash_unavailable_reason = None
+    
+    if debit_limit <= 0:
+        cash_available = False
+        cash_unavailable_reason = "Cash payments not configured for this merchant"
+    elif is_blocked:
+        cash_available = False
+        cash_unavailable_reason = "Cash payments temporarily unavailable"
+    elif abs(current_balance) >= debit_limit:
+        cash_available = False
+        cash_unavailable_reason = "Merchant's cash payment limit reached"
+    
+    # Calculate remaining cash capacity
+    remaining_cash_capacity = max(0, debit_limit - abs(current_balance)) if debit_limit > 0 else 0
+    
+    # Remove debit_account from response (internal info)
+    merchant.pop("debit_account", None)
+    
+    # Add cash payment info
+    merchant["cash_payment"] = {
+        "available": cash_available,
+        "reason": cash_unavailable_reason,
+        "remaining_capacity": round(remaining_cash_capacity, 2)
+    }
     
     return {"merchant": merchant}
 

@@ -338,6 +338,20 @@ npx expo start
   - **Kept:** "Top Up Debit Account" button only
   - Auto-refresh stats when navigating to Cash tab
 
+- **✅ Cash Payment Blocking Logic Fixed (COMPLETED 2026-03-10):**
+  - **Backend Changes:**
+    - Cash payments blocked if no debit limit configured (limit = 0)
+    - Cash payments blocked if debit limit reached
+    - Clear error messages when cash is unavailable
+  - **API Enhancement:** `/api/merchants/by-qr/{qr}` now includes:
+    - `cash_payment.available` (boolean)
+    - `cash_payment.reason` (why unavailable)
+    - `cash_payment.remaining_capacity` (how much more can be spent)
+  - **Frontend Changes:**
+    - Cash button disabled when not available
+    - Warning message shown explaining why
+    - Auto-selects MoMo when Cash unavailable
+
 - **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
   - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
   - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart
