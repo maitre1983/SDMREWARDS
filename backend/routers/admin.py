@@ -1004,7 +1004,7 @@ async def send_sms_to_client(
 async def get_merchants_debit_overview(
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Get overview of all merchant debit accounts"""
+    """Get overview of all merchant debit accounts with cash payment stats"""
     
     # Get all merchants with their debit_account info
     merchants = await db.merchants.find(
@@ -1024,14 +1024,34 @@ async def get_merchants_debit_overview(
     enriched = []
     total_debt = 0
     total_credit = 0
+    total_cash_volume = 0
+    total_cash_cashback = 0
     blocked_count = 0
     warning_count = 0
+    merchants_with_cash = 0
     
     for merchant in merchants:
+        merchant_id = merchant.get("id")
         debit_account = merchant.get("debit_account", {})
         balance = debit_account.get("balance", 0)
         debit_limit = debit_account.get("limit", 0)
         is_blocked = debit_account.get("is_blocked", False)
+        
+        # Get cash transactions for this merchant
+        cash_txs = await db.transactions.find(
+            {"merchant_id": merchant_id, "payment_method": "cash"},
+            {"_id": 0, "amount": 1, "cashback_amount": 1}
+        ).to_list(10000)
+        
+        merchant_cash_volume = sum(t.get("amount", 0) for t in cash_txs)
+        merchant_cash_cashback = sum(t.get("cashback_amount", 0) for t in cash_txs)
+        merchant_cash_count = len(cash_txs)
+        
+        total_cash_volume += merchant_cash_volume
+        total_cash_cashback += merchant_cash_cashback
+        
+        if merchant_cash_count > 0 or debit_limit > 0:
+            merchants_with_cash += 1
         
         # Calculate usage percentage
         usage_percentage = 0
@@ -1067,18 +1087,24 @@ async def get_merchants_debit_overview(
             "settlement_days": debit_account.get("settlement_period_days", 30),
             "is_blocked": is_blocked,
             "status": status,
-            "usage_percentage": round(usage_percentage, 1)
+            "usage_percentage": round(usage_percentage, 1),
+            "cash_volume": round(merchant_cash_volume, 2),
+            "cash_cashback": round(merchant_cash_cashback, 2),
+            "cash_transactions": merchant_cash_count
         })
     
-    # Sort by balance (most negative first)
-    enriched.sort(key=lambda x: x.get("balance", 0))
+    # Sort by cash volume (highest first), then by balance
+    enriched.sort(key=lambda x: (-x.get("cash_volume", 0), x.get("balance", 0)))
     
     return {
         "accounts": enriched,
         "summary": {
             "total_merchants": len(merchants),
+            "merchants_with_cash": merchants_with_cash,
             "total_debt": round(total_debt, 2),
             "total_credit": round(total_credit, 2),
+            "total_cash_volume": round(total_cash_volume, 2),
+            "total_cash_cashback": round(total_cash_cashback, 2),
             "blocked_count": blocked_count,
             "warning_count": warning_count
         }

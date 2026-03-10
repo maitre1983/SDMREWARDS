@@ -436,6 +436,18 @@ npx expo start
   - Updated backend `/api/merchants/transactions/history` to include `payment_method` field
   - Complete synchronization across Merchant ↔ Admin dashboards
 
+- **✅ Feature: Merchant Debit Settings Page Synchronization - FIXED 2026-03-10:**
+  - Fixed "Merchant Debit" tab in Admin Settings showing empty/zero data
+  - Updated `/api/admin/merchants/debit-overview` endpoint to include:
+    - Total Cash Volume (sum of all cash transactions)
+    - Total Cash Cashback distributed
+    - Merchants with Cash count
+    - Cash Volume per merchant with transaction count
+  - Auto-load data when opening Merchant Debit tab (useEffect)
+  - New columns: Cash Volume (with transaction count), Balance, Debit Limit, Usage %, Status
+  - Merchants sorted by Cash Volume (highest first)
+  - Full synchronization with debit account system
+
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
   - Issue: Back button on QR Scanner screen was not navigating back

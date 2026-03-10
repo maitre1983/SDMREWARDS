@@ -1231,6 +1231,13 @@ export default function AdminDashboard() {
     }
   }, [activeTab]);
 
+  // Load merchant debit overview when opening debit settings tab
+  useEffect(() => {
+    if (activeTab === 'settings' && settingsTab === 'debit' && pinVerified) {
+      fetchMerchantDebitOverview();
+    }
+  }, [activeTab, settingsTab, pinVerified]);
+
   // Handle tab change with PIN check
   const handleTabChange = (tab) => {
     if (tab === 'settings' && !pinVerified) {
@@ -1898,18 +1905,23 @@ export default function AdminDashboard() {
             {settingsTab === 'debit' && (
               <div className="space-y-6">
                 {/* Summary Cards */}
-                <div className="grid md:grid-cols-4 gap-4">
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                    <p className="text-slate-400 text-sm">Total Merchants</p>
-                    <p className="text-2xl font-bold text-white">{merchantDebitOverview.summary?.total_merchants || 0}</p>
+                    <p className="text-slate-400 text-sm">Merchants with Cash</p>
+                    <p className="text-2xl font-bold text-white">{merchantDebitOverview.summary?.merchants_with_cash || 0}</p>
+                    <p className="text-slate-500 text-xs">out of {merchantDebitOverview.summary?.total_merchants || 0} total</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-900/30 to-slate-900 border border-emerald-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Banknote size={16} className="text-emerald-400" />
+                      <p className="text-slate-400 text-sm">Total Cash Volume</p>
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-400">GHS {(merchantDebitOverview.summary?.total_cash_volume || 0).toLocaleString()}</p>
+                    <p className="text-slate-500 text-xs">Cashback: GHS {(merchantDebitOverview.summary?.total_cash_cashback || 0).toFixed(2)}</p>
                   </div>
                   <div className="bg-slate-800 border border-red-500/30 rounded-xl p-4">
-                    <p className="text-slate-400 text-sm">Total Debt</p>
+                    <p className="text-slate-400 text-sm">Total Debt (Owed by SDM)</p>
                     <p className="text-2xl font-bold text-red-400">GHS {merchantDebitOverview.summary?.total_debt?.toFixed(2) || '0.00'}</p>
-                  </div>
-                  <div className="bg-slate-800 border border-emerald-500/30 rounded-xl p-4">
-                    <p className="text-slate-400 text-sm">Total Credit</p>
-                    <p className="text-2xl font-bold text-emerald-400">GHS {merchantDebitOverview.summary?.total_credit?.toFixed(2) || '0.00'}</p>
                   </div>
                   <div className="bg-slate-800 border border-amber-500/30 rounded-xl p-4">
                     <p className="text-slate-400 text-sm">Blocked / Warning</p>
@@ -1934,6 +1946,7 @@ export default function AdminDashboard() {
                       <thead className="bg-slate-900 text-slate-400">
                         <tr>
                           <th className="text-left p-4">Merchant</th>
+                          <th className="text-right p-4">Cash Volume</th>
                           <th className="text-right p-4">Balance</th>
                           <th className="text-right p-4">Debit Limit</th>
                           <th className="text-center p-4">Usage</th>
@@ -1948,6 +1961,12 @@ export default function AdminDashboard() {
                               <div>
                                 <p className="text-white font-medium">{account.business_name || 'Unknown'}</p>
                                 <p className="text-slate-500 text-xs">{account.phone}</p>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div>
+                                <p className="text-emerald-400 font-semibold">GHS {account.cash_volume?.toFixed(2) || '0.00'}</p>
+                                <p className="text-slate-500 text-xs">{account.cash_transactions || 0} txns</p>
                               </div>
                             </td>
                             <td className="p-4 text-right">
@@ -2011,7 +2030,7 @@ export default function AdminDashboard() {
                           </tr>
                         )) : (
                           <tr>
-                            <td colSpan="6" className="text-center py-8 text-slate-500">
+                            <td colSpan="7" className="text-center py-8 text-slate-500">
                               {isLoadingDebit ? 'Loading...' : 'No merchant debit accounts found. Click Refresh to load.'}
                             </td>
                           </tr>
