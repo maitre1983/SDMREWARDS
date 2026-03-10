@@ -53,10 +53,18 @@ MIN_TRANSACTION_AMOUNT = 2.0
 
 # ============== REQUEST MODELS ==============
 
+# Payment method enum
+class PaymentMethod:
+    CASHBACK = "cashback"      # 100% cashback
+    MOMO = "momo"              # 100% mobile money
+    HYBRID = "hybrid"          # cashback + momo combined
+
 class AirtimeRequest(BaseModel):
     phone: str
     amount: float
     network: str  # MTN, TELECEL, AIRTELTIGO
+    payment_method: str = "cashback"  # cashback, momo, hybrid
+    momo_phone: Optional[str] = None  # Required for momo/hybrid
 
 
 class DataBundleRequest(BaseModel):
@@ -66,11 +74,15 @@ class DataBundleRequest(BaseModel):
     network: str  # MTN, TELECEL, AIRTELTIGO
     amount: float  # Price of the bundle
     display_name: str  # e.g. "1.37GB"
+    payment_method: str = "cashback"  # cashback, momo, hybrid
+    momo_phone: Optional[str] = None  # Required for momo/hybrid
 
 
 class ECGPaymentRequest(BaseModel):
     meter_number: str
     amount: float
+    payment_method: str = "cashback"  # cashback, momo, hybrid
+    momo_phone: Optional[str] = None  # Required for momo/hybrid
 
 
 class WithdrawalRequest(BaseModel):
@@ -159,12 +171,13 @@ async def debit_cashback(client_id: str, amount: float, description: str, servic
         {"$set": {"cashback_balance": new_balance, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
-    # Create transaction record
+    # Create transaction record with cashback_used tracking
     transaction = {
         "id": str(uuid.uuid4()),
         "type": service_type,
         "client_id": client_id,
         "amount": amount,
+        "cashback_used": amount,  # Track cashback used
         "description": description,
         "balance_before": current_balance,
         "balance_after": new_balance,
@@ -178,6 +191,61 @@ async def debit_cashback(client_id: str, amount: float, description: str, servic
         "balance_before": current_balance,
         "balance_after": new_balance,
         "transaction_id": transaction["id"]
+    }
+
+
+async def process_hybrid_payment(
+    client_id: str, 
+    total_amount: float, 
+    service_type: str,
+    description: str,
+    momo_phone: str = None,
+    payment_method: str = "cashback"
+) -> dict:
+    """
+    Process payment with flexible method (cashback, momo, or hybrid)
+    Returns breakdown of how the payment was made
+    """
+    client_record = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not client_record:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    cashback_balance = client_record.get("cashback_balance", 0)
+    
+    cashback_used = 0
+    momo_amount = 0
+    
+    if payment_method == "cashback":
+        # 100% cashback - must have sufficient balance
+        if cashback_balance < total_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient cashback balance. Available: GHS {cashback_balance:.2f}, Required: GHS {total_amount:.2f}"
+            )
+        cashback_used = total_amount
+        
+    elif payment_method == "momo":
+        # 100% MoMo - no cashback used
+        if not momo_phone:
+            raise HTTPException(status_code=400, detail="MoMo phone number required")
+        momo_amount = total_amount
+        
+    elif payment_method == "hybrid":
+        # Use all available cashback first, rest via MoMo
+        if not momo_phone and cashback_balance < total_amount:
+            raise HTTPException(status_code=400, detail="MoMo phone number required for hybrid payment")
+        
+        cashback_used = min(cashback_balance, total_amount)
+        momo_amount = round(total_amount - cashback_used, 2)
+    
+    return {
+        "total_amount": total_amount,
+        "cashback_used": round(cashback_used, 2),
+        "momo_amount": round(momo_amount, 2),
+        "cashback_balance_before": cashback_balance,
+        "cashback_balance_after": round(cashback_balance - cashback_used, 2),
+        "payment_method": payment_method,
+        "requires_momo": momo_amount > 0
     }
 
 

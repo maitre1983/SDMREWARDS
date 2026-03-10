@@ -172,6 +172,9 @@ export default function AdminDashboard() {
   // Global Payment Methods Stats (for Overview)
   const [globalPaymentMethods, setGlobalPaymentMethods] = useState(null);
   
+  // Cashback Ecosystem Stats (for Overview)
+  const [cashbackEcosystem, setCashbackEcosystem] = useState(null);
+  
   // Security states
   const [pinEnabled, setPinEnabled] = useState(false);
   const [pinVerified, setPinVerified] = useState(false);
@@ -308,11 +311,14 @@ export default function AdminDashboard() {
         console.error('Advanced stats fetch error:', advErr);
       }
       
-      // Fetch global payment methods stats (Cash vs MoMo)
+      // Fetch global payment methods stats (Cash vs MoMo) and cashback ecosystem
       try {
         const dashRes = await axios.get(`${API_URL}/api/admin/dashboard`, { headers });
         if (dashRes.data.payment_methods) {
           setGlobalPaymentMethods(dashRes.data.payment_methods);
+        }
+        if (dashRes.data.cashback_ecosystem) {
+          setCashbackEcosystem(dashRes.data.cashback_ecosystem);
         }
       } catch (pmErr) {
         console.error('Payment methods stats fetch error:', pmErr);
@@ -1420,6 +1426,7 @@ export default function AdminDashboard() {
             monthlyStats={monthlyStats}
             loadingMonthlyStats={loadingMonthlyStats}
             paymentMethods={globalPaymentMethods}
+            cashbackEcosystem={cashbackEcosystem}
           />
         )}
 

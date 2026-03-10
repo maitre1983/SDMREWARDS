@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Store, MapPin, Percent, CheckCircle, AlertCircle, 
-  Phone, Loader2, CreditCard, Banknote, Wallet, AlertTriangle
+  Phone, Loader2, CreditCard, Banknote, Wallet, AlertTriangle, Smartphone
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -22,15 +22,32 @@ export default function MerchantPayModal({
   onInitiatePayment,
   onCheckStatus,
   onConfirmTest,
-  onCashPayment
+  onCashPayment,
+  onCashbackPayment,  // New: for cashback payments
+  clientCashbackBalance = 0  // New: client's cashback balance
 }) {
   // Check if cash payment is available for this merchant
   const cashPaymentInfo = merchant?.cash_payment || {};
   const isCashAvailable = cashPaymentInfo.available !== false; // Default to true if not specified
   const cashUnavailableReason = cashPaymentInfo.reason;
   
-  // Default to 'momo' if cash is not available
-  const [paymentMethod, setPaymentMethod] = useState(isCashAvailable ? 'momo' : 'momo');
+  // Check if cashback payment is possible (client has enough balance)
+  const parsedAmount = parseFloat(amount) || 0;
+  const isCashbackSufficient = clientCashbackBalance >= parsedAmount;
+  
+  // Default to 'momo'
+  const [paymentMethod, setPaymentMethod] = useState('momo');
+  
+  // For hybrid payment
+  const [hybridMomoPhone, setHybridMomoPhone] = useState('');
+  
+  // Calculate payment breakdown for hybrid
+  const calculateHybridBreakdown = () => {
+    const total = parsedAmount;
+    const cashbackToUse = Math.min(clientCashbackBalance, total);
+    const momoToUse = Math.max(0, total - cashbackToUse);
+    return { cashbackToUse, momoToUse, total };
+  };
   
   // Reset to momo if cash becomes unavailable
   useEffect(() => {
@@ -46,6 +63,16 @@ export default function MerchantPayModal({
   const handlePayment = () => {
     if (paymentMethod === 'cash' && onCashPayment) {
       onCashPayment();
+    } else if (paymentMethod === 'cashback' && onCashbackPayment) {
+      onCashbackPayment({ paymentMethod: 'cashback', cashbackToUse: parsedAmount, momoToUse: 0 });
+    } else if (paymentMethod === 'hybrid' && onCashbackPayment) {
+      const breakdown = calculateHybridBreakdown();
+      onCashbackPayment({ 
+        paymentMethod: 'hybrid', 
+        cashbackToUse: breakdown.cashbackToUse, 
+        momoToUse: breakdown.momoToUse,
+        momoPhone: hybridMomoPhone
+      });
     } else {
       onInitiatePayment();
     }
@@ -157,7 +184,8 @@ export default function MerchantPayModal({
             {/* Payment Method Selector */}
             <div className="mb-5">
               <label className="text-slate-300 text-sm block mb-2">Payment Method</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                {/* MoMo */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('momo')}
@@ -168,9 +196,11 @@ export default function MerchantPayModal({
                   }`}
                   data-testid="payment-method-momo"
                 >
-                  <CreditCard size={20} />
-                  <span className="font-medium">MoMo</span>
+                  <Smartphone size={18} />
+                  <span className="font-medium text-sm">MoMo</span>
                 </button>
+                
+                {/* Cash */}
                 <button
                   type="button"
                   onClick={() => isCashAvailable && setPaymentMethod('cash')}
@@ -184,9 +214,55 @@ export default function MerchantPayModal({
                   }`}
                   data-testid="payment-method-cash"
                 >
-                  <Banknote size={20} />
-                  <span className="font-medium">Cash</span>
+                  <Banknote size={18} />
+                  <span className="font-medium text-sm">Cash</span>
                 </button>
+                
+                {/* Cashback */}
+                <button
+                  type="button"
+                  onClick={() => isCashbackSufficient && setPaymentMethod('cashback')}
+                  disabled={!isCashbackSufficient || parsedAmount <= 0}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                    !isCashbackSufficient || parsedAmount <= 0
+                      ? 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+                      : paymentMethod === 'cashback'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
+                  }`}
+                  data-testid="payment-method-cashback"
+                >
+                  <Wallet size={18} />
+                  <span className="font-medium text-sm">Cashback</span>
+                </button>
+                
+                {/* Hybrid */}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('hybrid')}
+                  disabled={parsedAmount <= 0 || clientCashbackBalance <= 0}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                    parsedAmount <= 0 || clientCashbackBalance <= 0
+                      ? 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
+                      : paymentMethod === 'hybrid'
+                        ? 'bg-purple-500/20 border-purple-500 text-purple-400'
+                        : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-600'
+                  }`}
+                  data-testid="payment-method-hybrid"
+                >
+                  <div className="flex items-center gap-0.5">
+                    <Wallet size={14} />
+                    <span>+</span>
+                    <Smartphone size={14} />
+                  </div>
+                  <span className="font-medium text-sm">Hybrid</span>
+                </button>
+              </div>
+              
+              {/* Cashback Balance Display */}
+              <div className="mt-3 bg-slate-900 rounded-lg p-2 flex justify-between items-center">
+                <span className="text-slate-400 text-xs">Your Cashback Balance</span>
+                <span className="text-amber-400 font-bold text-sm">GHS {clientCashbackBalance.toFixed(2)}</span>
               </div>
               
               {/* Cash unavailable warning */}
@@ -196,6 +272,21 @@ export default function MerchantPayModal({
                   <p className="text-amber-400 text-xs">
                     {cashUnavailableReason || "Cash payment not available for this merchant"}
                   </p>
+                </div>
+              )}
+              
+              {/* Hybrid Payment Breakdown */}
+              {paymentMethod === 'hybrid' && parsedAmount > 0 && (
+                <div className="mt-3 bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 space-y-2">
+                  <p className="text-purple-400 text-xs font-medium">Payment Breakdown:</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-amber-400 flex items-center gap-1"><Wallet size={14} /> Cashback</span>
+                    <span className="text-amber-400">GHS {calculateHybridBreakdown().cashbackToUse.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-blue-400 flex items-center gap-1"><Smartphone size={14} /> MoMo</span>
+                    <span className="text-blue-400">GHS {calculateHybridBreakdown().momoToUse.toFixed(2)}</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -251,6 +342,45 @@ export default function MerchantPayModal({
                 </div>
               </>
             )}
+            
+            {/* Hybrid-specific fields (MoMo for remaining amount) */}
+            {paymentMethod === 'hybrid' && calculateHybridBreakdown().momoToUse > 0 && (
+              <>
+                {/* Phone Input for Hybrid */}
+                <div className="mb-4">
+                  <label className="text-slate-300 text-sm block mb-2">MoMo Number (for GHS {calculateHybridBreakdown().momoToUse.toFixed(2)})</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                    <Input
+                      type="tel"
+                      placeholder="+233 XX XXX XXXX"
+                      value={hybridMomoPhone}
+                      onChange={(e) => setHybridMomoPhone(e.target.value)}
+                      className="pl-10 bg-slate-900 border-slate-700 text-white"
+                      data-testid="hybrid-pay-phone"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {/* Cashback Payment Info */}
+            {paymentMethod === 'cashback' && (
+              <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Wallet className="text-amber-400 shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <p className="text-amber-400 font-medium text-sm">Pay with Cashback</p>
+                    <p className="text-slate-400 text-xs mt-1">
+                      GHS {parsedAmount.toFixed(2)} will be deducted from your cashback balance.
+                    </p>
+                    <p className="text-amber-400 text-xs mt-1">
+                      Balance after: GHS {(clientCashbackBalance - parsedAmount).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Cash Payment Info */}
             {paymentMethod === 'cash' && (
@@ -268,7 +398,7 @@ export default function MerchantPayModal({
             )}
             
             {/* Cashback Preview */}
-            {amount && parseFloat(amount) > 0 && (
+            {amount && parseFloat(amount) > 0 && paymentMethod !== 'cashback' && (
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">You'll earn</span>
@@ -282,11 +412,22 @@ export default function MerchantPayModal({
             {/* Pay Button */}
             <Button
               onClick={handlePayment}
-              disabled={isProcessing || !amount || parseFloat(amount) <= 0 || (paymentMethod === 'momo' && !phone)}
+              disabled={
+                isProcessing || 
+                !amount || 
+                parseFloat(amount) <= 0 || 
+                (paymentMethod === 'momo' && !phone) ||
+                (paymentMethod === 'cashback' && !isCashbackSufficient) ||
+                (paymentMethod === 'hybrid' && calculateHybridBreakdown().momoToUse > 0 && hybridMomoPhone.length < 10)
+              }
               className={`w-full py-6 ${
                 paymentMethod === 'cash'
                   ? 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600'
-                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600'
+                  : paymentMethod === 'cashback'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600'
+                    : paymentMethod === 'hybrid'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600'
+                      : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600'
               }`}
               data-testid="merchant-pay-submit"
             >
@@ -294,10 +435,21 @@ export default function MerchantPayModal({
                 <Loader2 className="animate-spin mr-2" size={18} />
               ) : paymentMethod === 'cash' ? (
                 <Banknote className="mr-2" size={18} />
+              ) : paymentMethod === 'cashback' ? (
+                <Wallet className="mr-2" size={18} />
+              ) : paymentMethod === 'hybrid' ? (
+                <div className="flex items-center mr-2"><Wallet size={16} /><span className="mx-1">+</span><Smartphone size={16} /></div>
               ) : (
-                <CreditCard className="mr-2" size={18} />
+                <Smartphone className="mr-2" size={18} />
               )}
-              {paymentMethod === 'cash' ? 'Record Cash Payment' : 'Pay with MoMo'}
+              {paymentMethod === 'cash' 
+                ? 'Record Cash Payment' 
+                : paymentMethod === 'cashback'
+                  ? 'Pay with Cashback'
+                  : paymentMethod === 'hybrid'
+                    ? `Pay (GHS ${calculateHybridBreakdown().cashbackToUse.toFixed(2)} CB + GHS ${calculateHybridBreakdown().momoToUse.toFixed(2)} MoMo)`
+                    : 'Pay with MoMo'
+              }
             </Button>
           </>
         )}

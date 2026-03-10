@@ -133,6 +133,59 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
     all_cash_volume = sum(t.get("amount", 0) for t in all_cash_txs)
     all_total_volume = all_momo_volume + all_cash_volume
     
+    # ============== CASHBACK ECOSYSTEM STATS ==============
+    # 1. Total Cashback Distributed - sum of all cashback awarded to clients
+    all_client_transactions = await db.transactions.find(
+        {"cashback_amount": {"$gt": 0}},
+        {"_id": 0, "cashback_amount": 1}
+    ).to_list(100000)
+    total_cashback_distributed = sum(t.get("cashback_amount", 0) for t in all_client_transactions)
+    
+    # Add referral bonuses to distributed cashback
+    referral_txs = await db.transactions.find(
+        {"type": "referral_bonus"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    total_referral_bonus = sum(t.get("amount", 0) for t in referral_txs if t.get("amount", 0) > 0)
+    
+    # Add welcome bonuses
+    welcome_txs = await db.transactions.find(
+        {"type": "welcome_bonus"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    total_welcome_bonus = sum(t.get("amount", 0) for t in welcome_txs if t.get("amount", 0) > 0)
+    
+    # 2. Total Cashback Used - sum of all cashback spent by clients on services/payments
+    # Services from service_transactions collection: airtime, data_bundle, ecg_payment, withdrawal
+    service_txs = await db.service_transactions.find(
+        {"status": "completed"},
+        {"_id": 0, "total_deducted": 1, "amount": 1}
+    ).to_list(100000)
+    cashback_used_services = sum(t.get("total_deducted", t.get("amount", 0)) for t in service_txs)
+    
+    # Payments at merchants using cashback - look for negative amounts (cashback deductions)
+    # Or transactions where cashback was used (upgrade_payment_partial, etc.)
+    cashback_deduction_txs = await db.transactions.find(
+        {"$or": [
+            {"type": "upgrade_payment_partial"},
+            {"type": "cashback_payment"},
+            {"payment_method": "cashback"}
+        ]},
+        {"_id": 0, "amount": 1, "cashback_used": 1}
+    ).to_list(100000)
+    # Sum absolute values of negative amounts (cashback spent)
+    cashback_used_payments = sum(abs(t.get("amount", 0)) for t in cashback_deduction_txs if t.get("amount", 0) < 0)
+    cashback_used_payments += sum(t.get("cashback_used", 0) for t in cashback_deduction_txs if t.get("cashback_used", 0) > 0)
+    
+    # Total cashback used
+    total_cashback_used = cashback_used_services + cashback_used_payments
+    
+    # Total awarded (distributed + bonuses)
+    total_awarded = total_cashback_distributed + total_referral_bonus + total_welcome_bonus
+    
+    # 3. Cashback Remaining in ecosystem
+    cashback_remaining = total_awarded - total_cashback_used
+    
     return {
         "stats": {
             "total_clients": total_clients,
@@ -146,6 +199,16 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
             "total_revenue": total_revenue,
             "total_card_revenue": total_card_revenue,
             "card_type_stats": card_type_stats
+        },
+        "cashback_ecosystem": {
+            "total_distributed": round(total_cashback_distributed, 2),
+            "referral_bonus": round(total_referral_bonus, 2),
+            "welcome_bonus": round(total_welcome_bonus, 2),
+            "total_awarded": round(total_awarded, 2),
+            "total_used": round(total_cashback_used, 2),
+            "used_services": round(cashback_used_services, 2),
+            "used_payments": round(cashback_used_payments, 2),
+            "remaining": round(max(0, cashback_remaining), 2)
         },
         "payment_methods": {
             "today": {

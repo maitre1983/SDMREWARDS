@@ -448,6 +448,21 @@ npx expo start
   - Merchants sorted by Cash Volume (highest first)
   - Full synchronization with debit account system
 
+- **🚧 IN PROGRESS: Flexible Payment Methods (Cashback/MoMo/Hybrid) - 2026-03-10:**
+  - **Goal**: Allow clients to pay with 100% Cashback, 100% MoMo, or Hybrid (Cashback + MoMo)
+  - **Backend Changes Done**:
+    - Added `payment_method` and `momo_phone` fields to service request models (AirtimeRequest, DataBundleRequest, ECGPaymentRequest)
+    - Added `process_hybrid_payment()` helper function for calculating payment breakdown
+    - Created new endpoint `POST /api/payments/merchant/cashback` for cashback/hybrid merchant payments
+    - Updated Admin Dashboard `/api/admin/dashboard` to include `cashback_ecosystem` stats
+  - **Frontend Changes Done**:
+    - Added Payment Method selector (3 buttons: Cashback, MoMo, Hybrid) to ServicesPage.jsx
+    - Added `calculatePaymentBreakdown()` function for showing payment breakdown
+    - Modified MerchantPayModal.jsx to support 4 payment methods (MoMo, Cash, Cashback, Hybrid)
+    - Added `clientCashbackBalance` prop and `onCashbackPayment` callback
+    - Added new UI section "Cashback Ecosystem" to Admin Overview showing Total Awarded, Total Used, Remaining, Usage Rate
+  - **Testing Required**: Full end-to-end testing with testing agent needed to validate all payment flows
+
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
   - Issue: Back button on QR Scanner screen was not navigating back

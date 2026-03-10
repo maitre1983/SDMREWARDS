@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Users, Store, CreditCard, Activity, TrendingUp, Gift, UserPlus,
   Medal, Award, Crown, DollarSign, Star, BarChart3, Loader2,
-  Banknote, Smartphone
+  Banknote, Smartphone, Wallet, ArrowDownRight, ArrowUpRight
 } from 'lucide-react';
 import ServiceFeesAnalytics from './ServiceFeesAnalytics';
 
@@ -17,7 +17,8 @@ export default function AdminOverview({
   setSelectedMonth,
   monthlyStats,
   loadingMonthlyStats,
-  paymentMethods  // New prop for payment methods stats
+  paymentMethods,  // Payment methods stats
+  cashbackEcosystem  // Cashback ecosystem stats
 }) {
   return (
     <div className="space-y-6">
@@ -123,6 +124,87 @@ export default function AdminOverview({
           <p className="text-amber-400 text-xs mt-2">{advancedStats?.referral_stats?.successful_referrals || 0} successful referrals</p>
         </div>
       </div>
+
+      {/* Cashback Ecosystem Stats */}
+      {cashbackEcosystem && (
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <Wallet size={20} className="text-purple-400" />
+            Cashback Ecosystem
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Total Awarded */}
+            <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 border border-purple-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Gift className="text-purple-400" size={20} />
+                <span className="text-purple-400 text-sm font-medium">Total Awarded</span>
+              </div>
+              <p className="text-2xl font-bold text-white">GHS {(cashbackEcosystem.total_awarded || 0).toLocaleString()}</p>
+              <p className="text-slate-400 text-xs mt-1">
+                Cashback: GHS {(cashbackEcosystem.total_distributed || 0).toLocaleString()}
+              </p>
+              <p className="text-slate-400 text-xs">
+                Referrals: GHS {(cashbackEcosystem.referral_bonus || 0).toLocaleString()}
+              </p>
+            </div>
+            
+            {/* Total Used */}
+            <div className="bg-gradient-to-br from-red-900/40 to-slate-900 border border-red-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowUpRight className="text-red-400" size={20} />
+                <span className="text-red-400 text-sm font-medium">Total Used</span>
+              </div>
+              <p className="text-2xl font-bold text-white">GHS {(cashbackEcosystem.total_used || 0).toLocaleString()}</p>
+              <p className="text-slate-400 text-xs mt-1">
+                Services: GHS {(cashbackEcosystem.used_services || 0).toLocaleString()}
+              </p>
+              <p className="text-slate-400 text-xs">
+                Payments: GHS {(cashbackEcosystem.used_payments || 0).toLocaleString()}
+              </p>
+            </div>
+            
+            {/* Remaining */}
+            <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Wallet className="text-emerald-400" size={20} />
+                <span className="text-emerald-400 text-sm font-medium">Remaining</span>
+              </div>
+              <p className="text-2xl font-bold text-emerald-400">GHS {(cashbackEcosystem.remaining || 0).toLocaleString()}</p>
+              <p className="text-slate-400 text-xs mt-1">
+                In user wallets
+              </p>
+              <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-full transition-all"
+                  style={{ width: `${cashbackEcosystem.total_awarded > 0 ? Math.min(100, (cashbackEcosystem.remaining / cashbackEcosystem.total_awarded) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+            
+            {/* Usage Rate */}
+            <div className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="text-blue-400" size={20} />
+                <span className="text-blue-400 text-sm font-medium">Usage Rate</span>
+              </div>
+              <p className="text-2xl font-bold text-white">
+                {cashbackEcosystem.total_awarded > 0 
+                  ? Math.round((cashbackEcosystem.total_used / cashbackEcosystem.total_awarded) * 100) 
+                  : 0}%
+              </p>
+              <p className="text-slate-400 text-xs mt-1">
+                Cashback utilization
+              </p>
+              <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-full transition-all"
+                  style={{ width: `${cashbackEcosystem.total_awarded > 0 ? Math.min(100, (cashbackEcosystem.total_used / cashbackEcosystem.total_awarded) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Methods Breakdown (Global Cash vs MoMo) */}
       {paymentMethods && (

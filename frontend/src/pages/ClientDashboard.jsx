@@ -631,6 +631,72 @@ export default function ClientDashboard() {
     }
   };
 
+  // ============== CASHBACK PAYMENT TO MERCHANT ==============
+  
+  const initiateCashbackPayment = async ({ paymentMethod, cashbackToUse, momoToUse, momoPhone }) => {
+    const amount = parseFloat(merchantPayAmount);
+    if (!amount || amount < 1) {
+      toast.error('Minimum payment is GHS 1');
+      return;
+    }
+    
+    if (!selectedMerchant?.payment_qr_code) {
+      toast.error('Merchant QR code not found');
+      return;
+    }
+    
+    // Validate based on payment method
+    if (paymentMethod === 'cashback') {
+      if (cashbackToUse > (client?.cashback_balance || 0)) {
+        toast.error('Insufficient cashback balance');
+        return;
+      }
+    } else if (paymentMethod === 'hybrid' && momoToUse > 0) {
+      if (!momoPhone || momoPhone.length < 10) {
+        toast.error('Please enter a valid MoMo phone number');
+        return;
+      }
+    }
+    
+    setIsProcessingPayment(true);
+    setMerchantPayStatus('processing');
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/merchant/cashback`, {
+        client_phone: client?.phone,
+        merchant_qr_code: selectedMerchant?.payment_qr_code,
+        amount: amount,
+        payment_method: paymentMethod,
+        cashback_to_use: cashbackToUse,
+        momo_amount: momoToUse,
+        momo_phone: momoPhone || null
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data.success) {
+        setMerchantPayStatus('success');
+        const earnedCashback = res.data.cashback_earned || 0;
+        if (paymentMethod === 'cashback') {
+          toast.success(`Payment successful! GHS ${cashbackToUse.toFixed(2)} deducted from your cashback.${earnedCashback > 0 ? ` You earned GHS ${earnedCashback.toFixed(2)} cashback!` : ''}`);
+        } else if (paymentMethod === 'hybrid') {
+          toast.success(`Payment successful! GHS ${cashbackToUse.toFixed(2)} cashback + GHS ${momoToUse.toFixed(2)} MoMo.${earnedCashback > 0 ? ` You earned GHS ${earnedCashback.toFixed(2)} cashback!` : ''}`);
+        }
+        
+        // Refresh dashboard data after a short delay
+        setTimeout(() => {
+          fetchDashboardData();
+          closeMerchantPayModal();
+        }, 2000);
+      }
+    } catch (error) {
+      setMerchantPayStatus('failed');
+      toast.error(error.response?.data?.detail || 'Payment failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   // ============== REFERRAL SHARING ==============
 
   const copyReferralCode = () => {
@@ -1855,6 +1921,8 @@ export default function ClientDashboard() {
           onCheckStatus={checkMerchantPaymentStatus}
           onConfirmTest={confirmMerchantTestPayment}
           onCashPayment={initiateCashPayment}
+          onCashbackPayment={initiateCashbackPayment}
+          clientCashbackBalance={client?.cashback_balance || 0}
         />
       )}
       {/* ============== WITHDRAWAL MODAL ============== */}

@@ -4,7 +4,7 @@ SDM REWARDS - Payment Router
 Handles MoMo payment collection for VIP cards and merchant payments
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict
 from datetime import datetime, timezone, timedelta
@@ -12,6 +12,9 @@ import uuid
 import os
 import httpx
 import logging
+
+# Import auth dependency
+from routers.auth import get_current_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -651,6 +654,165 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
         "status": "completed",
         "payment_method": "cash",
         "message": f"Cash payment recorded! GHS {cashback_amount} cashback credited to your wallet."
+    }
+
+
+# ============== CASHBACK PAYMENT ENDPOINT ==============
+
+class CashbackPaymentRequest(BaseModel):
+    client_phone: str
+    merchant_qr_code: str
+    amount: float
+    payment_method: str  # "cashback" or "hybrid"
+    cashback_to_use: float
+    momo_amount: float = 0
+    momo_phone: Optional[str] = None
+
+
+@router.post("/merchant/cashback")
+async def process_cashback_merchant_payment(
+    request: CashbackPaymentRequest,
+    current_user: dict = Depends(get_current_client)
+):
+    """
+    Process payment to merchant using cashback (full or hybrid).
+    
+    Payment methods:
+    - cashback: 100% payment from client's cashback balance
+    - hybrid: Part cashback + part MoMo
+    
+    Flow:
+    1. Deduct cashback from client's balance
+    2. If hybrid, initiate MoMo payment for remaining
+    3. Credit merchant (no debit account impact for cashback)
+    4. Award new cashback based on merchant rate (only on MoMo portion)
+    """
+    if request.amount < 1:
+        raise HTTPException(status_code=400, detail="Minimum payment is GHS 1")
+    
+    # Find client by their authenticated ID
+    client = await db.clients.find_one({"id": current_user["id"]}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    if client.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Please purchase a membership card first")
+    
+    current_cashback = client.get("cashback_balance", 0)
+    
+    # Validate cashback usage
+    if request.cashback_to_use > current_cashback:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient cashback balance. Available: GHS {current_cashback:.2f}"
+        )
+    
+    if request.cashback_to_use + request.momo_amount < request.amount:
+        raise HTTPException(
+            status_code=400,
+            detail="Payment amounts don't add up to the total"
+        )
+    
+    # Find merchant by QR code
+    merchant = await db.merchants.find_one({"payment_qr_code": request.merchant_qr_code}, {"_id": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    if merchant.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Merchant is not active")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    transaction_id = str(uuid.uuid4())
+    payment_ref = f"SDM-CB-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
+    
+    # Calculate cashback earned (only on MoMo portion, not on cashback portion)
+    # When paying with cashback, you don't earn cashback on that portion
+    cashback_rate = merchant.get("cashback_rate", 5) / 100
+    momo_portion = request.momo_amount if request.payment_method == "hybrid" else 0
+    cashback_earned = round(momo_portion * cashback_rate * 0.95, 2)
+    sdm_commission = round(momo_portion * cashback_rate * 0.05, 2) if momo_portion > 0 else 0
+    
+    # 1. Deduct cashback from client's balance
+    new_cashback_balance = round(current_cashback - request.cashback_to_use + cashback_earned, 2)
+    await db.clients.update_one(
+        {"id": client["id"]},
+        {"$set": {"cashback_balance": new_cashback_balance, "updated_at": now}}
+    )
+    
+    # 2. Create main transaction (synced for Client, Merchant, Admin)
+    transaction = {
+        "id": transaction_id,
+        "reference": payment_ref,
+        "type": "payment",
+        "payment_method": request.payment_method,  # "cashback" or "hybrid"
+        "client_id": client["id"],
+        "client_phone": client.get("phone"),
+        "client_name": client.get("full_name"),
+        "merchant_id": merchant["id"],
+        "merchant_name": merchant.get("business_name"),
+        "amount": request.amount,
+        "cashback_used": request.cashback_to_use,  # Track cashback spent
+        "momo_amount": request.momo_amount,
+        "cashback_rate": merchant.get("cashback_rate", 5),
+        "cashback_amount": cashback_earned,  # New cashback earned
+        "sdm_commission": sdm_commission,
+        "status": "completed",
+        "description": f"{'Cashback' if request.payment_method == 'cashback' else 'Hybrid'} payment at {merchant['business_name']}",
+        "created_at": now
+    }
+    
+    await db.transactions.insert_one(transaction)
+    
+    # 3. Update merchant stats (payment_volume)
+    await db.merchants.update_one(
+        {"id": merchant["id"]},
+        {
+            "$inc": {"stats.total_payments": 1, "stats.total_volume": request.amount},
+            "$set": {"updated_at": now}
+        }
+    )
+    
+    # 4. Record client wallet transaction for cashback spent
+    if request.cashback_to_use > 0:
+        await db.wallet_transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "client_id": client["id"],
+            "type": "cashback_payment",
+            "amount": -request.cashback_to_use,
+            "balance_after": new_cashback_balance - cashback_earned,
+            "description": f"Cashback used for payment at {merchant['business_name']}",
+            "reference": payment_ref,
+            "created_at": now
+        })
+    
+    # 5. If earned new cashback, record it
+    if cashback_earned > 0:
+        await db.wallet_transactions.insert_one({
+            "id": str(uuid.uuid4()),
+            "client_id": client["id"],
+            "type": "cashback_earned",
+            "amount": cashback_earned,
+            "balance_after": new_cashback_balance,
+            "description": f"Cashback from payment at {merchant['business_name']}",
+            "reference": payment_ref,
+            "created_at": now
+        })
+    
+    logger.info(f"Cashback payment completed: {payment_ref}, method={request.payment_method}, amount={request.amount}, cashback_used={request.cashback_to_use}, cashback_earned={cashback_earned}")
+    
+    return {
+        "success": True,
+        "payment_id": transaction_id,
+        "reference": payment_ref,
+        "amount": request.amount,
+        "merchant": merchant["business_name"],
+        "payment_method": request.payment_method,
+        "cashback_used": request.cashback_to_use,
+        "momo_paid": request.momo_amount,
+        "cashback_earned": cashback_earned,
+        "new_balance": new_cashback_balance,
+        "status": "completed",
+        "message": f"Payment successful! {'Cashback used: GHS ' + str(request.cashback_to_use) if request.cashback_to_use > 0 else ''}{' + MoMo: GHS ' + str(request.momo_amount) if request.momo_amount > 0 else ''}."
     }
 
 
