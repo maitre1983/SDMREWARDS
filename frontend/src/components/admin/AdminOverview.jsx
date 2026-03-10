@@ -132,27 +132,12 @@ export default function AdminOverview({
             <Wallet size={20} className="text-purple-400" />
             Cashback Ecosystem
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Total Awarded */}
-            <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 border border-purple-500/30 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Gift className="text-purple-400" size={20} />
-                <span className="text-purple-400 text-sm font-medium">Total Awarded</span>
-              </div>
-              <p className="text-2xl font-bold text-white">GHS {(cashbackEcosystem.total_awarded || 0).toLocaleString()}</p>
-              <p className="text-slate-400 text-xs mt-1">
-                Cashback: GHS {(cashbackEcosystem.total_distributed || 0).toLocaleString()}
-              </p>
-              <p className="text-slate-400 text-xs">
-                Referrals: GHS {(cashbackEcosystem.referral_bonus || 0).toLocaleString()}
-              </p>
-            </div>
-            
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Total Used */}
             <div className="bg-gradient-to-br from-red-900/40 to-slate-900 border border-red-500/30 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <ArrowUpRight className="text-red-400" size={20} />
-                <span className="text-red-400 text-sm font-medium">Total Used</span>
+                <span className="text-red-400 text-sm font-medium">Total Cashback Used</span>
               </div>
               <p className="text-2xl font-bold text-white">GHS {(cashbackEcosystem.total_used || 0).toLocaleString()}</p>
               <p className="text-slate-400 text-xs mt-1">
@@ -167,7 +152,7 @@ export default function AdminOverview({
             <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-500/30 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Wallet className="text-emerald-400" size={20} />
-                <span className="text-emerald-400 text-sm font-medium">Remaining</span>
+                <span className="text-emerald-400 text-sm font-medium">Cashback Remaining</span>
               </div>
               <p className="text-2xl font-bold text-emerald-400">GHS {(cashbackEcosystem.remaining || 0).toLocaleString()}</p>
               <p className="text-slate-400 text-xs mt-1">
@@ -176,7 +161,7 @@ export default function AdminOverview({
               <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
                 <div 
                   className="bg-emerald-500 h-full transition-all"
-                  style={{ width: `${cashbackEcosystem.total_awarded > 0 ? Math.min(100, (cashbackEcosystem.remaining / cashbackEcosystem.total_awarded) * 100) : 0}%` }}
+                  style={{ width: `${cashbackEcosystem.total_distributed > 0 ? Math.min(100, (cashbackEcosystem.remaining / cashbackEcosystem.total_distributed) * 100) : 0}%` }}
                 />
               </div>
             </div>
@@ -188,8 +173,8 @@ export default function AdminOverview({
                 <span className="text-blue-400 text-sm font-medium">Usage Rate</span>
               </div>
               <p className="text-2xl font-bold text-white">
-                {cashbackEcosystem.total_awarded > 0 
-                  ? Math.round((cashbackEcosystem.total_used / cashbackEcosystem.total_awarded) * 100) 
+                {cashbackEcosystem.total_distributed > 0 
+                  ? Math.round((cashbackEcosystem.total_used / cashbackEcosystem.total_distributed) * 100) 
                   : 0}%
               </p>
               <p className="text-slate-400 text-xs mt-1">
@@ -198,7 +183,7 @@ export default function AdminOverview({
               <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
                 <div 
                   className="bg-blue-500 h-full transition-all"
-                  style={{ width: `${cashbackEcosystem.total_awarded > 0 ? Math.min(100, (cashbackEcosystem.total_used / cashbackEcosystem.total_awarded) * 100) : 0}%` }}
+                  style={{ width: `${cashbackEcosystem.total_distributed > 0 ? Math.min(100, (cashbackEcosystem.total_used / cashbackEcosystem.total_distributed) * 100) : 0}%` }}
                 />
               </div>
             </div>

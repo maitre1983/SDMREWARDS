@@ -202,13 +202,10 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
         },
         "cashback_ecosystem": {
             "total_distributed": round(total_cashback_distributed, 2),
-            "referral_bonus": round(total_referral_bonus, 2),
-            "welcome_bonus": round(total_welcome_bonus, 2),
-            "total_awarded": round(total_awarded, 2),
             "total_used": round(total_cashback_used, 2),
             "used_services": round(cashback_used_services, 2),
             "used_payments": round(cashback_used_payments, 2),
-            "remaining": round(max(0, cashback_remaining), 2)
+            "remaining": round(max(0, total_cashback_distributed - total_cashback_used), 2)
         },
         "payment_methods": {
             "today": {
