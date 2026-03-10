@@ -941,42 +941,77 @@ async def get_merchants_debit_overview(
 ):
     """Get overview of all merchant debit accounts"""
     
-    # Get all debit accounts
-    debit_accounts = await db.merchant_debit_accounts.find({}, {"_id": 0}).to_list(10000)
+    # Get all merchants with their debit_account info
+    merchants = await db.merchants.find(
+        {"status": "active"},
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "owner_name": 1,
+            "phone": 1,
+            "status": 1,
+            "debit_account": 1
+        }
+    ).to_list(10000)
     
-    # Enrich with merchant info
+    # Enrich and calculate stats
     enriched = []
-    for account in debit_accounts:
-        merchant = await db.merchants.find_one(
-            {"id": account.get("merchant_id")},
-            {"_id": 0, "business_name": 1, "owner_name": 1, "phone": 1, "status": 1}
-        )
-        if merchant:
-            balance = account.get("balance", 0)
-            debit_limit = account.get("debit_limit", 0)
-            usage_percentage = 0
-            if debit_limit > 0 and balance < 0:
-                usage_percentage = min(100, abs(balance) / debit_limit * 100)
-            
-            enriched.append({
-                **account,
-                "merchant": merchant,
-                "usage_percentage": round(usage_percentage, 1)
-            })
+    total_debt = 0
+    total_credit = 0
+    blocked_count = 0
+    warning_count = 0
+    
+    for merchant in merchants:
+        debit_account = merchant.get("debit_account", {})
+        balance = debit_account.get("balance", 0)
+        debit_limit = debit_account.get("limit", 0)
+        is_blocked = debit_account.get("is_blocked", False)
+        
+        # Calculate usage percentage
+        usage_percentage = 0
+        if debit_limit > 0:
+            usage_percentage = min(100, abs(balance) / debit_limit * 100)
+        
+        # Determine status
+        status = "not_configured"
+        if debit_limit > 0:
+            if is_blocked:
+                status = "blocked"
+                blocked_count += 1
+            elif usage_percentage >= 75:
+                status = "warning"
+                warning_count += 1
+            else:
+                status = "active"
+        
+        # Count debt and credit
+        if balance < 0:
+            total_debt += abs(balance)
+        else:
+            total_credit += balance
+        
+        enriched.append({
+            "merchant_id": merchant.get("id"),
+            "business_name": merchant.get("business_name"),
+            "owner_name": merchant.get("owner_name"),
+            "phone": merchant.get("phone"),
+            "merchant_status": merchant.get("status"),
+            "balance": round(balance, 2),
+            "debit_limit": round(debit_limit, 2),
+            "settlement_days": debit_account.get("settlement_period_days", 30),
+            "is_blocked": is_blocked,
+            "status": status,
+            "usage_percentage": round(usage_percentage, 1)
+        })
     
     # Sort by balance (most negative first)
     enriched.sort(key=lambda x: x.get("balance", 0))
     
-    # Calculate totals
-    total_debt = sum(abs(a.get("balance", 0)) for a in enriched if a.get("balance", 0) < 0)
-    total_credit = sum(a.get("balance", 0) for a in enriched if a.get("balance", 0) > 0)
-    blocked_count = sum(1 for a in enriched if a.get("status") == "blocked")
-    warning_count = sum(1 for a in enriched if a.get("status") == "warning")
-    
     return {
         "accounts": enriched,
         "summary": {
-            "total_merchants": len(enriched),
+            "total_merchants": len(merchants),
             "total_debt": round(total_debt, 2),
             "total_credit": round(total_credit, 2),
             "blocked_count": blocked_count,
@@ -1423,24 +1458,21 @@ async def update_merchant_debit_settings(
     
     now = datetime.now(timezone.utc).isoformat()
     
-    # Update or create debit account
-    result = await db.merchant_debit_accounts.update_one(
-        {"merchant_id": merchant_id},
+    # Get current debit account or initialize
+    current_debit = merchant.get("debit_account", {})
+    
+    # Update merchant's debit_account directly
+    result = await db.merchants.update_one(
+        {"id": merchant_id},
         {
             "$set": {
-                "debit_limit": request.debit_limit,
-                "settlement_days": request.settlement_days,
+                "debit_account.limit": request.debit_limit,
+                "debit_account.settlement_period_days": request.settlement_days,
+                "debit_account.balance": current_debit.get("balance", 0),
+                "debit_account.is_blocked": current_debit.get("is_blocked", False),
                 "updated_at": now
-            },
-            "$setOnInsert": {
-                "id": str(uuid.uuid4()),
-                "merchant_id": merchant_id,
-                "balance": 0.0,
-                "status": "active",
-                "created_at": now
             }
-        },
-        upsert=True
+        }
     )
     
     # Log action
@@ -1449,6 +1481,7 @@ async def update_merchant_debit_settings(
         "admin_id": current_admin["id"],
         "action": "update_merchant_debit_settings",
         "target_id": merchant_id,
+        "target_name": merchant.get("business_name"),
         "changes": {
             "debit_limit": request.debit_limit,
             "settlement_days": request.settlement_days
@@ -1466,7 +1499,7 @@ async def update_merchant_debit_settings(
     except Exception as e:
         logger.error(f"Failed to send debit settings SMS: {e}")
     
-    return {"success": True, "message": "Debit settings updated"}
+    return {"success": True, "message": f"Debit limit set to GHS {request.debit_limit:.2f}"}
 
 
 @router.post("/merchants/{merchant_id}/debit-adjust")
@@ -1486,20 +1519,24 @@ async def adjust_merchant_debit_balance(
     
     now = datetime.now(timezone.utc).isoformat()
     
-    # Get current account
-    debit_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
-    if not debit_account:
-        raise HTTPException(status_code=404, detail="Debit account not found. Please set debit limit first.")
-    
+    # Get current balance
+    debit_account = merchant.get("debit_account", {})
     current_balance = debit_account.get("balance", 0)
+    debit_limit = debit_account.get("limit", 0)
+    
+    if debit_limit == 0:
+        raise HTTPException(status_code=400, detail="Debit account not configured. Please set debit limit first.")
+    
     new_balance = current_balance + request.amount
     
-    # Update balance
-    await db.merchant_debit_accounts.update_one(
-        {"merchant_id": merchant_id},
+    # Update balance in merchants collection
+    await db.merchants.update_one(
+        {"id": merchant_id},
         {
-            "$inc": {"balance": request.amount},
-            "$set": {"updated_at": now}
+            "$set": {
+                "debit_account.balance": new_balance,
+                "updated_at": now
+            }
         }
     )
     
@@ -1515,7 +1552,7 @@ async def adjust_merchant_debit_balance(
         "description": f"Admin adjustment: {request.description}",
         "created_at": now
     }
-    await db.merchant_debit_ledger.insert_one(ledger_entry)
+    await db.debit_ledger.insert_one(ledger_entry)
     
     # Log action
     await db.admin_logs.insert_one({
@@ -1523,6 +1560,7 @@ async def adjust_merchant_debit_balance(
         "admin_id": current_admin["id"],
         "action": "adjust_merchant_debit_balance",
         "target_id": merchant_id,
+        "target_name": merchant.get("business_name"),
         "changes": {
             "amount": request.amount,
             "description": request.description,
@@ -1554,13 +1592,16 @@ async def unblock_merchant_debit_account(
     
     now = datetime.now(timezone.utc).isoformat()
     
-    result = await db.merchant_debit_accounts.update_one(
-        {"merchant_id": merchant_id},
-        {"$set": {"status": "active", "updated_at": now}}
-    )
+    # Check if blocked
+    debit_account = merchant.get("debit_account", {})
+    if not debit_account.get("is_blocked", False):
+        raise HTTPException(status_code=400, detail="Debit account is not blocked")
     
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Debit account not found or already active")
+    # Unblock in merchants collection
+    await db.merchants.update_one(
+        {"id": merchant_id},
+        {"$set": {"debit_account.is_blocked": False, "updated_at": now}}
+    )
     
     # Log action
     await db.admin_logs.insert_one({
@@ -1568,6 +1609,7 @@ async def unblock_merchant_debit_account(
         "admin_id": current_admin["id"],
         "action": "unblock_merchant_debit_account",
         "target_id": merchant_id,
+        "target_name": merchant.get("business_name"),
         "created_at": now
     })
     

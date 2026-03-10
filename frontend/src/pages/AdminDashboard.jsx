@@ -919,14 +919,21 @@ export default function AdminDashboard() {
     if (!selectedMerchantDebit) return;
     try {
       const headers = getHeaders();
+      // Use merchant_id from debit overview list OR id from merchant details
+      const merchantId = selectedMerchantDebit.merchant_id || selectedMerchantDebit.id;
       await axios.put(
-        `${API_URL}/api/admin/merchants/${selectedMerchantDebit.merchant_id}/debit-settings`,
+        `${API_URL}/api/admin/merchants/${merchantId}/debit-settings`,
         debitSettingsForm,
         { headers }
       );
       toast.success('Debit settings updated');
       setShowDebitSettingsModal(false);
       fetchMerchantDebitOverview();
+      // Also refresh merchant list if viewing a specific merchant
+      if (selectedMerchant) {
+        const res = await axios.get(`${API_URL}/api/admin/merchants/${merchantId}`, { headers });
+        setSelectedMerchant(res.data.merchant);
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update settings');
     }
@@ -1945,8 +1952,8 @@ export default function AdminDashboard() {
                           <tr key={idx} className="hover:bg-slate-900/50">
                             <td className="p-4">
                               <div>
-                                <p className="text-white font-medium">{account.merchant?.business_name || 'Unknown'}</p>
-                                <p className="text-slate-500 text-xs">{account.merchant?.phone}</p>
+                                <p className="text-white font-medium">{account.business_name || 'Unknown'}</p>
+                                <p className="text-slate-500 text-xs">{account.phone}</p>
                               </div>
                             </td>
                             <td className="p-4 text-right">
@@ -1981,6 +1988,9 @@ export default function AdminDashboard() {
                               {account.status === 'active' && (
                                 <span className="px-2 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-400">Active</span>
                               )}
+                              {account.status === 'not_configured' && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-slate-500/20 text-slate-400">Not Configured</span>
+                              )}
                             </td>
                             <td className="p-4 text-center">
                               <div className="flex justify-center gap-2">
@@ -1992,7 +2002,7 @@ export default function AdminDashboard() {
                                 >
                                   <Settings size={16} />
                                 </Button>
-                                {account.status === 'blocked' && (
+                                {account.is_blocked && (
                                   <Button
                                     size="sm"
                                     variant="ghost"
