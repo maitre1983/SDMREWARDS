@@ -360,6 +360,17 @@ npx expo start
   - "Unblock Account" button for blocked merchants
   - Admin can set debit limit per merchant
 
+- **✅ Merchant Debit System Unified (COMPLETED 2026-03-10):**
+  - **Fixed:** All debit data now stored in `merchants.debit_account` subdocument
+  - **Fixed:** `GET /api/admin/merchants/debit-overview` returns all merchants with debit info
+  - **Fixed:** Settings > Merchant Debit tab now shows:
+    - Total Merchants: count of all active merchants
+    - Total Debt: sum of negative balances
+    - Total Credit: sum of positive balances
+    - Blocked/Warning: counts
+  - **Fixed:** Configure modal uses `merchant_id` OR `id` to find merchant
+  - **Tests:** 13/13 backend tests passing, 100% frontend UI verified
+
 - **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
   - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
   - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart
