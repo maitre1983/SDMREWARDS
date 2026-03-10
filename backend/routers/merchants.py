@@ -79,6 +79,26 @@ class ResetPinRequest(BaseModel):
     new_pin: str
 
 
+# ============== CASH PAYMENT & DEBIT ACCOUNT MODELS ==============
+
+class SearchCustomerRequest(BaseModel):
+    query: str  # Customer ID or phone number
+
+
+class CashTransactionRequest(BaseModel):
+    customer_id: Optional[str] = None  # SDM Customer ID
+    customer_phone: Optional[str] = None  # Customer phone number
+    amount: float  # Transaction amount in GHS
+    description: Optional[str] = None
+
+
+class TopUpDebitAccountRequest(BaseModel):
+    amount: float
+    payment_method: str  # "momo"
+    momo_phone: str
+    momo_network: str  # MTN, Telecel, AirtelTigo
+
+
 # ============== CASHIER MANAGEMENT MODELS ==============
 
 class CreateCashierRequest(BaseModel):
@@ -728,6 +748,515 @@ async def get_merchant_payouts(
             "pages": (total_count + limit - 1) // limit
         }
     }
+
+
+# ============== CASH PAYMENT & DEBIT ACCOUNT SYSTEM ==============
+
+@router.get("/search-customer")
+async def search_customer(
+    query: str,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Search for a customer by SDM ID or phone number
+    Used for cash payment transactions
+    """
+    if not query or len(query) < 3:
+        raise HTTPException(status_code=400, detail="Query must be at least 3 characters")
+    
+    # Search by ID, phone, or username
+    customer = await db.clients.find_one(
+        {
+            "$or": [
+                {"id": query},
+                {"phone": query},
+                {"phone": {"$regex": query, "$options": "i"}},
+                {"username": {"$regex": query, "$options": "i"}}
+            ],
+            "status": "active"
+        },
+        {
+            "_id": 0,
+            "id": 1,
+            "full_name": 1,
+            "phone": 1,
+            "username": 1,
+            "card_type": 1,
+            "card_status": 1
+        }
+    )
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Check if customer has active card
+    if customer.get("card_status") != "active" and not customer.get("card_type"):
+        raise HTTPException(status_code=400, detail="Customer does not have an active SDM card")
+    
+    return {
+        "customer": customer,
+        "message": "Customer found"
+    }
+
+
+@router.get("/debit-account")
+async def get_debit_account(current_merchant: dict = Depends(get_current_merchant)):
+    """
+    Get merchant's debit account information
+    Shows current balance, limit, and status
+    """
+    merchant_id = current_merchant["id"]
+    
+    # Get or create debit account
+    debit_account = await db.merchant_debit_accounts.find_one(
+        {"merchant_id": merchant_id},
+        {"_id": 0}
+    )
+    
+    if not debit_account:
+        # Create default debit account
+        debit_account = {
+            "id": str(uuid.uuid4()),
+            "merchant_id": merchant_id,
+            "balance": 0.0,  # Positive = credit, Negative = debit
+            "debit_limit": 0.0,  # Set by admin, 0 = no limit configured
+            "settlement_days": 0,  # Set by admin, 0 = no deadline
+            "status": "active",  # active, blocked, warning
+            "last_alert_sent": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.merchant_debit_accounts.insert_one(debit_account)
+        debit_account.pop("_id", None)
+    
+    # Calculate usage percentage
+    debit_limit = debit_account.get("debit_limit", 0)
+    balance = debit_account.get("balance", 0)
+    
+    usage_percentage = 0
+    if debit_limit > 0 and balance < 0:
+        usage_percentage = min(100, abs(balance) / debit_limit * 100)
+    
+    return {
+        "debit_account": debit_account,
+        "stats": {
+            "current_balance": round(balance, 2),
+            "debit_limit": round(debit_limit, 2),
+            "available_credit": round(max(0, debit_limit + balance), 2) if debit_limit > 0 else None,
+            "usage_percentage": round(usage_percentage, 1),
+            "status": debit_account.get("status", "active"),
+            "is_blocked": debit_account.get("status") == "blocked"
+        }
+    }
+
+
+@router.get("/debit-history")
+async def get_debit_history(
+    page: int = 1,
+    limit: int = 20,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Get merchant's debit account transaction history
+    """
+    merchant_id = current_merchant["id"]
+    
+    skip = (page - 1) * limit
+    
+    # Get debit transactions (ledger entries)
+    transactions = await db.merchant_debit_ledger.find(
+        {"merchant_id": merchant_id},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    total_count = await db.merchant_debit_ledger.count_documents({"merchant_id": merchant_id})
+    
+    return {
+        "transactions": transactions,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total": total_count,
+            "pages": (total_count + limit - 1) // limit
+        }
+    }
+
+
+@router.post("/cash-transaction")
+async def record_cash_transaction(
+    request: CashTransactionRequest,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Record a cash payment transaction
+    - Customer pays cash directly to merchant
+    - Cashback is credited to customer's wallet
+    - Merchant's debit account is debited by cashback amount
+    """
+    merchant_id = current_merchant["id"]
+    
+    # Validate input
+    if not request.customer_id and not request.customer_phone:
+        raise HTTPException(status_code=400, detail="Customer ID or phone number is required")
+    
+    if request.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+    
+    # Find customer
+    query = {}
+    if request.customer_id:
+        query["id"] = request.customer_id
+    elif request.customer_phone:
+        phone = request.customer_phone.replace(" ", "").replace("-", "")
+        query["$or"] = [
+            {"phone": phone},
+            {"phone": {"$regex": phone.replace("+", "\\+"), "$options": "i"}}
+        ]
+    
+    customer = await db.clients.find_one(query)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Check customer has active card
+    if customer.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Customer account is not active")
+    
+    # Get merchant's debit account
+    debit_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
+    
+    if not debit_account:
+        # Create default debit account
+        debit_account = {
+            "id": str(uuid.uuid4()),
+            "merchant_id": merchant_id,
+            "balance": 0.0,
+            "debit_limit": 0.0,
+            "settlement_days": 0,
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.merchant_debit_accounts.insert_one(debit_account)
+    
+    # Check if merchant account is blocked
+    if debit_account.get("status") == "blocked":
+        raise HTTPException(
+            status_code=403, 
+            detail="Your debit account is blocked. Please top up your account or contact support."
+        )
+    
+    # Calculate cashback
+    cashback_rate = current_merchant.get("cashback_rate", 5)
+    cashback_amount = round(request.amount * cashback_rate / 100, 2)
+    
+    # Check if this would exceed debit limit
+    debit_limit = debit_account.get("debit_limit", 0)
+    current_balance = debit_account.get("balance", 0)
+    new_balance = current_balance - cashback_amount
+    
+    if debit_limit > 0 and abs(new_balance) > debit_limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"This transaction would exceed your debit limit. Available: GHS {max(0, debit_limit + current_balance):.2f}"
+        )
+    
+    # Create transaction record
+    transaction_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    
+    transaction = {
+        "id": transaction_id,
+        "type": "cash_payment",
+        "payment_method": "cash",
+        "merchant_id": merchant_id,
+        "client_id": customer["id"],
+        "amount": request.amount,
+        "cashback_amount": cashback_amount,
+        "cashback_rate": cashback_rate,
+        "description": request.description or f"Cash payment at {current_merchant.get('business_name', 'merchant')}",
+        "status": "completed",
+        "created_at": now
+    }
+    
+    await db.transactions.insert_one(transaction)
+    
+    # Credit customer's cashback balance
+    await db.clients.update_one(
+        {"id": customer["id"]},
+        {
+            "$inc": {"cashback_balance": cashback_amount},
+            "$set": {"updated_at": now}
+        }
+    )
+    
+    # Debit merchant's account
+    await db.merchant_debit_accounts.update_one(
+        {"merchant_id": merchant_id},
+        {
+            "$inc": {"balance": -cashback_amount},
+            "$set": {"updated_at": now}
+        }
+    )
+    
+    # Create ledger entry
+    ledger_entry = {
+        "id": str(uuid.uuid4()),
+        "merchant_id": merchant_id,
+        "type": "debit",
+        "amount": cashback_amount,
+        "balance_after": new_balance,
+        "reference_type": "cash_transaction",
+        "reference_id": transaction_id,
+        "description": f"Cashback for cash payment - Customer: {customer.get('full_name', 'Unknown')}",
+        "created_at": now
+    }
+    await db.merchant_debit_ledger.insert_one(ledger_entry)
+    
+    # Update merchant stats
+    await db.merchants.update_one(
+        {"id": merchant_id},
+        {
+            "$inc": {
+                "total_transactions": 1,
+                "total_sales": request.amount,
+                "total_cashback_given": cashback_amount
+            },
+            "$set": {"updated_at": now}
+        }
+    )
+    
+    # Check if alert should be sent (75% threshold)
+    updated_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
+    new_balance = updated_account.get("balance", 0)
+    debit_limit = updated_account.get("debit_limit", 0)
+    
+    if debit_limit > 0:
+        usage_percentage = abs(new_balance) / debit_limit * 100 if new_balance < 0 else 0
+        
+        # Send alert at 75%
+        if usage_percentage >= 75 and usage_percentage < 100:
+            last_alert = updated_account.get("last_alert_sent")
+            should_send_alert = True
+            
+            if last_alert:
+                last_alert_time = datetime.fromisoformat(last_alert.replace('Z', '+00:00'))
+                if (datetime.now(timezone.utc) - last_alert_time).days < 1:
+                    should_send_alert = False
+            
+            if should_send_alert:
+                # Send SMS alert
+                try:
+                    from services.sms_service import get_sms
+                    sms_service = get_sms()
+                    merchant_phone = current_merchant.get("phone")
+                    if merchant_phone:
+                        message = f"SDM REWARDS ALERT: Your debit account is at {usage_percentage:.0f}% of your limit. Please top up to continue processing transactions."
+                        await sms_service.send_sms(merchant_phone, message)
+                        
+                        await db.merchant_debit_accounts.update_one(
+                            {"merchant_id": merchant_id},
+                            {"$set": {"last_alert_sent": now, "status": "warning"}}
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to send debit alert SMS: {e}")
+        
+        # Block at 100%
+        if usage_percentage >= 100:
+            await db.merchant_debit_accounts.update_one(
+                {"merchant_id": merchant_id},
+                {"$set": {"status": "blocked"}}
+            )
+            
+            # Send block notification
+            try:
+                from services.sms_service import get_sms
+                sms_service = get_sms()
+                merchant_phone = current_merchant.get("phone")
+                if merchant_phone:
+                    message = f"SDM REWARDS: Your debit account has reached its limit and is now BLOCKED. Please top up immediately to continue accepting cash payments."
+                    await sms_service.send_sms(merchant_phone, message)
+            except Exception as e:
+                logger.error(f"Failed to send block notification SMS: {e}")
+    
+    return {
+        "success": True,
+        "transaction": {
+            "id": transaction_id,
+            "amount": request.amount,
+            "cashback_amount": cashback_amount,
+            "customer_name": customer.get("full_name", "Customer"),
+            "created_at": now
+        },
+        "debit_account": {
+            "new_balance": round(new_balance, 2),
+            "debit_limit": round(debit_limit, 2)
+        },
+        "message": f"Cash transaction recorded. GHS {cashback_amount:.2f} cashback credited to customer."
+    }
+
+
+@router.post("/topup-debit-account")
+async def topup_debit_account(
+    request: TopUpDebitAccountRequest,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Top up merchant's debit account using Mobile Money
+    """
+    merchant_id = current_merchant["id"]
+    
+    if request.amount < 10:
+        raise HTTPException(status_code=400, detail="Minimum top-up amount is GHS 10")
+    
+    if request.payment_method != "momo":
+        raise HTTPException(status_code=400, detail="Only Mobile Money payments are supported")
+    
+    if request.momo_network not in ["MTN", "Telecel", "AirtelTigo"]:
+        raise HTTPException(status_code=400, detail="Invalid mobile network")
+    
+    # Create payment record
+    payment_id = str(uuid.uuid4())[:8].upper()
+    now = datetime.now(timezone.utc).isoformat()
+    
+    payment = {
+        "id": payment_id,
+        "type": "debit_topup",
+        "merchant_id": merchant_id,
+        "amount": request.amount,
+        "payment_method": "momo",
+        "momo_phone": request.momo_phone,
+        "momo_network": request.momo_network,
+        "status": "pending",
+        "created_at": now
+    }
+    
+    await db.payments.insert_one(payment)
+    
+    # Initiate MoMo collection via BulkClix
+    try:
+        from services.bulkclix_service import get_bulkclix_service
+        bulkclix = get_bulkclix_service()
+        
+        momo_result = await bulkclix.collect_momo(
+            phone=request.momo_phone,
+            amount=request.amount,
+            network=request.momo_network,
+            reference=f"TOPUP-{payment_id}",
+            description=f"SDM Debit Account Top-up"
+        )
+        
+        if momo_result.get("success"):
+            await db.payments.update_one(
+                {"id": payment_id},
+                {"$set": {
+                    "provider_reference": momo_result.get("reference"),
+                    "status": "processing"
+                }}
+            )
+            
+            return {
+                "success": True,
+                "payment_id": payment_id,
+                "amount": request.amount,
+                "status": "processing",
+                "message": "Please approve the payment prompt on your phone"
+            }
+        else:
+            await db.payments.update_one(
+                {"id": payment_id},
+                {"$set": {"status": "failed", "error": momo_result.get("error")}}
+            )
+            raise HTTPException(status_code=400, detail=momo_result.get("error", "Payment initiation failed"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Debit top-up error: {e}")
+        await db.payments.update_one(
+            {"id": payment_id},
+            {"$set": {"status": "failed", "error": str(e)}}
+        )
+        raise HTTPException(status_code=500, detail="Payment service error")
+
+
+@router.post("/topup-callback/{payment_id}")
+async def topup_callback(payment_id: str, status: str):
+    """
+    Callback endpoint for debit account top-up payment confirmation
+    Called by payment processor or admin
+    """
+    payment = await db.payments.find_one({"id": payment_id, "type": "debit_topup"})
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if payment.get("status") == "completed":
+        return {"success": True, "message": "Payment already processed"}
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if status == "success":
+        merchant_id = payment.get("merchant_id")
+        amount = payment.get("amount", 0)
+        
+        # Update payment status
+        await db.payments.update_one(
+            {"id": payment_id},
+            {"$set": {"status": "completed", "completed_at": now}}
+        )
+        
+        # Credit merchant's debit account
+        await db.merchant_debit_accounts.update_one(
+            {"merchant_id": merchant_id},
+            {
+                "$inc": {"balance": amount},
+                "$set": {"updated_at": now}
+            }
+        )
+        
+        # Get updated balance
+        debit_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
+        new_balance = debit_account.get("balance", 0) if debit_account else amount
+        
+        # Create ledger entry
+        ledger_entry = {
+            "id": str(uuid.uuid4()),
+            "merchant_id": merchant_id,
+            "type": "credit",
+            "amount": amount,
+            "balance_after": new_balance,
+            "reference_type": "topup",
+            "reference_id": payment_id,
+            "description": f"Debit account top-up via MoMo",
+            "created_at": now
+        }
+        await db.merchant_debit_ledger.insert_one(ledger_entry)
+        
+        # Unblock account if it was blocked
+        if debit_account and debit_account.get("status") == "blocked" and new_balance >= 0:
+            await db.merchant_debit_accounts.update_one(
+                {"merchant_id": merchant_id},
+                {"$set": {"status": "active"}}
+            )
+        
+        # Send confirmation SMS
+        try:
+            merchant = await db.merchants.find_one({"id": merchant_id})
+            if merchant and merchant.get("phone"):
+                from services.sms_service import get_sms
+                sms_service = get_sms()
+                message = f"SDM REWARDS: Your debit account has been topped up with GHS {amount:.2f}. New balance: GHS {new_balance:.2f}"
+                await sms_service.send_sms(merchant["phone"], message)
+        except Exception as e:
+            logger.error(f"Failed to send top-up confirmation SMS: {e}")
+        
+        return {"success": True, "message": "Top-up completed", "new_balance": new_balance}
+    else:
+        await db.payments.update_one(
+            {"id": payment_id},
+            {"$set": {"status": "failed", "updated_at": now}}
+        )
+        return {"success": False, "message": "Payment failed"}
 
 
 # ============== SETTINGS ==============

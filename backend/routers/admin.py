@@ -66,6 +66,16 @@ class StatusActionRequest(BaseModel):
     action: str  # "activate", "suspend", "delete"
 
 
+class MerchantDebitSettingsRequest(BaseModel):
+    debit_limit: float  # Maximum allowed debit in GHS
+    settlement_days: int = 0  # Days for settlement (0 = no deadline)
+
+
+class MerchantDebitAdjustRequest(BaseModel):
+    amount: float  # Positive for credit, negative for debit
+    description: str
+
+
 # ============== DASHBOARD ==============
 
 @router.get("/dashboard")
@@ -1281,6 +1291,295 @@ async def send_sms_to_merchant(
     })
     
     return {"success": result.get("success", False), "message": "SMS sent" if result.get("success") else "SMS failed"}
+
+
+# ============== MERCHANT DEBIT ACCOUNTS ==============
+
+@router.get("/merchants/debit-overview")
+async def get_merchants_debit_overview(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get overview of all merchant debit accounts"""
+    
+    # Get all debit accounts
+    debit_accounts = await db.merchant_debit_accounts.find({}, {"_id": 0}).to_list(10000)
+    
+    # Enrich with merchant info
+    enriched = []
+    for account in debit_accounts:
+        merchant = await db.merchants.find_one(
+            {"id": account.get("merchant_id")},
+            {"_id": 0, "business_name": 1, "owner_name": 1, "phone": 1, "status": 1}
+        )
+        if merchant:
+            balance = account.get("balance", 0)
+            debit_limit = account.get("debit_limit", 0)
+            usage_percentage = 0
+            if debit_limit > 0 and balance < 0:
+                usage_percentage = min(100, abs(balance) / debit_limit * 100)
+            
+            enriched.append({
+                **account,
+                "merchant": merchant,
+                "usage_percentage": round(usage_percentage, 1)
+            })
+    
+    # Sort by balance (most negative first)
+    enriched.sort(key=lambda x: x.get("balance", 0))
+    
+    # Calculate totals
+    total_debt = sum(abs(a.get("balance", 0)) for a in enriched if a.get("balance", 0) < 0)
+    total_credit = sum(a.get("balance", 0) for a in enriched if a.get("balance", 0) > 0)
+    blocked_count = sum(1 for a in enriched if a.get("status") == "blocked")
+    warning_count = sum(1 for a in enriched if a.get("status") == "warning")
+    
+    return {
+        "accounts": enriched,
+        "summary": {
+            "total_merchants": len(enriched),
+            "total_debt": round(total_debt, 2),
+            "total_credit": round(total_credit, 2),
+            "blocked_count": blocked_count,
+            "warning_count": warning_count
+        }
+    }
+
+
+@router.get("/merchants/{merchant_id}/debit-account")
+async def get_merchant_debit_account(
+    merchant_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get detailed debit account info for a specific merchant"""
+    
+    merchant = await db.merchants.find_one({"id": merchant_id}, {"_id": 0, "password_hash": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    debit_account = await db.merchant_debit_accounts.find_one(
+        {"merchant_id": merchant_id},
+        {"_id": 0}
+    )
+    
+    if not debit_account:
+        debit_account = {
+            "id": str(uuid.uuid4()),
+            "merchant_id": merchant_id,
+            "balance": 0.0,
+            "debit_limit": 0.0,
+            "settlement_days": 0,
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.merchant_debit_accounts.insert_one(debit_account)
+        debit_account.pop("_id", None)
+    
+    # Get ledger history
+    ledger = await db.merchant_debit_ledger.find(
+        {"merchant_id": merchant_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    
+    # Calculate stats
+    balance = debit_account.get("balance", 0)
+    debit_limit = debit_account.get("debit_limit", 0)
+    usage_percentage = 0
+    if debit_limit > 0 and balance < 0:
+        usage_percentage = min(100, abs(balance) / debit_limit * 100)
+    
+    return {
+        "merchant": merchant,
+        "debit_account": debit_account,
+        "ledger": ledger,
+        "stats": {
+            "current_balance": round(balance, 2),
+            "debit_limit": round(debit_limit, 2),
+            "usage_percentage": round(usage_percentage, 1),
+            "available_credit": round(max(0, debit_limit + balance), 2) if debit_limit > 0 else None
+        }
+    }
+
+
+@router.put("/merchants/{merchant_id}/debit-settings")
+async def update_merchant_debit_settings(
+    merchant_id: str,
+    request: MerchantDebitSettingsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update merchant's debit limit and settlement period (Super Admin only)"""
+    
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    merchant = await db.merchants.find_one({"id": merchant_id})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    if request.debit_limit < 0:
+        raise HTTPException(status_code=400, detail="Debit limit cannot be negative")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Update or create debit account
+    result = await db.merchant_debit_accounts.update_one(
+        {"merchant_id": merchant_id},
+        {
+            "$set": {
+                "debit_limit": request.debit_limit,
+                "settlement_days": request.settlement_days,
+                "updated_at": now
+            },
+            "$setOnInsert": {
+                "id": str(uuid.uuid4()),
+                "merchant_id": merchant_id,
+                "balance": 0.0,
+                "status": "active",
+                "created_at": now
+            }
+        },
+        upsert=True
+    )
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "update_merchant_debit_settings",
+        "target_id": merchant_id,
+        "changes": {
+            "debit_limit": request.debit_limit,
+            "settlement_days": request.settlement_days
+        },
+        "created_at": now
+    })
+    
+    # Send notification to merchant
+    try:
+        from services.sms_service import get_sms
+        sms_service = get_sms()
+        if merchant.get("phone"):
+            message = f"SDM REWARDS: Your debit limit has been set to GHS {request.debit_limit:.2f}. You can now process cash transactions with cashback."
+            await sms_service.send_sms(merchant["phone"], message)
+    except Exception as e:
+        logger.error(f"Failed to send debit settings SMS: {e}")
+    
+    return {"success": True, "message": "Debit settings updated"}
+
+
+@router.post("/merchants/{merchant_id}/debit-adjust")
+async def adjust_merchant_debit_balance(
+    merchant_id: str,
+    request: MerchantDebitAdjustRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Manually adjust merchant's debit balance (Super Admin only)"""
+    
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    merchant = await db.merchants.find_one({"id": merchant_id})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Get current account
+    debit_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
+    if not debit_account:
+        raise HTTPException(status_code=404, detail="Debit account not found. Please set debit limit first.")
+    
+    current_balance = debit_account.get("balance", 0)
+    new_balance = current_balance + request.amount
+    
+    # Update balance
+    await db.merchant_debit_accounts.update_one(
+        {"merchant_id": merchant_id},
+        {
+            "$inc": {"balance": request.amount},
+            "$set": {"updated_at": now}
+        }
+    )
+    
+    # Create ledger entry
+    ledger_entry = {
+        "id": str(uuid.uuid4()),
+        "merchant_id": merchant_id,
+        "type": "credit" if request.amount > 0 else "debit",
+        "amount": abs(request.amount),
+        "balance_after": new_balance,
+        "reference_type": "admin_adjustment",
+        "reference_id": current_admin["id"],
+        "description": f"Admin adjustment: {request.description}",
+        "created_at": now
+    }
+    await db.merchant_debit_ledger.insert_one(ledger_entry)
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "adjust_merchant_debit_balance",
+        "target_id": merchant_id,
+        "changes": {
+            "amount": request.amount,
+            "description": request.description,
+            "new_balance": new_balance
+        },
+        "created_at": now
+    })
+    
+    return {
+        "success": True,
+        "message": f"Balance adjusted by GHS {request.amount:.2f}",
+        "new_balance": round(new_balance, 2)
+    }
+
+
+@router.post("/merchants/{merchant_id}/unblock-debit")
+async def unblock_merchant_debit_account(
+    merchant_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Manually unblock a merchant's debit account (Super Admin only)"""
+    
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    merchant = await db.merchants.find_one({"id": merchant_id})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.merchant_debit_accounts.update_one(
+        {"merchant_id": merchant_id},
+        {"$set": {"status": "active", "updated_at": now}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Debit account not found or already active")
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "unblock_merchant_debit_account",
+        "target_id": merchant_id,
+        "created_at": now
+    })
+    
+    # Notify merchant
+    try:
+        from services.sms_service import get_sms
+        sms_service = get_sms()
+        if merchant.get("phone"):
+            message = f"SDM REWARDS: Your debit account has been unblocked by admin. You can now process cash transactions again."
+            await sms_service.send_sms(merchant["phone"], message)
+    except Exception as e:
+        logger.error(f"Failed to send unblock notification SMS: {e}")
+    
+    return {"success": True, "message": "Merchant debit account unblocked"}
 
 
 # ============== TRANSACTIONS ==============

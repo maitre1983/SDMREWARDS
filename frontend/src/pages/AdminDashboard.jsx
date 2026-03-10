@@ -46,7 +46,9 @@ import {
   Banknote,
   Key,
   Bell,
-  Send
+  Send,
+  AlertTriangle,
+  Unlock
 } from 'lucide-react';
 
 // Admin Components
@@ -154,6 +156,13 @@ export default function AdminDashboard() {
   const [showPushModal, setShowPushModal] = useState(false);
   const [pushForm, setPushForm] = useState({ title: '', message: '', segment: 'All', url: '' });
   const [pushLoading, setPushLoading] = useState(false);
+  
+  // Merchant Debit Account states
+  const [merchantDebitOverview, setMerchantDebitOverview] = useState({ accounts: [], summary: {} });
+  const [selectedMerchantDebit, setSelectedMerchantDebit] = useState(null);
+  const [showDebitSettingsModal, setShowDebitSettingsModal] = useState(false);
+  const [debitSettingsForm, setDebitSettingsForm] = useState({ debit_limit: 0, settlement_days: 0 });
+  const [isLoadingDebit, setIsLoadingDebit] = useState(false);
   
   // Security states
   const [pinEnabled, setPinEnabled] = useState(false);
@@ -882,6 +891,59 @@ export default function AdminDashboard() {
     }
   };
 
+  // ============== MERCHANT DEBIT ACCOUNT FUNCTIONS ==============
+  
+  const fetchMerchantDebitOverview = async () => {
+    try {
+      setIsLoadingDebit(true);
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/merchants/debit-overview`, { headers });
+      setMerchantDebitOverview(res.data);
+    } catch (error) {
+      console.error('Merchant debit overview fetch error:', error);
+    } finally {
+      setIsLoadingDebit(false);
+    }
+  };
+
+  const handleOpenDebitSettings = (merchant) => {
+    setSelectedMerchantDebit(merchant);
+    setDebitSettingsForm({
+      debit_limit: merchant.debit_limit || 0,
+      settlement_days: merchant.settlement_days || 0
+    });
+    setShowDebitSettingsModal(true);
+  };
+
+  const handleSaveDebitSettings = async () => {
+    if (!selectedMerchantDebit) return;
+    try {
+      const headers = getHeaders();
+      await axios.put(
+        `${API_URL}/api/admin/merchants/${selectedMerchantDebit.merchant_id}/debit-settings`,
+        debitSettingsForm,
+        { headers }
+      );
+      toast.success('Debit settings updated');
+      setShowDebitSettingsModal(false);
+      fetchMerchantDebitOverview();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update settings');
+    }
+  };
+
+  const handleUnblockMerchantDebit = async (merchantId) => {
+    if (!window.confirm('Unblock this merchant\'s debit account?')) return;
+    try {
+      const headers = getHeaders();
+      await axios.post(`${API_URL}/api/admin/merchants/${merchantId}/unblock-debit`, {}, { headers });
+      toast.success('Merchant debit account unblocked');
+      fetchMerchantDebitOverview();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to unblock');
+    }
+  };
+
   // ============== PHASE 3: SECURITY FUNCTIONS ==============
   
   // Check PIN status
@@ -1368,6 +1430,7 @@ export default function AdminDashboard() {
                     { id: 'commissions', label: 'Commissions', icon: Percent },
                     { id: 'services', label: 'Service Fees', icon: Sliders },
                     { id: 'referrals', label: 'Referrals', icon: Gift },
+                    { id: 'debit', label: 'Merchant Debit', icon: Banknote },
                     { id: 'users', label: 'Add Users', icon: UserPlus },
                     { id: 'sms', label: 'SMS Center', icon: MessageSquare },
                     { id: 'security', label: 'Security', icon: Shield },
@@ -1826,6 +1889,132 @@ export default function AdminDashboard() {
                     {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
                     Save Referral Settings
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Merchant Debit Accounts */}
+            {settingsTab === 'debit' && (
+              <div className="space-y-6">
+                {/* Summary Cards */}
+                <div className="grid md:grid-cols-4 gap-4">
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm">Total Merchants</p>
+                    <p className="text-2xl font-bold text-white">{merchantDebitOverview.summary?.total_merchants || 0}</p>
+                  </div>
+                  <div className="bg-slate-800 border border-red-500/30 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm">Total Debt</p>
+                    <p className="text-2xl font-bold text-red-400">GHS {merchantDebitOverview.summary?.total_debt?.toFixed(2) || '0.00'}</p>
+                  </div>
+                  <div className="bg-slate-800 border border-emerald-500/30 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm">Total Credit</p>
+                    <p className="text-2xl font-bold text-emerald-400">GHS {merchantDebitOverview.summary?.total_credit?.toFixed(2) || '0.00'}</p>
+                  </div>
+                  <div className="bg-slate-800 border border-amber-500/30 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm">Blocked / Warning</p>
+                    <p className="text-2xl font-bold text-amber-400">
+                      {merchantDebitOverview.summary?.blocked_count || 0} / {merchantDebitOverview.summary?.warning_count || 0}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Refresh Button */}
+                <div className="flex justify-end">
+                  <Button onClick={fetchMerchantDebitOverview} variant="outline" className="border-slate-600" disabled={isLoadingDebit}>
+                    {isLoadingDebit ? <Loader2 className="animate-spin mr-2" size={16} /> : <RefreshCw size={16} className="mr-2" />}
+                    Refresh
+                  </Button>
+                </div>
+                
+                {/* Merchants Table */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-900 text-slate-400">
+                        <tr>
+                          <th className="text-left p-4">Merchant</th>
+                          <th className="text-right p-4">Balance</th>
+                          <th className="text-right p-4">Debit Limit</th>
+                          <th className="text-center p-4">Usage</th>
+                          <th className="text-center p-4">Status</th>
+                          <th className="text-center p-4">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700">
+                        {merchantDebitOverview.accounts?.length > 0 ? merchantDebitOverview.accounts.map((account, idx) => (
+                          <tr key={idx} className="hover:bg-slate-900/50">
+                            <td className="p-4">
+                              <div>
+                                <p className="text-white font-medium">{account.merchant?.business_name || 'Unknown'}</p>
+                                <p className="text-slate-500 text-xs">{account.merchant?.phone}</p>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <span className={account.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                                GHS {account.balance?.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="p-4 text-right text-amber-400">
+                              GHS {account.debit_limit?.toFixed(2) || '0.00'}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full ${
+                                      account.usage_percentage >= 100 ? 'bg-red-500' :
+                                      account.usage_percentage >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                                    }`}
+                                    style={{ width: `${Math.min(100, account.usage_percentage || 0)}%` }}
+                                  />
+                                </div>
+                                <span className="text-slate-400 text-xs">{account.usage_percentage?.toFixed(0) || 0}%</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-center">
+                              {account.status === 'blocked' && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-red-500/20 text-red-400">Blocked</span>
+                              )}
+                              {account.status === 'warning' && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-amber-500/20 text-amber-400">Warning</span>
+                              )}
+                              {account.status === 'active' && (
+                                <span className="px-2 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-400">Active</span>
+                              )}
+                            </td>
+                            <td className="p-4 text-center">
+                              <div className="flex justify-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleOpenDebitSettings(account)}
+                                  className="text-blue-400 hover:text-blue-300"
+                                >
+                                  <Settings size={16} />
+                                </Button>
+                                {account.status === 'blocked' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleUnblockMerchantDebit(account.merchant_id)}
+                                    className="text-emerald-400 hover:text-emerald-300"
+                                  >
+                                    <Unlock size={16} />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan="6" className="text-center py-8 text-slate-500">
+                              {isLoadingDebit ? 'Loading...' : 'No merchant debit accounts found. Click Refresh to load.'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -3082,6 +3271,72 @@ export default function AdminDashboard() {
               >
                 {pushLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Send size={16} className="mr-2" />}
                 Send Notification
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MERCHANT DEBIT SETTINGS MODAL */}
+      {showDebitSettingsModal && selectedMerchantDebit && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Settings className="text-amber-400" size={20} />
+              Debit Account Settings
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Configure debit limit for: <span className="text-white font-medium">{selectedMerchantDebit.merchant?.business_name}</span>
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Debit Limit (GHS)</Label>
+                <Input
+                  type="number"
+                  value={debitSettingsForm.debit_limit}
+                  onChange={(e) => setDebitSettingsForm({...debitSettingsForm, debit_limit: parseFloat(e.target.value) || 0})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="e.g., 1000"
+                  min="0"
+                />
+                <p className="text-slate-500 text-xs mt-1">Maximum amount the merchant can owe in cashback</p>
+              </div>
+              
+              <div>
+                <Label className="text-slate-300 mb-2 block">Settlement Period (Days)</Label>
+                <Input
+                  type="number"
+                  value={debitSettingsForm.settlement_days}
+                  onChange={(e) => setDebitSettingsForm({...debitSettingsForm, settlement_days: parseInt(e.target.value) || 0})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="e.g., 30"
+                  min="0"
+                />
+                <p className="text-slate-500 text-xs mt-1">Days before payment is due (0 = no deadline)</p>
+              </div>
+              
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                <p className="text-amber-400 text-sm">
+                  <AlertTriangle size={16} className="inline mr-1" />
+                  At 75% usage, merchant receives SMS warning. At 100%, account is blocked.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => setShowDebitSettingsModal(false)}
+                variant="outline"
+                className="flex-1 border-slate-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveDebitSettings}
+                className="flex-1 bg-amber-600 hover:bg-amber-700"
+              >
+                Save Settings
               </Button>
             </div>
           </div>

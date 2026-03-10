@@ -31,7 +31,12 @@ import {
   UserCog,
   Building,
   ChevronRight,
-  Info
+  Info,
+  Banknote,
+  Search,
+  UserCheck,
+  ArrowUpRight,
+  AlertTriangle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -84,6 +89,22 @@ export default function MerchantDashboard() {
   const [pinError, setPinError] = useState('');
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
 
+  // Cash Payment & Debit Account states
+  const [debitAccount, setDebitAccount] = useState(null);
+  const [debitHistory, setDebitHistory] = useState([]);
+  const [showCashPaymentModal, setShowCashPaymentModal] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [foundCustomer, setFoundCustomer] = useState(null);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [cashDescription, setCashDescription] = useState('');
+  const [isProcessingCash, setIsProcessingCash] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpPhone, setTopUpPhone] = useState('');
+  const [topUpNetwork, setTopUpNetwork] = useState('MTN');
+  const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
+
   const token = localStorage.getItem('sdm_merchant_token');
 
   useEffect(() => {
@@ -93,6 +114,7 @@ export default function MerchantDashboard() {
     }
     fetchDashboardData();
     fetchPinStatus();
+    fetchDebitAccount();
   }, [token]);
 
   const fetchPinStatus = async () => {
@@ -154,6 +176,114 @@ export default function MerchantDashboard() {
       setTransactions(res.data.transactions || []);
     } catch (error) {
       console.error('Transactions fetch error:', error);
+    }
+  };
+
+  // ============== DEBIT ACCOUNT FUNCTIONS ==============
+  
+  const fetchDebitAccount = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${API_URL}/api/merchants/debit-account`, { headers });
+      setDebitAccount(res.data);
+    } catch (error) {
+      console.error('Debit account fetch error:', error);
+    }
+  };
+
+  const fetchDebitHistory = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${API_URL}/api/merchants/debit-history?limit=20`, { headers });
+      setDebitHistory(res.data.transactions || []);
+    } catch (error) {
+      console.error('Debit history fetch error:', error);
+    }
+  };
+
+  const searchCustomer = async () => {
+    if (!customerSearch || customerSearch.length < 3) {
+      toast.error('Enter at least 3 characters');
+      return;
+    }
+    try {
+      setIsSearchingCustomer(true);
+      setFoundCustomer(null);
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${API_URL}/api/merchants/search-customer?query=${encodeURIComponent(customerSearch)}`, { headers });
+      setFoundCustomer(res.data.customer);
+      toast.success('Customer found!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Customer not found');
+      setFoundCustomer(null);
+    } finally {
+      setIsSearchingCustomer(false);
+    }
+  };
+
+  const handleCashPayment = async () => {
+    if (!foundCustomer) {
+      toast.error('Please search and select a customer first');
+      return;
+    }
+    const amount = parseFloat(cashAmount);
+    if (!amount || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    try {
+      setIsProcessingCash(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(`${API_URL}/api/merchants/cash-transaction`, {
+        customer_id: foundCustomer.id,
+        amount: amount,
+        description: cashDescription || undefined
+      }, { headers });
+      
+      toast.success(`Cash payment recorded! GHS ${res.data.transaction.cashback_amount.toFixed(2)} cashback credited to customer.`);
+      setShowCashPaymentModal(false);
+      setFoundCustomer(null);
+      setCustomerSearch('');
+      setCashAmount('');
+      setCashDescription('');
+      fetchDebitAccount();
+      fetchDebitHistory();
+      fetchDashboardData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to record cash payment');
+    } finally {
+      setIsProcessingCash(false);
+    }
+  };
+
+  const handleTopUp = async () => {
+    const amount = parseFloat(topUpAmount);
+    if (!amount || amount < 10) {
+      toast.error('Minimum top-up amount is GHS 10');
+      return;
+    }
+    if (!topUpPhone) {
+      toast.error('Please enter your MoMo number');
+      return;
+    }
+    try {
+      setIsProcessingTopUp(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(`${API_URL}/api/merchants/topup-debit-account`, {
+        amount: amount,
+        payment_method: 'momo',
+        momo_phone: topUpPhone,
+        momo_network: topUpNetwork
+      }, { headers });
+      
+      toast.success('Please approve the payment prompt on your phone');
+      setShowTopUpModal(false);
+      setTopUpAmount('');
+      // Poll for payment status or wait for callback
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to initiate top-up');
+    } finally {
+      setIsProcessingTopUp(false);
     }
   };
 
@@ -539,6 +669,164 @@ export default function MerchantDashboard() {
           </div>
         )}
 
+        {/* Cash Payment Tab */}
+        {activeTab === 'cash' && (
+          <div className="space-y-6">
+            {/* Debit Account Overview */}
+            <div className="bg-gradient-to-br from-amber-900/30 to-slate-800 border border-amber-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
+                    <Wallet size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold">Debit Account</h3>
+                    <p className="text-amber-300 text-sm">For cash payment cashback</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => { fetchDebitAccount(); fetchDebitHistory(); }}
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400"
+                >
+                  <RefreshCw size={16} />
+                </Button>
+              </div>
+              
+              {debitAccount ? (
+                <div className="space-y-4">
+                  {/* Balance Display */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-800/50 rounded-lg p-4">
+                      <p className="text-slate-400 text-sm mb-1">Current Balance</p>
+                      <p className={`text-2xl font-bold ${debitAccount.stats?.current_balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        GHS {debitAccount.stats?.current_balance?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                    <div className="bg-slate-800/50 rounded-lg p-4">
+                      <p className="text-slate-400 text-sm mb-1">Debit Limit</p>
+                      <p className="text-2xl font-bold text-amber-400">
+                        GHS {debitAccount.stats?.debit_limit?.toFixed(2) || '0.00'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Status Alerts */}
+                  {debitAccount.stats?.is_blocked && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-red-400">
+                        <AlertTriangle size={20} />
+                        <span className="font-semibold">Account Blocked</span>
+                      </div>
+                      <p className="text-red-300 text-sm mt-1">
+                        Your debit limit has been reached. Please top up your account to continue processing cash payments.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {debitAccount.stats?.usage_percentage >= 75 && !debitAccount.stats?.is_blocked && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-amber-400">
+                        <AlertCircle size={20} />
+                        <span className="font-semibold">Warning: {debitAccount.stats?.usage_percentage?.toFixed(0)}% of limit used</span>
+                      </div>
+                      <p className="text-amber-300 text-sm mt-1">
+                        Consider topping up your account soon to avoid interruptions.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Usage Bar */}
+                  {debitAccount.stats?.debit_limit > 0 && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-400">Usage</span>
+                        <span className="text-slate-300">{debitAccount.stats?.usage_percentage?.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full transition-all ${
+                            debitAccount.stats?.usage_percentage >= 100 ? 'bg-red-500' :
+                            debitAccount.stats?.usage_percentage >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(100, debitAccount.stats?.usage_percentage || 0)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {debitAccount.stats?.debit_limit === 0 && (
+                    <div className="bg-slate-800/50 border border-slate-600 rounded-lg p-4 text-center">
+                      <Info size={24} className="text-slate-400 mx-auto mb-2" />
+                      <p className="text-slate-300">No debit limit configured</p>
+                      <p className="text-slate-500 text-sm">Contact admin to set up your debit limit for cash transactions</p>
+                    </div>
+                  )}
+                  
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      onClick={() => setShowCashPaymentModal(true)}
+                      className="bg-emerald-600 hover:bg-emerald-700"
+                      disabled={debitAccount.stats?.is_blocked || debitAccount.stats?.debit_limit === 0}
+                    >
+                      <Banknote size={18} className="mr-2" />
+                      Record Cash Payment
+                    </Button>
+                    <Button
+                      onClick={() => setShowTopUpModal(true)}
+                      className="bg-amber-600 hover:bg-amber-700"
+                    >
+                      <ArrowUpRight size={18} className="mr-2" />
+                      Top Up Account
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Loader2 className="animate-spin text-amber-400 mx-auto mb-2" size={32} />
+                  <p className="text-slate-400">Loading debit account...</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Debit History */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                <History size={18} /> Debit History
+              </h3>
+              {debitHistory.length > 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {debitHistory.map((entry, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          entry.type === 'credit' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {entry.type === 'credit' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                        </div>
+                        <div>
+                          <p className="text-white text-sm">{entry.description?.slice(0, 40)}...</p>
+                          <p className="text-slate-500 text-xs">{new Date(entry.created_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-semibold ${entry.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {entry.type === 'credit' ? '+' : '-'}GHS {entry.amount?.toFixed(2)}
+                        </p>
+                        <p className="text-slate-500 text-xs">Bal: GHS {entry.balance_after?.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 text-center py-4">No debit transactions yet</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Transactions Tab */}
         {activeTab === 'history' && (
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
@@ -874,6 +1162,14 @@ export default function MerchantDashboard() {
             <span className="text-xs">Dashboard</span>
           </button>
           <button
+            onClick={() => { setActiveTab('cash'); fetchDebitAccount(); fetchDebitHistory(); }}
+            className={`flex flex-col items-center gap-1 ${activeTab === 'cash' ? 'text-emerald-400' : 'text-slate-500'}`}
+            data-testid="nav-cash"
+          >
+            <Banknote size={22} />
+            <span className="text-xs">Cash</span>
+          </button>
+          <button
             onClick={() => setActiveTab('qr')}
             className={`flex flex-col items-center gap-1 ${activeTab === 'qr' ? 'text-emerald-400' : 'text-slate-500'}`}
             data-testid="nav-qr"
@@ -921,6 +1217,195 @@ export default function MerchantDashboard() {
         merchantPhone={merchant?.phone}
         merchantEmail={merchant?.email}
       />
+
+      {/* Cash Payment Modal */}
+      {showCashPaymentModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+              <Banknote className="text-emerald-400" size={24} />
+              Record Cash Payment
+            </h3>
+            
+            {/* Customer Search */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-slate-300 text-sm mb-2 block">Search Customer</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Customer ID or Phone"
+                    className="bg-slate-900 border-slate-700 text-white flex-1"
+                  />
+                  <Button
+                    onClick={searchCustomer}
+                    disabled={isSearchingCustomer}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {isSearchingCustomer ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Found Customer */}
+              {foundCustomer && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
+                      <UserCheck size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-semibold">{foundCustomer.full_name}</p>
+                      <p className="text-emerald-300 text-sm">{foundCustomer.phone} • {foundCustomer.card_type?.toUpperCase()} Card</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Amount */}
+              <div>
+                <label className="text-slate-300 text-sm mb-2 block">Transaction Amount (GHS)</label>
+                <Input
+                  type="number"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="bg-slate-900 border-slate-700 text-white"
+                  min="1"
+                />
+              </div>
+              
+              {/* Preview Cashback */}
+              {cashAmount && parseFloat(cashAmount) > 0 && (
+                <div className="bg-slate-900 rounded-lg p-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Cashback Rate:</span>
+                    <span className="text-emerald-400">{merchant?.cashback_rate || 5}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-slate-400">Customer Cashback:</span>
+                    <span className="text-emerald-400 font-semibold">
+                      GHS {(parseFloat(cashAmount) * (merchant?.cashback_rate || 5) / 100).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Description */}
+              <div>
+                <label className="text-slate-300 text-sm mb-2 block">Description (Optional)</label>
+                <Input
+                  value={cashDescription}
+                  onChange={(e) => setCashDescription(e.target.value)}
+                  placeholder="e.g., Product purchase"
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => {
+                  setShowCashPaymentModal(false);
+                  setFoundCustomer(null);
+                  setCustomerSearch('');
+                  setCashAmount('');
+                  setCashDescription('');
+                }}
+                variant="outline"
+                className="flex-1 border-slate-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCashPayment}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                disabled={!foundCustomer || !cashAmount || isProcessingCash}
+              >
+                {isProcessingCash ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                Record Payment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Up Modal */}
+      {showTopUpModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
+            <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+              <ArrowUpRight className="text-amber-400" size={24} />
+              Top Up Debit Account
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-slate-300 text-sm mb-2 block">Amount (GHS)</label>
+                <Input
+                  type="number"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value)}
+                  placeholder="Minimum GHS 10"
+                  className="bg-slate-900 border-slate-700 text-white"
+                  min="10"
+                />
+              </div>
+              
+              <div>
+                <label className="text-slate-300 text-sm mb-2 block">MoMo Number</label>
+                <Input
+                  value={topUpPhone}
+                  onChange={(e) => setTopUpPhone(e.target.value)}
+                  placeholder="e.g., 0541008285"
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              
+              <div>
+                <label className="text-slate-300 text-sm mb-2 block">Network</label>
+                <select
+                  value={topUpNetwork}
+                  onChange={(e) => setTopUpNetwork(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="MTN">MTN Mobile Money</option>
+                  <option value="Telecel">Telecel Cash</option>
+                  <option value="AirtelTigo">AirtelTigo Money</option>
+                </select>
+              </div>
+              
+              {topUpAmount && parseFloat(topUpAmount) >= 10 && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                  <p className="text-amber-400 text-sm">
+                    You will receive a payment prompt on <strong>{topUpPhone || 'your phone'}</strong> to approve GHS {parseFloat(topUpAmount).toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <Button
+                onClick={() => { setShowTopUpModal(false); setTopUpAmount(''); }}
+                variant="outline"
+                className="flex-1 border-slate-600"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleTopUp}
+                className="flex-1 bg-amber-600 hover:bg-amber-700"
+                disabled={!topUpAmount || parseFloat(topUpAmount) < 10 || !topUpPhone || isProcessingTopUp}
+              >
+                {isProcessingTopUp ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                Pay Now
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
