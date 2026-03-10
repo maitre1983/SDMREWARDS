@@ -112,6 +112,27 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
         card_type = card.get("metadata", {}).get("card_type", "unknown")
         card_type_stats[card_type] = card_type_stats.get(card_type, 0) + 1
     
+    # Payment Methods Global Stats (Cash vs MoMo)
+    # Today's breakdown
+    today_momo_txs = [t for t in today_transactions if t.get("payment_method") != "cash" and t.get("type") == "payment"]
+    today_cash_txs = [t for t in today_transactions if t.get("payment_method") == "cash"]
+    
+    today_momo_volume = sum(t.get("amount", 0) for t in today_momo_txs)
+    today_cash_volume = sum(t.get("amount", 0) for t in today_cash_txs)
+    
+    # All-time payment methods breakdown
+    all_payment_txs = await db.transactions.find(
+        {"type": "payment"},
+        {"_id": 0, "amount": 1, "cashback_amount": 1, "payment_method": 1}
+    ).to_list(100000)
+    
+    all_momo_txs = [t for t in all_payment_txs if t.get("payment_method") != "cash"]
+    all_cash_txs = [t for t in all_payment_txs if t.get("payment_method") == "cash"]
+    
+    all_momo_volume = sum(t.get("amount", 0) for t in all_momo_txs)
+    all_cash_volume = sum(t.get("amount", 0) for t in all_cash_txs)
+    all_total_volume = all_momo_volume + all_cash_volume
+    
     return {
         "stats": {
             "total_clients": total_clients,
@@ -125,6 +146,40 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
             "total_revenue": total_revenue,
             "total_card_revenue": total_card_revenue,
             "card_type_stats": card_type_stats
+        },
+        "payment_methods": {
+            "today": {
+                "momo": {
+                    "volume": round(today_momo_volume, 2),
+                    "count": len(today_momo_txs),
+                    "percentage": round(today_momo_volume / (today_momo_volume + today_cash_volume) * 100, 1) if (today_momo_volume + today_cash_volume) > 0 else 0
+                },
+                "cash": {
+                    "volume": round(today_cash_volume, 2),
+                    "count": len(today_cash_txs),
+                    "percentage": round(today_cash_volume / (today_momo_volume + today_cash_volume) * 100, 1) if (today_momo_volume + today_cash_volume) > 0 else 0
+                },
+                "total": {
+                    "volume": round(today_momo_volume + today_cash_volume, 2),
+                    "count": len(today_momo_txs) + len(today_cash_txs)
+                }
+            },
+            "all_time": {
+                "momo": {
+                    "volume": round(all_momo_volume, 2),
+                    "count": len(all_momo_txs),
+                    "percentage": round(all_momo_volume / all_total_volume * 100, 1) if all_total_volume > 0 else 0
+                },
+                "cash": {
+                    "volume": round(all_cash_volume, 2),
+                    "count": len(all_cash_txs),
+                    "percentage": round(all_cash_volume / all_total_volume * 100, 1) if all_total_volume > 0 else 0
+                },
+                "total": {
+                    "volume": round(all_total_volume, 2),
+                    "count": len(all_payment_txs)
+                }
+            }
         },
         "admin": {
             "email": current_admin["email"],

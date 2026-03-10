@@ -424,6 +424,18 @@ npx expo start
   - Visual cards showing Cash, MoMo, and Total stats with progress bars
   - Fully synchronized with merchant dashboard data
 
+- **✅ Feature: Global Payment Methods Stats on Admin Overview - ADDED 2026-03-10:**
+  - Updated `/api/admin/dashboard` endpoint to return `payment_methods` object with today and all-time stats
+  - New section "Payment Methods (Cash vs MoMo)" on Admin Overview page
+  - Shows Today's Breakdown and All-Time Breakdown with volume, count, and percentage bars
+
+- **✅ Feature: Payment Method Column in Transaction History - ADDED 2026-03-10:**
+  - Added "Method" column to Merchant Full History page (MerchantHistoryPage.jsx)
+  - Added "Method" column to Admin Merchant Modal transaction table
+  - Badges: Green "Cash" with banknote icon, Blue "MoMo" with smartphone icon
+  - Updated backend `/api/merchants/transactions/history` to include `payment_method` field
+  - Complete synchronization across Merchant ↔ Admin dashboards
+
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
   - Issue: Back button on QR Scanner screen was not navigating back

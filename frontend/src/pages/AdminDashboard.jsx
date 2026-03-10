@@ -169,6 +169,9 @@ export default function AdminDashboard() {
   const [merchantPaymentMethodsStats, setMerchantPaymentMethodsStats] = useState(null);
   const [paymentMethodsPeriod, setPaymentMethodsPeriod] = useState('today');
   
+  // Global Payment Methods Stats (for Overview)
+  const [globalPaymentMethods, setGlobalPaymentMethods] = useState(null);
+  
   // Security states
   const [pinEnabled, setPinEnabled] = useState(false);
   const [pinVerified, setPinVerified] = useState(false);
@@ -303,6 +306,16 @@ export default function AdminDashboard() {
         setAdvancedStats(advancedRes.data);
       } catch (advErr) {
         console.error('Advanced stats fetch error:', advErr);
+      }
+      
+      // Fetch global payment methods stats (Cash vs MoMo)
+      try {
+        const dashRes = await axios.get(`${API_URL}/api/admin/dashboard`, { headers });
+        if (dashRes.data.payment_methods) {
+          setGlobalPaymentMethods(dashRes.data.payment_methods);
+        }
+      } catch (pmErr) {
+        console.error('Payment methods stats fetch error:', pmErr);
       }
       
       // Fetch platform config for Settings
@@ -1399,6 +1412,7 @@ export default function AdminDashboard() {
             setSelectedMonth={setSelectedMonth}
             monthlyStats={monthlyStats}
             loadingMonthlyStats={loadingMonthlyStats}
+            paymentMethods={globalPaymentMethods}
           />
         )}
 
@@ -2793,6 +2807,7 @@ export default function AdminDashboard() {
                     <tr>
                       <th className="text-left p-2">Date</th>
                       <th className="text-left p-2">Client</th>
+                      <th className="text-center p-2">Method</th>
                       <th className="text-right p-2">Amount</th>
                       <th className="text-right p-2">Cashback</th>
                       <th className="text-left p-2">Status</th>
@@ -2803,13 +2818,24 @@ export default function AdminDashboard() {
                       <tr key={idx} className="hover:bg-slate-900/50">
                         <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString()}</td>
                         <td className="p-2 text-slate-300">{tx.client_name || 'Unknown'}</td>
+                        <td className="p-2 text-center">
+                          {tx.payment_method === 'cash' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              <Banknote size={12} /> Cash
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                              <Smartphone size={12} /> MoMo
+                            </span>
+                          )}
+                        </td>
                         <td className="p-2 text-right text-white">GHS {tx.amount?.toFixed(2)}</td>
                         <td className="p-2 text-right text-purple-400">GHS {tx.cashback_amount?.toFixed(2)}</td>
                         <td className="p-2">{getStatusBadge(tx.status || 'completed')}</td>
                       </tr>
                     ))}
                     {merchantTransactions.length === 0 && (
-                      <tr><td colSpan="5" className="text-center text-slate-500 py-8">No transactions found</td></tr>
+                      <tr><td colSpan="6" className="text-center text-slate-500 py-8">No transactions found</td></tr>
                     )}
                   </tbody>
                 </table>

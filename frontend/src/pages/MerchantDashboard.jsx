@@ -34,7 +34,8 @@ import {
   Info,
   Banknote,
   ArrowUpRight,
-  AlertTriangle
+  AlertTriangle,
+  Smartphone
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -923,9 +924,13 @@ export default function MerchantDashboard() {
                       }`}>
                         {txn.status}
                       </span>
-                      {txn.payment_method && (
-                        <span className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
-                          {txn.payment_method}
+                      {txn.payment_method === 'cash' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <Banknote size={12} /> Cash
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                          <Smartphone size={12} /> MoMo
                         </span>
                       )}
                     </div>

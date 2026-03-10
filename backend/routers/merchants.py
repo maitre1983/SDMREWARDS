@@ -775,7 +775,8 @@ async def get_transaction_history(
             "description": txn.get("description", ""),
             "reference": txn.get("payment_reference", ""),
             "status": txn.get("status", "completed"),
-            "type": txn.get("type", "merchant_payment")
+            "type": txn.get("type", "merchant_payment"),
+            "payment_method": txn.get("payment_method", "momo")  # Include payment method
         })
     
     # Calculate summary stats

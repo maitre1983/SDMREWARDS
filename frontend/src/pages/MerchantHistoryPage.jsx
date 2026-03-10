@@ -19,7 +19,9 @@ import {
   RefreshCw,
   Loader2,
   ArrowUpDown,
-  X
+  X,
+  Banknote,
+  Smartphone
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -405,7 +407,7 @@ export default function MerchantHistoryPage() {
           ) : (
             <>
               {/* Table Header */}
-              <div className="grid grid-cols-6 gap-4 px-4 py-3 bg-slate-900 border-b border-slate-700 text-sm font-medium text-slate-400">
+              <div className="grid grid-cols-7 gap-4 px-4 py-3 bg-slate-900 border-b border-slate-700 text-sm font-medium text-slate-400">
                 <button
                   onClick={() => handleSort('date')}
                   className="flex items-center gap-1 hover:text-white transition-colors text-left"
@@ -415,6 +417,7 @@ export default function MerchantHistoryPage() {
                   <ArrowUpDown size={14} className={sortBy === 'date' ? 'text-amber-400' : ''} />
                 </button>
                 <div>Client</div>
+                <div className="text-center">Method</div>
                 <button
                   onClick={() => handleSort('amount')}
                   className="flex items-center gap-1 hover:text-white transition-colors text-left"
@@ -440,7 +443,7 @@ export default function MerchantHistoryPage() {
                 {transactions.map((txn) => (
                   <div
                     key={txn.id}
-                    className="grid grid-cols-6 gap-4 px-4 py-3 hover:bg-slate-700/30 transition-colors text-sm"
+                    className="grid grid-cols-7 gap-4 px-4 py-3 hover:bg-slate-700/30 transition-colors text-sm"
                     data-testid={`transaction-row-${txn.id}`}
                   >
                     <div className="text-slate-300">
@@ -448,6 +451,17 @@ export default function MerchantHistoryPage() {
                     </div>
                     <div className="text-white font-medium truncate">
                       {txn.client_name}
+                    </div>
+                    <div className="text-center">
+                      {txn.payment_method === 'cash' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <Banknote size={12} /> Cash
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                          <Smartphone size={12} /> MoMo
+                        </span>
+                      )}
                     </div>
                     <div className="text-white font-semibold">
                       GHS {txn.amount?.toFixed(2)}

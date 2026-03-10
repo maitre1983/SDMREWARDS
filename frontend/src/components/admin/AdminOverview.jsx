@@ -1,7 +1,8 @@
 import React from 'react';
 import { 
   Users, Store, CreditCard, Activity, TrendingUp, Gift, UserPlus,
-  Medal, Award, Crown, DollarSign, Star, BarChart3, Loader2
+  Medal, Award, Crown, DollarSign, Star, BarChart3, Loader2,
+  Banknote, Smartphone
 } from 'lucide-react';
 import ServiceFeesAnalytics from './ServiceFeesAnalytics';
 
@@ -15,7 +16,8 @@ export default function AdminOverview({
   selectedMonth,
   setSelectedMonth,
   monthlyStats,
-  loadingMonthlyStats
+  loadingMonthlyStats,
+  paymentMethods  // New prop for payment methods stats
 }) {
   return (
     <div className="space-y-6">
@@ -121,6 +123,95 @@ export default function AdminOverview({
           <p className="text-amber-400 text-xs mt-2">{advancedStats?.referral_stats?.successful_referrals || 0} successful referrals</p>
         </div>
       </div>
+
+      {/* Payment Methods Breakdown (Global Cash vs MoMo) */}
+      {paymentMethods && (
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+            <BarChart3 size={20} className="text-cyan-400" />
+            Payment Methods (Cash vs MoMo)
+          </h3>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Today's Stats */}
+            <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-4">
+              <h4 className="text-slate-300 text-sm font-medium mb-3 flex items-center gap-2">
+                Today's Breakdown
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Banknote size={18} className="text-emerald-400" />
+                    <span className="text-emerald-400 font-medium text-sm">Cash</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">GHS {paymentMethods.today?.cash?.volume?.toLocaleString() || '0'}</p>
+                  <p className="text-slate-400 text-sm">{paymentMethods.today?.cash?.count || 0} transactions</p>
+                  <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-emerald-500 h-full transition-all"
+                      style={{ width: `${paymentMethods.today?.cash?.percentage || 0}%` }}
+                    />
+                  </div>
+                  <p className="text-emerald-400 text-xs mt-1">{paymentMethods.today?.cash?.percentage || 0}%</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Smartphone size={18} className="text-blue-400" />
+                    <span className="text-blue-400 font-medium text-sm">MoMo</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">GHS {paymentMethods.today?.momo?.volume?.toLocaleString() || '0'}</p>
+                  <p className="text-slate-400 text-sm">{paymentMethods.today?.momo?.count || 0} transactions</p>
+                  <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-blue-500 h-full transition-all"
+                      style={{ width: `${paymentMethods.today?.momo?.percentage || 0}%` }}
+                    />
+                  </div>
+                  <p className="text-blue-400 text-xs mt-1">{paymentMethods.today?.momo?.percentage || 0}%</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* All-Time Stats */}
+            <div className="bg-slate-900/50 border border-slate-700 rounded-xl p-4">
+              <h4 className="text-slate-300 text-sm font-medium mb-3 flex items-center gap-2">
+                All-Time Breakdown
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Banknote size={18} className="text-emerald-400" />
+                    <span className="text-emerald-400 font-medium text-sm">Cash</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">GHS {paymentMethods.all_time?.cash?.volume?.toLocaleString() || '0'}</p>
+                  <p className="text-slate-400 text-sm">{paymentMethods.all_time?.cash?.count || 0} transactions</p>
+                  <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-emerald-500 h-full transition-all"
+                      style={{ width: `${paymentMethods.all_time?.cash?.percentage || 0}%` }}
+                    />
+                  </div>
+                  <p className="text-emerald-400 text-xs mt-1">{paymentMethods.all_time?.cash?.percentage || 0}%</p>
+                </div>
+                <div className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Smartphone size={18} className="text-blue-400" />
+                    <span className="text-blue-400 font-medium text-sm">MoMo</span>
+                  </div>
+                  <p className="text-2xl font-bold text-white">GHS {paymentMethods.all_time?.momo?.volume?.toLocaleString() || '0'}</p>
+                  <p className="text-slate-400 text-sm">{paymentMethods.all_time?.momo?.count || 0} transactions</p>
+                  <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-blue-500 h-full transition-all"
+                      style={{ width: `${paymentMethods.all_time?.momo?.percentage || 0}%` }}
+                    />
+                  </div>
+                  <p className="text-blue-400 text-xs mt-1">{paymentMethods.all_time?.momo?.percentage || 0}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SDM Commissions & Service Fees Analytics */}
       <ServiceFeesAnalytics token={token} advancedStats={advancedStats} />
