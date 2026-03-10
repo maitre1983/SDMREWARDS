@@ -325,6 +325,18 @@ npx expo start
     - Merchant debit account (debited for cashback)
     - Admin statistics
   - Button changes to "Record Cash Payment" (green) when Cash selected
+  - **When debit limit reached:** Cash payments blocked, only MoMo allowed
+
+- **✅ Merchant Cash Dashboard Refactored (COMPLETED 2026-03-10):**
+  - **Removed:** Manual "Record Cash Payment" modal (clients now initiate)
+  - **Added:** "Today's Payments" section with automatic stats:
+    - Cash volume & count
+    - MoMo volume & count  
+    - Total volume & count
+    - Cashback distributed from cash sales
+  - **Added:** Info box explaining how cash payments work
+  - **Kept:** "Top Up Debit Account" button only
+  - Auto-refresh stats when navigating to Cash tab
 
 - **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
   - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`

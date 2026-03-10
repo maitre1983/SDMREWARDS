@@ -33,8 +33,6 @@ import {
   ChevronRight,
   Info,
   Banknote,
-  Search,
-  UserCheck,
   ArrowUpRight,
   AlertTriangle
 } from 'lucide-react';
@@ -92,14 +90,8 @@ export default function MerchantDashboard() {
   // Cash Payment & Debit Account states
   const [debitAccount, setDebitAccount] = useState(null);
   const [debitHistory, setDebitHistory] = useState([]);
-  const [showCashPaymentModal, setShowCashPaymentModal] = useState(false);
+  const [todayCashStats, setTodayCashStats] = useState(null);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [foundCustomer, setFoundCustomer] = useState(null);
-  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
-  const [cashAmount, setCashAmount] = useState('');
-  const [cashDescription, setCashDescription] = useState('');
-  const [isProcessingCash, setIsProcessingCash] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState('');
   const [topUpPhone, setTopUpPhone] = useState('');
   const [topUpNetwork, setTopUpNetwork] = useState('MTN');
@@ -115,6 +107,7 @@ export default function MerchantDashboard() {
     fetchDashboardData();
     fetchPinStatus();
     fetchDebitAccount();
+    fetchTodayCashStats();
   }, [token]);
 
   const fetchPinStatus = async () => {
@@ -201,58 +194,23 @@ export default function MerchantDashboard() {
     }
   };
 
-  const searchCustomer = async () => {
-    if (!customerSearch || customerSearch.length < 3) {
-      toast.error('Enter at least 3 characters');
-      return;
-    }
+  const fetchTodayCashStats = async () => {
     try {
-      setIsSearchingCustomer(true);
-      setFoundCustomer(null);
       const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get(`${API_URL}/api/merchants/search-customer?query=${encodeURIComponent(customerSearch)}`, { headers });
-      setFoundCustomer(res.data.customer);
-      toast.success('Customer found!');
+      const res = await axios.get(`${API_URL}/api/merchants/dashboard/payment-methods?chart_type=daily`, { headers });
+      // Get today's data (last item in the array)
+      const todayData = res.data.data?.[res.data.data.length - 1] || {};
+      setTodayCashStats({
+        cash_volume: todayData.cash_volume || 0,
+        cash_count: todayData.cash_count || 0,
+        cash_cashback: todayData.cash_cashback || 0,
+        momo_volume: todayData.momo_volume || 0,
+        momo_count: todayData.momo_count || 0,
+        total_volume: todayData.total_volume || 0,
+        total_count: todayData.total_count || 0
+      });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Customer not found');
-      setFoundCustomer(null);
-    } finally {
-      setIsSearchingCustomer(false);
-    }
-  };
-
-  const handleCashPayment = async () => {
-    if (!foundCustomer) {
-      toast.error('Please search and select a customer first');
-      return;
-    }
-    const amount = parseFloat(cashAmount);
-    if (!amount || amount <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-    try {
-      setIsProcessingCash(true);
-      const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.post(`${API_URL}/api/merchants/cash-transaction`, {
-        customer_id: foundCustomer.id,
-        amount: amount,
-        description: cashDescription || undefined
-      }, { headers });
-      
-      toast.success(`Cash payment recorded! GHS ${res.data.transaction.cashback_amount.toFixed(2)} cashback credited to customer.`);
-      setShowCashPaymentModal(false);
-      setFoundCustomer(null);
-      setCustomerSearch('');
-      setCashAmount('');
-      setCashDescription('');
-      fetchDebitAccount();
-      fetchDebitHistory();
-      fetchDashboardData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to record cash payment');
-    } finally {
-      setIsProcessingCash(false);
+      console.error('Today cash stats fetch error:', error);
     }
   };
 
@@ -672,6 +630,87 @@ export default function MerchantDashboard() {
         {/* Cash Payment Tab */}
         {activeTab === 'cash' && (
           <div className="space-y-6">
+            {/* Today's Cash Stats */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-bold flex items-center gap-2">
+                  <Banknote size={20} className="text-emerald-400" />
+                  Today's Payments
+                </h3>
+                <Button
+                  onClick={() => { fetchTodayCashStats(); fetchDebitAccount(); fetchDebitHistory(); }}
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400"
+                >
+                  <RefreshCw size={16} />
+                </Button>
+              </div>
+              
+              {todayCashStats ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Cash Sales */}
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Banknote className="text-emerald-400" size={18} />
+                      <span className="text-emerald-400 text-sm font-medium">Cash</span>
+                    </div>
+                    <p className="text-white text-xl font-bold">
+                      GHS {todayCashStats.cash_volume?.toFixed(2)}
+                    </p>
+                    <p className="text-slate-400 text-xs">
+                      {todayCashStats.cash_count} transaction{todayCashStats.cash_count !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  
+                  {/* MoMo Sales */}
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CreditCard className="text-blue-400" size={18} />
+                      <span className="text-blue-400 text-sm font-medium">MoMo</span>
+                    </div>
+                    <p className="text-white text-xl font-bold">
+                      GHS {todayCashStats.momo_volume?.toFixed(2)}
+                    </p>
+                    <p className="text-slate-400 text-xs">
+                      {todayCashStats.momo_count} transaction{todayCashStats.momo_count !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  
+                  {/* Total */}
+                  <div className="bg-slate-900 rounded-lg p-4 border border-slate-600">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="text-amber-400" size={18} />
+                      <span className="text-slate-300 text-sm font-medium">Total</span>
+                    </div>
+                    <p className="text-white text-xl font-bold">
+                      GHS {todayCashStats.total_volume?.toFixed(2)}
+                    </p>
+                    <p className="text-slate-400 text-xs">
+                      {todayCashStats.total_count} transactions
+                    </p>
+                  </div>
+                  
+                  {/* Cash Cashback Given */}
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="text-purple-400" size={18} />
+                      <span className="text-purple-400 text-sm font-medium">Cashback</span>
+                    </div>
+                    <p className="text-purple-400 text-xl font-bold">
+                      GHS {todayCashStats.cash_cashback?.toFixed(2)}
+                    </p>
+                    <p className="text-slate-400 text-xs">from cash sales</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <Loader2 className="animate-spin text-amber-400 mx-auto mb-2" size={24} />
+                  <p className="text-slate-400 text-sm">Loading today's stats...</p>
+                </div>
+              )}
+            </div>
+
             {/* Debit Account Overview */}
             <div className="bg-gradient-to-br from-amber-900/30 to-slate-800 border border-amber-500/30 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
@@ -764,24 +803,30 @@ export default function MerchantDashboard() {
                     </div>
                   )}
                   
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      onClick={() => setShowCashPaymentModal(true)}
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                      disabled={debitAccount.stats?.is_blocked || debitAccount.stats?.debit_limit === 0}
-                    >
-                      <Banknote size={18} className="mr-2" />
-                      Record Cash Payment
-                    </Button>
-                    <Button
-                      onClick={() => setShowTopUpModal(true)}
-                      className="bg-amber-600 hover:bg-amber-700"
-                    >
-                      <ArrowUpRight size={18} className="mr-2" />
-                      Top Up Account
-                    </Button>
+                  {/* Cash Payment Info Box */}
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
+                        <Banknote className="text-emerald-400" size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-emerald-400 font-medium">Cash Payments</h4>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Clients can pay cash by scanning your QR code and selecting "Cash" as payment method. 
+                          Cashback is automatically credited to them and debited from your account.
+                        </p>
+                      </div>
+                    </div>
                   </div>
+                  
+                  {/* Top Up Button */}
+                  <Button
+                    onClick={() => setShowTopUpModal(true)}
+                    className="w-full bg-amber-600 hover:bg-amber-700"
+                  >
+                    <ArrowUpRight size={18} className="mr-2" />
+                    Top Up Debit Account
+                  </Button>
                 </div>
               ) : (
                 <div className="text-center py-8">
@@ -1162,7 +1207,7 @@ export default function MerchantDashboard() {
             <span className="text-xs">Dashboard</span>
           </button>
           <button
-            onClick={() => { setActiveTab('cash'); fetchDebitAccount(); fetchDebitHistory(); }}
+            onClick={() => { setActiveTab('cash'); fetchDebitAccount(); fetchDebitHistory(); fetchTodayCashStats(); }}
             className={`flex flex-col items-center gap-1 ${activeTab === 'cash' ? 'text-emerald-400' : 'text-slate-500'}`}
             data-testid="nav-cash"
           >
@@ -1218,119 +1263,7 @@ export default function MerchantDashboard() {
         merchantEmail={merchant?.email}
       />
 
-      {/* Cash Payment Modal */}
-      {showCashPaymentModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
-            <h3 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
-              <Banknote className="text-emerald-400" size={24} />
-              Record Cash Payment
-            </h3>
-            
-            {/* Customer Search */}
-            <div className="space-y-4">
-              <div>
-                <label className="text-slate-300 text-sm mb-2 block">Search Customer</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    placeholder="Customer ID or Phone"
-                    className="bg-slate-900 border-slate-700 text-white flex-1"
-                  />
-                  <Button
-                    onClick={searchCustomer}
-                    disabled={isSearchingCustomer}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    {isSearchingCustomer ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />}
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Found Customer */}
-              {foundCustomer && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
-                      <UserCheck size={20} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold">{foundCustomer.full_name}</p>
-                      <p className="text-emerald-300 text-sm">{foundCustomer.phone} • {foundCustomer.card_type?.toUpperCase()} Card</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Amount */}
-              <div>
-                <label className="text-slate-300 text-sm mb-2 block">Transaction Amount (GHS)</label>
-                <Input
-                  type="number"
-                  value={cashAmount}
-                  onChange={(e) => setCashAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  className="bg-slate-900 border-slate-700 text-white"
-                  min="1"
-                />
-              </div>
-              
-              {/* Preview Cashback */}
-              {cashAmount && parseFloat(cashAmount) > 0 && (
-                <div className="bg-slate-900 rounded-lg p-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Cashback Rate:</span>
-                    <span className="text-emerald-400">{merchant?.cashback_rate || 5}%</span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-slate-400">Customer Cashback:</span>
-                    <span className="text-emerald-400 font-semibold">
-                      GHS {(parseFloat(cashAmount) * (merchant?.cashback_rate || 5) / 100).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              )}
-              
-              {/* Description */}
-              <div>
-                <label className="text-slate-300 text-sm mb-2 block">Description (Optional)</label>
-                <Input
-                  value={cashDescription}
-                  onChange={(e) => setCashDescription(e.target.value)}
-                  placeholder="e.g., Product purchase"
-                  className="bg-slate-900 border-slate-700 text-white"
-                />
-              </div>
-            </div>
-            
-            {/* Actions */}
-            <div className="flex gap-3 mt-6">
-              <Button
-                onClick={() => {
-                  setShowCashPaymentModal(false);
-                  setFoundCustomer(null);
-                  setCustomerSearch('');
-                  setCashAmount('');
-                  setCashDescription('');
-                }}
-                variant="outline"
-                className="flex-1 border-slate-600"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCashPayment}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                disabled={!foundCustomer || !cashAmount || isProcessingCash}
-              >
-                {isProcessingCash ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-                Record Payment
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Cash Payment Info Modal - Removed: Clients now initiate cash payments */}
 
       {/* Top Up Modal */}
       {showTopUpModal && (
