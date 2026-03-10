@@ -584,6 +584,53 @@ export default function ClientDashboard() {
     setMerchantPayNetwork('MTN');
   };
 
+  // ============== CASH PAYMENT TO MERCHANT ==============
+  
+  const initiateCashPayment = async () => {
+    const amount = parseFloat(merchantPayAmount);
+    if (!amount || amount < 1) {
+      toast.error('Minimum payment is GHS 1');
+      return;
+    }
+    
+    if (!selectedMerchant?.payment_qr_code) {
+      toast.error('Merchant QR code not found');
+      return;
+    }
+    
+    const payPhone = merchantPayPhone || client?.phone;
+    if (!payPhone || payPhone.length < 10) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setMerchantPayStatus('processing');
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/merchant/cash`, {
+        client_phone: payPhone,
+        merchant_qr_code: selectedMerchant?.payment_qr_code,
+        amount: amount
+      });
+      
+      if (res.data.success) {
+        setMerchantPayStatus('cash_success');
+        toast.success(`Cash payment recorded! GHS ${res.data.cashback_earned} cashback credited.`);
+        
+        // Refresh dashboard data after a short delay
+        setTimeout(() => {
+          fetchDashboardData();
+        }, 1500);
+      }
+    } catch (error) {
+      setMerchantPayStatus('failed');
+      toast.error(error.response?.data?.detail || 'Cash payment failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   // ============== REFERRAL SHARING ==============
 
   const copyReferralCode = () => {
@@ -1807,6 +1854,7 @@ export default function ClientDashboard() {
           onInitiatePayment={initiateMerchantPayment}
           onCheckStatus={checkMerchantPaymentStatus}
           onConfirmTest={confirmMerchantTestPayment}
+          onCashPayment={initiateCashPayment}
         />
       )}
       {/* ============== WITHDRAWAL MODAL ============== */}

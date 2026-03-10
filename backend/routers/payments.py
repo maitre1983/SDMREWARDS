@@ -105,6 +105,13 @@ class MerchantPaymentRequest(BaseModel):
     network: Optional[str] = None  # Client can specify network
 
 
+class ClientCashPaymentRequest(BaseModel):
+    """Client-initiated cash payment to merchant"""
+    client_phone: str
+    merchant_qr_code: str
+    amount: float
+
+
 # ============== ENDPOINTS ==============
 
 @router.post("/card/initiate")
@@ -463,6 +470,178 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
             {"$set": {"status": "failed", "provider_message": str(e)}}
         )
         raise HTTPException(status_code=500, detail="Payment service unavailable")
+
+
+@router.post("/merchant/cash")
+async def initiate_cash_payment(request: ClientCashPaymentRequest):
+    """
+    Client-initiated cash payment to merchant
+    - Records payment in main transactions table
+    - Debits merchant's debit account for cashback
+    - Credits client's cashback balance
+    - Syncs across Client, Merchant, and Admin views
+    """
+    if request.amount < 1:
+        raise HTTPException(status_code=400, detail="Minimum payment is GHS 1")
+    
+    # Find client
+    client = await db.clients.find_one({"phone": request.client_phone}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    if client.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Please purchase a membership card first")
+    
+    # Find merchant by QR code
+    merchant = await db.merchants.find_one({"payment_qr_code": request.merchant_qr_code}, {"_id": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    if merchant.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Merchant is not active")
+    
+    # Check merchant's debit account
+    debit_account = merchant.get("debit_account", {})
+    current_balance = debit_account.get("balance", 0)
+    debit_limit = debit_account.get("limit", 0)
+    is_blocked = debit_account.get("is_blocked", False)
+    
+    # Calculate cashback (using 95% of rate like MoMo payments)
+    cashback_rate = merchant.get("cashback_rate", 5) / 100
+    cashback_amount = round(request.amount * cashback_rate * 0.95, 2)
+    
+    # SDM commission (5% of cashback)
+    sdm_commission = round(request.amount * cashback_rate * 0.05, 2)
+    
+    # Check if merchant can afford this cashback via debit account
+    new_balance = current_balance - cashback_amount
+    if debit_limit > 0:
+        if is_blocked:
+            raise HTTPException(
+                status_code=400, 
+                detail="Merchant's debit account is blocked. Cash payments unavailable."
+            )
+        if abs(new_balance) > debit_limit:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Merchant's debit limit reached. Cash payment unavailable. Please pay with MoMo."
+            )
+    
+    now = datetime.now(timezone.utc).isoformat()
+    transaction_id = str(uuid.uuid4())
+    payment_ref = f"SDM-CASH-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
+    
+    # 1. Create main transaction (synced for Client, Merchant, Admin)
+    transaction = {
+        "id": transaction_id,
+        "reference": payment_ref,
+        "type": "payment",
+        "payment_method": "cash",  # Important: marks this as cash payment
+        "client_id": client["id"],
+        "client_phone": client.get("phone"),
+        "client_name": client.get("full_name"),
+        "merchant_id": merchant["id"],
+        "merchant_name": merchant.get("business_name"),
+        "amount": request.amount,
+        "cashback_rate": merchant.get("cashback_rate", 5),
+        "cashback_amount": cashback_amount,
+        "sdm_commission": sdm_commission,
+        "status": "completed",
+        "description": f"Cash payment at {merchant['business_name']}",
+        "created_at": now,
+        "completed_at": now
+    }
+    await db.transactions.insert_one(transaction)
+    
+    # 2. Create cash_transaction record for debit account tracking
+    cash_tx = {
+        "id": str(uuid.uuid4()),
+        "transaction_id": transaction_id,  # Link to main transaction
+        "merchant_id": merchant["id"],
+        "client_id": client["id"],
+        "client_name": client.get("full_name"),
+        "client_phone": client.get("phone"),
+        "amount": request.amount,
+        "cashback_rate": merchant.get("cashback_rate", 5),
+        "cashback_awarded": cashback_amount,
+        "initiated_by": "client",  # Client initiated this payment
+        "created_at": now
+    }
+    await db.cash_transactions.insert_one(cash_tx)
+    
+    # 3. Update merchant's debit account balance
+    await db.merchants.update_one(
+        {"id": merchant["id"]},
+        {
+            "$set": {
+                "debit_account.balance": new_balance,
+                "updated_at": now
+            },
+            "$inc": {
+                "total_sales": request.amount,
+                "total_cashback_given": cashback_amount,
+                "total_transactions": 1
+            }
+        }
+    )
+    
+    # 4. Record debit history
+    debit_history = {
+        "id": str(uuid.uuid4()),
+        "merchant_id": merchant["id"],
+        "type": "debit",
+        "amount": cashback_amount,
+        "balance_after": new_balance,
+        "description": f"Cashback for cash sale to {client.get('full_name', 'Customer')} - {payment_ref}",
+        "transaction_id": transaction_id,
+        "created_at": now
+    }
+    await db.debit_ledger.insert_one(debit_history)
+    
+    # 5. Credit client's cashback balance
+    await db.clients.update_one(
+        {"id": client["id"]},
+        {
+            "$inc": {
+                "cashback_balance": cashback_amount,
+                "total_earned": cashback_amount,
+                "total_spent": request.amount
+            },
+            "$set": {"updated_at": now}
+        }
+    )
+    
+    # 6. Check if merchant needs alert or blocking (75% / 100% of limit)
+    if debit_limit > 0:
+        usage_percentage = (abs(new_balance) / debit_limit) * 100
+        
+        # Block at 100%
+        if usage_percentage >= 100 and not is_blocked:
+            await db.merchants.update_one(
+                {"id": merchant["id"]},
+                {"$set": {"debit_account.is_blocked": True}}
+            )
+            # TODO: Send SMS alert to merchant
+            logger.warning(f"Merchant {merchant['id']} debit account blocked - limit reached")
+        
+        # Alert at 75%
+        elif usage_percentage >= 75 and usage_percentage < 100:
+            # TODO: Send SMS alert to merchant
+            logger.info(f"Merchant {merchant['id']} debit account at {usage_percentage:.1f}% usage")
+    
+    logger.info(f"Cash payment completed: {payment_ref}, amount={request.amount}, cashback={cashback_amount}")
+    
+    return {
+        "success": True,
+        "payment_id": transaction_id,
+        "reference": payment_ref,
+        "amount": request.amount,
+        "merchant": merchant["business_name"],
+        "cashback_earned": cashback_amount,
+        "status": "completed",
+        "payment_method": "cash",
+        "message": f"Cash payment recorded! GHS {cashback_amount} cashback credited to your wallet."
+    }
 
 
 @router.get("/status/{payment_id}")
