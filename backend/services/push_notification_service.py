@@ -12,10 +12,16 @@ from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# OneSignal Configuration
-ONESIGNAL_APP_ID = os.environ.get("ONESIGNAL_APP_ID", "5c95e6f8-d2e8-4c22-b070-dfd556d746a0")
-ONESIGNAL_API_KEY = os.environ.get("ONESIGNAL_API_KEY", "")
+# OneSignal Configuration - Read at runtime
 ONESIGNAL_BASE_URL = "https://onesignal.com/api/v1"
+
+
+def get_onesignal_config():
+    """Get OneSignal configuration from environment at runtime"""
+    return {
+        "app_id": os.environ.get("ONESIGNAL_APP_ID", "5c95e6f8-d2e8-4c22-b070-dfd556d746a0"),
+        "api_key": os.environ.get("ONESIGNAL_API_KEY", "")
+    }
 
 
 class PushNotificationService:
@@ -23,9 +29,15 @@ class PushNotificationService:
     
     def __init__(self, db=None):
         self.db = db
-        self.app_id = ONESIGNAL_APP_ID
-        self.api_key = ONESIGNAL_API_KEY
         self.base_url = ONESIGNAL_BASE_URL
+    
+    @property
+    def app_id(self):
+        return get_onesignal_config()["app_id"]
+    
+    @property
+    def api_key(self):
+        return get_onesignal_config()["api_key"]
     
     def is_configured(self) -> bool:
         """Check if OneSignal is properly configured"""
