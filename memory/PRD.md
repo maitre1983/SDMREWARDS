@@ -286,6 +286,7 @@ npx expo start
     - `GET /api/admin/merchants/debit-overview` - Admin view all debit accounts
     - `PUT /api/admin/merchants/{id}/debit-settings` - Admin set debit limits
     - `POST /api/admin/merchants/{id}/unblock-debit` - Admin unblock merchant
+    - `GET /api/merchants/dashboard/payment-methods` - Cash vs MoMo revenue stats
   - **Frontend Merchant Dashboard:**
     - New "Cash" tab with debit account overview
     - Balance display with usage percentage bar
@@ -293,6 +294,7 @@ npx expo start
     - Cashback preview calculation
     - "Top Up Account" modal with MoMo payment
     - Debit history list
+    - **NEW: Revenue Dashboard with Cash vs MoMo charts**
   - **Frontend Admin Dashboard:**
     - Settings > "Merchant Debit" tab
     - View all merchant debit accounts with status
@@ -304,6 +306,19 @@ npx expo start
     - Top-up unblocks account automatically
   - **Fixed:** Route ordering bug in admin.py (debit-overview route moved before parameterized route)
   - **Tests:** 11/11 backend tests passing, 100% frontend UI verified
+
+- **✅ Mobile App Cash Payment UI (COMPLETED 2026-03-10):**
+  - Created `CashPaymentScreen.js` for merchant mobile app
+  - Added navigation in `App.js` to `MerchantCashPayment` screen
+  - Updated `HomeScreen.js` with Cash button in bottom nav and Quick Actions
+  - Added API methods in `api.js`: getDebitAccount, getDebitHistory, searchCustomer, recordCashTransaction, topUpDebitAccount
+  - Features: Debit account overview, customer search, cash payment recording, top-up via MoMo
+
+- **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
+  - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
+  - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart
+  - Shows percentage breakdown: MoMo % vs Cash %
+  - Summary cards for MoMo, Cash, Total, and Cashback distributed
 
 - **✅ BulkClix SMS API Fixed (2026-03-10):**
   - Updated SMS service to use correct BulkClix API format

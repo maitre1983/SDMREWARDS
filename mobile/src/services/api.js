@@ -264,6 +264,38 @@ export const merchantAPI = {
     const response = await api.put('/merchants/settings/cashback', { cashback_rate: rate });
     return response.data;
   },
+
+  // ============== CASH PAYMENT / DEBIT ACCOUNT ==============
+  
+  // Get debit account info
+  getDebitAccount: async () => {
+    const response = await api.get('/merchants/debit-account');
+    return response.data;
+  },
+
+  // Get debit history
+  getDebitHistory: async (params = {}) => {
+    const response = await api.get('/merchants/debit-history', { params });
+    return response.data;
+  },
+
+  // Search customer by phone or ID
+  searchCustomer: async (query) => {
+    const response = await api.get(`/merchants/search-customer?query=${encodeURIComponent(query)}`);
+    return response.data;
+  },
+
+  // Record a cash transaction
+  recordCashTransaction: async (data) => {
+    const response = await api.post('/merchants/cash-transaction', data);
+    return response.data;
+  },
+
+  // Top up debit account via MoMo
+  topUpDebitAccount: async (data) => {
+    const response = await api.post('/merchants/topup-debit-account', data);
+    return response.data;
+  },
 };
 
 // ============== PAYMENTS API ==============

@@ -36,6 +36,7 @@ import ContactsScreen from './src/screens/client/ContactsScreen';
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
 import MerchantHistoryScreen from './src/screens/merchant/HistoryScreen';
 import MerchantSettingsScreen from './src/screens/merchant/SettingsScreen';
+import MerchantCashPaymentScreen from './src/screens/merchant/CashPaymentScreen';
 
 // Placeholder component for screens not yet implemented
 const PlaceholderScreen = ({ route }) => (
@@ -133,6 +134,7 @@ function MerchantMainNavigator() {
       <Stack.Screen name="Home" component={MerchantHomeScreen} />
       <Stack.Screen name="MerchantTransactions" component={MerchantHistoryScreen} />
       <Stack.Screen name="MerchantSettings" component={MerchantSettingsScreen} />
+      <Stack.Screen name="MerchantCashPayment" component={MerchantCashPaymentScreen} />
     </Stack.Navigator>
   );
 }

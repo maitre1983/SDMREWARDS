@@ -384,6 +384,19 @@ export default function MerchantHomeScreen({ navigation }) {
         <View style={styles.quickActions}>
           <TouchableOpacity 
             style={styles.quickAction}
+            onPress={() => navigation.navigate('MerchantCashPayment')}
+          >
+            <LinearGradient
+              colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']}
+              style={styles.quickActionGradient}
+            >
+              <Ionicons name="cash" size={24} color="#10B981" />
+              <Text style={styles.quickActionText}>Cash Payment</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.quickAction}
             onPress={() => navigation.navigate('MerchantTransactions')}
           >
             <LinearGradient
@@ -421,6 +434,19 @@ export default function MerchantHomeScreen({ navigation }) {
           <TouchableOpacity style={[styles.navItem, styles.navItemActive]}>
             <Ionicons name="home" size={22} color={COLORS.primary} />
             <Text style={[styles.navLabel, styles.navLabelActive]}>Home</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.navItem}
+            onPress={() => navigation.navigate('MerchantCashPayment')}
+          >
+            <LinearGradient
+              colors={['#10B981', '#059669']}
+              style={styles.cashNavButton}
+            >
+              <Ionicons name="cash" size={24} color={COLORS.white} />
+            </LinearGradient>
+            <Text style={styles.navLabelCash}>Cash</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -810,6 +836,24 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 10,
     marginTop: 8,
+  },
+  navLabelCash: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 8,
+  },
+  cashNavButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -20,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   qrNavButton: {
     width: 56,

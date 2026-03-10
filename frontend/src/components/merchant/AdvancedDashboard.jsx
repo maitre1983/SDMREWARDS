@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Legend 
+  Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import { 
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, 
   Users, Calculator, Calendar, BarChart3, Loader2,
-  ArrowUpRight, ArrowDownRight, Minus
+  ArrowUpRight, ArrowDownRight, Minus, Banknote, CreditCard
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -17,6 +17,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
   const [advancedStats, setAdvancedStats] = useState(null);
   const [summary, setSummary] = useState(null);
   const [chartData, setChartData] = useState(null);
+  const [paymentMethodsData, setPaymentMethodsData] = useState(null);
   const [chartType, setChartType] = useState('daily');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,15 +30,17 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [statsRes, summaryRes, chartRes] = await Promise.all([
+      const [statsRes, summaryRes, chartRes, paymentMethodsRes] = await Promise.all([
         axios.get(`${API_URL}/api/merchants/dashboard/advanced-stats?period=${period}`, { headers }),
         axios.get(`${API_URL}/api/merchants/dashboard/summary`, { headers }),
-        axios.get(`${API_URL}/api/merchants/dashboard/chart-data?chart_type=${chartType}`, { headers })
+        axios.get(`${API_URL}/api/merchants/dashboard/chart-data?chart_type=${chartType}`, { headers }),
+        axios.get(`${API_URL}/api/merchants/dashboard/payment-methods?chart_type=${chartType}`, { headers })
       ]);
       
       setAdvancedStats(statsRes.data);
       setSummary(summaryRes.data);
       setChartData(chartRes.data);
+      setPaymentMethodsData(paymentMethodsRes.data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -335,6 +338,160 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
               <p className="text-slate-400 text-xs">Transactions</p>
               <p className="text-white font-bold">{chartData.totals.transactions}</p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Cash vs MoMo Revenue Chart */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Banknote size={18} className="text-amber-400" /> Revenus: Cash vs MoMo
+          </h3>
+        </div>
+
+        {/* Summary Cards */}
+        {paymentMethodsData?.totals && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {/* MoMo Stats */}
+            <div className="bg-gradient-to-br from-blue-900/30 to-slate-900 rounded-xl p-4 border border-blue-500/30">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="text-blue-400" size={18} />
+                <span className="text-blue-400 text-sm font-medium">MoMo</span>
+              </div>
+              <p className="text-white text-xl font-bold">
+                {formatCurrency(paymentMethodsData.totals.momo_volume)}
+              </p>
+              <p className="text-slate-400 text-xs">
+                {paymentMethodsData.totals.momo_count} transactions
+              </p>
+              {paymentMethodsData.totals.momo_percentage > 0 && (
+                <div className="mt-2 bg-blue-500/20 rounded-full px-2 py-0.5 inline-block">
+                  <span className="text-blue-400 text-xs font-medium">
+                    {paymentMethodsData.totals.momo_percentage}%
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Cash Stats */}
+            <div className="bg-gradient-to-br from-emerald-900/30 to-slate-900 rounded-xl p-4 border border-emerald-500/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Banknote className="text-emerald-400" size={18} />
+                <span className="text-emerald-400 text-sm font-medium">Cash</span>
+              </div>
+              <p className="text-white text-xl font-bold">
+                {formatCurrency(paymentMethodsData.totals.cash_volume)}
+              </p>
+              <p className="text-slate-400 text-xs">
+                {paymentMethodsData.totals.cash_count} transactions
+              </p>
+              {paymentMethodsData.totals.cash_percentage > 0 && (
+                <div className="mt-2 bg-emerald-500/20 rounded-full px-2 py-0.5 inline-block">
+                  <span className="text-emerald-400 text-xs font-medium">
+                    {paymentMethodsData.totals.cash_percentage}%
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Total Volume */}
+            <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="text-amber-400" size={18} />
+                <span className="text-slate-300 text-sm font-medium">Total</span>
+              </div>
+              <p className="text-white text-xl font-bold">
+                {formatCurrency(paymentMethodsData.totals.total_volume)}
+              </p>
+              <p className="text-slate-400 text-xs">
+                {paymentMethodsData.totals.total_count} transactions
+              </p>
+            </div>
+
+            {/* Total Cashback */}
+            <div className="bg-slate-900 rounded-xl p-4 border border-slate-600">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="text-purple-400" size={18} />
+                <span className="text-slate-300 text-sm font-medium">Cashback</span>
+              </div>
+              <p className="text-purple-400 text-xl font-bold">
+                {formatCurrency(paymentMethodsData.totals.total_cashback)}
+              </p>
+              <p className="text-slate-400 text-xs">
+                distribué aux clients
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Stacked Bar Chart: Cash vs MoMo */}
+        {paymentMethodsData?.data && paymentMethodsData.data.length > 0 ? (
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={paymentMethodsData.data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis 
+                  dataKey="label" 
+                  stroke="#94a3b8" 
+                  tick={{ fill: '#94a3b8', fontSize: 12 }}
+                />
+                <YAxis 
+                  stroke="#94a3b8"
+                  tick={{ fill: '#94a3b8', fontSize: 12 }}
+                  tickFormatter={(value) => `${value}`}
+                />
+                <Tooltip 
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
+                          <p className="text-white font-medium mb-2">{label}</p>
+                          {payload.map((entry, index) => (
+                            <p key={index} style={{ color: entry.color }} className="text-sm">
+                              {entry.name}: {formatCurrency(entry.value)}
+                            </p>
+                          ))}
+                          <div className="mt-2 pt-2 border-t border-slate-600">
+                            <p className="text-slate-300 text-sm">
+                              Total: {formatCurrency(
+                                (payload.find(p => p.dataKey === 'momo_volume')?.value || 0) +
+                                (payload.find(p => p.dataKey === 'cash_volume')?.value || 0)
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend 
+                  wrapperStyle={{ color: '#94a3b8' }}
+                  formatter={(value) => <span style={{ color: '#94a3b8' }}>{value}</span>}
+                />
+                <Bar 
+                  dataKey="momo_volume" 
+                  name="MoMo (GHS)" 
+                  stackId="a"
+                  fill="#3b82f6" 
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar 
+                  dataKey="cash_volume" 
+                  name="Cash (GHS)" 
+                  stackId="a"
+                  fill="#10b981" 
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-64 flex flex-col items-center justify-center text-slate-500">
+            <Banknote size={48} className="mb-3 opacity-50" />
+            <p>Pas de données pour cette période</p>
+            <p className="text-sm">Les ventes cash et MoMo apparaîtront ici</p>
           </div>
         )}
       </div>

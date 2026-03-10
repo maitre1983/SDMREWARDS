@@ -504,6 +504,139 @@ async def get_chart_data(
     }
 
 
+@router.get("/dashboard/payment-methods")
+async def get_payment_methods_stats(
+    chart_type: str = "daily",  # daily, weekly, monthly
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get sales breakdown by payment method (Cash vs MoMo) with chart data"""
+    merchant_id = current_merchant["id"]
+    now = datetime.now(timezone.utc)
+    
+    data_points = []
+    
+    def calculate_period_data(start: datetime, end: datetime, label: str):
+        """Helper to calculate Cash vs MoMo stats for a period"""
+        return {
+            "label": label,
+            "date": start.isoformat(),
+            "start": start,
+            "end": end
+        }
+    
+    # Build periods based on chart_type
+    periods = []
+    if chart_type == "daily":
+        # Last 7 days
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            periods.append({
+                "label": day.strftime("%a"),
+                "date": day_start.isoformat(),
+                "start": day_start,
+                "end": day_end
+            })
+    elif chart_type == "weekly":
+        # Last 4 weeks
+        for i in range(3, -1, -1):
+            week_start = now - timedelta(weeks=i, days=now.weekday())
+            week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_end = week_start + timedelta(weeks=1)
+            periods.append({
+                "label": f"S{week_start.isocalendar()[1]}",
+                "date": week_start.isoformat(),
+                "start": week_start,
+                "end": week_end
+            })
+    elif chart_type == "monthly":
+        # Last 6 months
+        for i in range(5, -1, -1):
+            month = now.month - i
+            year = now.year
+            if month <= 0:
+                month += 12
+                year -= 1
+            month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+            if month == 12:
+                month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+            periods.append({
+                "label": month_start.strftime("%b"),
+                "date": month_start.isoformat(),
+                "start": month_start,
+                "end": month_end
+            })
+    
+    # Fetch data for each period
+    for period in periods:
+        # Get regular transactions (MoMo payments)
+        momo_txs = await db.transactions.find({
+            "merchant_id": merchant_id,
+            "created_at": {
+                "$gte": period["start"].isoformat(),
+                "$lt": period["end"].isoformat()
+            }
+        }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(1000)
+        
+        # Get cash transactions
+        cash_txs = await db.cash_transactions.find({
+            "merchant_id": merchant_id,
+            "created_at": {
+                "$gte": period["start"].isoformat(),
+                "$lt": period["end"].isoformat()
+            }
+        }, {"_id": 0, "amount": 1, "cashback_awarded": 1}).to_list(1000)
+        
+        momo_volume = sum(t.get("amount", 0) for t in momo_txs)
+        momo_cashback = sum(t.get("cashback_amount", 0) for t in momo_txs)
+        cash_volume = sum(t.get("amount", 0) for t in cash_txs)
+        cash_cashback = sum(t.get("cashback_awarded", 0) for t in cash_txs)
+        
+        data_points.append({
+            "label": period["label"],
+            "date": period["date"],
+            "momo_volume": round(momo_volume, 2),
+            "momo_cashback": round(momo_cashback, 2),
+            "momo_count": len(momo_txs),
+            "cash_volume": round(cash_volume, 2),
+            "cash_cashback": round(cash_cashback, 2),
+            "cash_count": len(cash_txs),
+            "total_volume": round(momo_volume + cash_volume, 2),
+            "total_cashback": round(momo_cashback + cash_cashback, 2),
+            "total_count": len(momo_txs) + len(cash_txs)
+        })
+    
+    # Calculate totals
+    totals = {
+        "momo_volume": sum(p["momo_volume"] for p in data_points),
+        "momo_cashback": sum(p["momo_cashback"] for p in data_points),
+        "momo_count": sum(p["momo_count"] for p in data_points),
+        "cash_volume": sum(p["cash_volume"] for p in data_points),
+        "cash_cashback": sum(p["cash_cashback"] for p in data_points),
+        "cash_count": sum(p["cash_count"] for p in data_points),
+        "total_volume": sum(p["total_volume"] for p in data_points),
+        "total_cashback": sum(p["total_cashback"] for p in data_points),
+        "total_count": sum(p["total_count"] for p in data_points)
+    }
+    
+    # Calculate percentages
+    if totals["total_volume"] > 0:
+        totals["momo_percentage"] = round(totals["momo_volume"] / totals["total_volume"] * 100, 1)
+        totals["cash_percentage"] = round(totals["cash_volume"] / totals["total_volume"] * 100, 1)
+    else:
+        totals["momo_percentage"] = 0
+        totals["cash_percentage"] = 0
+    
+    return {
+        "chart_type": chart_type,
+        "data": data_points,
+        "totals": totals
+    }
+
+
 # ============== TRANSACTION HISTORY ==============
 
 @router.get("/transactions/history")
