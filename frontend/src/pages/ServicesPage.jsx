@@ -46,10 +46,6 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   const [meterNumber, setMeterNumber] = useState('');
   const [bundleCode, setBundleCode] = useState('');
   
-  // Payment method states (for services)
-  const [paymentMethod, setPaymentMethod] = useState('cashback'); // 'cashback', 'momo', 'hybrid'
-  const [momoPhone, setMomoPhone] = useState('');
-  
   // Data bundle states
   const [dataServices, setDataServices] = useState([]);
   const [selectedDataService, setSelectedDataService] = useState(null);
@@ -245,38 +241,6 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
     };
   };
   
-  // Calculate payment breakdown based on selected method
-  const calculatePaymentBreakdown = () => {
-    const calc = calculateTotal();
-    const total = calc.total;
-    const cashbackBalance = balance || 0;
-    
-    let cashbackToUse = 0;
-    let momoToUse = 0;
-    
-    if (paymentMethod === 'cashback') {
-      // 100% cashback
-      cashbackToUse = total;
-      momoToUse = 0;
-    } else if (paymentMethod === 'momo') {
-      // 100% MoMo
-      cashbackToUse = 0;
-      momoToUse = total;
-    } else if (paymentMethod === 'hybrid') {
-      // Use all available cashback, rest via MoMo
-      cashbackToUse = Math.min(cashbackBalance, total);
-      momoToUse = Math.max(0, total - cashbackToUse);
-    }
-    
-    return {
-      ...calc,
-      cashbackToUse: Math.round(cashbackToUse * 100) / 100,
-      momoToUse: Math.round(momoToUse * 100) / 100,
-      canPay: paymentMethod === 'momo' || (paymentMethod === 'cashback' && cashbackBalance >= total) || (paymentMethod === 'hybrid' && (cashbackBalance >= total || momoPhone.length >= 10)),
-      needsMomo: momoToUse > 0
-    };
-  };
-  
   // Calculate upgrade payment breakdown
   const calculateUpgradePayment = () => {
     if (!selectedUpgradeCard) return { cashback: 0, momo: 0, total: 0 };
@@ -461,16 +425,11 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       return;
     }
     
-    const breakdown = calculatePaymentBreakdown();
+    const calc = calculateTotal();
     
-    // Validate payment based on method
-    if (paymentMethod === 'cashback' && breakdown.cashbackToUse > balance) {
+    // Services are paid with cashback only
+    if (calc.total > balance) {
       toast.error(`Insufficient cashback balance. Available: GHS ${balance.toFixed(2)}`);
-      return;
-    }
-    
-    if ((paymentMethod === 'momo' || (paymentMethod === 'hybrid' && breakdown.momoToUse > 0)) && momoPhone.length < 10) {
-      toast.error('Please enter a valid MoMo phone number');
       return;
     }
     
@@ -483,13 +442,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
       switch (activeService) {
         case 'airtime':
           endpoint = '/api/services/airtime/purchase';
-          payload = { 
-            phone, 
-            amount: parseFloat(amount), 
-            network,
-            payment_method: paymentMethod,
-            momo_phone: paymentMethod !== 'cashback' ? momoPhone : null
-          };
+          payload = { phone, amount: parseFloat(amount), network };
           break;
         case 'data':
           if (!selectedBundle) {
@@ -504,19 +457,12 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             service_id: selectedBundle.service_id,
             network,
             amount: selectedBundle.amount,
-            display_name: selectedBundle.display,
-            payment_method: paymentMethod,
-            momo_phone: paymentMethod !== 'cashback' ? momoPhone : null
+            display_name: selectedBundle.display
           };
           break;
         case 'ecg':
           endpoint = '/api/services/ecg/pay';
-          payload = { 
-            meter_number: meterNumber, 
-            amount: parseFloat(amount),
-            payment_method: paymentMethod,
-            momo_phone: paymentMethod !== 'cashback' ? momoPhone : null
-          };
+          payload = { meter_number: meterNumber, amount: parseFloat(amount) };
           break;
         case 'withdrawal':
           endpoint = '/api/services/withdrawal/initiate';
@@ -552,8 +498,6 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
     setSelectedBundle(null);
     setDataBundlesApi([]);
     setBundleUserName('');
-    setPaymentMethod('cashback');
-    setMomoPhone('');
   };
   
   // Render the card upgrade form
@@ -1036,118 +980,36 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
           )}
         </div>
         
-        {/* Payment Method Selection */}
-        {(amount || selectedBundle) && activeService !== 'withdrawal' && (
-          <div className="space-y-3">
-            <Label className="text-slate-300 text-sm">Payment Method</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                onClick={() => setPaymentMethod('cashback')}
-                className={`p-3 rounded-xl border text-center transition-all ${
-                  paymentMethod === 'cashback'
-                    ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-                data-testid="payment-method-cashback"
-              >
-                <Wallet size={20} className="mx-auto mb-1" />
-                <span className="text-xs font-medium">Cashback</span>
-              </button>
-              <button
-                onClick={() => setPaymentMethod('momo')}
-                className={`p-3 rounded-xl border text-center transition-all ${
-                  paymentMethod === 'momo'
-                    ? 'bg-blue-500/20 border-blue-500 text-blue-400'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-                data-testid="payment-method-momo"
-              >
-                <Smartphone size={20} className="mx-auto mb-1" />
-                <span className="text-xs font-medium">MoMo</span>
-              </button>
-              <button
-                onClick={() => setPaymentMethod('hybrid')}
-                className={`p-3 rounded-xl border text-center transition-all ${
-                  paymentMethod === 'hybrid'
-                    ? 'bg-purple-500/20 border-purple-500 text-purple-400'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                }`}
-                data-testid="payment-method-hybrid"
-              >
-                <div className="flex justify-center gap-0.5 mb-1">
-                  <Wallet size={14} />
-                  <span>+</span>
-                  <Smartphone size={14} />
-                </div>
-                <span className="text-xs font-medium">Hybrid</span>
-              </button>
-            </div>
-            
-            {/* MoMo Phone Number (when MoMo or Hybrid selected) */}
-            {(paymentMethod === 'momo' || (paymentMethod === 'hybrid' && calculatePaymentBreakdown().momoToUse > 0)) && (
-              <div className="mt-3">
-                <Label className="text-slate-300 text-sm">MoMo Phone for Payment</Label>
-                <Input
-                  type="tel"
-                  placeholder="Enter MoMo number to pay"
-                  value={momoPhone}
-                  onChange={(e) => setMomoPhone(e.target.value)}
-                  className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
-                  data-testid="momo-payment-phone"
-                />
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Cost Summary */}
+        {/* Cost Summary - Services are paid with Cashback only */}
         {(amount || selectedBundle) && (() => {
-          const breakdown = calculatePaymentBreakdown();
+          const calc = calculateTotal();
           return (
             <div className="bg-slate-800/50 rounded-xl p-4 space-y-2">
               <div className="flex justify-between text-slate-400 text-sm">
                 <span>Amount</span>
-                <span>GHS {breakdown.amount.toFixed(2)}</span>
+                <span>GHS {calc.amount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-slate-400 text-sm">
-                <span>Service Fee {breakdown.feeType === 'fixed' ? '(Fixed)' : `(${breakdown.feeRate}%)`}</span>
-                <span>GHS {breakdown.fee.toFixed(2)}</span>
+                <span>Service Fee {calc.feeType === 'fixed' ? '(Fixed)' : `(${calc.feeRate}%)`}</span>
+                <span>GHS {calc.fee.toFixed(2)}</span>
               </div>
               <div className="border-t border-slate-700 pt-2 flex justify-between text-white font-semibold">
                 <span>Total</span>
-                <span>GHS {breakdown.total.toFixed(2)}</span>
+                <span>GHS {calc.total.toFixed(2)}</span>
               </div>
               
-              {/* Payment Breakdown */}
-              {paymentMethod !== 'cashback' && (
-                <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
-                  <p className="text-slate-400 text-xs mb-1">Payment Breakdown:</p>
-                  {breakdown.cashbackToUse > 0 && (
-                    <div className="flex justify-between text-amber-400 text-sm">
-                      <span className="flex items-center gap-1"><Wallet size={14} /> Cashback</span>
-                      <span>GHS {breakdown.cashbackToUse.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {breakdown.momoToUse > 0 && (
-                    <div className="flex justify-between text-blue-400 text-sm">
-                      <span className="flex items-center gap-1"><Smartphone size={14} /> MoMo</span>
-                      <span>GHS {breakdown.momoToUse.toFixed(2)}</span>
-                    </div>
-                  )}
+              {/* Payment Method Info */}
+              <div className="border-t border-slate-700 pt-2 mt-2">
+                <div className="flex items-center gap-2 text-amber-400 text-sm">
+                  <Wallet size={14} />
+                  <span>Paid from Cashback Balance</span>
                 </div>
-              )}
+              </div>
               
-              {paymentMethod === 'cashback' && breakdown.total > balance && (
+              {calc.total > balance && (
                 <div className="flex items-center gap-2 text-red-400 text-sm mt-2">
                   <AlertCircle size={14} />
-                  <span>Insufficient cashback balance</span>
-                </div>
-              )}
-              
-              {(paymentMethod === 'momo' || paymentMethod === 'hybrid') && breakdown.momoToUse > 0 && momoPhone.length < 10 && (
-                <div className="flex items-center gap-2 text-amber-400 text-sm mt-2">
-                  <AlertCircle size={14} />
-                  <span>Enter MoMo number for payment</span>
+                  <span>Insufficient cashback balance (Available: GHS {balance.toFixed(2)})</span>
                 </div>
               )}
             </div>
@@ -1156,13 +1018,11 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         
         {/* Submit Button */}
         {(() => {
-          const breakdown = calculatePaymentBreakdown();
+          const calc = calculateTotal();
           return (
             <Button
               onClick={handlePurchase}
-              disabled={isLoading || 
-                (paymentMethod === 'cashback' && breakdown.total > balance) ||
-                ((paymentMethod === 'momo' || (paymentMethod === 'hybrid' && breakdown.momoToUse > 0)) && momoPhone.length < 10) ||
+              disabled={isLoading || calc.total > balance || 
                 (['airtime', 'withdrawal'].includes(activeService) && (!phone || !amount)) ||
                 (activeService === 'ecg' && (!meterNumber || !amount)) ||
                 (activeService === 'data' && (!phone || !selectedBundle))
@@ -1175,7 +1035,7 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
               ) : (
                 <CheckCircle className="mr-2" size={18} />
               )}
-              {isLoading ? 'Processing...' : `Pay GHS ${breakdown.total.toFixed(2)}`}
+              {isLoading ? 'Processing...' : `Pay GHS ${calc.total.toFixed(2)}`}
             </Button>
           );
         })()}

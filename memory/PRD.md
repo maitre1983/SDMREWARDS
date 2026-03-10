@@ -448,20 +448,36 @@ npx expo start
   - Merchants sorted by Cash Volume (highest first)
   - Full synchronization with debit account system
 
-- **🚧 IN PROGRESS: Flexible Payment Methods (Cashback/MoMo/Hybrid) - 2026-03-10:**
-  - **Goal**: Allow clients to pay with 100% Cashback, 100% MoMo, or Hybrid (Cashback + MoMo)
-  - **Backend Changes Done**:
-    - Added `payment_method` and `momo_phone` fields to service request models (AirtimeRequest, DataBundleRequest, ECGPaymentRequest)
-    - Added `process_hybrid_payment()` helper function for calculating payment breakdown
-    - Created new endpoint `POST /api/payments/merchant/cashback` for cashback/hybrid merchant payments
-    - Updated Admin Dashboard `/api/admin/dashboard` to include `cashback_ecosystem` stats
-  - **Frontend Changes Done**:
-    - Added Payment Method selector (3 buttons: Cashback, MoMo, Hybrid) to ServicesPage.jsx
-    - Added `calculatePaymentBreakdown()` function for showing payment breakdown
-    - Modified MerchantPayModal.jsx to support 4 payment methods (MoMo, Cash, Cashback, Hybrid)
-    - Added `clientCashbackBalance` prop and `onCashbackPayment` callback
-    - Added new UI section "Cashback Ecosystem" to Admin Overview showing Total Awarded, Total Used, Remaining, Usage Rate
-  - **Testing Required**: Full end-to-end testing with testing agent needed to validate all payment flows
+- **✅ Feature: Flexible Payment Methods for Merchants - COMPLETED 2026-03-10:**
+  - **Goal**: Allow clients to pay at merchants with 4 methods: MoMo, Cash, Cashback, or Hybrid (Cashback + MoMo)
+  
+  - **Backend Changes**:
+    - Created new endpoint `POST /api/payments/merchant/cashback` for cashback/hybrid payments
+    - Tracks `cashback_used` field in transactions for accurate ecosystem stats
+    - Cashback earned only on MoMo portion (not on cashback portion used)
+    - Added `cashback_ecosystem` stats to `/api/admin/dashboard`:
+      - Total Awarded (distributed + referrals + bonuses)
+      - Total Used (services + payments)
+      - Remaining (awarded - used)
+      - Usage Rate (used / awarded × 100)
+  
+  - **Frontend Changes**:
+    - **MerchantPayModal.jsx**: 
+      - Added 4-button payment method selector (MoMo, Cash, Cashback, Hybrid)
+      - Shows client's cashback balance
+      - Hybrid breakdown (cashback + MoMo amounts)
+      - Disables Cashback button if insufficient balance
+    - **AdminOverview.jsx**: 
+      - New "Cashback Ecosystem" section with 4 indicators
+      - Visual progress bars for Remaining and Usage Rate
+    - **ServicesPage.jsx**: 
+      - Simplified to cashback-only (as per user requirement)
+      - Services (Airtime, Data, ECG) are paid with cashback only
+  
+  - **Tested & Verified**:
+    - ✅ 100% Cashback payment: GHS 5 → Balance 12.44 → 7.44
+    - ✅ Hybrid payment: GHS 10 (7.44 CB + 2.56 MoMo) → Earned 0.12 cashback on MoMo portion
+    - ✅ Admin Ecosystem stats updated correctly
 
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
