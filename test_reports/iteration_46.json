@@ -1,0 +1,117 @@
+{
+  "summary": "Merchant Payment Modal Testing - ALL 4 PAYMENT METHODS WORKING. Tested MerchantPayModal with MoMo, Cash, Cashback, and Hybrid payment methods. Backend APIs verified working. Frontend UI displays all 4 payment method buttons correctly with proper enable/disable logic based on client's cashback balance.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MerchantPayModal - Cashback selection with insufficient balance",
+        "issue": "When Cashback is selected and amount > balance, UI shows 'Balance after: GHS -0.88' (negative). The button is correctly disabled but selecting it still shows the info box with negative balance",
+        "selector": "[data-testid='payment-method-cashback']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_merchant_payment_modal.py",
+    "/app/test_reports/pytest/merchant_payment_modal_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_merchant_payment_modal.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100% (all 4 payment methods verified working)"
+  },
+  "test_credentials": {
+    "client": {"phone": "+233555861556", "password": "000000"},
+    "merchant_qr_codes": ["TESTSHOP001", "SDM-M-C2A29E44"]
+  },
+  "seed_data_creation": "None - used existing Test User SDM with GHS 0.12 cashback balance",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Merchant Payment Modal with 4 payment methods fully functional. Access via: Client Dashboard > Partners tab > Select merchant > Pay This Merchant. Payment methods: 1) MoMo (blue, shows phone/network), 2) Cash (green, direct record), 3) Cashback (amber, disabled if balance < amount), 4) Hybrid (purple, shows cashback+MoMo breakdown).",
+  "features_tested": {
+    "modal_opens_correctly": {
+      "status": "PASS",
+      "description": "Modal opens from Partners page after clicking 'Pay This Merchant' button"
+    },
+    "payment_method_buttons": {
+      "momo": {
+        "status": "PASS",
+        "color": "blue",
+        "fields_shown": ["MoMo Number", "Network dropdown"],
+        "button_text": "Pay with MoMo"
+      },
+      "cash": {
+        "status": "PASS",
+        "color": "green",
+        "fields_shown": ["Cash Payment info box"],
+        "button_text": "Record Cash Payment"
+      },
+      "cashback": {
+        "status": "PASS",
+        "color": "amber",
+        "fields_shown": ["Pay with Cashback info box", "Balance after calculation"],
+        "button_text": "Pay with Cashback",
+        "disabled_when": "amount > client cashback balance"
+      },
+      "hybrid": {
+        "status": "PASS",
+        "color": "purple",
+        "fields_shown": ["Payment Breakdown (Cashback + MoMo)", "MoMo Number (for remaining amount)"],
+        "button_text": "Pay (GHS X CB + GHS Y MoMo)",
+        "disabled_when": "cashback balance <= 0"
+      }
+    },
+    "cashback_balance_display": {
+      "status": "PASS",
+      "description": "Shows 'Your Cashback Balance: GHS X.XX' in modal"
+    },
+    "cashback_button_disable_logic": {
+      "status": "PASS",
+      "description": "Cashback button disabled when client balance < payment amount"
+    },
+    "backend_apis": [
+      {
+        "endpoint": "GET /api/merchants/by-qr/{code}",
+        "status": "PASS",
+        "description": "Returns merchant info including cash_payment availability"
+      },
+      {
+        "endpoint": "POST /api/payments/merchant/cashback",
+        "status": "PASS",
+        "description": "Processes cashback and hybrid payments with auth required"
+      },
+      {
+        "endpoint": "POST /api/payments/merchant/cash",
+        "status": "PASS",
+        "description": "Records cash payment and credits cashback"
+      },
+      {
+        "endpoint": "POST /api/payments/merchant/initiate",
+        "status": "PASS",
+        "description": "Initiates MoMo payment request"
+      }
+    ]
+  },
+  "pytest_results": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "test_classes": [
+      "TestMerchantQRLookup (3 tests)",
+      "TestCashbackPayment (3 tests)",
+      "TestHybridPayment (2 tests)",
+      "TestCashPayment (2 tests)",
+      "TestMoMoPayment (2 tests)",
+      "TestClientCashbackBalance (1 test)"
+    ]
+  }
+}
