@@ -366,17 +366,27 @@ export default function MerchantPayModal({
             
             {/* Cashback Payment Info */}
             {paymentMethod === 'cashback' && (
-              <div className="mb-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+              <div className={`mb-6 ${isCashbackSufficient ? 'bg-amber-500/10 border-amber-500/30' : 'bg-red-500/10 border-red-500/30'} border rounded-lg p-4`}>
                 <div className="flex items-start gap-3">
-                  <Wallet className="text-amber-400 shrink-0 mt-0.5" size={20} />
+                  <Wallet className={`${isCashbackSufficient ? 'text-amber-400' : 'text-red-400'} shrink-0 mt-0.5`} size={20} />
                   <div>
-                    <p className="text-amber-400 font-medium text-sm">Pay with Cashback</p>
-                    <p className="text-slate-400 text-xs mt-1">
-                      GHS {parsedAmount.toFixed(2)} will be deducted from your cashback balance.
+                    <p className={`${isCashbackSufficient ? 'text-amber-400' : 'text-red-400'} font-medium text-sm`}>
+                      {isCashbackSufficient ? 'Pay with Cashback' : 'Insufficient Cashback Balance'}
                     </p>
-                    <p className="text-amber-400 text-xs mt-1">
-                      Balance after: GHS {(clientCashbackBalance - parsedAmount).toFixed(2)}
-                    </p>
+                    {isCashbackSufficient ? (
+                      <>
+                        <p className="text-slate-400 text-xs mt-1">
+                          GHS {parsedAmount.toFixed(2)} will be deducted from your cashback balance.
+                        </p>
+                        <p className="text-amber-400 text-xs mt-1">
+                          Balance after: GHS {(clientCashbackBalance - parsedAmount).toFixed(2)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-slate-400 text-xs mt-1">
+                        You need GHS {(parsedAmount - clientCashbackBalance).toFixed(2)} more. Try Hybrid payment instead.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
