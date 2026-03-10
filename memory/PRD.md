@@ -276,6 +276,35 @@ npx expo start
 ---
 
 ## Recent Changes (2026-03-10)
+- **✅ Cash Payment with Merchant Debit Account (COMPLETED 2026-03-10):**
+  - **Backend APIs:**
+    - `GET /api/merchants/debit-account` - View debit account balance/limits
+    - `GET /api/merchants/search-customer` - Search customers by phone/ID
+    - `POST /api/merchants/cash-transaction` - Record cash payment with cashback
+    - `GET /api/merchants/debit-history` - View debit transaction history
+    - `POST /api/merchants/topup-debit-account` - Top up debit account via MoMo
+    - `GET /api/admin/merchants/debit-overview` - Admin view all debit accounts
+    - `PUT /api/admin/merchants/{id}/debit-settings` - Admin set debit limits
+    - `POST /api/admin/merchants/{id}/unblock-debit` - Admin unblock merchant
+  - **Frontend Merchant Dashboard:**
+    - New "Cash" tab with debit account overview
+    - Balance display with usage percentage bar
+    - "Record Cash Payment" modal with customer search
+    - Cashback preview calculation
+    - "Top Up Account" modal with MoMo payment
+    - Debit history list
+  - **Frontend Admin Dashboard:**
+    - Settings > "Merchant Debit" tab
+    - View all merchant debit accounts with status
+    - Configure debit limits per merchant
+    - Unblock blocked merchants
+  - **Automated Features:**
+    - SMS alert at 75% debit limit usage
+    - Automatic blocking at 100% limit
+    - Top-up unblocks account automatically
+  - **Fixed:** Route ordering bug in admin.py (debit-overview route moved before parameterized route)
+  - **Tests:** 11/11 backend tests passing, 100% frontend UI verified
+
 - **✅ BulkClix SMS API Fixed (2026-03-10):**
   - Updated SMS service to use correct BulkClix API format
   - Added `Accept: application/json` header
