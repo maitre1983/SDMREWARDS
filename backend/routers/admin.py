@@ -933,6 +933,58 @@ async def send_sms_to_client(
 
 # ============== MERCHANTS MANAGEMENT ==============
 
+# NOTE: Static routes must come BEFORE parameterized routes to avoid routing conflicts
+
+@router.get("/merchants/debit-overview")
+async def get_merchants_debit_overview(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get overview of all merchant debit accounts"""
+    
+    # Get all debit accounts
+    debit_accounts = await db.merchant_debit_accounts.find({}, {"_id": 0}).to_list(10000)
+    
+    # Enrich with merchant info
+    enriched = []
+    for account in debit_accounts:
+        merchant = await db.merchants.find_one(
+            {"id": account.get("merchant_id")},
+            {"_id": 0, "business_name": 1, "owner_name": 1, "phone": 1, "status": 1}
+        )
+        if merchant:
+            balance = account.get("balance", 0)
+            debit_limit = account.get("debit_limit", 0)
+            usage_percentage = 0
+            if debit_limit > 0 and balance < 0:
+                usage_percentage = min(100, abs(balance) / debit_limit * 100)
+            
+            enriched.append({
+                **account,
+                "merchant": merchant,
+                "usage_percentage": round(usage_percentage, 1)
+            })
+    
+    # Sort by balance (most negative first)
+    enriched.sort(key=lambda x: x.get("balance", 0))
+    
+    # Calculate totals
+    total_debt = sum(abs(a.get("balance", 0)) for a in enriched if a.get("balance", 0) < 0)
+    total_credit = sum(a.get("balance", 0) for a in enriched if a.get("balance", 0) > 0)
+    blocked_count = sum(1 for a in enriched if a.get("status") == "blocked")
+    warning_count = sum(1 for a in enriched if a.get("status") == "warning")
+    
+    return {
+        "accounts": enriched,
+        "summary": {
+            "total_merchants": len(enriched),
+            "total_debt": round(total_debt, 2),
+            "total_credit": round(total_credit, 2),
+            "blocked_count": blocked_count,
+            "warning_count": warning_count
+        }
+    }
+
+
 @router.get("/merchants")
 async def list_merchants(
     limit: int = 50,
@@ -1293,57 +1345,7 @@ async def send_sms_to_merchant(
     return {"success": result.get("success", False), "message": "SMS sent" if result.get("success") else "SMS failed"}
 
 
-# ============== MERCHANT DEBIT ACCOUNTS ==============
-
-@router.get("/merchants/debit-overview")
-async def get_merchants_debit_overview(
-    current_admin: dict = Depends(get_current_admin)
-):
-    """Get overview of all merchant debit accounts"""
-    
-    # Get all debit accounts
-    debit_accounts = await db.merchant_debit_accounts.find({}, {"_id": 0}).to_list(10000)
-    
-    # Enrich with merchant info
-    enriched = []
-    for account in debit_accounts:
-        merchant = await db.merchants.find_one(
-            {"id": account.get("merchant_id")},
-            {"_id": 0, "business_name": 1, "owner_name": 1, "phone": 1, "status": 1}
-        )
-        if merchant:
-            balance = account.get("balance", 0)
-            debit_limit = account.get("debit_limit", 0)
-            usage_percentage = 0
-            if debit_limit > 0 and balance < 0:
-                usage_percentage = min(100, abs(balance) / debit_limit * 100)
-            
-            enriched.append({
-                **account,
-                "merchant": merchant,
-                "usage_percentage": round(usage_percentage, 1)
-            })
-    
-    # Sort by balance (most negative first)
-    enriched.sort(key=lambda x: x.get("balance", 0))
-    
-    # Calculate totals
-    total_debt = sum(abs(a.get("balance", 0)) for a in enriched if a.get("balance", 0) < 0)
-    total_credit = sum(a.get("balance", 0) for a in enriched if a.get("balance", 0) > 0)
-    blocked_count = sum(1 for a in enriched if a.get("status") == "blocked")
-    warning_count = sum(1 for a in enriched if a.get("status") == "warning")
-    
-    return {
-        "accounts": enriched,
-        "summary": {
-            "total_merchants": len(enriched),
-            "total_debt": round(total_debt, 2),
-            "total_credit": round(total_credit, 2),
-            "blocked_count": blocked_count,
-            "warning_count": warning_count
-        }
-    }
-
+# ============== MERCHANT DEBIT ACCOUNTS (Parameterized routes) ==============
 
 @router.get("/merchants/{merchant_id}/debit-account")
 async def get_merchant_debit_account(

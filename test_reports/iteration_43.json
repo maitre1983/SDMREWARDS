@@ -1,0 +1,109 @@
+{
+  "summary": "Cash Payment with Merchant Debit Account feature testing completed - ALL TESTS PASS. Backend APIs and Frontend UI fully functional. Fixed routing bug in admin.py where static route /merchants/debit-overview was placed after parameterized /merchants/{merchant_id} route.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [],
+    "fixed_in_this_iteration": [
+      {
+        "endpoint": "/api/admin/merchants/debit-overview",
+        "issue": "Route ordering bug - static route defined after parameterized route, causing 404 'Merchant not found' error",
+        "fix": "Moved /merchants/debit-overview route before /merchants/{merchant_id} in admin.py",
+        "file": "/app/backend/routers/admin.py",
+        "priority": "HIGH"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cash_payment_debit_account.py",
+    "/app/test_reports/pytest/cash_payment_debit_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/routers/admin.py",
+    "/app/backend/tests/test_cash_payment_debit_account.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all UI flows verified)"
+  },
+  "test_credentials": {
+    "client": {"phone": "+233555861556", "password": "000000"},
+    "merchant": {"phone": "+233555123456", "password": "000000"},
+    "admin": {"email": "emileparfait2003@gmail.com", "password": "password", "pin": "0000"}
+  },
+  "seed_data_creation": "Cash payment transactions created during testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cash Payment with Merchant Debit Account feature is fully functional. All endpoints tested: GET /api/merchants/debit-account, GET /api/merchants/search-customer, POST /api/merchants/cash-transaction, GET /api/admin/merchants/debit-overview, PUT /api/admin/merchants/{merchant_id}/debit-settings. E2E flow verified: Admin sets debit limit -> Merchant searches customer -> Records cash payment -> Customer gets cashback -> Merchant debit account debited. Frontend verified: Merchant Cash tab shows debit account info, Record Cash Payment modal works with customer search, Admin Settings > Merchant Debit tab shows all merchant debit accounts.",
+  "features_tested": {
+    "backend_apis": [
+      {
+        "endpoint": "GET /api/merchants/debit-account",
+        "status": "PASS",
+        "description": "Merchant can view their debit account balance and limits"
+      },
+      {
+        "endpoint": "GET /api/merchants/search-customer?query={phone}",
+        "status": "PASS",
+        "description": "Merchant can search for customers by phone number"
+      },
+      {
+        "endpoint": "POST /api/merchants/cash-transaction",
+        "status": "PASS",
+        "description": "Merchant records cash payment, customer gets cashback"
+      },
+      {
+        "endpoint": "GET /api/merchants/debit-history",
+        "status": "PASS",
+        "description": "Merchant can view debit transaction history"
+      },
+      {
+        "endpoint": "GET /api/admin/merchants/debit-overview",
+        "status": "PASS (after fix)",
+        "description": "Admin can view all merchant debit accounts"
+      },
+      {
+        "endpoint": "PUT /api/admin/merchants/{merchant_id}/debit-settings",
+        "status": "PASS",
+        "description": "Admin can set debit limit for a merchant"
+      },
+      {
+        "endpoint": "GET /api/admin/merchants/{merchant_id}/debit-account",
+        "status": "PASS",
+        "description": "Admin can view specific merchant's debit account"
+      }
+    ],
+    "frontend_ui": [
+      {
+        "component": "Merchant Dashboard - Cash Tab",
+        "status": "PASS",
+        "description": "Shows debit account overview with balance, limit, usage bar, and action buttons"
+      },
+      {
+        "component": "Record Cash Payment Modal",
+        "status": "PASS",
+        "description": "Search customer by phone, select customer, enter amount (shows cashback calculation), record payment"
+      },
+      {
+        "component": "Debit History List",
+        "status": "PASS",
+        "description": "Shows all debit transactions with amounts and running balance"
+      },
+      {
+        "component": "Admin Settings - Merchant Debit Tab",
+        "status": "PASS",
+        "description": "Shows merchant debit accounts table with balance, limit, usage, status, and configure actions"
+      }
+    ],
+    "e2e_flow": {
+      "status": "PASS",
+      "test_case": "Admin sets debit limit (GHS 1000) -> Merchant searches customer -> Records GHS 35 cash payment -> Customer receives GHS 1.75 cashback (5% rate) -> Merchant debit account debited by GHS 1.75"
+    }
+  }
+}
