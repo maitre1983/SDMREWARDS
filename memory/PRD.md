@@ -398,6 +398,14 @@ npx expo start
   - Bulk SMS now sends all recipients in a single API call
   - Tested and confirmed working with real SMS delivery
 
+## Recent Changes (2026-03-10)
+- **✅ Bug Fix: Merchant Debit Account Desynchronization (FIXED 2026-03-10):**
+  - Issue: Merchant Dashboard showing incorrect debit balance and limit (stale/default data)
+  - Root cause: `/api/merchants/debit-account` endpoint was querying an obsolete database collection instead of reading from the `debit_account` sub-document within the `merchants` collection
+  - Fix: Updated `get_debit_account()` function in `/app/backend/routers/merchants.py` to fetch fresh data from `db.merchants.find_one()` with proper projection
+  - Verified: API returns correct `balance: 0`, `limit: 1000.0` matching admin configuration
+  - Tested: UI displays correct data in the Cash tab of Merchant Dashboard
+
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
   - Issue: Back button on QR Scanner screen was not navigating back
