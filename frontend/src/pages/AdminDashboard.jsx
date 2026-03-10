@@ -44,7 +44,9 @@ import {
   History,
   Phone,
   Banknote,
-  Key
+  Key,
+  Bell,
+  Send
 } from 'lucide-react';
 
 // Admin Components
@@ -145,6 +147,13 @@ export default function AdminDashboard() {
   const [scheduledSMS, setScheduledSMS] = useState([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [newTemplate, setNewTemplate] = useState({ name: '', message: '', category: 'general' });
+  
+  // Push Notification states
+  const [pushNotifications, setPushNotifications] = useState([]);
+  const [pushStats, setPushStats] = useState({ subscribers: 0 });
+  const [showPushModal, setShowPushModal] = useState(false);
+  const [pushForm, setPushForm] = useState({ title: '', message: '', segment: 'All', url: '' });
+  const [pushLoading, setPushLoading] = useState(false);
   
   // Security states
   const [pinEnabled, setPinEnabled] = useState(false);
@@ -780,6 +789,9 @@ export default function AdminDashboard() {
       setSmsHistory(historyRes.data.logs || []);
       setSmsTemplates(templatesRes.data.templates || []);
       setScheduledSMS(scheduledRes.data.scheduled || []);
+      
+      // Also fetch push notification data
+      fetchPushData();
     } catch (error) {
       console.error('SMS data fetch error:', error);
     }
@@ -829,6 +841,44 @@ export default function AdminDashboard() {
       fetchSMSData();
     } catch (error) {
       toast.error('Failed to cancel scheduled SMS');
+    }
+  };
+
+  // ============== PUSH NOTIFICATIONS FUNCTIONS ==============
+  
+  // Fetch push notification data
+  const fetchPushData = async () => {
+    try {
+      const headers = getHeaders();
+      const [historyRes, statsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/admin/push-notifications/history`, { headers }),
+        axios.get(`${API_URL}/api/admin/push-notifications/stats`, { headers })
+      ]);
+      setPushNotifications(historyRes.data.notifications || []);
+      setPushStats(statsRes.data || { subscribers: 0 });
+    } catch (error) {
+      console.error('Push notification data fetch error:', error);
+    }
+  };
+
+  // Send push notification
+  const handleSendPushNotification = async () => {
+    if (!pushForm.title.trim() || !pushForm.message.trim()) {
+      toast.error('Please enter notification title and message');
+      return;
+    }
+    try {
+      setPushLoading(true);
+      const headers = getHeaders();
+      const res = await axios.post(`${API_URL}/api/admin/push-notifications/send`, pushForm, { headers });
+      toast.success(`Push notification sent to ${res.data.recipients} subscribers`);
+      setShowPushModal(false);
+      setPushForm({ title: '', message: '', segment: 'All', url: '' });
+      fetchPushData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to send push notification');
+    } finally {
+      setPushLoading(false);
     }
   };
 
@@ -1814,8 +1864,8 @@ export default function AdminDashboard() {
             {/* SMS Center (Phase 2) */}
             {settingsTab === 'sms' && (
               <div className="space-y-6">
-                {/* Quick Send Actions */}
-                <div className="grid md:grid-cols-2 gap-6">
+                {/* Quick Send Actions - SMS & Push */}
+                <div className="grid md:grid-cols-3 gap-6">
                   <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
                     <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
                       <MessageSquare size={20} className="text-purple-400" /> Bulk SMS to Clients
@@ -1837,6 +1887,54 @@ export default function AdminDashboard() {
                     >
                       <MessageSquare size={16} className="mr-2" /> Send to Merchants
                     </Button>
+                  </div>
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                    <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                      <Bell size={20} className="text-emerald-400" /> Push Notifications
+                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-slate-400 text-sm">Subscribers:</span>
+                      <span className="text-emerald-400 font-bold">{pushStats.subscribers || 0}</span>
+                    </div>
+                    <Button 
+                      onClick={() => setShowPushModal(true)} 
+                      className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <Bell size={16} className="mr-2" /> Send Push Notification
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Push Notification History */}
+                <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                    <Bell size={20} className="text-emerald-400" /> Push Notification History
+                  </h3>
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-slate-400 bg-slate-900 sticky top-0">
+                        <tr>
+                          <th className="text-left p-2">Date</th>
+                          <th className="text-left p-2">Title</th>
+                          <th className="text-left p-2">Message</th>
+                          <th className="text-left p-2">Recipients</th>
+                          <th className="text-left p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/50">
+                        {pushNotifications.length > 0 ? pushNotifications.slice(0, 10).map((notif, idx) => (
+                          <tr key={idx} className="hover:bg-slate-900/50">
+                            <td className="p-2 text-slate-300">{new Date(notif.created_at).toLocaleDateString()}</td>
+                            <td className="p-2 text-white font-medium">{notif.title}</td>
+                            <td className="p-2 text-slate-400 truncate max-w-xs">{notif.message?.slice(0, 40)}...</td>
+                            <td className="p-2 text-emerald-400">{notif.recipients || '-'}</td>
+                            <td className="p-2">{getStatusBadge(notif.status || 'sent')}</td>
+                          </tr>
+                        )) : (
+                          <tr><td colSpan="5" className="text-center text-slate-500 py-8">No push notifications sent yet</td></tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
@@ -2905,6 +3003,85 @@ export default function AdminDashboard() {
               >
                 {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <MessageSquare size={16} className="mr-2" />}
                 Send Bulk SMS
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PUSH NOTIFICATION MODAL */}
+      {showPushModal && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-lg p-6">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Bell className="text-emerald-400" size={20} />
+              Send Push Notification
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300 mb-2 block">Title</Label>
+                <Input
+                  value={pushForm.title}
+                  onChange={(e) => setPushForm({...pushForm, title: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="Notification title..."
+                  maxLength={50}
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Message</Label>
+                <textarea
+                  value={pushForm.message}
+                  onChange={(e) => setPushForm({...pushForm, message: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white min-h-[100px]"
+                  placeholder="Notification message..."
+                  maxLength={200}
+                />
+                <p className="text-slate-500 text-xs mt-1">{pushForm.message.length}/200 characters</p>
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Target Audience</Label>
+                <select
+                  value={pushForm.segment}
+                  onChange={(e) => setPushForm({...pushForm, segment: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                >
+                  <option value="All">All Subscribers</option>
+                  <option value="Active Users">Active Users</option>
+                  <option value="Inactive Users">Inactive Users</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-slate-300 mb-2 block">Link URL (optional)</Label>
+                <Input
+                  value={pushForm.url}
+                  onChange={(e) => setPushForm({...pushForm, url: e.target.value})}
+                  className="bg-slate-900 border-slate-700 text-white"
+                  placeholder="https://sdmrewards.com/..."
+                />
+              </div>
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                <p className="text-emerald-400 text-sm flex items-center gap-2">
+                  <Bell size={16} />
+                  Push notification will be sent to {pushStats.subscribers || 0} subscribers
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button 
+                onClick={() => { setShowPushModal(false); setPushForm({ title: '', message: '', segment: 'All', url: '' }); }} 
+                variant="outline" 
+                className="flex-1 border-slate-600"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSendPushNotification} 
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700" 
+                disabled={pushLoading}
+              >
+                {pushLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Send size={16} className="mr-2" />}
+                Send Notification
               </Button>
             </div>
           </div>

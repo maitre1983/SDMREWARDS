@@ -2017,6 +2017,82 @@ async def create_admin(
     }
 
 
+# ============== PUSH NOTIFICATIONS ==============
+
+class PushNotificationRequest(BaseModel):
+    title: str
+    message: str
+    segment: str = "All"
+    url: Optional[str] = None
+
+
+@router.post("/push-notifications/send")
+async def send_push_notification(
+    request: PushNotificationRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Send push notification to all users or a segment"""
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    from services.push_notification_service import get_push_service
+    push_service = get_push_service(db)
+    
+    if request.segment == "All":
+        result = await push_service.send_to_all(request.title, request.message, request.url)
+    else:
+        result = await push_service.send_to_segment(request.title, request.message, request.segment, request.url)
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "send_push_notification",
+        "details": {
+            "title": request.title,
+            "message": request.message,
+            "segment": request.segment,
+            "recipients": result.get("recipients", 0)
+        },
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    if result.get("success"):
+        return {
+            "success": True,
+            "notification_id": result.get("notification_id"),
+            "recipients": result.get("recipients", 0),
+            "message": f"Push notification sent to {result.get('recipients', 0)} subscribers"
+        }
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to send notification"))
+
+
+@router.get("/push-notifications/history")
+async def get_push_notification_history(
+    limit: int = 50,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get push notification history"""
+    from services.push_notification_service import get_push_service
+    push_service = get_push_service(db)
+    
+    history = await push_service.get_notification_history(limit)
+    return {"notifications": history, "total": len(history)}
+
+
+@router.get("/push-notifications/stats")
+async def get_push_notification_stats(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get OneSignal app statistics"""
+    from services.push_notification_service import get_push_service
+    push_service = get_push_service(db)
+    
+    stats = await push_service.get_app_stats()
+    return stats
+
+
 # ============== REVENUE REPORTS ==============
 
 @router.get("/revenue")
