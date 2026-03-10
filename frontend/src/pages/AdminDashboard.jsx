@@ -48,7 +48,8 @@ import {
   Bell,
   Send,
   AlertTriangle,
-  Unlock
+  Unlock,
+  Smartphone
 } from 'lucide-react';
 
 // Admin Components
@@ -163,6 +164,10 @@ export default function AdminDashboard() {
   const [showDebitSettingsModal, setShowDebitSettingsModal] = useState(false);
   const [debitSettingsForm, setDebitSettingsForm] = useState({ debit_limit: 0, settlement_days: 0 });
   const [isLoadingDebit, setIsLoadingDebit] = useState(false);
+  
+  // Payment Methods Stats for merchant
+  const [merchantPaymentMethodsStats, setMerchantPaymentMethodsStats] = useState(null);
+  const [paymentMethodsPeriod, setPaymentMethodsPeriod] = useState('today');
   
   // Security states
   const [pinEnabled, setPinEnabled] = useState(false);
@@ -442,10 +447,20 @@ export default function AdminDashboard() {
     try {
       setSelectedMerchant(merchant);
       setShowMerchantModal(true);
+      setMerchantPaymentMethodsStats(null); // Reset stats
+      setPaymentMethodsPeriod('today'); // Reset period
+      
       const headers = getHeaders();
-      const res = await axios.get(`${API_URL}/api/admin/merchants/${merchant.id}/transactions`, { headers });
-      setMerchantTransactions(res.data.transactions || []);
-      setTransactionSummary(res.data.summary || {});
+      
+      // Fetch transactions and payment methods stats in parallel
+      const [txRes, statsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/admin/merchants/${merchant.id}/transactions`, { headers }),
+        axios.get(`${API_URL}/api/admin/merchants/${merchant.id}/payment-methods?period=today`, { headers })
+      ]);
+      
+      setMerchantTransactions(txRes.data.transactions || []);
+      setTransactionSummary(txRes.data.summary || {});
+      setMerchantPaymentMethodsStats(statsRes.data.stats || null);
       setLocationForm({
         address: merchant.address || '',
         google_maps_url: merchant.google_maps_url || '',
@@ -454,6 +469,19 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Error fetching merchant transactions:', error);
       toast.error('Failed to load transactions');
+    }
+  };
+  
+  // Fetch payment methods stats for selected period
+  const fetchMerchantPaymentMethodsStats = async (period) => {
+    if (!selectedMerchant) return;
+    try {
+      const headers = getHeaders();
+      const res = await axios.get(`${API_URL}/api/admin/merchants/${selectedMerchant.id}/payment-methods?period=${period}`, { headers });
+      setMerchantPaymentMethodsStats(res.data.stats || null);
+      setPaymentMethodsPeriod(period);
+    } catch (error) {
+      console.error('Error fetching payment methods stats:', error);
     }
   };
 
@@ -2675,6 +2703,84 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Payment Methods Breakdown (Cash vs MoMo) */}
+            <div className="p-4 border-b border-slate-700">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-white font-medium flex items-center gap-2">
+                  <CreditCard size={18} className="text-cyan-400" /> Payment Methods Breakdown
+                </h3>
+                <div className="flex gap-1">
+                  {['today', 'week', 'month', 'all'].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => fetchMerchantPaymentMethodsStats(p)}
+                      className={`px-2 py-1 text-xs rounded ${paymentMethodsPeriod === p ? 'bg-cyan-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                    >
+                      {p === 'today' ? 'Today' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'All'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {merchantPaymentMethodsStats ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Cash Stats */}
+                  <div className="bg-gradient-to-br from-emerald-900/30 to-slate-900 border border-emerald-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Banknote size={18} className="text-emerald-400" />
+                      <span className="text-emerald-400 font-medium text-sm">Cash</span>
+                    </div>
+                    <p className="text-2xl font-bold text-white">GHS {merchantPaymentMethodsStats.cash?.volume?.toFixed(2) || '0.00'}</p>
+                    <p className="text-slate-400 text-sm">{merchantPaymentMethodsStats.cash?.count || 0} transactions</p>
+                    {merchantPaymentMethodsStats.total?.volume > 0 && (
+                      <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-emerald-500 h-full transition-all"
+                          style={{ width: `${merchantPaymentMethodsStats.cash?.percentage || 0}%` }}
+                        />
+                      </div>
+                    )}
+                    <p className="text-emerald-400 text-xs mt-1">{merchantPaymentMethodsStats.cash?.percentage || 0}%</p>
+                  </div>
+                  
+                  {/* MoMo Stats */}
+                  <div className="bg-gradient-to-br from-blue-900/30 to-slate-900 border border-blue-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Smartphone size={18} className="text-blue-400" />
+                      <span className="text-blue-400 font-medium text-sm">MoMo</span>
+                    </div>
+                    <p className="text-2xl font-bold text-white">GHS {merchantPaymentMethodsStats.momo?.volume?.toFixed(2) || '0.00'}</p>
+                    <p className="text-slate-400 text-sm">{merchantPaymentMethodsStats.momo?.count || 0} transactions</p>
+                    {merchantPaymentMethodsStats.total?.volume > 0 && (
+                      <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-blue-500 h-full transition-all"
+                          style={{ width: `${merchantPaymentMethodsStats.momo?.percentage || 0}%` }}
+                        />
+                      </div>
+                    )}
+                    <p className="text-blue-400 text-xs mt-1">{merchantPaymentMethodsStats.momo?.percentage || 0}%</p>
+                  </div>
+                  
+                  {/* Total */}
+                  <div className="bg-gradient-to-br from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign size={18} className="text-purple-400" />
+                      <span className="text-purple-400 font-medium text-sm">Total</span>
+                    </div>
+                    <p className="text-2xl font-bold text-white">GHS {merchantPaymentMethodsStats.total?.volume?.toFixed(2) || '0.00'}</p>
+                    <p className="text-slate-400 text-sm">{merchantPaymentMethodsStats.total?.count || 0} transactions</p>
+                    <p className="text-purple-400 text-xs mt-3">Cashback: GHS {merchantPaymentMethodsStats.total?.cashback?.toFixed(2) || '0.00'}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-900 rounded-lg p-4 text-center text-slate-400">
+                  <RefreshCw className="animate-spin mx-auto mb-2" size={24} />
+                  <p>Loading payment methods stats...</p>
+                </div>
+              )}
+            </div>
 
             {/* Transaction History */}
             <div className="p-4 border-b border-slate-700">

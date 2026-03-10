@@ -406,6 +406,24 @@ npx expo start
   - Verified: API returns correct `balance: 0`, `limit: 1000.0` matching admin configuration
   - Tested: UI displays correct data in the Cash tab of Merchant Dashboard
 
+- **✅ Bug Fix: Payment Methods Stats (Cash vs MoMo) - FIXED 2026-03-10:**
+  - Issue: Merchant Cash tab showing identical values for Cash and MoMo payments (wrong data)
+  - Root cause: Backend `/api/merchants/dashboard/payment-methods` endpoint was:
+    1. Treating ALL transactions as MoMo (not filtering by `payment_method`)
+    2. Querying non-existent `cash_transactions` collection for Cash data
+  - Fix: Updated endpoint to filter transactions by `payment_method` field:
+    - MoMo: `payment_method: "momo"` or `payment_method: {$exists: false}` (legacy)
+    - Cash: `payment_method: "cash"`
+  - Result: Now correctly shows Cash: GHS 255 (8 transactions, 100%), MoMo: GHS 0 (0 transactions, 0%)
+
+- **✅ Feature: Admin Payment Methods Breakdown - ADDED 2026-03-10:**
+  - New endpoint: `GET /api/admin/merchants/{merchant_id}/payment-methods?period=today|week|month|all`
+  - Returns breakdown of Cash vs MoMo payments with volume, count, cashback, and percentages
+  - New UI section in Admin Merchant Details modal: "Payment Methods Breakdown"
+  - Period selector buttons: Today, Week, Month, All
+  - Visual cards showing Cash, MoMo, and Total stats with progress bars
+  - Fully synchronized with merchant dashboard data
+
 ## Recent Changes (2026-03-09)
 - **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
   - Issue: Back button on QR Scanner screen was not navigating back

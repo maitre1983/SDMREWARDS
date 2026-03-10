@@ -1239,6 +1239,90 @@ async def get_merchant_transactions(
     }
 
 
+@router.get("/merchants/{merchant_id}/payment-methods")
+async def get_merchant_payment_methods_stats(
+    merchant_id: str,
+    period: str = "today",  # today, week, month, all
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get payment method statistics (Cash vs MoMo) for a specific merchant.
+    Returns breakdown of transactions by payment method.
+    """
+    merchant_doc = await db.merchants.find_one({"id": merchant_id}, {"_id": 0, "business_name": 1, "owner_name": 1})
+    if not merchant_doc:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    now = datetime.now(timezone.utc)
+    
+    # Calculate date range based on period
+    if period == "today":
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "week":
+        start_date = now - timedelta(days=now.weekday())
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "month":
+        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:  # all time
+        start_date = None
+    
+    # Base query
+    base_query = {"merchant_id": merchant_id}
+    if start_date:
+        base_query["created_at"] = {"$gte": start_date.isoformat()}
+    
+    # Get MoMo transactions
+    momo_query = {**base_query, "$or": [
+        {"payment_method": "momo"},
+        {"payment_method": {"$exists": False}}  # Legacy transactions default to momo
+    ]}
+    momo_txs = await db.transactions.find(momo_query, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(10000)
+    
+    # Get Cash transactions
+    cash_query = {**base_query, "payment_method": "cash"}
+    cash_txs = await db.transactions.find(cash_query, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(10000)
+    
+    # Calculate stats
+    momo_volume = sum(t.get("amount", 0) for t in momo_txs)
+    momo_cashback = sum(t.get("cashback_amount", 0) for t in momo_txs)
+    momo_count = len(momo_txs)
+    
+    cash_volume = sum(t.get("amount", 0) for t in cash_txs)
+    cash_cashback = sum(t.get("cashback_amount", 0) for t in cash_txs)
+    cash_count = len(cash_txs)
+    
+    total_volume = momo_volume + cash_volume
+    total_count = momo_count + cash_count
+    
+    # Calculate percentages
+    momo_percentage = round(momo_volume / total_volume * 100, 1) if total_volume > 0 else 0
+    cash_percentage = round(cash_volume / total_volume * 100, 1) if total_volume > 0 else 0
+    
+    return {
+        "merchant": merchant_doc,
+        "period": period,
+        "stats": {
+            "momo": {
+                "volume": round(momo_volume, 2),
+                "cashback": round(momo_cashback, 2),
+                "count": momo_count,
+                "percentage": momo_percentage
+            },
+            "cash": {
+                "volume": round(cash_volume, 2),
+                "cashback": round(cash_cashback, 2),
+                "count": cash_count,
+                "percentage": cash_percentage
+            },
+            "total": {
+                "volume": round(total_volume, 2),
+                "cashback": round(momo_cashback + cash_cashback, 2),
+                "count": total_count
+            }
+        }
+    }
+
+
 @router.post("/merchants/{merchant_id}/reject")
 async def reject_merchant(merchant_id: str, current_admin: dict = Depends(get_current_admin)):
     """Reject pending merchant"""

@@ -607,28 +607,33 @@ async def get_payment_methods_stats(
     
     # Fetch data for each period
     for period in periods:
-        # Get regular transactions (MoMo payments)
+        # Get MoMo transactions (payment_method = "momo" or not set for legacy)
         momo_txs = await db.transactions.find({
             "merchant_id": merchant_id,
             "created_at": {
                 "$gte": period["start"].isoformat(),
                 "$lt": period["end"].isoformat()
-            }
+            },
+            "$or": [
+                {"payment_method": "momo"},
+                {"payment_method": {"$exists": False}}  # Legacy transactions default to momo
+            ]
         }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(1000)
         
-        # Get cash transactions
-        cash_txs = await db.cash_transactions.find({
+        # Get cash transactions (payment_method = "cash")
+        cash_txs = await db.transactions.find({
             "merchant_id": merchant_id,
             "created_at": {
                 "$gte": period["start"].isoformat(),
                 "$lt": period["end"].isoformat()
-            }
-        }, {"_id": 0, "amount": 1, "cashback_awarded": 1}).to_list(1000)
+            },
+            "payment_method": "cash"
+        }, {"_id": 0, "amount": 1, "cashback_amount": 1}).to_list(1000)
         
         momo_volume = sum(t.get("amount", 0) for t in momo_txs)
         momo_cashback = sum(t.get("cashback_amount", 0) for t in momo_txs)
         cash_volume = sum(t.get("amount", 0) for t in cash_txs)
-        cash_cashback = sum(t.get("cashback_awarded", 0) for t in cash_txs)
+        cash_cashback = sum(t.get("cashback_amount", 0) for t in cash_txs)
         
         data_points.append({
             "label": period["label"],
