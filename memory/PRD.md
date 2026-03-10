@@ -314,6 +314,18 @@ npx expo start
   - Added API methods in `api.js`: getDebitAccount, getDebitHistory, searchCustomer, recordCashTransaction, topUpDebitAccount
   - Features: Debit account overview, customer search, cash payment recording, top-up via MoMo
 
+- **✅ Client-Side Cash Payment Option (COMPLETED 2026-03-10):**
+  - Added Cash/MoMo payment method selector in `MerchantPayModal.jsx`
+  - New backend endpoint: `POST /api/payments/merchant/cash`
+  - Cash option hides phone/network fields, shows cash info box
+  - Cashback credited instantly to client wallet
+  - **Data Sync:** Transaction appears in:
+    - Client transaction history (payment_method='cash')
+    - Merchant transaction history
+    - Merchant debit account (debited for cashback)
+    - Admin statistics
+  - Button changes to "Record Cash Payment" (green) when Cash selected
+
 - **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
   - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
   - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart
