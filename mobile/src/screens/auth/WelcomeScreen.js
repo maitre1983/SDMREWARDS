@@ -14,6 +14,8 @@ import {
   Easing,
   TouchableOpacity,
   ImageBackground,
+  Platform,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +44,18 @@ export default function WelcomeScreen({ navigation }) {
   // Carousel state
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const carouselAnim = useRef(new Animated.Value(0)).current;
+  
+  // Handle navigation - works on both native and web
+  const handleNavigate = (userType) => {
+    if (Platform.OS === 'web') {
+      // On web, redirect to the main web app login page
+      const baseUrl = window.location.origin.replace('/api/mobile', '');
+      window.location.href = `${baseUrl}/${userType}`;
+    } else if (navigation) {
+      // On native, use React Navigation
+      navigation.navigate('Login', { userType });
+    }
+  };
   
   // Animation values
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -329,7 +343,7 @@ export default function WelcomeScreen({ navigation }) {
       >
         {/* I'm a Customer - Primary Orange Button */}
         <TouchableOpacity
-          onPress={() => navigation.navigate('Login', { userType: 'client' })}
+          onPress={() => handleNavigate('client')}
           style={styles.customerButton}
           activeOpacity={0.8}
         >
@@ -347,7 +361,7 @@ export default function WelcomeScreen({ navigation }) {
 
         {/* I'm a Merchant - Secondary Green Button */}
         <TouchableOpacity
-          onPress={() => navigation.navigate('Login', { userType: 'merchant' })}
+          onPress={() => handleNavigate('merchant')}
           style={styles.merchantButton}
           activeOpacity={0.8}
         >
