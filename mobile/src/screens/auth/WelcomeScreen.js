@@ -49,8 +49,7 @@ export default function WelcomeScreen({ navigation }) {
   const handleNavigate = (userType) => {
     if (Platform.OS === 'web') {
       // On web, redirect to the main web app login page
-      const baseUrl = window.location.origin.replace('/api/mobile', '');
-      window.location.href = `${baseUrl}/${userType}`;
+      window.location.href = `https://web-boost-seo.preview.emergentagent.com/${userType}`;
     } else if (navigation) {
       // On native, use React Navigation
       navigation.navigate('Login', { userType });
