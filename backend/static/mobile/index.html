@@ -1,17 +1,245 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>SDM Rewards</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    html, body { height: 100%; margin: 0; }
-    body { overflow: hidden; }
-    #root { display: flex; height: 100%; flex: 1; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+      min-height: 100vh;
+      color: white;
+      overflow-x: hidden;
+    }
+    .container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      position: relative;
+    }
+    
+    /* Background Carousel */
+    .carousel-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .carousel-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+    }
+    .carousel-image.active {
+      opacity: 1;
+    }
+    .carousel-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(to bottom, rgba(15,23,42,0.4) 0%, rgba(30,27,75,0.6) 50%, rgba(15,23,42,0.85) 100%);
+    }
+    
+    /* Content */
+    .content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    
+    /* Logo */
+    .logo-container {
+      text-align: center;
+      margin-top: 20px;
+      margin-bottom: 15px;
+    }
+    .logo {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      border: 3px solid #F59E0B;
+      box-shadow: 0 0 30px rgba(245,158,11,0.5);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-top: 15px;
+      text-shadow: 0 2px 10px rgba(245,158,11,0.5);
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    
+    /* Features */
+    .features {
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .feature-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+      font-size: 20px;
+    }
+    .feature-text {
+      font-size: 15px;
+      font-weight: 500;
+    }
+    
+    /* Buttons */
+    .buttons {
+      margin-top: auto;
+      padding-bottom: 10px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 18px 24px;
+      border: none;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      cursor: pointer;
+      margin-bottom: 12px;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: scale(1.02);
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn-customer {
+      background: linear-gradient(90deg, #F59E0B 0%, #EA580C 50%, #F59E0B 100%);
+      box-shadow: 0 8px 20px rgba(245,158,11,0.4);
+    }
+    .btn-merchant {
+      background: linear-gradient(90deg, #10B981 0%, #059669 50%, #10B981 100%);
+      box-shadow: 0 8px 20px rgba(16,185,129,0.4);
+    }
+    .btn-icon {
+      margin-right: 12px;
+      font-size: 24px;
+    }
+    .btn-arrow {
+      margin-left: 12px;
+      font-size: 20px;
+    }
+    
+    /* Footer */
+    .footer {
+      text-align: center;
+      color: #64748b;
+      font-size: 12px;
+      padding: 10px 0;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script src="/api/mobile/_expo/static/js/web/index-3e01b9bc26078bd3072c69dd7e83795a.js" defer></script>
+  <div class="container">
+    <!-- Background Carousel -->
+    <div class="carousel-container">
+      <img class="carousel-image active" src="https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/01b1df557fb0b9b58ab0869db1bfe6667fb94c6ee469d2cb0bedd4a754670fdc.png" alt="">
+      <img class="carousel-image" src="https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/e1923f2d8da8b45d43f9d74219b04906dd4b54a45ed360cb4b43927a0cc4a2a7.png" alt="">
+      <img class="carousel-image" src="https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/aa160bba66dc42fe80a8a6629b5040893f84a10d1bbbebad5fa330bb25a81388.png" alt="">
+      <img class="carousel-image" src="https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/3194f47457d24bb9b5086ab083814e6b2d0d976fe9cc46b95b910da532b29452.png" alt="">
+      <div class="carousel-overlay"></div>
+    </div>
+    
+    <!-- Content -->
+    <div class="content">
+      <!-- Logo -->
+      <div class="logo-container">
+        <img class="logo" src="https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vc8llt43_WhatsApp%20Image%202026-03-04%20at%2020.16.26.jpeg" alt="SDM Rewards">
+        <h1 class="title">SDM REWARDS</h1>
+        <p class="subtitle">Earn cashback on every purchase</p>
+      </div>
+      
+      <!-- Features -->
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon" style="background: rgba(245,158,11,0.2);">
+            <span style="color: #F59E0B;">📱</span>
+          </div>
+          <span class="feature-text">Pay Merchants with QR</span>
+        </div>
+        <div class="feature">
+          <div class="feature-icon" style="background: rgba(16,185,129,0.2);">
+            <span style="color: #10B981;">🎁</span>
+          </div>
+          <span class="feature-text">Earn Cashback Rewards</span>
+        </div>
+      </div>
+      
+      <!-- Buttons -->
+      <div class="buttons">
+        <a href="https://web-boost-seo.preview.emergentagent.com/client" class="btn btn-customer">
+          <span class="btn-icon">👤</span>
+          I'm a Customer
+          <span class="btn-arrow">→</span>
+        </a>
+        <a href="https://web-boost-seo.preview.emergentagent.com/merchant" class="btn btn-merchant">
+          <span class="btn-icon">🏪</span>
+          I'm a Merchant
+          <span class="btn-arrow">→</span>
+        </a>
+      </div>
+      
+      <!-- Footer -->
+      <div class="footer">Powered by GIT NFT GHANA LTD</div>
+    </div>
+  </div>
+  
+  <script>
+    // Carousel animation
+    const images = document.querySelectorAll('.carousel-image');
+    let currentIndex = 0;
+    
+    setInterval(() => {
+      images[currentIndex].classList.remove('active');
+      currentIndex = (currentIndex + 1) % images.length;
+      images[currentIndex].classList.add('active');
+    }, 4000);
+  </script>
 </body>
 </html>
