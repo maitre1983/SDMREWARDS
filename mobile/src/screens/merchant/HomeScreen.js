@@ -15,6 +15,7 @@ import {
   Share,
   Animated,
   Easing,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +32,8 @@ export default function MerchantHomeScreen({ navigation }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [pendingConfirmations, setPendingConfirmations] = useState([]);
+  const [processingConfirm, setProcessingConfirm] = useState(null);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -102,12 +105,14 @@ export default function MerchantHomeScreen({ navigation }) {
 
   const fetchDashboardData = async () => {
     try {
-      const [dashboard, txResponse] = await Promise.all([
+      const [dashboard, txResponse, pendingRes] = await Promise.all([
         merchantAPI.getDashboard(),
         merchantAPI.getTransactions({ limit: 10 }),
+        merchantAPI.getPendingConfirmations(),
       ]);
       setDashboardData(dashboard);
       setTransactions(txResponse.transactions || []);
+      setPendingConfirmations(pendingRes.transactions || []);
     } catch (error) {
       console.error('Error fetching dashboard:', error);
     }
@@ -118,6 +123,49 @@ export default function MerchantHomeScreen({ navigation }) {
     await fetchDashboardData();
     setRefreshing(false);
   }, []);
+
+  const handleConfirmPayment = async (transactionId) => {
+    try {
+      setProcessingConfirm(transactionId);
+      const result = await merchantAPI.confirmCashPayment(transactionId);
+      if (result.success) {
+        Alert.alert('Success', result.message || 'Payment confirmed!');
+        await fetchDashboardData();
+      }
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to confirm payment');
+    } finally {
+      setProcessingConfirm(null);
+    }
+  };
+
+  const handleRejectPayment = async (transactionId) => {
+    Alert.alert(
+      'Reject Payment',
+      'Are you sure you want to reject this cash payment? The customer will be notified.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setProcessingConfirm(transactionId);
+              const result = await merchantAPI.rejectCashPayment(transactionId);
+              if (result.success) {
+                Alert.alert('Rejected', result.message || 'Payment rejected');
+                await fetchDashboardData();
+              }
+            } catch (error) {
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to reject payment');
+            } finally {
+              setProcessingConfirm(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const shareQRCode = async () => {
     try {
@@ -332,6 +380,66 @@ export default function MerchantHomeScreen({ navigation }) {
             </Animated.View>
           ))}
         </View>
+
+        {/* Pending Confirmations Section */}
+        {pendingConfirmations.length > 0 && (
+          <Animated.View style={[styles.pendingSection, { opacity: fadeAnim }]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionHeaderLeft}>
+                <View style={styles.pendingBadge}>
+                  <Text style={styles.pendingBadgeText}>{pendingConfirmations.length}</Text>
+                </View>
+                <Text style={styles.sectionTitle}>Pending Confirmations</Text>
+              </View>
+            </View>
+
+            <View style={styles.pendingList}>
+              {pendingConfirmations.map((tx) => (
+                <View key={tx.id} style={styles.pendingItem}>
+                  <View style={styles.pendingItemHeader}>
+                    <View style={styles.pendingCustomer}>
+                      <Ionicons name="person-circle" size={36} color={COLORS.primary} />
+                      <View style={styles.pendingCustomerInfo}>
+                        <Text style={styles.pendingCustomerName}>{tx.client_name || 'Customer'}</Text>
+                        <Text style={styles.pendingCustomerPhone}>{tx.client_phone}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.pendingAmount}>
+                      <Text style={styles.pendingAmountValue}>GHS {parseFloat(tx.amount).toFixed(2)}</Text>
+                      <Text style={styles.pendingCashback}>Cashback: GHS {parseFloat(tx.cashback_amount).toFixed(2)}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.pendingActions}>
+                    <TouchableOpacity
+                      style={[styles.pendingActionBtn, styles.rejectBtn]}
+                      onPress={() => handleRejectPayment(tx.id)}
+                      disabled={processingConfirm === tx.id}
+                    >
+                      <Ionicons name="close" size={18} color="#EF4444" />
+                      <Text style={styles.rejectBtnText}>Reject</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[styles.pendingActionBtn, styles.confirmBtn]}
+                      onPress={() => handleConfirmPayment(tx.id)}
+                      disabled={processingConfirm === tx.id}
+                    >
+                      {processingConfirm === tx.id ? (
+                        <Text style={styles.confirmBtnText}>Processing...</Text>
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                          <Text style={styles.confirmBtnText}>Confirm Receipt</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        )}
 
         {/* Recent Transactions */}
         <Animated.View style={[styles.transactionsSection, { opacity: fadeAnim }]}>
@@ -927,5 +1035,102 @@ const styles = StyleSheet.create({
     top: -40,
     right: 0,
     padding: SPACING.md,
+  },
+  // Pending Confirmations Styles
+  pendingSection: {
+    marginBottom: SPACING.lg,
+  },
+  pendingBadge: {
+    backgroundColor: '#EF4444',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.xs,
+  },
+  pendingBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  pendingList: {
+    gap: SPACING.sm,
+  },
+  pendingItem: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    padding: SPACING.md,
+  },
+  pendingItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+  },
+  pendingCustomer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  pendingCustomerInfo: {
+    marginLeft: SPACING.sm,
+    flex: 1,
+  },
+  pendingCustomerName: {
+    color: COLORS.text,
+    fontSize: FONTS.sizes.md,
+    fontWeight: '600',
+  },
+  pendingCustomerPhone: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.sm,
+  },
+  pendingAmount: {
+    alignItems: 'flex-end',
+  },
+  pendingAmountValue: {
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.lg,
+    fontWeight: 'bold',
+  },
+  pendingCashback: {
+    color: COLORS.secondary,
+    fontSize: FONTS.sizes.xs,
+  },
+  pendingActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  pendingActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: 10,
+    gap: 6,
+  },
+  rejectBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    flex: 1,
+  },
+  rejectBtnText: {
+    color: '#EF4444',
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '600',
+  },
+  confirmBtn: {
+    backgroundColor: '#10B981',
+    flex: 2,
+  },
+  confirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '600',
   },
 });

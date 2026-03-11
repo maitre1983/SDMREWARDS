@@ -100,6 +100,26 @@ Fraud prevention system for cash payments:
 - **Pay All Services** (purple icon) with subText: "Airtime, Data, ECG +more"
 - Removed separate "Buy airtime & data" and "ECG Payment" options
 
+### ✅ Mobile App - Pending Confirmations Feature - IMPLEMENTED 2026-03-11
+**MerchantHomeScreen now displays pending cash payment confirmations:**
+
+**Files Modified:**
+- `/app/mobile/src/services/api.js` - Added 3 new endpoints:
+  - `getPendingConfirmations()` - Fetch pending cash payments
+  - `confirmCashPayment(transactionId)` - Confirm a cash payment
+  - `rejectCashPayment(transactionId, reason)` - Reject a cash payment
+  
+- `/app/mobile/src/screens/merchant/HomeScreen.js` - Added:
+  - State: `pendingConfirmations`, `processingConfirm`
+  - Functions: `handleConfirmPayment`, `handleRejectPayment`
+  - UI: New "Pending Confirmations" section with badge, customer info, amount, and Confirm/Reject buttons
+  - Styles: `pendingSection`, `pendingItem`, `confirmBtn`, `rejectBtn`, etc.
+
+**Backend Endpoints Tested:**
+- ✅ `GET /api/merchants/pending-confirmations` - Returns pending transactions
+- ✅ `POST /api/merchants/confirm-cash-payment/{id}` - Confirms payment, debits merchant, credits client
+- ✅ `POST /api/merchants/reject-cash-payment/{id}` - Rejects payment, notifies client
+
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
 - **AdminDashboard.jsx**: Reduced from 3,837 to 2,866 lines (25% reduction)

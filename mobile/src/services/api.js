@@ -296,6 +296,26 @@ export const merchantAPI = {
     const response = await api.post('/merchants/topup-debit-account', data);
     return response.data;
   },
+
+  // ============== PENDING CONFIRMATIONS ==============
+  
+  // Get pending cash payment confirmations
+  getPendingConfirmations: async () => {
+    const response = await api.get('/merchants/pending-confirmations');
+    return response.data;
+  },
+
+  // Confirm a cash payment
+  confirmCashPayment: async (transactionId) => {
+    const response = await api.post(`/merchants/confirm-cash-payment/${transactionId}`);
+    return response.data;
+  },
+
+  // Reject a cash payment
+  rejectCashPayment: async (transactionId, reason = '') => {
+    const response = await api.post(`/merchants/reject-cash-payment/${transactionId}`, { reason });
+    return response.data;
+  },
 };
 
 // ============== PAYMENTS API ==============
