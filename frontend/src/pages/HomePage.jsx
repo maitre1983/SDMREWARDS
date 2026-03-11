@@ -30,10 +30,7 @@ import {
   Share2,
   Facebook,
   Twitter,
-  MessageCircle,
-  Smartphone,
-  Wifi,
-  Grid3X3
+  MessageCircle
 } from 'lucide-react';
 
 // SDM Logo URL - Stored externally
@@ -271,32 +268,28 @@ export default function HomePage() {
               </h1>
               
               {/* Subtitle */}
-              <p className="text-lg text-slate-300 mb-10 max-w-xl mx-auto lg:mx-0">
+              <p className="text-lg text-slate-300 mb-8 max-w-xl mx-auto lg:mx-0">
                 {t('hero_subtitle')}
               </p>
               
-              {/* CTA Buttons - PROMINENT & HIGHLY VISIBLE */}
-              <div className="flex flex-col gap-5 justify-center lg:justify-start mb-12 max-w-md mx-auto lg:mx-0">
-                {/* I'm a Customer Button - Primary */}
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
                 <Button
                   onClick={() => navigate('/client')}
-                  className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 hover:from-amber-600 hover:via-orange-600 hover:to-amber-600 text-white px-10 py-8 text-xl font-bold rounded-2xl shadow-2xl shadow-amber-500/30 border-2 border-amber-400/50 transform hover:scale-[1.02] transition-all duration-300"
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-8 py-6 text-lg rounded-xl"
                   data-testid="hero-cta-client"
                 >
-                  <Users className="mr-3" size={28} />
+                  <Users className="mr-2" size={20} />
                   {t('hero_cta_client')}
-                  <ArrowRight className="ml-3" size={24} />
                 </Button>
-                
-                {/* I'm a Merchant Button - Secondary but still prominent */}
                 <Button
                   onClick={() => navigate('/merchant')}
-                  className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-700 hover:via-teal-700 hover:to-emerald-700 text-white px-10 py-8 text-xl font-bold rounded-2xl shadow-2xl shadow-emerald-500/30 border-2 border-emerald-400/50 transform hover:scale-[1.02] transition-all duration-300"
+                  variant="outline"
+                  className="border-2 border-amber-500/50 text-white hover:bg-amber-500/10 px-8 py-6 text-lg rounded-xl"
                   data-testid="hero-cta-merchant"
                 >
-                  <Store className="mr-3" size={28} />
+                  <Store className="mr-2" size={20} />
                   {t('hero_cta_merchant')}
-                  <ArrowRight className="ml-3" size={24} />
                 </Button>
               </div>
               
@@ -345,68 +338,6 @@ export default function HomePage() {
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
           <ChevronRight className="rotate-90 text-slate-500" size={32} />
-        </div>
-      </section>
-
-      {/* ============== QUICK SERVICES (NEW SECTION) ============== */}
-      <section id="quick-services" className="py-16 bg-gradient-to-b from-slate-900 to-slate-800/80">
-        <div className="max-w-5xl mx-auto px-4">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">{t('quick_services_title')}</h2>
-            <p className="text-slate-400 text-base max-w-xl mx-auto">{t('quick_services_subtitle')}</p>
-          </div>
-          
-          {/* Three Main Services - Highlighted */}
-          <div className="grid sm:grid-cols-3 gap-5">
-            {/* Pay Merchants with QR */}
-            <button
-              onClick={() => navigate('/client')}
-              className="group relative bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-2 border-amber-500/40 rounded-2xl p-6 text-left hover:border-amber-500 hover:from-amber-500/20 hover:to-orange-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-amber-500/20"
-              data-testid="service-pay-merchants"
-            >
-              <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <QrCode className="text-white" size={28} />
-              </div>
-              <h3 className="text-white font-bold text-lg mb-2">{t('service_pay_merchants')}</h3>
-              <p className="text-slate-400 text-sm">{t('service_pay_merchants_desc')}</p>
-              <ArrowRight className="absolute bottom-6 right-6 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
-            </button>
-            
-            {/* Earn Cashback Rewards */}
-            <button
-              onClick={() => navigate('/client')}
-              className="group relative bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-2 border-emerald-500/40 rounded-2xl p-6 text-left hover:border-emerald-500 hover:from-emerald-500/20 hover:to-teal-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-emerald-500/20"
-              data-testid="service-earn-cashback"
-            >
-              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <Gift className="text-white" size={28} />
-              </div>
-              <h3 className="text-white font-bold text-lg mb-2">{t('service_earn_cashback')}</h3>
-              <p className="text-slate-400 text-sm">{t('service_earn_cashback_desc')}</p>
-              <ArrowRight className="absolute bottom-6 right-6 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
-            </button>
-            
-            {/* Pay All Services (Airtime, Data, ECG) */}
-            <button
-              onClick={() => navigate('/client')}
-              className="group relative bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-2 border-purple-500/40 rounded-2xl p-6 text-left hover:border-purple-500 hover:from-purple-500/20 hover:to-pink-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/20"
-              data-testid="service-pay-all"
-            >
-              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                <Grid3X3 className="text-white" size={28} />
-              </div>
-              <h3 className="text-white font-bold text-lg mb-2">{t('service_pay_all')}</h3>
-              <p className="text-slate-400 text-sm">{t('service_pay_all_desc')}</p>
-              {/* Sub-icons for services */}
-              <div className="flex items-center gap-2 mt-3 text-slate-500">
-                <Smartphone size={14} />
-                <Wifi size={14} />
-                <Zap size={14} />
-                <span className="text-xs">+more</span>
-              </div>
-              <ArrowRight className="absolute bottom-6 right-6 text-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
-            </button>
-          </div>
         </div>
       </section>
 
@@ -822,26 +753,21 @@ export default function HomePage() {
           <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-24 h-24 mx-auto mb-6 rounded-2xl" />
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">{t('cta_title')}</h2>
           <p className="text-lg text-amber-100 mb-8 max-w-2xl mx-auto">{t('cta_subtitle')}</p>
-          <div className="flex flex-col gap-4 justify-center max-w-md mx-auto">
-            {/* I'm a Customer - Primary */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               onClick={() => navigate('/client')}
-              className="w-full bg-white text-amber-600 hover:bg-slate-100 px-10 py-7 text-xl font-bold shadow-xl rounded-2xl transform hover:scale-[1.02] transition-all"
-              data-testid="final-cta-client"
+              className="bg-white text-amber-600 hover:bg-slate-100 px-8 py-6 text-lg font-semibold"
             >
-              <Users className="mr-3" size={24} />
+              <Users className="mr-2" size={20} />
               {t('hero_cta_client')}
-              <ArrowRight className="ml-3" size={20} />
             </Button>
-            {/* I'm a Merchant - Secondary */}
             <Button
               onClick={() => navigate('/merchant')}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-7 text-xl font-bold shadow-xl rounded-2xl transform hover:scale-[1.02] transition-all border-2 border-emerald-400"
-              data-testid="final-cta-merchant"
+              variant="outline"
+              className="border-2 border-white text-white hover:bg-white/10 px-8 py-6 text-lg"
             >
-              <Store className="mr-3" size={24} />
+              <Store className="mr-2" size={20} />
               {t('hero_cta_merchant')}
-              <ArrowRight className="ml-3" size={20} />
             </Button>
           </div>
         </div>
