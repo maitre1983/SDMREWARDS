@@ -63,6 +63,28 @@ Fraud prevention system for cash payments:
 - **Data payload**: Includes `transaction_id`, `amount`, `client_name`, `cashback_amount` for deep linking
 - **Note**: Requires merchant to have registered their device with OneSignal to receive notifications
 
+### ✅ HomePage UI Improvements - IMPLEMENTED 2026-03-11
+**1. CTA Buttons ("I'm a Customer" / "I'm a Merchant") - Made Highly Visible:**
+- Increased size (py-8, text-xl, font-bold)
+- Distinct colors: Orange gradient for Customer, Green gradient for Merchant
+- Added icons (Users, Store) and arrow indicators
+- Added hover scale effect and shadow
+- Full-width buttons stacked vertically for clarity
+- Both English ("I'm a Customer/Merchant") and French ("Je suis Client/Marchand") translations
+
+**2. Services Restructured:**
+- Removed individual "Airtime", "Data", "ECG" from home screen
+- New structure with 3 main options:
+  1. **Pay Merchants with QR** - Scan QR to pay and earn cashback
+  2. **Earn Cashback Rewards** - Get rewarded on every purchase
+  3. **Pay All Services** - Groups Airtime, Data, ECG and more
+- New "What You Can Do" / "Ce Que Vous Pouvez Faire" section
+- Responsive design: grid on desktop, stacked on mobile
+
+**Files modified:**
+- `/app/frontend/src/pages/HomePage.jsx` - CTA buttons & Quick Services section
+- `/app/frontend/src/translations.js` - New translations for services
+
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
 - **AdminDashboard.jsx**: Reduced from 3,837 to 2,866 lines (25% reduction)

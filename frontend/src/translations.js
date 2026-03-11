@@ -21,8 +21,8 @@ export const translations = {
     hero_tagline: "CASHBACK REWARDS PLATFORM",
     hero_title: "Earn Cashback on Every Purchase",
     hero_subtitle: "Join SDM Rewards and receive instant cashback when you shop at partner merchants. The more you spend, the more you earn.",
-    hero_cta_client: "Join as Customer",
-    hero_cta_merchant: "Become a Partner",
+    hero_cta_client: "I'm a Customer",
+    hero_cta_merchant: "I'm a Merchant",
     hero_stats_members: "Active Members",
     hero_stats_merchants: "Partner Merchants",
     hero_stats_cashback: "Cashback Distributed",
@@ -42,6 +42,16 @@ export const translations = {
     value_easy_desc: "Simple QR code scanning for instant payments",
     value_support: "24/7 Support",
     value_support_desc: "Our team is always here to help you",
+    
+    // ============== QUICK SERVICES (Home Screen) ==============
+    quick_services_title: "What You Can Do",
+    quick_services_subtitle: "Everything you need in one place",
+    service_pay_merchants: "Pay Merchants with QR",
+    service_pay_merchants_desc: "Scan QR code to pay and earn cashback instantly",
+    service_earn_cashback: "Earn Cashback Rewards",
+    service_earn_cashback_desc: "Get rewarded on every purchase you make",
+    service_pay_all: "Pay All Services",
+    service_pay_all_desc: "Airtime, Data, ECG and more",
     
     // ============== MEMBERSHIP CARDS ==============
     cards_title: "Choose Your Membership Card",
@@ -207,8 +217,8 @@ export const translations = {
     hero_tagline: "PLATEFORME DE CASHBACK",
     hero_title: "Gagnez du Cashback sur Chaque Achat",
     hero_subtitle: "Rejoignez SDM Rewards et recevez du cashback instantané lorsque vous achetez chez les commerçants partenaires. Plus vous dépensez, plus vous gagnez.",
-    hero_cta_client: "Rejoindre en tant que Client",
-    hero_cta_merchant: "Devenir Partenaire",
+    hero_cta_client: "Je suis Client",
+    hero_cta_merchant: "Je suis Marchand",
     hero_stats_members: "Membres Actifs",
     hero_stats_merchants: "Marchands Partenaires",
     hero_stats_cashback: "Cashback Distribué",
@@ -228,6 +238,16 @@ export const translations = {
     value_easy_desc: "Simple scan QR code pour des paiements instantanés",
     value_support: "Support 24/7",
     value_support_desc: "Notre équipe est toujours là pour vous aider",
+    
+    // ============== QUICK SERVICES (Home Screen) ==============
+    quick_services_title: "Ce Que Vous Pouvez Faire",
+    quick_services_subtitle: "Tout ce dont vous avez besoin en un seul endroit",
+    service_pay_merchants: "Payer les Marchands par QR",
+    service_pay_merchants_desc: "Scannez le code QR pour payer et gagner du cashback instantanément",
+    service_earn_cashback: "Gagner du Cashback",
+    service_earn_cashback_desc: "Soyez récompensé sur chaque achat que vous faites",
+    service_pay_all: "Payer Tous les Services",
+    service_pay_all_desc: "Airtime, Data, ECG et plus encore",
     
     // ============== MEMBERSHIP CARDS ==============
     cards_title: "Choisissez Votre Carte de Membre",
