@@ -616,7 +616,7 @@ export default function ClientDashboard() {
       
       if (res.data.success) {
         setMerchantPayStatus('cash_success');
-        toast.success(`Cash payment recorded! GHS ${res.data.cashback_earned} cashback credited.`);
+        toast.success(`Cash payment pending! Awaiting merchant confirmation.`);
         
         // Refresh dashboard data after a short delay
         setTimeout(() => {

@@ -479,10 +479,10 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
 async def initiate_cash_payment(request: ClientCashPaymentRequest):
     """
     Client-initiated cash payment to merchant
-    - Records payment in main transactions table
-    - Debits merchant's debit account for cashback
-    - Credits client's cashback balance
-    - Syncs across Client, Merchant, and Admin views
+    - Creates pending transaction requiring merchant confirmation
+    - Max 3 pending confirmations per client
+    - Expires after 72 hours if not confirmed
+    - Cashback only credited after merchant confirms
     """
     if request.amount < 1:
         raise HTTPException(status_code=400, detail="Minimum payment is GHS 1")
@@ -494,6 +494,19 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
     
     if client.get("status") != "active":
         raise HTTPException(status_code=400, detail="Please purchase a membership card first")
+    
+    # Check max pending confirmations per client (limit: 3)
+    pending_count = await db.transactions.count_documents({
+        "client_id": client["id"],
+        "payment_method": "cash",
+        "status": "pending_confirmation"
+    })
+    
+    if pending_count >= 3:
+        raise HTTPException(
+            status_code=400, 
+            detail="You have 3 pending cash payments awaiting confirmation. Please wait for merchant to confirm previous payments."
+        )
     
     # Find merchant by QR code
     merchant = await db.merchants.find_one({"payment_qr_code": request.merchant_qr_code}, {"_id": 0})
@@ -530,26 +543,27 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
             detail="Cash payments blocked. Merchant's debit limit has been reached. Please pay with MoMo."
         )
     
-    # Calculate new balance after this transaction
+    # Calculate new balance after this transaction (to check if it would exceed limit)
     new_balance = current_balance - cashback_amount
     
     # Check if this transaction would exceed the debit limit
     if abs(new_balance) > debit_limit:
         raise HTTPException(
             status_code=400, 
-            detail=f"Cash payment would exceed merchant's debit limit (GHS {debit_limit}). Please pay with MoMo or use a smaller amount."
+            detail=f"Cash payment would exceed merchant's debit limit. Please pay with MoMo or use a smaller amount."
         )
     
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=72)  # 72-hour expiration
     transaction_id = str(uuid.uuid4())
-    payment_ref = f"SDM-CASH-{datetime.now().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
+    payment_ref = f"SDM-CASH-{now.strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:8].upper()}"
     
-    # 1. Create main transaction (synced for Client, Merchant, Admin)
+    # Create main transaction with PENDING_CONFIRMATION status
     transaction = {
         "id": transaction_id,
         "reference": payment_ref,
         "type": "payment",
-        "payment_method": "cash",  # Important: marks this as cash payment
+        "payment_method": "cash",
         "client_id": client["id"],
         "client_phone": client.get("phone"),
         "client_name": client.get("full_name"),
@@ -559,90 +573,17 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
         "cashback_rate": merchant.get("cashback_rate", 5),
         "cashback_amount": cashback_amount,
         "sdm_commission": sdm_commission,
-        "status": "completed",
+        "status": "pending_confirmation",  # PENDING - requires merchant confirmation
         "description": f"Cash payment at {merchant['business_name']}",
-        "created_at": now,
-        "completed_at": now
+        "created_at": now.isoformat(),
+        "expires_at": expires_at.isoformat()
     }
     await db.transactions.insert_one(transaction)
     
-    # 2. Create cash_transaction record for debit account tracking
-    cash_tx = {
-        "id": str(uuid.uuid4()),
-        "transaction_id": transaction_id,  # Link to main transaction
-        "merchant_id": merchant["id"],
-        "client_id": client["id"],
-        "client_name": client.get("full_name"),
-        "client_phone": client.get("phone"),
-        "amount": request.amount,
-        "cashback_rate": merchant.get("cashback_rate", 5),
-        "cashback_awarded": cashback_amount,
-        "initiated_by": "client",  # Client initiated this payment
-        "created_at": now
-    }
-    await db.cash_transactions.insert_one(cash_tx)
+    # NOTE: Cashback NOT credited - will be credited when merchant confirms
+    # NOTE: Merchant debit NOT debited - will be debited when merchant confirms
     
-    # 3. Update merchant's debit account balance
-    await db.merchants.update_one(
-        {"id": merchant["id"]},
-        {
-            "$set": {
-                "debit_account.balance": new_balance,
-                "updated_at": now
-            },
-            "$inc": {
-                "total_sales": request.amount,
-                "total_cashback_given": cashback_amount,
-                "total_transactions": 1
-            }
-        }
-    )
-    
-    # 4. Record debit history
-    debit_history = {
-        "id": str(uuid.uuid4()),
-        "merchant_id": merchant["id"],
-        "type": "debit",
-        "amount": cashback_amount,
-        "balance_after": new_balance,
-        "description": f"Cashback for cash sale to {client.get('full_name', 'Customer')} - {payment_ref}",
-        "transaction_id": transaction_id,
-        "created_at": now
-    }
-    await db.debit_ledger.insert_one(debit_history)
-    
-    # 5. Credit client's cashback balance
-    await db.clients.update_one(
-        {"id": client["id"]},
-        {
-            "$inc": {
-                "cashback_balance": cashback_amount,
-                "total_earned": cashback_amount,
-                "total_spent": request.amount
-            },
-            "$set": {"updated_at": now}
-        }
-    )
-    
-    # 6. Check if merchant needs alert or blocking (75% / 100% of limit)
-    if debit_limit > 0:
-        usage_percentage = (abs(new_balance) / debit_limit) * 100
-        
-        # Block at 100%
-        if usage_percentage >= 100 and not is_blocked:
-            await db.merchants.update_one(
-                {"id": merchant["id"]},
-                {"$set": {"debit_account.is_blocked": True}}
-            )
-            # TODO: Send SMS alert to merchant
-            logger.warning(f"Merchant {merchant['id']} debit account blocked - limit reached")
-        
-        # Alert at 75%
-        elif usage_percentage >= 75 and usage_percentage < 100:
-            # TODO: Send SMS alert to merchant
-            logger.info(f"Merchant {merchant['id']} debit account at {usage_percentage:.1f}% usage")
-    
-    logger.info(f"Cash payment completed: {payment_ref}, amount={request.amount}, cashback={cashback_amount}")
+    logger.info(f"Cash payment pending confirmation: {payment_ref}, amount={request.amount}, cashback={cashback_amount}")
     
     return {
         "success": True,
@@ -650,10 +591,11 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
         "reference": payment_ref,
         "amount": request.amount,
         "merchant": merchant["business_name"],
-        "cashback_earned": cashback_amount,
-        "status": "completed",
+        "cashback_amount": cashback_amount,
+        "status": "pending_confirmation",
         "payment_method": "cash",
-        "message": f"Cash payment recorded! GHS {cashback_amount} cashback credited to your wallet."
+        "expires_at": expires_at.isoformat(),
+        "message": f"Payment recorded! Awaiting merchant confirmation. Cashback will be credited once confirmed."
     }
 
 

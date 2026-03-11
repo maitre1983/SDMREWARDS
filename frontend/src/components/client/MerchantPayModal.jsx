@@ -116,12 +116,17 @@ export default function MerchantPayModal({
           </div>
         ) : status === 'cash_success' ? (
           <div className="text-center py-8">
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Banknote className="text-emerald-400" size={40} />
+            <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Banknote className="text-orange-400" size={40} />
             </div>
-            <p className="text-white text-lg font-semibold">Cash Payment Recorded!</p>
-            <p className="text-emerald-400 mt-2">GHS {cashbackAmount} Cashback credited</p>
+            <p className="text-white text-lg font-semibold">Cash Payment Pending</p>
+            <p className="text-orange-400 mt-2">Awaiting merchant confirmation</p>
             <p className="text-slate-400 text-sm mt-2">Please pay GHS {amount} in cash to the merchant</p>
+            <div className="mt-4 p-3 bg-slate-800 rounded-lg">
+              <p className="text-slate-400 text-sm">Potential Cashback:</p>
+              <p className="text-purple-400 font-bold text-lg">GHS {cashbackAmount}</p>
+              <p className="text-slate-500 text-xs mt-1">Will be credited once merchant confirms receipt</p>
+            </div>
           </div>
         ) : status === 'failed' ? (
           <div className="text-center py-8">
