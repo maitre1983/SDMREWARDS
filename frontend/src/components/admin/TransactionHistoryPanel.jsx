@@ -220,10 +220,10 @@ export default function TransactionHistoryPanel({ token }) {
               <thead className="bg-slate-50 border-b">
                 <tr>
                   <th className="text-left p-4 font-medium text-slate-600">Transaction</th>
-                  <th className="text-left p-4 font-medium text-slate-600">Marchand</th>
+                  <th className="text-left p-4 font-medium text-slate-600">Merchant</th>
                   <th className="text-left p-4 font-medium text-slate-600">Client</th>
-                  <th className="text-right p-4 font-medium text-slate-600">Montant</th>
-                  <th className="text-right p-4 font-medium text-slate-600">Marchand reçoit</th>
+                  <th className="text-right p-4 font-medium text-slate-600">Amount</th>
+                  <th className="text-right p-4 font-medium text-slate-600">Merchant Receives</th>
                   <th className="text-right p-4 font-medium text-slate-600">Commission</th>
                   <th className="text-right p-4 font-medium text-slate-600">Cashback</th>
                   <th className="text-center p-4 font-medium text-slate-600">Status</th>
@@ -306,7 +306,7 @@ export default function TransactionHistoryPanel({ token }) {
                             </div>
                             {txn.settlement_result && (
                               <div className="col-span-2">
-                                <p className="text-slate-500">Règlement Marchand</p>
+                                <p className="text-slate-500">Merchant Settlement</p>
                                 <p className={txn.settlement_result.status === 'completed' ? 'text-emerald-600' : 'text-red-600'}>
                                   {txn.settlement_result.status} - Ref: {txn.settlement_result.reference}
                                 </p>

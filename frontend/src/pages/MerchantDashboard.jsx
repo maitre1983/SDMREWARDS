@@ -950,7 +950,7 @@ export default function MerchantDashboard() {
             <div className="flex gap-2 overflow-x-auto pb-2">
               {[
                 { id: 'cashback', label: 'Cashback', icon: Percent },
-                { id: 'payment', label: 'Paiement', icon: Wallet },
+                { id: 'payment', label: 'Payment', icon: Wallet },
                 { id: 'cashiers', label: 'Caissiers', icon: UserCog },
                 { id: 'business', label: 'Commerce', icon: Building },
                 { id: 'security', label: 'Sécurité', icon: Shield }

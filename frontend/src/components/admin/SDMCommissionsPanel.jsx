@@ -62,7 +62,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
   const handleUpdateRate = async () => {
     const rate = parseFloat(newRate);
     if (isNaN(rate) || rate < 0.5 || rate > 20) {
-      toast.error('Le taux doit être entre 0.5% et 20%');
+      toast.error('Rate must be between 0.5% and 20%');
       return;
     }
     
@@ -81,11 +81,11 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
 
   const handleWithdraw = async () => {
     if (!withdrawForm.amount || parseFloat(withdrawForm.amount) <= 0) {
-      toast.error('Montant invalide');
+      toast.error('Invalid amount');
       return;
     }
     if (!withdrawForm.momo_number) {
-      toast.error('Numéro MoMo requis');
+      toast.error('MoMo number required');
       return;
     }
 
@@ -110,7 +110,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
   };
 
   const formatAmount = (amount) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     }).format(amount || 0);
@@ -118,7 +118,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString('fr-FR', {
+    return new Date(dateStr).toLocaleString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -158,8 +158,8 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Commissions SDM</h2>
-          <p className="text-slate-500">Gérez les revenus de commission de SDM</p>
+          <h2 className="text-2xl font-bold text-slate-900">SDM Commissions</h2>
+          <p className="text-slate-500">Manage SDM commission revenue</p>
         </div>
         <Button onClick={fetchCommissions} variant="outline" className="gap-2">
           <RefreshCw size={16} />
@@ -174,7 +174,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
             <TrendingUp size={24} className="opacity-80" />
           </div>
           <p className="text-3xl font-bold mt-3">{formatAmount(commissions?.total_earned)} GHS</p>
-          <p className="text-sm opacity-80 mt-1">Total des commissions gagnées</p>
+          <p className="text-sm opacity-80 mt-1">Total Commissions Earned</p>
         </div>
         
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
@@ -182,7 +182,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
             <ArrowUpRight size={24} className="opacity-80" />
           </div>
           <p className="text-3xl font-bold mt-3">{formatAmount(commissions?.total_withdrawn)} GHS</p>
-          <p className="text-sm opacity-80 mt-1">Total retiré</p>
+          <p className="text-sm opacity-80 mt-1">Total Withdrawn</p>
         </div>
         
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
@@ -190,7 +190,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
             <Wallet size={24} className="opacity-80" />
           </div>
           <p className="text-3xl font-bold mt-3">{formatAmount(commissions?.available_balance)} GHS</p>
-          <p className="text-sm opacity-80 mt-1">Solde disponible</p>
+          <p className="text-sm opacity-80 mt-1">Available Balance</p>
         </div>
       </div>
 
@@ -200,7 +200,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Settings size={20} className="text-slate-600" />
-              <h3 className="font-semibold text-lg">Taux de Commission SDM</h3>
+              <h3 className="font-semibold text-lg">SDM Commission Rate</h3>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg">
@@ -213,7 +213,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
                   variant="outline"
                   size="sm"
                 >
-                  Modifier
+                  Edit
                 </Button>
               )}
             </div>
@@ -222,11 +222,11 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
           {showRateForm && (
             <div className="mt-4 p-4 bg-slate-50 rounded-lg space-y-4">
               <p className="text-sm text-slate-600">
-                Définissez le taux de commission prélevé sur chaque cashback (entre 0.5% et 20%)
+                Set the commission rate charged on each cashback (between 0.5% and 20%)
               </p>
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1">Nouveau taux (%)</label>
+                  <label className="block text-sm font-medium mb-1">New Rate (%)</label>
                   <Input
                     type="number"
                     step="0.1"
@@ -244,10 +244,10 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
                     disabled={isUpdatingRate}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
-                    {isUpdatingRate ? <RefreshCw className="animate-spin" size={16} /> : 'Enregistrer'}
+                    {isUpdatingRate ? <RefreshCw className="animate-spin" size={16} /> : 'Save'}
                   </Button>
                   <Button onClick={() => { setShowRateForm(false); setNewRate(commissionRate?.toString() || ''); }} variant="outline">
-                    Annuler
+                    Cancel
                   </Button>
                 </div>
               </div>
@@ -266,18 +266,18 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
               disabled={!commissions?.available_balance || commissions.available_balance <= 0}
             >
               <Send size={18} />
-              Retirer mes commissions
+              Withdraw Commissions
             </Button>
           ) : (
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Retrait des commissions</h3>
+              <h3 className="font-semibold text-lg">Commission Withdrawal</h3>
               <p className="text-sm text-slate-500">
-                Solde disponible: <strong>{formatAmount(commissions?.available_balance)} GHS</strong>
+                Available Balance: <strong>{formatAmount(commissions?.available_balance)} GHS</strong>
               </p>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Montant (GHS)</label>
+                  <label className="block text-sm font-medium mb-1">Amount (GHS)</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -289,7 +289,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Réseau</label>
+                  <label className="block text-sm font-medium mb-1">Network</label>
                   <select
                     value={withdrawForm.momo_provider}
                     onChange={(e) => setWithdrawForm({...withdrawForm, momo_provider: e.target.value})}
@@ -304,7 +304,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Numéro MoMo</label>
+                  <label className="block text-sm font-medium mb-1">MoMo Number</label>
                   <Input
                     value={withdrawForm.momo_number}
                     onChange={(e) => setWithdrawForm({...withdrawForm, momo_number: e.target.value})}
@@ -312,7 +312,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Nom du compte</label>
+                  <label className="block text-sm font-medium mb-1">Account Name</label>
                   <Input
                     value={withdrawForm.account_name}
                     onChange={(e) => setWithdrawForm({...withdrawForm, account_name: e.target.value})}
@@ -328,13 +328,13 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                 >
                   {isWithdrawing ? <RefreshCw className="animate-spin" size={16} /> : <Send size={16} />}
-                  <span className="ml-2">Confirmer le retrait</span>
+                  <span className="ml-2">Confirm Withdrawal</span>
                 </Button>
                 <Button
                   onClick={() => setShowWithdrawForm(false)}
                   variant="outline"
                 >
-                  Annuler
+                  Cancel
                 </Button>
               </div>
             </div>
@@ -347,7 +347,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
         <div className="bg-white rounded-xl p-6">
           <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
             <History size={20} />
-            Historique des retraits
+            Withdrawal History
           </h3>
           <div className="space-y-3">
             {commissions.withdrawal_history.map((w) => (
@@ -369,7 +369,7 @@ export default function SDMCommissionsPanel({ token, currentAdmin }) {
       <div className="bg-white rounded-xl p-6">
         <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
           <DollarSign size={20} />
-          Commissions récentes
+          Recent Commissions
         </h3>
         {commissions?.recent_commissions?.length > 0 ? (
           <div className="space-y-2">

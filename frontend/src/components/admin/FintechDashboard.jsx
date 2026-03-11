@@ -2266,7 +2266,7 @@ export default function FintechDashboard({ token }) {
               </div>
               <div className="flex gap-2 mt-4">
                 <Button onClick={handleCreatePartner} className="bg-emerald-600 hover:bg-emerald-700">
-                  Ajouter
+                  Add
                 </Button>
                 <Button variant="outline" onClick={() => setShowPartnerForm(false)}>
                   Cancel

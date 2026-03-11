@@ -380,7 +380,13 @@ export const translations = {
 // Language utility functions
 export const getLanguageFromStorage = () => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('sdm_language') || 'en';
+    const saved = localStorage.getItem('sdm_language');
+    // Default to English for Ghana market
+    if (!saved) {
+      localStorage.setItem('sdm_language', 'en');
+      return 'en';
+    }
+    return saved;
   }
   return 'en';
 };

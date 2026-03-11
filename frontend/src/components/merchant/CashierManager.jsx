@@ -36,7 +36,7 @@ export default function CashierManager({ token }) {
       setCashiers(res.data.cashiers || []);
     } catch (error) {
       console.error('Error fetching cashiers:', error);
-      toast.error('Erreur lors du chargement des caissiers');
+      toast.error('Error loading cashiers');
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +59,7 @@ export default function CashierManager({ token }) {
 
   const handleSave = async () => {
     if (!formData.name || !formData.code) {
-      toast.error('Veuillez remplir le nom et le code');
+      toast.error('Please fill in name and code');
       return;
     }
 
@@ -73,20 +73,20 @@ export default function CashierManager({ token }) {
           formData,
           { headers }
         );
-        toast.success('Caissier modifié');
+        toast.success('Cashier updated');
       } else {
         await axios.post(
           `${API_URL}/api/merchants/cashiers`,
           formData,
           { headers }
         );
-        toast.success('Caissier créé');
+        toast.success('Cashier created');
       }
       
       setShowModal(false);
       fetchCashiers();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la sauvegarde');
+      toast.error(error.response?.data?.detail || 'Error saving');
     } finally {
       setIsSaving(false);
     }
@@ -99,10 +99,10 @@ export default function CashierManager({ token }) {
         { is_active: !cashier.is_active },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(cashier.is_active ? 'Caissier désactivé' : 'Caissier activé');
+      toast.success(cashier.is_active ? 'Cashier deactivated' : 'Cashier activated');
       fetchCashiers();
     } catch (error) {
-      toast.error('Erreur lors de la modification');
+      toast.error('Error updating');
     }
   };
 
@@ -112,11 +112,11 @@ export default function CashierManager({ token }) {
         `${API_URL}/api/merchants/cashiers/${cashierId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('Caissier supprimé');
+      toast.success('Cashier deleted');
       setShowDeleteConfirm(null);
       fetchCashiers();
     } catch (error) {
-      toast.error('Erreur lors de la suppression');
+      toast.error('Error deleting');
     }
   };
 
@@ -134,7 +134,7 @@ export default function CashierManager({ token }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="text-emerald-400" size={20} />
-          <h3 className="text-white font-semibold">Gestion des Caissiers</h3>
+          <h3 className="text-white font-semibold">Cashier Management</h3>
         </div>
         <Button
           onClick={() => handleOpenModal()}
@@ -142,7 +142,7 @@ export default function CashierManager({ token }) {
           size="sm"
           data-testid="add-cashier-btn"
         >
-          <Plus size={16} className="mr-1" /> Ajouter
+          <Plus size={16} className="mr-1" /> Add
         </Button>
       </div>
 
@@ -150,8 +150,8 @@ export default function CashierManager({ token }) {
       {cashiers.length === 0 ? (
         <div className="text-center py-8 bg-slate-900 rounded-xl border border-slate-700">
           <UserCog className="mx-auto text-slate-500 mb-3" size={48} />
-          <p className="text-slate-400">Aucun caissier configuré</p>
-          <p className="text-slate-500 text-sm">Ajoutez des caissiers pour gérer vos caisses</p>
+          <p className="text-slate-400">No cashiers configured</p>
+          <p className="text-slate-500 text-sm">Add cashiers to manage your registers</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -194,7 +194,7 @@ export default function CashierManager({ token }) {
                       ? 'bg-emerald-500/10 text-emerald-400' 
                       : 'bg-slate-700 text-slate-400'
                   }`}>
-                    {cashier.is_active ? 'Actif' : 'Inactif'}
+                    {cashier.is_active ? 'Active' : 'Inactive'}
                   </span>
                   
                   <button
@@ -204,7 +204,7 @@ export default function CashierManager({ token }) {
                         ? 'text-amber-400 hover:bg-amber-500/10' 
                         : 'text-emerald-400 hover:bg-emerald-500/10'
                     }`}
-                    title={cashier.is_active ? 'Désactiver' : 'Activer'}
+                    title={cashier.is_active ? 'Deactivate' : 'Activate'}
                   >
                     {cashier.is_active ? <XCircle size={18} /> : <CheckCircle size={18} />}
                   </button>
@@ -212,7 +212,7 @@ export default function CashierManager({ token }) {
                   <button
                     onClick={() => handleOpenModal(cashier)}
                     className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg"
-                    title="Modifier"
+                    title="Edit"
                   >
                     <Edit2 size={18} />
                   </button>
@@ -220,7 +220,7 @@ export default function CashierManager({ token }) {
                   <button
                     onClick={() => setShowDeleteConfirm(cashier.id)}
                     className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
-                    title="Supprimer"
+                    title="Delete"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -249,7 +249,7 @@ export default function CashierManager({ token }) {
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-white font-semibold">
-                {editingCashier ? 'Modifier le caissier' : 'Nouveau caissier'}
+                {editingCashier ? 'Edit Cashier' : 'New Cashier'}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
                 <X size={20} />
@@ -258,30 +258,30 @@ export default function CashierManager({ token }) {
 
             <div className="space-y-4">
               <div>
-                <Label className="text-slate-400">Nom du caissier *</Label>
+                <Label className="text-slate-400">Cashier Name *</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: Jean Dupont"
+                  placeholder="Ex: John Doe"
                   className="mt-1 bg-slate-900 border-slate-700 text-white"
                   data-testid="cashier-name-input"
                 />
               </div>
 
               <div>
-                <Label className="text-slate-400">Code caisse *</Label>
+                <Label className="text-slate-400">Register Code *</Label>
                 <Input
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="Ex: CAISSE1"
+                  placeholder="Ex: REGISTER1"
                   className="mt-1 bg-slate-900 border-slate-700 text-white font-mono"
                   data-testid="cashier-code-input"
                 />
-                <p className="text-slate-500 text-xs mt-1">Identifiant unique pour cette caisse</p>
+                <p className="text-slate-500 text-xs mt-1">Unique identifier for this register</p>
               </div>
 
               <div>
-                <Label className="text-slate-400">Numéro de caisse</Label>
+                <Label className="text-slate-400">Register Number</Label>
                 <Input
                   value={formData.register_number}
                   onChange={(e) => setFormData({ ...formData, register_number: e.target.value })}
@@ -297,7 +297,7 @@ export default function CashierManager({ token }) {
                   variant="outline"
                   className="flex-1 border-slate-700 text-slate-300"
                 >
-                  Annuler
+                  Cancel
                 </Button>
                 <Button
                   onClick={handleSave}
@@ -310,7 +310,7 @@ export default function CashierManager({ token }) {
                   ) : (
                     <Save className="mr-2" size={18} />
                   )}
-                  {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                  {isSaving ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             </div>
@@ -322,9 +322,9 @@ export default function CashierManager({ token }) {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="text-white font-semibold mb-4">Supprimer le caissier ?</h3>
+            <h3 className="text-white font-semibold mb-4">Delete Cashier?</h3>
             <p className="text-slate-400 text-sm mb-6">
-              Cette action est irréversible. Les statistiques de ce caissier seront perdues.
+              This action is irreversible. The cashier's statistics will be lost.
             </p>
             <div className="flex gap-3">
               <Button
@@ -332,7 +332,7 @@ export default function CashierManager({ token }) {
                 variant="outline"
                 className="flex-1 border-slate-700 text-slate-300"
               >
-                Annuler
+                Cancel
               </Button>
               <Button
                 onClick={() => handleDelete(showDeleteConfirm)}
@@ -340,7 +340,7 @@ export default function CashierManager({ token }) {
                 data-testid="confirm-delete-btn"
               >
                 <Trash2 className="mr-2" size={18} />
-                Supprimer
+                Delete
               </Button>
             </div>
           </div>

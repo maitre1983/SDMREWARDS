@@ -501,7 +501,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
         <div>
           <p className="text-emerald-400 font-medium">Taux de cashback actuel</p>
           <p className="text-slate-400 text-sm">
-            Membre depuis {summary?.member_since ? new Date(summary.member_since).toLocaleDateString('fr-FR') : 'N/A'}
+            Member since {summary?.member_since ? new Date(summary.member_since).toLocaleDateString('en-US') : 'N/A'}
           </p>
         </div>
         <div className="text-3xl font-bold text-emerald-400">

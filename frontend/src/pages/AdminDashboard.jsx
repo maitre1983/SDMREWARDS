@@ -49,7 +49,8 @@ import {
   Send,
   AlertTriangle,
   Unlock,
-  Smartphone
+  Smartphone,
+  Sparkles
 } from 'lucide-react';
 
 // Admin Components
@@ -58,6 +59,7 @@ import CardTypesManager from '../components/admin/CardTypesManager';
 import AdminOverview from '../components/admin/AdminOverview';
 import AdminClients from '../components/admin/AdminClients';
 import AdminMerchants from '../components/admin/AdminMerchants';
+import SEODashboard from '../components/admin/SEODashboard';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
@@ -1394,6 +1396,7 @@ export default function AdminDashboard() {
             { id: 'overview', label: 'Overview', icon: BarChart3 },
             { id: 'clients', label: 'Clients', icon: Users },
             { id: 'merchants', label: 'Merchants', icon: Store },
+            { id: 'seo', label: 'SEO & Analytics', icon: Sparkles },
             { id: 'settings', label: 'Settings', icon: Settings }
           ].map(tab => (
             <button
@@ -1469,6 +1472,11 @@ export default function AdminDashboard() {
             handleDeleteMerchant={handleDeleteMerchant}
             handleOpenResetPassword={handleOpenResetPassword}
           />
+        )}
+
+        {/* SEO & Analytics Tab */}
+        {activeTab === 'seo' && (
+          <SEODashboard token={token} />
         )}
 
         {/* Settings Tab */}

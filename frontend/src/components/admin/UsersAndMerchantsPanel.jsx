@@ -191,7 +191,7 @@ export default function UsersAndMerchantsPanel({ token }) {
             }`}
           >
             <Store size={16} />
-            Marchands ({merchants.length})
+            Merchants ({merchants.length})
           </button>
           <button
             onClick={() => setActiveTab('logs')}
@@ -497,7 +497,7 @@ export default function UsersAndMerchantsPanel({ token }) {
         <div className="bg-cyan-50 rounded-xl p-4">
           <Store className="w-8 h-8 text-cyan-600 mb-2" />
           <p className="text-2xl font-bold text-cyan-900">{merchants.length}</p>
-          <p className="text-sm text-cyan-600">Total Marchands</p>
+          <p className="text-sm text-cyan-600">Total Merchants</p>
         </div>
         <div className="bg-red-50 rounded-xl p-4">
           <Ban className="w-8 h-8 text-red-600 mb-2" />

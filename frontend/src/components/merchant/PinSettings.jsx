@@ -26,11 +26,11 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
 
   const handleEnablePin = async () => {
     if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
-      toast.error('Le PIN doit contenir 4 à 6 chiffres');
+      toast.error('PIN must be 4 to 6 digits');
       return;
     }
     if (newPin !== confirmPin) {
-      toast.error('Les codes PIN ne correspondent pas');
+      toast.error('PIN codes do not match');
       return;
     }
 
@@ -41,13 +41,13 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
         { pin: newPin },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('Protection PIN activée');
+      toast.success('PIN protection enabled');
       onPinStatusChange({ pin_enabled: true, has_pin: true });
       setShowEnableForm(false);
       setNewPin('');
       setConfirmPin('');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'activation');
+      toast.error(error.response?.data?.detail || 'Error enabling PIN');
     } finally {
       setIsEnabling(false);
     }
@@ -55,7 +55,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
 
   const handleDisablePin = async () => {
     if (!currentPin) {
-      toast.error('Entrez votre PIN actuel');
+      toast.error('Enter your current PIN');
       return;
     }
 
@@ -66,12 +66,12 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
         { pin: currentPin },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('Protection PIN désactivée');
+      toast.success('PIN protection disabled');
       onPinStatusChange({ pin_enabled: false, has_pin: true });
       setShowDisableForm(false);
       setCurrentPin('');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'PIN incorrect');
+      toast.error(error.response?.data?.detail || 'Incorrect PIN');
     } finally {
       setIsDisabling(false);
     }
@@ -79,11 +79,11 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
 
   const handleChangePin = async () => {
     if (!currentPin) {
-      toast.error('Entrez votre PIN actuel');
+      toast.error('Enter your current PIN');
       return;
     }
     if (newPinForChange.length < 4 || newPinForChange.length > 6 || !/^\d+$/.test(newPinForChange)) {
-      toast.error('Le nouveau PIN doit contenir 4 à 6 chiffres');
+      toast.error('New PIN must be 4 to 6 digits');
       return;
     }
 
@@ -97,12 +97,12 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
           params: { current_pin: currentPin, new_pin: newPinForChange }
         }
       );
-      toast.success('PIN modifié avec succès');
+      toast.success('PIN changed successfully');
       setShowChangeForm(false);
       setCurrentPin('');
       setNewPinForChange('');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors du changement');
+      toast.error(error.response?.data?.detail || 'Error changing PIN');
     } finally {
       setIsChanging(false);
     }
@@ -113,7 +113,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
       {/* Header */}
       <div className="flex items-center gap-2">
         <Shield className="text-amber-400" size={20} />
-        <h3 className="text-white font-semibold">Sécurité PIN</h3>
+        <h3 className="text-white font-semibold">PIN Security</h3>
       </div>
 
       {/* Status Card */}
@@ -148,7 +148,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
             <span className={`text-sm font-medium ${
               pinStatus?.pin_enabled ? 'text-emerald-400' : 'text-slate-500'
             }`}>
-              {pinStatus?.pin_enabled ? 'Activé' : 'Désactivé'}
+              {pinStatus?.pin_enabled ? 'Enabled' : 'Disabled'}
             </span>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
           data-testid="enable-pin-btn"
         >
           <ToggleRight className="mr-2" size={18} />
-          Activer la protection PIN
+          Enable PIN Protection
         </Button>
       )}
 
@@ -175,7 +175,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
             data-testid="change-pin-btn"
           >
             <Key className="mr-2" size={18} />
-            Changer le PIN
+            Change PIN
           </Button>
           <Button
             onClick={() => setShowDisableForm(true)}
@@ -184,7 +184,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
             data-testid="disable-pin-btn"
           >
             <ToggleLeft className="mr-2" size={18} />
-            Désactiver
+            Disable
           </Button>
         </div>
       )}
@@ -192,10 +192,10 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
       {/* Enable PIN Form */}
       {showEnableForm && (
         <div className="p-4 bg-slate-900 border border-slate-700 rounded-xl space-y-4">
-          <h4 className="text-white font-medium">Créer un code PIN</h4>
+          <h4 className="text-white font-medium">Create a PIN Code</h4>
           
           <div>
-            <Label className="text-slate-400">Nouveau PIN (4-6 chiffres)</Label>
+            <Label className="text-slate-400">New PIN (4-6 digits)</Label>
             <Input
               type="password"
               inputMode="numeric"
@@ -209,7 +209,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
           </div>
 
           <div>
-            <Label className="text-slate-400">Confirmer le PIN</Label>
+            <Label className="text-slate-400">Confirm PIN</Label>
             <Input
               type="password"
               inputMode="numeric"
@@ -232,7 +232,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               variant="outline"
               className="flex-1 border-slate-700 text-slate-300"
             >
-              Annuler
+              Cancel
             </Button>
             <Button
               onClick={handleEnablePin}
@@ -241,7 +241,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               data-testid="confirm-enable-pin-btn"
             >
               {isEnabling ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-              {isEnabling ? 'Activation...' : 'Activer'}
+              {isEnabling ? 'Enabling...' : 'Enable'}
             </Button>
           </div>
         </div>
@@ -250,13 +250,13 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
       {/* Disable PIN Form */}
       {showDisableForm && (
         <div className="p-4 bg-slate-900 border border-red-500/30 rounded-xl space-y-4">
-          <h4 className="text-white font-medium">Désactiver la protection PIN</h4>
+          <h4 className="text-white font-medium">Disable PIN Protection</h4>
           <p className="text-slate-400 text-sm">
-            Entrez votre PIN actuel pour confirmer la désactivation.
+            Enter your current PIN to confirm disabling.
           </p>
           
           <div>
-            <Label className="text-slate-400">PIN actuel</Label>
+            <Label className="text-slate-400">Current PIN</Label>
             <Input
               type="password"
               inputMode="numeric"
@@ -278,7 +278,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               variant="outline"
               className="flex-1 border-slate-700 text-slate-300"
             >
-              Annuler
+              Cancel
             </Button>
             <Button
               onClick={handleDisablePin}
@@ -287,7 +287,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               data-testid="confirm-disable-pin-btn"
             >
               {isDisabling ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-              {isDisabling ? 'Désactivation...' : 'Désactiver'}
+              {isDisabling ? 'Disabling...' : 'Disable'}
             </Button>
           </div>
         </div>
@@ -296,10 +296,10 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
       {/* Change PIN Form */}
       {showChangeForm && (
         <div className="p-4 bg-slate-900 border border-slate-700 rounded-xl space-y-4">
-          <h4 className="text-white font-medium">Changer le code PIN</h4>
+          <h4 className="text-white font-medium">Change PIN Code</h4>
           
           <div>
-            <Label className="text-slate-400">PIN actuel</Label>
+            <Label className="text-slate-400">Current PIN</Label>
             <Input
               type="password"
               inputMode="numeric"
@@ -313,7 +313,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
           </div>
 
           <div>
-            <Label className="text-slate-400">Nouveau PIN (4-6 chiffres)</Label>
+            <Label className="text-slate-400">New PIN (4-6 digits)</Label>
             <Input
               type="password"
               inputMode="numeric"
@@ -336,7 +336,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               variant="outline"
               className="flex-1 border-slate-700 text-slate-300"
             >
-              Annuler
+              Cancel
             </Button>
             <Button
               onClick={handleChangePin}
@@ -345,7 +345,7 @@ export default function PinSettings({ token, pinStatus, onPinStatusChange }) {
               data-testid="confirm-change-pin-btn"
             >
               {isChanging ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-              {isChanging ? 'Changement...' : 'Changer'}
+              {isChanging ? 'Changing...' : 'Change'}
             </Button>
           </div>
         </div>

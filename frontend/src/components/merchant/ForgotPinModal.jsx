@@ -25,7 +25,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
       }
       setStep('verify');
     } catch (err) {
-      setError(err.message || 'Erreur lors de l\'envoi de l\'OTP');
+      setError(err.message || 'Error sending OTP');
     } finally {
       setIsLoading(false);
     }
@@ -33,11 +33,11 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
 
   const handleResetPin = async () => {
     if (newPin !== confirmPin) {
-      setError('Les codes PIN ne correspondent pas');
+      setError('PIN codes do not match');
       return;
     }
     if (newPin.length < 4 || newPin.length > 6 || !/^\d+$/.test(newPin)) {
-      setError('Le PIN doit contenir 4 à 6 chiffres');
+      setError('PIN must be 4 to 6 digits');
       return;
     }
 
@@ -48,7 +48,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
       await onResetPin(otp, newPin);
       setStep('success');
     } catch (err) {
-      setError(err.message || 'OTP invalide ou expiré');
+      setError(err.message || 'Invalid or expired OTP');
     } finally {
       setIsLoading(false);
     }
@@ -76,11 +76,11 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
               <KeyRound className="text-amber-400" size={24} />
             </div>
             <div>
-              <h3 className="text-white font-semibold">Réinitialiser le PIN</h3>
+              <h3 className="text-white font-semibold">Reset PIN</h3>
               <p className="text-slate-400 text-sm">
-                {step === 'choose' && 'Choisissez une méthode'}
-                {step === 'verify' && 'Entrez le code OTP'}
-                {step === 'success' && 'PIN réinitialisé'}
+                {step === 'choose' && 'Choose a method'}
+                {step === 'verify' && 'Enter OTP code'}
+                {step === 'success' && 'PIN reset complete'}
               </p>
             </div>
           </div>
@@ -99,7 +99,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
         {step === 'choose' && (
           <div className="space-y-3">
             <p className="text-slate-300 text-sm mb-4">
-              Nous vous enverrons un code OTP pour vérifier votre identité.
+              We will send you an OTP code to verify your identity.
             </p>
             
             <button
@@ -114,7 +114,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
               <div className="text-left flex-1">
                 <p className="text-white font-medium">SMS</p>
                 <p className="text-slate-400 text-sm">
-                  {merchantPhone ? `***${merchantPhone.slice(-4)}` : 'Numéro enregistré'}
+                  {merchantPhone ? `***${merchantPhone.slice(-4)}` : 'Registered number'}
                 </p>
               </div>
             </button>
@@ -131,7 +131,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
               <div className="text-left flex-1">
                 <p className="text-white font-medium">Email</p>
                 <p className="text-slate-400 text-sm">
-                  {merchantEmail ? `***${merchantEmail.slice(-10)}` : 'Non disponible'}
+                  {merchantEmail ? `***${merchantEmail.slice(-10)}` : 'Not available'}
                 </p>
               </div>
             </button>
@@ -169,7 +169,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
             </div>
 
             <div>
-              <label className="text-slate-400 text-sm block mb-2">Nouveau PIN (4-6 chiffres)</label>
+              <label className="text-slate-400 text-sm block mb-2">New PIN (4-6 digits)</label>
               <Input
                 type="password"
                 inputMode="numeric"
@@ -183,7 +183,7 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
             </div>
 
             <div>
-              <label className="text-slate-400 text-sm block mb-2">Confirmer le PIN</label>
+              <label className="text-slate-400 text-sm block mb-2">Confirm PIN</label>
               <Input
                 type="password"
                 inputMode="numeric"
@@ -207,14 +207,14 @@ export default function ForgotPinModal({ isOpen, onClose, onRequestOTP, onResetP
               ) : (
                 <KeyRound className="mr-2" size={18} />
               )}
-              {isLoading ? 'Réinitialisation...' : 'Réinitialiser le PIN'}
+              {isLoading ? 'Resetting...' : 'Reset PIN'}
             </Button>
 
             <button
               onClick={() => setStep('choose')}
               className="w-full text-slate-400 hover:text-white text-sm"
             >
-              Retour
+              Back
             </button>
           </div>
         )}
