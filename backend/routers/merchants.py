@@ -1368,16 +1368,84 @@ async def confirm_cash_payment(
         }
     )
     
-    # Check debit limit alerts
+    # Check debit limit alerts and send SMS notifications
     debit_limit = debit_account.get("debit_limit", 0) if debit_account else 0
     if debit_limit > 0:
         usage_percentage = abs(new_balance) / debit_limit * 100 if new_balance < 0 else 0
         
-        if usage_percentage >= 100:
+        # Send SMS alert at 75% usage
+        if 75 <= usage_percentage < 90:
+            # Check if we already sent 75% alert
+            last_alert = await db.debit_alerts.find_one({
+                "merchant_id": merchant_id,
+                "alert_type": "75_percent",
+                "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()}
+            })
+            if not last_alert:
+                try:
+                    from services.sms_service import SMSService
+                    sms_service = SMSService(db)
+                    await sms_service.send_sms(
+                        merchant.get("phone"),
+                        f"⚠️ SDM REWARDS ALERT: Your debit account has reached {usage_percentage:.0f}% of your limit (GHS {abs(new_balance):.2f} / GHS {debit_limit:.2f}). Please top up soon to continue receiving cashback payments."
+                    )
+                    await db.debit_alerts.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "merchant_id": merchant_id,
+                        "alert_type": "75_percent",
+                        "usage_percentage": usage_percentage,
+                        "balance": new_balance,
+                        "debit_limit": debit_limit,
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    logger.info(f"Sent 75% debit alert to merchant {merchant_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send 75% debit alert: {e}")
+        
+        # Send SMS alert at 90% usage
+        elif 90 <= usage_percentage < 100:
+            last_alert = await db.debit_alerts.find_one({
+                "merchant_id": merchant_id,
+                "alert_type": "90_percent",
+                "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()}
+            })
+            if not last_alert:
+                try:
+                    from services.sms_service import SMSService
+                    sms_service = SMSService(db)
+                    await sms_service.send_sms(
+                        merchant.get("phone"),
+                        f"🚨 SDM REWARDS URGENT: Your debit account is at {usage_percentage:.0f}% capacity! Balance: GHS {abs(new_balance):.2f} / Limit: GHS {debit_limit:.2f}. Top up NOW to avoid service interruption."
+                    )
+                    await db.debit_alerts.insert_one({
+                        "id": str(uuid.uuid4()),
+                        "merchant_id": merchant_id,
+                        "alert_type": "90_percent",
+                        "usage_percentage": usage_percentage,
+                        "balance": new_balance,
+                        "debit_limit": debit_limit,
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    logger.info(f"Sent 90% debit alert to merchant {merchant_id}")
+                except Exception as e:
+                    logger.error(f"Failed to send 90% debit alert: {e}")
+        
+        # Block at 100%
+        elif usage_percentage >= 100:
             await db.merchant_debit_accounts.update_one(
                 {"merchant_id": merchant_id},
                 {"$set": {"status": "blocked"}}
             )
+            # Send blocked notification
+            try:
+                from services.sms_service import SMSService
+                sms_service = SMSService(db)
+                await sms_service.send_sms(
+                    merchant.get("phone"),
+                    f"🛑 SDM REWARDS: Your debit account has been BLOCKED. You have reached your limit of GHS {debit_limit:.2f}. Please top up to resume cashback services."
+                )
+            except Exception as e:
+                logger.error(f"Failed to send blocked alert: {e}")
     
     return {
         "success": True,
@@ -2536,3 +2604,229 @@ async def get_payout_info(current_merchant: dict = Depends(get_current_merchant)
         }
     }
 
+
+
+# ============== MONTHLY STATEMENTS ==============
+
+@router.get("/statements")
+async def get_available_statements(
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get list of available monthly statements"""
+    merchant_id = current_merchant["id"]
+    
+    # Get the first transaction date to determine available months
+    first_transaction = await db.transactions.find_one(
+        {"merchant_id": merchant_id},
+        sort=[("created_at", 1)]
+    )
+    
+    if not first_transaction:
+        return {"statements": [], "message": "No transactions yet"}
+    
+    # Generate list of available months
+    first_date = datetime.fromisoformat(first_transaction["created_at"].replace("Z", "+00:00"))
+    current_date = datetime.now(timezone.utc)
+    
+    statements = []
+    date = first_date.replace(day=1)
+    
+    while date <= current_date:
+        month_name = date.strftime("%B %Y")
+        statements.append({
+            "month": date.month,
+            "year": date.year,
+            "label": month_name,
+            "period": f"{date.strftime('%Y-%m')}"
+        })
+        # Move to next month
+        if date.month == 12:
+            date = date.replace(year=date.year + 1, month=1)
+        else:
+            date = date.replace(month=date.month + 1)
+    
+    # Reverse to show most recent first
+    statements.reverse()
+    
+    return {"statements": statements}
+
+
+@router.get("/statements/{year}/{month}")
+async def get_monthly_statement(
+    year: int,
+    month: int,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get detailed monthly statement for a specific month"""
+    merchant_id = current_merchant["id"]
+    merchant = current_merchant
+    
+    # Calculate date range
+    start_date = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end_date = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    
+    # Get all transactions for this month
+    transactions = await db.transactions.find({
+        "merchant_id": merchant_id,
+        "created_at": {
+            "$gte": start_date.isoformat(),
+            "$lt": end_date.isoformat()
+        },
+        "status": "completed"
+    }, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    # Calculate summary statistics
+    total_sales = sum(t.get("amount", 0) for t in transactions)
+    total_cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+    total_transactions = len(transactions)
+    
+    # Get payment method breakdown
+    payment_methods = {}
+    for t in transactions:
+        method = t.get("payment_method", "unknown")
+        if method not in payment_methods:
+            payment_methods[method] = {"count": 0, "amount": 0, "cashback": 0}
+        payment_methods[method]["count"] += 1
+        payment_methods[method]["amount"] += t.get("amount", 0)
+        payment_methods[method]["cashback"] += t.get("cashback_amount", 0)
+    
+    # Get daily breakdown
+    daily_breakdown = {}
+    for t in transactions:
+        date_str = t.get("created_at", "")[:10]  # YYYY-MM-DD
+        if date_str not in daily_breakdown:
+            daily_breakdown[date_str] = {"count": 0, "amount": 0, "cashback": 0}
+        daily_breakdown[date_str]["count"] += 1
+        daily_breakdown[date_str]["amount"] += t.get("amount", 0)
+        daily_breakdown[date_str]["cashback"] += t.get("cashback_amount", 0)
+    
+    # Get debit account transactions for this month
+    debit_transactions = await db.debit_transactions.find({
+        "merchant_id": merchant_id,
+        "created_at": {
+            "$gte": start_date.isoformat(),
+            "$lt": end_date.isoformat()
+        }
+    }, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    total_topups = sum(t.get("amount", 0) for t in debit_transactions if t.get("type") == "topup")
+    
+    return {
+        "statement": {
+            "merchant": {
+                "business_name": merchant.get("business_name"),
+                "phone": merchant.get("phone"),
+                "qr_code": merchant.get("qr_code"),
+                "address": merchant.get("address")
+            },
+            "period": {
+                "month": month,
+                "year": year,
+                "label": start_date.strftime("%B %Y"),
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat()
+            },
+            "summary": {
+                "total_transactions": total_transactions,
+                "total_sales": round(total_sales, 2),
+                "total_cashback_given": round(total_cashback, 2),
+                "total_topups": round(total_topups, 2),
+                "net_debit": round(total_cashback - total_topups, 2),
+                "average_transaction": round(total_sales / total_transactions, 2) if total_transactions > 0 else 0
+            },
+            "payment_methods": payment_methods,
+            "daily_breakdown": [
+                {"date": k, **v} for k, v in sorted(daily_breakdown.items(), reverse=True)
+            ],
+            "transactions": transactions[:100],  # Limit to 100 most recent
+            "debit_transactions": debit_transactions[:50],
+            "generated_at": datetime.now(timezone.utc).isoformat()
+        }
+    }
+
+
+@router.get("/statements/{year}/{month}/download")
+async def download_monthly_statement(
+    year: int,
+    month: int,
+    format: str = "csv",
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Download monthly statement as CSV"""
+    from fastapi.responses import StreamingResponse
+    import io
+    import csv
+    
+    merchant_id = current_merchant["id"]
+    merchant = current_merchant
+    
+    # Calculate date range
+    start_date = datetime(year, month, 1, tzinfo=timezone.utc)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end_date = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+    
+    # Get all transactions
+    transactions = await db.transactions.find({
+        "merchant_id": merchant_id,
+        "created_at": {
+            "$gte": start_date.isoformat(),
+            "$lt": end_date.isoformat()
+        },
+        "status": "completed"
+    }, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    # Create CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow([
+        f"SDM REWARDS - Monthly Statement",
+        f"{merchant.get('business_name', 'Merchant')}",
+        f"{start_date.strftime('%B %Y')}"
+    ])
+    writer.writerow([])
+    
+    # Summary
+    total_sales = sum(t.get("amount", 0) for t in transactions)
+    total_cashback = sum(t.get("cashback_amount", 0) for t in transactions)
+    
+    writer.writerow(["SUMMARY"])
+    writer.writerow(["Total Transactions", len(transactions)])
+    writer.writerow(["Total Sales (GHS)", f"{total_sales:.2f}"])
+    writer.writerow(["Total Cashback Given (GHS)", f"{total_cashback:.2f}"])
+    writer.writerow([])
+    
+    # Transaction details
+    writer.writerow(["TRANSACTION DETAILS"])
+    writer.writerow(["Date", "Reference", "Customer", "Amount (GHS)", "Cashback (GHS)", "Payment Method", "Status"])
+    
+    for t in transactions:
+        writer.writerow([
+            t.get("created_at", "")[:19].replace("T", " "),
+            t.get("payment_reference", ""),
+            t.get("client_name", t.get("client_phone", "N/A")),
+            f"{t.get('amount', 0):.2f}",
+            f"{t.get('cashback_amount', 0):.2f}",
+            t.get("payment_method", "N/A"),
+            t.get("status", "N/A")
+        ])
+    
+    writer.writerow([])
+    writer.writerow([f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC"])
+    writer.writerow(["© 2026 SDM Rewards - GIT NFT GHANA LTD"])
+    
+    output.seek(0)
+    
+    filename = f"SDM_Statement_{merchant.get('business_name', 'Merchant').replace(' ', '_')}_{year}_{month:02d}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

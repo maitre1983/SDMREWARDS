@@ -120,6 +120,35 @@ Fraud prevention system for cash payments:
 - ✅ `POST /api/merchants/confirm-cash-payment/{id}` - Confirms payment, debits merchant, credits client
 - ✅ `POST /api/merchants/reject-cash-payment/{id}` - Rejects payment, notifies client
 
+### ✅ SMS Alert at 75%/90% Debit Limit - IMPLEMENTED 2026-03-11
+**Automatic SMS alerts when merchant debit account reaches threshold:**
+- **75% Alert**: "⚠️ SDM REWARDS ALERT: Your debit account has reached X% of your limit..."
+- **90% Alert**: "🚨 SDM REWARDS URGENT: Your debit account is at X% capacity! Top up NOW..."
+- **100% Block**: Account blocked with SMS notification
+- Alerts are sent only once per 24 hours per threshold
+- Stored in `debit_alerts` collection for tracking
+
+**File Modified:** `/app/backend/routers/merchants.py` (confirm_cash_payment function)
+
+### ✅ Monthly Merchant Statements - IMPLEMENTED 2026-03-11
+**Downloadable monthly financial statements for merchants:**
+
+**Backend Endpoints (3 new):**
+- `GET /api/merchants/statements` - List available months
+- `GET /api/merchants/statements/{year}/{month}` - Detailed statement with:
+  - Summary (transactions, sales, cashback, average)
+  - Payment methods breakdown
+  - Daily summary
+  - Transaction list
+- `GET /api/merchants/statements/{year}/{month}/download` - Download CSV
+
+**Frontend Component:** `/app/frontend/src/components/merchant/MonthlyStatements.jsx`
+- Statement list view with download buttons
+- Detailed statement view with all statistics
+- CSV download functionality
+
+**Access:** Merchant Dashboard > Settings > Relevés
+
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
 - **AdminDashboard.jsx**: Reduced from 3,837 to 2,866 lines (25% reduction)

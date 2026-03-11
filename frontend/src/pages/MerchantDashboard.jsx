@@ -36,7 +36,8 @@ import {
   ArrowUpRight,
   AlertTriangle,
   Smartphone,
-  XCircle
+  XCircle,
+  FileText
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -47,6 +48,7 @@ import CashierManager from '../components/merchant/CashierManager';
 import BusinessInfoEditor from '../components/merchant/BusinessInfoEditor';
 import PinSettings from '../components/merchant/PinSettings';
 import AdvancedDashboard from '../components/merchant/AdvancedDashboard';
+import MonthlyStatements from '../components/merchant/MonthlyStatements';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
@@ -1115,6 +1117,7 @@ export default function MerchantDashboard() {
               {[
                 { id: 'cashback', label: 'Cashback', icon: Percent },
                 { id: 'payment', label: 'Payment', icon: Wallet },
+                { id: 'statements', label: 'Relevés', icon: FileText },
                 { id: 'cashiers', label: 'Caissiers', icon: UserCog },
                 { id: 'business', label: 'Commerce', icon: Building },
                 { id: 'security', label: 'Sécurité', icon: Shield }
@@ -1163,6 +1166,11 @@ export default function MerchantDashboard() {
                   </Button>
                 </div>
               </div>
+            )}
+
+            {/* Monthly Statements */}
+            {settingsTab === 'statements' && (
+              <MonthlyStatements token={token} />
             )}
 
             {/* Payment Settings */}
