@@ -4,7 +4,7 @@
 SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP card purchases, QR payments, referral bonuses, and comprehensive admin/merchant dashboards.
 
 ## Core Requirements
-- **Language:** English (fully migrated from French)
+- **Language:** English (primary) with French option available
 - **Theme:** Dark fintech aesthetic with blue/gold accents
 - **Authentication:** JWT-based with OTP verification via BulkClix
 - **Payments:** BulkClix Mobile Money (MoMo) integration - LIVE
@@ -17,21 +17,46 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ## Tech Stack
 - **Backend:** FastAPI, MongoDB (motor), JWT, Pydantic
 - **Frontend:** React, Tailwind CSS, Shadcn/UI, recharts, qrcode.react
-- **3rd Party:** BulkClix (payments, SMS, OTP, Airtime, Data Bundles)
-
-## Documentation (Updated 2026-03-09)
-- [x] `/app/README.md` - Documentation principale complète
-- [x] `/app/API_DOCUMENTATION.md` - Documentation API complète (50+ endpoints)
-- [x] `/app/backend/.env.example` - Exemple de configuration backend
-- [x] `/app/frontend/.env.example` - Exemple de configuration frontend
-- [x] `/app/mobile/README_COMPLET.md` - Guide d'installation mobile
-- [x] `/app/mobile/FULL_PROJECT_GUIDE.md` - Guide complet du projet mobile
-- [x] `/app/backend/ARCHITECTURE.md` - Architecture backend
-- [x] `/app/backend/CHANGELOG.md` - Historique des changements
+- **3rd Party:** BulkClix (payments, SMS, OTP, Airtime, Data Bundles), OneSignal (push notifications)
+- **AI/LLM:** Emergent LLM Key (OpenAI GPT-5.2 for SEO analysis)
 
 ---
 
-## Completed Features
+## Completed Features (Updated 2026-03-11)
+
+### Platform Language & SEO (100%) - COMPLETED 2026-03-11
+- [x] **English as Primary Language** - Entire platform translated to English
+  - User Dashboard, Merchant Dashboard, Admin Dashboard
+  - All front-end pages, menus, notifications, system messages
+  - Registration and payment pages
+  - Date formatting changed from fr-FR to en-US
+  - Language selector (EN/FR flags) retained for bilingual support
+  
+- [x] **Advanced SEO Optimization**
+  - XML Sitemap generation (`/api/seo/sitemap.xml`) - 10 indexed pages
+  - Robots.txt configuration (`/api/seo/robots.txt`)
+  - Proper H1, H2, H3 heading structure
+  - Meta tags optimization (title, description, keywords)
+  - Open Graph tags for social sharing
+  - Schema.org structured data (Organization, FAQPage, Product, LocalBusiness)
+  - Target keywords: cashback, rewards, loyalty programs, mobile payments, fintech Ghana
+  
+- [x] **AI-Powered SEO Features** (Emergent LLM Key integration)
+  - Keyword performance analysis (`/api/seo/keywords/suggestions`)
+  - SEO optimization recommendations (`/api/seo/analyze`)
+  - AI-assisted content generation (`/api/seo/content/generate`)
+  - SEO analysis history tracking (`/api/seo/history`)
+  - Admin SEO Dashboard with 4 tabs: Overview, Keywords, AI Analysis, Content Generator
+  
+- [x] **Analytics Integration**
+  - Google Analytics 4 script placeholder added (needs GA_MEASUREMENT_ID)
+  - Custom analytics in SEO Dashboard (indexed pages, target keywords, schema types)
+
+### Flexible Payment System (100%) - COMPLETED 2026-03-10
+- [x] Four payment methods for merchants: MoMo, Cash, Cashback, Hybrid
+- [x] Services (Airtime, Data, ECG) - Cashback only payments
+- [x] Payment method badges on all transaction tables
+- [x] Admin "Cashback Ecosystem" metrics
 
 ### Authentication & Users (100%)
 - [x] Client registration with OTP verification
@@ -47,13 +72,12 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Settings panel (cards, commissions, SMS templates, security)
 - [x] Monthly analytics with month picker
 - [x] Super admin PIN change functionality
-- [x] Partial refactoring (Overview, Clients, Merchants tabs extracted)
-- [x] Merchant payouts management (view payout history)
+- [x] SEO & Analytics tab with AI features
 - [ ] Settings tab sub-components extraction (IN PROGRESS)
 
 ### Services Hub (100% for implemented services)
 - [x] **Airtime Purchase** - BulkClix API integration (MTN, Telecel, AirtelTigo)
-- [x] **Data Bundle Purchase** - Real BulkClix API with recipient validation (COMPLETED 2026-03-08)
+- [x] **Data Bundle Purchase** - Real BulkClix API with recipient validation
 - [x] **Card Upgrade** - Upgrade membership with MoMo + cashback options
 - [x] **MoMo Withdrawal** - Withdraw cashback to mobile money
 - [ ] ECG Payment - Waiting for API documentation
@@ -64,14 +88,14 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] Payout status tracking (pending, completed, failed)
 - [x] Admin view of all merchant payouts
 - [x] Merchant view of own payout history
-- [x] Bank transfer payout option (COMPLETED 2026-03-08)
+- [x] Bank transfer payout option
 - [x] Bank account verification via BulkClix API
 - [x] Preferred payout method toggle (MoMo vs Bank)
 
 ### Merchant Dashboard (100%)
-- [x] Sales statistics and charts
-- [x] PIN management
-- [x] Cashier CRUD operations
+- [x] Sales statistics and charts (English labels)
+- [x] PIN management (English UI)
+- [x] Cashier CRUD operations (English UI)
 - [x] Business info editing
 - [x] Transaction history page with filters, pagination, and export
 
@@ -88,605 +112,99 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - [x] SMS notifications (card purchase, referral bonus)
 - [x] Card expiry reminder endpoint
 
-### SEO Package (100%)
-- [x] robots.txt
-- [x] sitemap.xml
-- [x] English meta descriptions
+---
+
+## In Progress / Upcoming
+
+### P1 - Mobile App React Native Testing
+- Test CashPaymentScreen.js functionality
+- Verify payment flows on mobile
+
+### P2 - AdminDashboard.jsx Refactoring
+The file is ~4000 lines and needs to be broken into:
+- [ ] Extract `AdminSettings.jsx` component
+- [ ] Extract settings sub-tabs into separate components
+- [ ] Create custom hooks for state management
 
 ---
 
-## In Progress
+## Future Tasks (Backlog)
 
-### P1 - AdminDashboard.jsx Refactoring
-**Status:** IN PROGRESS
-- [x] Extract Overview tab → `AdminOverview.jsx`
-- [x] Extract Clients tab → `AdminClients.jsx`
-- [x] Extract Merchants tab → `AdminMerchants.jsx`
-- [ ] Extract Settings > Cards → `AdminSettingsCards.jsx`
-- [ ] Extract Settings > Commissions → `AdminSettingsCommissions.jsx`
-- [ ] Extract Settings > SMS → `AdminSettingsSMS.jsx`
-- [ ] Extract Settings > Security → `AdminSettingsSecurity.jsx`
-- [ ] Extract Settings > Users → `AdminSettingsUsers.jsx`
+1. **Client Cashback History** - Detailed view of where/when cashback was used
+2. **Automated Debit Alert** - SMS at 75% debit limit for merchants
+3. **Merchant Statements** - Monthly financial statement generation
+4. **ECG Payment** - Full integration when API available
+5. **Two-Factor Authentication (2FA)**
+6. **Google Analytics Setup** - Replace GA_MEASUREMENT_ID placeholder with actual tracking ID
 
 ---
 
-## Upcoming Tasks (Priority Order)
+## Key API Endpoints
 
-### P0 - Mobile App Feature Parity (COMPLETED)
-- [x] Client Dashboard matching web design - COMPLETED 2026-03-09
-- [x] Partners Screen (merchant list) - COMPLETED 2026-03-09
-- [x] QR Scanner with payment flow - COMPLETED 2026-03-09
-- [x] History Screen - Transaction history with filters - COMPLETED 2026-03-09
-- [x] Referrals Screen - QR code sharing, referral list - COMPLETED 2026-03-09
-- [x] Services Screen - Airtime & Data Bundle purchases - COMPLETED 2026-03-09
-- [x] Withdrawal Screen - Cashback to MoMo - COMPLETED 2026-03-09
-- [x] Profile Screen - User settings with modals - COMPLETED 2026-03-09
-- [x] Merchant Dashboard - QR code, sales stats - COMPLETED 2026-03-09
-- [x] Card Screen - Purchase & Upgrade cards - COMPLETED 2026-03-09
-- [x] Merchant History Screen - Full transaction history - COMPLETED 2026-03-09
-- [x] Merchant Settings Screen - Business info, cashback rate, payout - COMPLETED 2026-03-09
-- [x] Contacts Integration - Invite from phone contacts - COMPLETED 2026-03-09
-- [x] Forgot Password - Password reset with OTP for client & merchant - COMPLETED 2026-03-09
+### SEO Endpoints (New)
+- `GET /api/seo/sitemap.xml` - XML sitemap for crawlers
+- `GET /api/seo/robots.txt` - Robots.txt configuration
+- `GET /api/seo/analytics/overview` - SEO metrics overview
+- `GET /api/seo/keywords/suggestions` - AI keyword suggestions
+- `POST /api/seo/analyze` - AI-powered SEO analysis
+- `POST /api/seo/content/generate` - AI content generation
+- `GET /api/seo/history` - SEO analysis history
 
-### P1 - Services Feature Completion
-- [x] Airtime purchase with BulkClix API - COMPLETED
-- [x] Data Bundle purchase with BulkClix API - COMPLETED 2026-03-08
-- [ ] ECG Payment - Waiting for API documentation from user
+### Payment Endpoints
+- `POST /api/payments/merchant` - Process MoMo payment
+- `POST /api/payments/merchant/cash` - Record cash payment
+- `POST /api/payments/merchant/cashback` - Process cashback/hybrid payment
 
-### P1 - AdminDashboard.jsx Refactoring (Settings)
-- Extract Settings > Cards → `AdminSettingsCards.jsx`
-- Extract Settings > Commissions → `AdminSettingsCommissions.jsx`
-- Extract Settings > SMS → `AdminSettingsSMS.jsx`
-- Extract Settings > Security → `AdminSettingsSecurity.jsx`
-- Extract Settings > Users → `AdminSettingsUsers.jsx`
-
-### P1 - ClientDashboard.jsx Refactoring (COMPLETED 2026-03-09)
-- [x] MerchantPayModal extracted and wired
-- [x] WithdrawalModal extracted and wired
-- [x] PaymentSettingsModal extracted and wired
-- [x] **Old inline modal code REMOVED** - 842 lines deleted
-- [x] Feature flag USE_REFACTORED_MODALS removed
-- File reduced from 2696 lines to 1854 lines
-
-### P2 - Backend Refactoring
-- [ ] Split `admin.py` (~2661 lines) into smaller files:
-  - `admin_clients.py` - Client management endpoints
-  - `admin_merchants.py` - Merchant management endpoints
-  - `admin_settings.py` - Platform settings endpoints
-  - `admin_analytics.py` - Dashboard and analytics endpoints
-  - NOTE: Kept as-is for stability. Can be done incrementally when adding new features.
-
-### P2 - Minor Issues
-- [x] Fix datetime timezone error in admin.py (settings PIN lock)
-- [x] Fix bcrypt attribute error (downgraded to 3.2.2) - COMPLETED 2026-03-09
-- [ ] Admin UI for payment provider logos
+### Admin Endpoints
+- `GET /api/admin/dashboard` - Dashboard overview with cashback ecosystem
+- `GET /api/admin/merchants/debit-overview` - Merchant debit account stats
 
 ---
 
-## Future/Backlog
-- Mobile Application (React Native)
-- Advanced SEO strategies
-- Split `payments.py` into collection/disbursement files
+## Database Schema
+
+### Key Collections
+- `clients` - User accounts with cashback_balance
+- `merchants` - Merchant accounts with debit_account sub-document
+- `transactions` - Payment records with payment_method field
+- `seo_analyses` - AI SEO analysis history
 
 ---
 
-## Key Files
-- `/app/backend/routers/auth.py` - Authentication + OTP (BulkClix native)
-- `/app/backend/routers/payments.py` - MoMo payments
-- `/app/backend/routers/admin.py` - Admin endpoints (needs refactoring)
-- `/app/frontend/src/pages/AdminDashboard.jsx` - Main admin UI (partially refactored)
-- `/app/frontend/src/components/admin/` - Extracted admin components
+## Test Credentials
+
+**Admin:**
+- URL: `/admin{DDMMYY}` (e.g., `/admin110326`)
+- Email: emileparfait2003@gmail.com
+- Password: password
+
+**Client:**
+- Phone: +233555861556
+- Password: 000000
+
+**Merchant:**
+- Phone: +233555123456
+- Password: 000000
 
 ---
 
-## Mobile Application (NEW - 2026-03-09)
+## Files of Reference
 
-### Overview
-SDM Rewards mobile app built with **Expo/React Native** for iOS and Android.
-Web preview accessible at: `/mobile` path on the main domain.
-
-### Implemented Features
-- **Authentication Flow**
-  - Welcome screen with animated logo, particles, staggered feature list
-  - Login screen with animated form and gradient buttons
-  - Registration with OTP verification
-  - Secure token storage (expo-secure-store for native, localStorage for web)
-
-- **Client Dashboard (COMPLETED 2026-03-09)**
-  - Header with animated logo, greeting message, profile/logout icons
-  - Main balance card with gradient, member badge, Total Earned/Spent
-  - Action buttons: Services, Withdraw, Settings
-  - Stats cards: Referrals count, Bonus Earned (with animations)
-  - Recent Activity list with transaction icons
-  - Custom bottom navigation: Home, Partners, QR (elevated), History, Referrals
-
-- **Partners Screen (NEW - 2026-03-09)**
-  - Search bar with instant filtering
-  - City filter chips (All, Accra, Kumasi, Tamale, Takoradi, Cape Coast)
-  - Merchant cards with:
-    - Business name and type
-    - Cashback rate badge
-    - Address and phone (clickable to call)
-    - "Directions" button (opens Google Maps)
-    - "Pay" button (navigates to payment flow)
-  - Animated card entrance effects
-  - Pull-to-refresh support
-
-- **QR Scanner Screen (ENHANCED 2026-03-09)**
-  - Camera-based QR scanning with permission handling
-  - Direct payment modal when merchant passed from Partners
-  - Payment form: phone, network selector, amount
-  - Cashback preview calculation
-  - Payment status tracking (pending, success, failed)
-  - Test mode support for development
-
-- **Merchant Features**
-  - Home dashboard with QR code display
-  - Sales statistics and transaction list
-  - QR code sharing functionality
-  - Bottom tab navigation
-
-### Technical Stack
-- Expo SDK 55
-- React Navigation (Stack + Bottom Tabs)
-- expo-camera for QR scanning
-- react-native-qrcode-svg for QR generation
-- expo-linear-gradient for gradient backgrounds
-- expo-secure-store for secure storage (native)
-- localStorage fallback for web
-- axios for API calls
-- Animated API for smooth transitions
-
-### Project Structure
-```
-/app/mobile/
-├── App.js                    # Main entry + navigation
-├── app.json                  # Expo config
-├── src/
-│   ├── components/Common.js  # Reusable UI components
-│   ├── contexts/AuthContext.js
-│   ├── services/api.js       # API service layer (with publicAPI)
-│   ├── utils/constants.js    # Theme & helpers
-│   └── screens/
-│       ├── auth/             # Welcome, Login, Register
-│       ├── client/
-│       │   ├── HomeScreen.js      # Dashboard (animated)
-│       │   ├── PartnersScreen.js  # Merchant list (NEW)
-│       │   └── QRScannerScreen.js # Scanner + payment modal
-│       └── merchant/         # Merchant screens
-│       ├── client/           # Home, QRScanner
-│       └── merchant/         # Home
-```
-
-### Completed Screens
-- [x] History Screen - Transaction history with filters - COMPLETED 2026-03-09
-- [x] Profile Screen - User settings with modals - COMPLETED 2026-03-09
-- [x] Services Screen - Airtime & Data Bundle purchases - COMPLETED 2026-03-09
-- [x] Withdrawal Screen - Cashback to MoMo - COMPLETED 2026-03-09
-- [x] Referrals Screen - QR code sharing, referral list - COMPLETED 2026-03-09
-- [x] Card Screen - Purchase & Upgrade membership cards - COMPLETED 2026-03-09
-
-### How to Run
-```bash
-cd /app/mobile
-npm install
-npx expo start
-```
+### Modified in this session (2026-03-11)
+- `/app/backend/routers/seo.py` - New SEO router with AI features
+- `/app/frontend/src/components/admin/SEODashboard.jsx` - New SEO dashboard
+- `/app/frontend/src/pages/AdminDashboard.jsx` - Added SEO tab
+- `/app/frontend/src/components/merchant/PinSettings.jsx` - Translated to English
+- `/app/frontend/src/components/merchant/CashierManager.jsx` - Translated to English
+- `/app/frontend/src/components/merchant/ForgotPinModal.jsx` - Translated to English
+- `/app/frontend/src/components/admin/SDMCommissionsPanel.jsx` - Translated to English
+- `/app/frontend/src/components/admin/CardTypesManager.jsx` - Translated to English
+- `/app/frontend/public/index.html` - Added GA4 placeholder
 
 ---
 
-## Recent Changes (2026-03-10)
-- **✅ Cash Payment with Merchant Debit Account (COMPLETED 2026-03-10):**
-  - **Backend APIs:**
-    - `GET /api/merchants/debit-account` - View debit account balance/limits
-    - `GET /api/merchants/search-customer` - Search customers by phone/ID
-    - `POST /api/merchants/cash-transaction` - Record cash payment with cashback
-    - `GET /api/merchants/debit-history` - View debit transaction history
-    - `POST /api/merchants/topup-debit-account` - Top up debit account via MoMo
-    - `GET /api/admin/merchants/debit-overview` - Admin view all debit accounts
-    - `PUT /api/admin/merchants/{id}/debit-settings` - Admin set debit limits
-    - `POST /api/admin/merchants/{id}/unblock-debit` - Admin unblock merchant
-    - `GET /api/merchants/dashboard/payment-methods` - Cash vs MoMo revenue stats
-  - **Frontend Merchant Dashboard:**
-    - New "Cash" tab with debit account overview
-    - Balance display with usage percentage bar
-    - "Record Cash Payment" modal with customer search
-    - Cashback preview calculation
-    - "Top Up Account" modal with MoMo payment
-    - Debit history list
-    - **NEW: Revenue Dashboard with Cash vs MoMo charts**
-  - **Frontend Admin Dashboard:**
-    - Settings > "Merchant Debit" tab
-    - View all merchant debit accounts with status
-    - Configure debit limits per merchant
-    - Unblock blocked merchants
-  - **Automated Features:**
-    - SMS alert at 75% debit limit usage
-    - Automatic blocking at 100% limit
-    - Top-up unblocks account automatically
-  - **Fixed:** Route ordering bug in admin.py (debit-overview route moved before parameterized route)
-  - **Tests:** 11/11 backend tests passing, 100% frontend UI verified
-
-- **✅ Mobile App Cash Payment UI (COMPLETED 2026-03-10):**
-  - Created `CashPaymentScreen.js` for merchant mobile app
-  - Added navigation in `App.js` to `MerchantCashPayment` screen
-  - Updated `HomeScreen.js` with Cash button in bottom nav and Quick Actions
-  - Added API methods in `api.js`: getDebitAccount, getDebitHistory, searchCustomer, recordCashTransaction, topUpDebitAccount
-  - Features: Debit account overview, customer search, cash payment recording, top-up via MoMo
-
-- **✅ Client-Side Cash Payment Option (COMPLETED 2026-03-10):**
-  - Added Cash/MoMo payment method selector in `MerchantPayModal.jsx`
-  - New backend endpoint: `POST /api/payments/merchant/cash`
-  - Cash option hides phone/network fields, shows cash info box
-  - Cashback credited instantly to client wallet
-  - **Data Sync:** Transaction appears in:
-    - Client transaction history (payment_method='cash')
-    - Merchant transaction history
-    - Merchant debit account (debited for cashback)
-    - Admin statistics
-  - Button changes to "Record Cash Payment" (green) when Cash selected
-  - **When debit limit reached:** Cash payments blocked, only MoMo allowed
-
-- **✅ Merchant Cash Dashboard Refactored (COMPLETED 2026-03-10):**
-  - **Removed:** Manual "Record Cash Payment" modal (clients now initiate)
-  - **Added:** "Today's Payments" section with automatic stats:
-    - Cash volume & count
-    - MoMo volume & count  
-    - Total volume & count
-    - Cashback distributed from cash sales
-  - **Added:** Info box explaining how cash payments work
-  - **Kept:** "Top Up Debit Account" button only
-  - Auto-refresh stats when navigating to Cash tab
-
-- **✅ Cash Payment Blocking Logic Fixed (COMPLETED 2026-03-10):**
-  - **Backend Changes:**
-    - Cash payments blocked if no debit limit configured (limit = 0)
-    - Cash payments blocked if debit limit reached
-    - Clear error messages when cash is unavailable
-  - **API Enhancement:** `/api/merchants/by-qr/{qr}` now includes:
-    - `cash_payment.available` (boolean)
-    - `cash_payment.reason` (why unavailable)
-    - `cash_payment.remaining_capacity` (how much more can be spent)
-  - **Frontend Changes:**
-    - Cash button disabled when not available
-    - Warning message shown explaining why
-    - Auto-selects MoMo when Cash unavailable
-
-- **✅ Admin Debit Limit Configuration (COMPLETED 2026-03-10):**
-  - Added "Debit Account" section in Merchant Details modal
-  - Shows: Current Balance, Debit Limit, Usage %, Status
-  - Visual usage bar (green < 75%, amber 75-99%, red 100%)
-  - "Configure Debit Limit" button opens settings modal
-  - "Unblock Account" button for blocked merchants
-  - Admin can set debit limit per merchant
-
-- **✅ Merchant Debit System Unified (COMPLETED 2026-03-10):**
-  - **Fixed:** All debit data now stored in `merchants.debit_account` subdocument
-  - **Fixed:** `GET /api/admin/merchants/debit-overview` returns all merchants with debit info
-  - **Fixed:** Settings > Merchant Debit tab now shows:
-    - Total Merchants: count of all active merchants
-    - Total Debt: sum of negative balances
-    - Total Credit: sum of positive balances
-    - Blocked/Warning: counts
-  - **Fixed:** Configure modal uses `merchant_id` OR `id` to find merchant
-  - **Tests:** 13/13 backend tests passing, 100% frontend UI verified
-
-- **✅ Settings Cleanup - Remove Duplicate Commission Menu (COMPLETED 2026-03-10):**
-  - **Removed:** "Commissions" tab (duplicate of Service Fees)
-  - **Kept:** "Service Fees" tab with Merchant Payments commission config
-  - Settings tabs: Card Prices, Service Fees, Referrals, Merchant Debit, Add Users, SMS Center, Security, Admin Users
-
-- **✅ SDM Cashback Commissions Dashboard Fixed (COMPLETED 2026-03-10):**
-  - **Fixed:** Commission calculation now sums BOTH `commission_amount` AND `sdm_commission` fields
-  - Overview dashboard now shows correct commission totals:
-    - Total (All Time): GHS 14.11
-    - Today: GHS 0.31
-    - This Month: GHS 6.92
-    - This Year: GHS 14.11
-
-- **✅ Revenue Dashboard Cash vs MoMo (COMPLETED 2026-03-10):**
-  - New backend endpoint: `GET /api/merchants/dashboard/payment-methods`
-  - Updated `AdvancedDashboard.jsx` with Cash vs MoMo stacked bar chart
-  - Shows percentage breakdown: MoMo % vs Cash %
-  - Summary cards for MoMo, Cash, Total, and Cashback distributed
-
-- **✅ BulkClix SMS API Fixed (2026-03-10):**
-  - Updated SMS service to use correct BulkClix API format
-  - Added `Accept: application/json` header
-  - Fixed phone number formatting to local format (0XXXXXXXXX)
-  - Added new `send_bulk_sms()` method for efficient bulk SMS
-  - Bulk SMS now sends all recipients in a single API call
-  - Tested and confirmed working with real SMS delivery
-
-## Recent Changes (2026-03-10)
-- **✅ Bug Fix: Merchant Debit Account Desynchronization (FIXED 2026-03-10):**
-  - Issue: Merchant Dashboard showing incorrect debit balance and limit (stale/default data)
-  - Root cause: `/api/merchants/debit-account` endpoint was querying an obsolete database collection instead of reading from the `debit_account` sub-document within the `merchants` collection
-  - Fix: Updated `get_debit_account()` function in `/app/backend/routers/merchants.py` to fetch fresh data from `db.merchants.find_one()` with proper projection
-  - Verified: API returns correct `balance: 0`, `limit: 1000.0` matching admin configuration
-  - Tested: UI displays correct data in the Cash tab of Merchant Dashboard
-
-- **✅ Bug Fix: Payment Methods Stats (Cash vs MoMo) - FIXED 2026-03-10:**
-  - Issue: Merchant Cash tab showing identical values for Cash and MoMo payments (wrong data)
-  - Root cause: Backend `/api/merchants/dashboard/payment-methods` endpoint was:
-    1. Treating ALL transactions as MoMo (not filtering by `payment_method`)
-    2. Querying non-existent `cash_transactions` collection for Cash data
-  - Fix: Updated endpoint to filter transactions by `payment_method` field:
-    - MoMo: `payment_method: "momo"` or `payment_method: {$exists: false}` (legacy)
-    - Cash: `payment_method: "cash"`
-  - Result: Now correctly shows Cash: GHS 255 (8 transactions, 100%), MoMo: GHS 0 (0 transactions, 0%)
-
-- **✅ Feature: Admin Payment Methods Breakdown - ADDED 2026-03-10:**
-  - New endpoint: `GET /api/admin/merchants/{merchant_id}/payment-methods?period=today|week|month|all`
-  - Returns breakdown of Cash vs MoMo payments with volume, count, cashback, and percentages
-  - New UI section in Admin Merchant Details modal: "Payment Methods Breakdown"
-  - Period selector buttons: Today, Week, Month, All
-  - Visual cards showing Cash, MoMo, and Total stats with progress bars
-  - Fully synchronized with merchant dashboard data
-
-- **✅ Feature: Global Payment Methods Stats on Admin Overview - ADDED 2026-03-10:**
-  - Updated `/api/admin/dashboard` endpoint to return `payment_methods` object with today and all-time stats
-  - New section "Payment Methods (Cash vs MoMo)" on Admin Overview page
-  - Shows Today's Breakdown and All-Time Breakdown with volume, count, and percentage bars
-
-- **✅ Feature: Payment Method Column in Transaction History - ADDED 2026-03-10:**
-  - Added "Method" column to Merchant Full History page (MerchantHistoryPage.jsx)
-  - Added "Method" column to Admin Merchant Modal transaction table
-  - Badges: Green "Cash" with banknote icon, Blue "MoMo" with smartphone icon
-  - Updated backend `/api/merchants/transactions/history` to include `payment_method` field
-  - Complete synchronization across Merchant ↔ Admin dashboards
-
-- **✅ Feature: Merchant Debit Settings Page Synchronization - FIXED 2026-03-10:**
-  - Fixed "Merchant Debit" tab in Admin Settings showing empty/zero data
-  - Updated `/api/admin/merchants/debit-overview` endpoint to include:
-    - Total Cash Volume (sum of all cash transactions)
-    - Total Cash Cashback distributed
-    - Merchants with Cash count
-    - Cash Volume per merchant with transaction count
-  - Auto-load data when opening Merchant Debit tab (useEffect)
-  - New columns: Cash Volume (with transaction count), Balance, Debit Limit, Usage %, Status
-  - Merchants sorted by Cash Volume (highest first)
-  - Full synchronization with debit account system
-
-- **✅ Feature: Flexible Payment Methods for Merchants - COMPLETED 2026-03-10:**
-  - **Goal**: Allow clients to pay at merchants with 4 methods: MoMo, Cash, Cashback, or Hybrid (Cashback + MoMo)
-  
-  - **Backend Changes**:
-    - Created new endpoint `POST /api/payments/merchant/cashback` for cashback/hybrid payments
-    - Tracks `cashback_used` field in transactions for accurate ecosystem stats
-    - Cashback earned only on MoMo portion (not on cashback portion used)
-    - Added `cashback_ecosystem` stats to `/api/admin/dashboard`:
-      - Total Awarded (distributed + referrals + bonuses)
-      - Total Used (services + payments)
-      - Remaining (awarded - used)
-      - Usage Rate (used / awarded × 100)
-  
-  - **Frontend Changes**:
-    - **MerchantPayModal.jsx**: 
-      - Added 4-button payment method selector (MoMo, Cash, Cashback, Hybrid)
-      - Shows client's cashback balance
-      - Hybrid breakdown (cashback + MoMo amounts)
-      - Disables Cashback button if insufficient balance
-    - **AdminOverview.jsx**: 
-      - New "Cashback Ecosystem" section with 4 indicators
-      - Visual progress bars for Remaining and Usage Rate
-    - **ServicesPage.jsx**: 
-      - Simplified to cashback-only (as per user requirement)
-      - Services (Airtime, Data, ECG) are paid with cashback only
-  
-  - **Tested & Verified**:
-    - ✅ 100% Cashback payment: GHS 5 → Balance 12.44 → 7.44
-    - ✅ Hybrid payment: GHS 10 (7.44 CB + 2.56 MoMo) → Earned 0.12 cashback on MoMo portion
-    - ✅ Admin Ecosystem stats updated correctly
-
-## Recent Changes (2026-03-09)
-- **✅ Bug Fix: QR Scanner Back Button (FIXED 2026-03-09):**
-  - Issue: Back button on QR Scanner screen was not navigating back
-  - Fix: Created centralized `handleGoBack()` function
-  - Added proper `data-testid` for testing
-
-- **✅ Bug Fix: Partner Payment Blank Page (FIXED 2026-03-09):**
-  - Issue: Clicking "Pay" button on Partners screen showed blank page instead of payment modal
-  - Root cause: `renderPaymentModal()` was being called before its definition in the render flow
-  - Fix: Moved the conditional render `if (route.params?.merchant)` AFTER the `renderPaymentModal` function definition
-  - Added dedicated header with back button for direct payment mode from Partners screen
-  - Payment modal now opens correctly when selecting a partner merchant
-
-- **✅ Mobile Card Purchase/Upgrade Feature (COMPLETED):**
-  - Implemented full UI in `/app/mobile/src/screens/client/CardScreen.js`
-  - Shows available cards: Silver, Gold, Platinum, Diamond
-  - Current card badge with expiration date
-  - Available cashback display
-  - Purchase modal with 3 payment methods:
-    - Mobile Money (full amount)
-    - Full Cashback (when balance sufficient)
-    - Combined (partial cashback + MoMo for remainder)
-  - Network selector for MoMo payments
-  - Payment summary breakdown
-  - Backend fix: Added cashback deduction in card purchase endpoint
-  - Tested: Purchase with cashback works (50 GHS balance → Silver card purchase → 26 GHS remaining)
-  - Tested: Upgrade with combined payment (cashback + MoMo pending)
-
-- **✅ Merchant Mobile Features (COMPLETED):**
-  - Created dedicated `/app/mobile/src/screens/merchant/HistoryScreen.js`:
-    - Full transaction history with search and filters
-    - Date filters (All Time, Today, This Week, This Month)
-    - Stats summary (Total Sales, Transactions, Cashback Paid)
-    - Export transactions via share
-  - Created dedicated `/app/mobile/src/screens/merchant/SettingsScreen.js`:
-    - Business Information editing
-    - Cashback Rate management (0-50%)
-    - Payout Settings (MoMo network & number)
-    - PIN change placeholder
-    - Help & Support link
-    - Logout with confirmation
-
-- **✅ Admin Password Reset Feature (COMPLETED):**
-  - Backend endpoints added in `/app/backend/routers/admin.py`:
-    - `POST /api/admin/clients/{client_id}/reset-password` - Reset client password
-    - `POST /api/admin/merchants/{merchant_id}/reset-password` - Reset merchant password
-  - Only Super Admin can reset passwords
-  - Action is logged in `admin_logs` collection
-  - Frontend UI added:
-    - Key icon (🔑) button in Clients list actions
-    - Key icon (🔑) button in Merchants list actions
-    - Reset Password modal with confirmation
-    - Password validation (min 6 characters, match confirmation)
-  - Tested: Admin can reset client/merchant passwords successfully
-
-- **✅ Forgot Password Feature (COMPLETED):**
-  - Created `/app/mobile/src/screens/auth/ForgotPasswordScreen.js`
-  - 3-step flow: Phone → OTP → New Password
-  - Progress bar showing current step
-  - Password validation with visual hints
-  - Success screen with navigation back to login
-  - Backend endpoints added in `/app/backend/routers/auth.py`:
-    - `POST /api/auth/client/reset-password`
-    - `POST /api/auth/merchant/reset-password`
-  - Test mode: Use OTP `123456` when BulkClix not configured
-  - "Forgot Password?" link added to LoginScreen
-
-- **✅ Contacts Integration for Referrals (COMPLETED):**
-  - Created `/app/mobile/src/screens/client/ContactsScreen.js`
-  - Permission request for contacts access
-  - Filters Ghana phone numbers only (+233)
-  - Synchronization with existing referrals:
-    - Shows "SDM Member" badge for contacts already registered
-    - Shows "Invited" badge for pending referrals
-    - Allows inviting non-member contacts
-  - Multiple selection with bulk invite
-  - WhatsApp and SMS quick invite buttons
-  - Alphabet index for quick navigation
-  - Search contacts by name or phone
-  - "Invite from Contacts" button added to Referrals screen
-
-
-- **✅ SMS Bulk Sending - Verified Working:**
-  - Tested bulk SMS to clients endpoint - 12/13 messages sent successfully
-  - BulkClix returns campaignId confirming acceptance
-  - Failed messages are due to invalid phone numbers in DB (test data)
-- **✅ bcrypt Error Fixed:**
-  - Downgraded bcrypt from 4.1.3 to 3.2.2
-  - No more `AttributeError: module 'bcrypt' has no attribute '__about__'` in logs
-- **✅ MoMo Withdrawal Fee Configuration:**
-  - Admin Dashboard Service Fees shows all 5 services: Airtime, Data, ECG, Merchant Payment, MoMo Withdrawal
-  - Admin can set withdrawal fee type (percentage or fixed) and rate
-  - Backend reads fee from platform_config.service_commissions.withdrawal
-  - New endpoint: GET /api/payments/withdrawal/fee
-  - Withdrawal API now calculates and deducts fee, sends net amount to user
-  - WithdrawalModal displays fee breakdown before confirming
-- **✅ Service Commissions Loading Fixed:**
-  - AdminDashboard now loads service_commissions from config on startup
-  - Ensures saved values are displayed correctly when reopening settings
-- **✅ Withdrawal SMS Notification:**
-  - Automatic SMS sent after successful withdrawal
-  - Shows net amount received (without fee details)
-  - Works in both test mode and production mode
-
-## Recent Changes (2026-03-08)
-- **✅ Merchant Auto-Payout System Verified & Enhanced:**
-  - Confirmed merchant receives money immediately when customer pays (via BulkClix disbursement API)
-  - Added `merchant_payouts` collection to track all payouts
-  - Added `GET /api/merchants/payouts` endpoint for merchant dashboard
-  - Added `GET /api/admin/merchant-payouts` endpoint for admin dashboard
-  - Payout flow: Customer pays GHS 10 → 5% cashback (GHS 0.50) → Merchant receives GHS 9.50
-  - Enhanced logging for debugging payout issues
-- **✅ Client Withdrawal Method Choice (MoMo or Bank):**
-  - Added "Payment Settings" modal where clients configure their MoMo and Bank account details
-  - Withdrawal modal now offers choice between "Mobile Money" (Instant) and "Bank Account" (1-3 days)
-  - Clients can set their preferred default withdrawal method
-  - Settings button added next to Withdraw button on dashboard
-  - Backend endpoints: GET/PUT `/api/clients/payment-settings`
-- **✅ Auto-Pay Merchant on Customer Payment:**
-  - When a customer pays a merchant, the merchant's share is automatically transferred to their configured MoMo account
-  - Uses BulkClix disbursement API (`/payment-api/send/mobilemoney`)
-  - Merchant share = Payment Amount - Cashback (e.g., on GHS 100 with 5% cashback, merchant receives GHS 95)
-  - SMS notification sent to merchant with payout details
-  - Payout records stored in `merchant_payouts` collection for tracking
-  - Works with all networks: MTN, Telecel, AirtelTigo
-- **✅ Added All Mobile Networks to Merchant Payment Form:**
-  - Added phone number input field with placeholder showing registered number
-  - Added network selector dropdown with MTN, Telecel, AirtelTigo options
-  - Form accessible via QR Code → Browse Partner Merchants → Pay This Merchant
-- **✅ Fixed Membership Card Statistics in Admin Dashboard:**
-  - Card counts by category (Silver, Gold, Platinum, Diamond) now accurately reflect active clients
-  - Changed counting logic from transactions to clients collection for accurate real-time data
-  - Added Diamond card category display
-  - Revenue now includes both card purchases and upgrades
-  - Total = Silver + Gold + Platinum + Diamond (properly synchronized)
-- **✅ Fixed Card Upgrade Polling in Services Page:**
-  - Added automatic polling (every 3 seconds) to detect payment confirmation
-  - Added "I Have Paid - Check Status" button for manual verification
-  - Fixed payment status detection so upgrade completes automatically after MoMo confirmation
-  - Card level updates immediately after payment is confirmed
-- **✅ Integrated BulkClix Airtime API:**
-  - Updated `/api/services/airtime/purchase` to use correct BulkClix endpoint `/airtime-api/sendAirtime`
-  - Added proper network ID mapping (MTN, Telecel, AirtelTigo)
-  - Tested and confirmed airtime delivery works
-- **✅ Card Upgrade in Services Page:**
-  - Added Card Upgrade functionality to Services menu (`ServicesPage.jsx`)
-  - Clients can upgrade from Silver → Gold → Platinum → Diamond
-  - Full payment options: MoMo, Cashback, or combination
-  - Payment summary shows breakdown (card price, cashback applied, MoMo amount)
-  - Welcome bonus automatically credited upon successful upgrade
-  - Tested with 100% pass rate (14/14 backend tests, all frontend features)
-- **✅ Fixed Referral Bonus System:**
-  - Fixed: Referrer now receives 3 GHS bonus when referred user buys a card
-  - Fixed: Referral status now shows "Active" instead of "Pending" when referred user has bought a card
-  - Backend: Updated `payments.py` to look up referrer by `referral_code` stored in `referred_by` field
-  - Backend: Updated `clients.py` `/referrals` endpoint to sync and return `display_status`
-  - Frontend: Updated referral list to show proper status (Pending/Active/Bonus credited)
-- **✅ Fixed SMS Sending:**
-  - Corrected import from `bulkclix_service` to `sms_service`
-  - Added `get_sms()` alias function
-  - Fixed BulkClix response parsing to detect `campaignId` for success
-
-## Recent Changes (2026-03-06)
-- **✅ Partner Merchant Visibility for Clients:**
-  - New "Partners" tab in Client Dashboard shows all active merchants
-  - Displays: business name, address, phone (clickable), Google Maps link
-  - Search functionality to find specific merchants
-  - New public API endpoints: `GET /api/public/merchants`, `GET /api/public/merchants/{id}`
-- **✅ Google Maps Location for Merchants:**
-  - Merchants can add Google Maps URL in Settings → Business Info
-  - Admin Dashboard "Add Merchant Manually" now includes Google Maps URL field
-  - Location syncs automatically to Client Dashboard
-- **✅ English Language Priority:**
-  - Updated `BusinessInfoEditor.jsx` to English (previously French)
-  - All dashboards now display in English by default
-- **✅ Admin Dashboard ↔ Landing Page Synchronization:**
-  - Enhanced `/api/public/card-types` endpoint with complete card data
-  - Landing Page now dynamically renders cards from API (prices, bonuses, benefits, durations)
-  - Custom cards created in Admin Dashboard auto-appear on Landing Page
-  - Auto-refresh every 5 minutes to catch Admin changes
-  - Platform info (referral bonus, contact) also synced
-- **✅ Membership Upgrade Feature - Enhanced:**
-  - Clients now pay FULL PRICE for upgrades (not difference)
-  - Added cashback payment option (full or partial)
-  - Welcome bonus automatically credited upon upgrade
-  - Backend: `clients.py` and `payments.py` updated
-  - Frontend: New UI in `ClientDashboard.jsx` with cashback toggle and payment summary
-- **✅ Added Merchant Transaction History Page:**
-  - New page: `/merchant/history` with full transaction history
-  - Features: Pagination, date filters, amount filters, search
-  - Export: CSV and JSON formats
-  - Summary stats: Total volume, cashback, transaction count
-  - Backend endpoints: `GET /api/merchants/transactions/history`, `GET /api/merchants/transactions/export`
-- **✅ Added all Ghana Mobile Networks to payment forms:**
-  - Updated dropdowns: MTN MoMo, Telecel (ex-Vodafone), AirtelTigo (AT)
-  - Files modified: `ClientDashboard.jsx`, `ServicesPage.jsx`, `MerchantDashboard.jsx`
-  - Backend: Added `normalize_network()` function, updated `detect_network()` to return TELECEL
-  - FAQ updated to reflect correct network names
-  - Homepage payment logos updated to use Telecel naming
-- **✅ Fixed datetime timezone error in admin.py:**
-  - `locked_until` comparison now handles timezone-naive datetimes correctly
-
-## Recent Changes (2025-03-05)
-- Fixed OTP bug: Added missing `BULKCLIX_OTP_SENDER_ID` env variable loading in auth.py
-- OTP now working with BulkClix native API (HTTP 200 OK confirmed)
-
----
-
-## Credentials
-- Super Admin: `emileparfait2003@gmail.com`
-- BulkClix API Key: Configured in `/app/backend/.env`
+## 3rd Party Integrations
+- **BulkClix:** SMS, Payments, OTP, Airtime, Data Bundles
+- **OneSignal:** Web push notifications
+- **Emergent LLM Key:** AI-powered SEO analysis (GPT-5.2)
+- **Google Analytics 4:** Visitor tracking (placeholder added)
