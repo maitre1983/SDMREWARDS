@@ -47,11 +47,17 @@ export default function WelcomeScreen({ navigation }) {
   
   // Handle navigation - works on both native and web
   const handleNavigate = (userType) => {
-    if (Platform.OS === 'web') {
-      // On web, redirect to the main web app login page
-      window.location.href = `https://web-boost-seo.preview.emergentagent.com/${userType}`;
-    } else if (navigation) {
-      // On native, use React Navigation
+    // Direct approach that works on web
+    try {
+      if (typeof window !== 'undefined') {
+        window.location.href = `https://web-boost-seo.preview.emergentagent.com/${userType}`;
+        return;
+      }
+    } catch (e) {
+      console.log('Web redirect failed', e);
+    }
+    // Fallback for native
+    if (navigation) {
       navigation.navigate('Login', { userType });
     }
   };
