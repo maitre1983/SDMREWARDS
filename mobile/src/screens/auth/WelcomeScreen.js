@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   buttonsContainer: {
-    marginTop: 'auto',
+    marginTop: verticalScale(20),
     gap: verticalScale(12),
     paddingBottom: verticalScale(8),
   },
