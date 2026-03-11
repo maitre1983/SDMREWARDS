@@ -3287,7 +3287,7 @@ async def send_email(
     request: EmailRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Send email to clients, merchants, or individual users via OneSignal"""
+    """Send email to clients, merchants, or individual users via Resend"""
     import httpx
     import os
     from dotenv import load_dotenv
@@ -3295,36 +3295,41 @@ async def send_email(
     # Ensure env variables are loaded
     load_dotenv()
     
-    # Load directly from environment
-    ONESIGNAL_APP_ID = os.environ.get("ONESIGNAL_APP_ID", "")
-    ONESIGNAL_API_KEY = os.environ.get("ONESIGNAL_API_KEY", "")
+    # Load Resend API key
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+    SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
     
-    logger.info(f"OneSignal APP_ID exists: {bool(ONESIGNAL_APP_ID)}, API_KEY exists: {bool(ONESIGNAL_API_KEY)}")
-    
-    if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
-        raise HTTPException(status_code=500, detail="OneSignal not configured. Please set ONESIGNAL_APP_ID and ONESIGNAL_API_KEY in environment.")
+    if not RESEND_API_KEY:
+        raise HTTPException(status_code=500, detail="Resend not configured. Please set RESEND_API_KEY in environment.")
     
     recipients = []
     recipient_count = 0
     
     # Build recipient list based on type
     if request.recipient_type == 'individual':
-        # Find individual user by email or phone
-        user = None
+        # For individual emails, use the provided email directly if no user found
         if request.individual_email:
+            # First try to find user in database
             user = await db.clients.find_one({"email": request.individual_email.lower()}, {"_id": 0})
             if not user:
                 user = await db.merchants.find_one({"email": request.individual_email.lower()}, {"_id": 0})
+            
+            # If user found, use their email, otherwise use the provided email directly
+            email_to_use = user.get('email') if user else request.individual_email
+            recipients.append(email_to_use)
+            recipient_count = 1
         elif request.individual_phone:
             user = await db.clients.find_one({"phone": request.individual_phone}, {"_id": 0})
             if not user:
                 user = await db.merchants.find_one({"phone": request.individual_phone}, {"_id": 0})
-        
-        if not user or not user.get('email'):
-            raise HTTPException(status_code=404, detail="User not found or has no email")
-        
-        recipients.append(user['email'])
-        recipient_count = 1
+            
+            if not user or not user.get('email'):
+                raise HTTPException(status_code=404, detail="User not found or has no email")
+            
+            recipients.append(user['email'])
+            recipient_count = 1
+        else:
+            raise HTTPException(status_code=400, detail="Please provide email or phone number")
         
     elif request.recipient_type == 'clients':
         # Get clients based on filter
@@ -3383,36 +3388,33 @@ async def send_email(
     </html>
     """
     
-    # Send via OneSignal Email API
+    # Send via Resend Email API
     try:
         async with httpx.AsyncClient() as client:
-            # OneSignal requires sending emails in batches
-            batch_size = 2000  # OneSignal limit
             success_count = 0
             
-            for i in range(0, len(recipients), batch_size):
-                batch = recipients[i:i + batch_size]
-                
+            for email_address in recipients:
                 payload = {
-                    "app_id": ONESIGNAL_APP_ID,
-                    "include_email_tokens": batch,
-                    "email_subject": request.subject,
-                    "email_body": email_html,
-                    "email_from_name": "SDM Rewards",
-                    "email_from_address": "noreply@sdmrewards.com"
+                    "from": f"SDM Rewards <{SENDER_EMAIL}>",
+                    "to": [email_address],
+                    "subject": request.subject,
+                    "html": email_html
                 }
                 
                 response = await client.post(
-                    "https://onesignal.com/api/v1/notifications",
+                    "https://api.resend.com/emails",
                     json=payload,
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Basic {ONESIGNAL_API_KEY}"
+                        "Authorization": f"Bearer {RESEND_API_KEY}"
                     }
                 )
                 
-                if response.status_code == 200:
-                    success_count += len(batch)
+                if response.status_code in [200, 201]:
+                    success_count += 1
+                    logger.info(f"Email sent to {email_address}")
+                else:
+                    logger.error(f"Failed to send email to {email_address}: {response.text}")
         
         # Log the email send
         await db.email_logs.insert_one({
