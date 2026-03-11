@@ -1,0 +1,77 @@
+{
+  "summary": "CRITICAL BUG FIX VERIFIED: Merchant debit_account.balance is now correctly decremented when confirming cash payments. Tested 2 pending transactions - both properly debited merchant account and credited client cashback.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_merchant_debit_balance_fix.py",
+    "/app/test_reports/pytest/merchant_debit_balance_fix_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Bug fix at line 1365 in /app/backend/routers/merchants.py correctly adds '$inc': {'debit_account.balance': -cashback_amount} to the db.merchants.update_one() call",
+    "The fix ensures merchant's debit_account.balance in the merchants collection is debited when confirming cash payments"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_merchant_debit_balance_fix.py"
+  ],
+  "success_rate": {
+    "backend": "100% - All merchant debit balance tests passed (5 passed, 1 skipped)"
+  },
+  "test_credentials": {
+    "client": {
+      "phone": "+233555861556",
+      "password": "000000"
+    },
+    "merchant": {
+      "phone": "+233555123456",
+      "password": "000000"
+    }
+  },
+  "seed_data_creation": "Used 2 existing pending cash transactions for verification",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fix verified. Merchant debit_account.balance now correctly decremented on cash payment confirmation. Current merchant balance: -3.23 GHS (after 2 confirmations of 0.71 and 1.19 GHS). No pending cash payments remaining.",
+  "bug_fix_verification": {
+    "bug_description": "When merchant confirms cash payment, debit_account.balance was NOT being debited",
+    "fix_location": "/app/backend/routers/merchants.py:1365",
+    "fix_code": "'$inc': {'debit_account.balance': -cashback_amount}",
+    "test_results": {
+      "transaction_1": {
+        "id": "701780e6-afda-423d-a5b2-d380a5242b2e",
+        "cashback_amount": 0.71,
+        "merchant_balance_before": -1.33,
+        "merchant_balance_after": -2.04,
+        "balance_change": -0.71,
+        "client_balance_before": 2.42,
+        "client_balance_after": 3.13,
+        "result": "PASS"
+      },
+      "transaction_2": {
+        "id": "ae7b98e6-8405-4fd6-abff-aeb54197133d",
+        "cashback_amount": 1.19,
+        "merchant_balance_before": -2.04,
+        "merchant_balance_after": -3.23,
+        "balance_change": -1.19,
+        "client_balance_before": 3.13,
+        "client_balance_after": 4.32,
+        "result": "PASS"
+      }
+    },
+    "verification_summary": "Both transactions correctly debited merchant account and credited client cashback. Bug is FIXED."
+  },
+  "api_endpoints_tested": {
+    "POST /api/merchants/confirm-cash-payment/{transaction_id}": "PASS - Correctly decrements merchant debit_account.balance",
+    "GET /api/merchants/debit-account": "PASS - Returns correct balance after debits",
+    "GET /api/merchants/pending-confirmations": "PASS - Shows pending transactions",
+    "POST /api/auth/merchant/login": "PASS - Returns access_token",
+    "POST /api/auth/client/login": "PASS - Returns access_token",
+    "GET /api/clients/me": "PASS - Shows updated cashback_balance"
+  }
+}

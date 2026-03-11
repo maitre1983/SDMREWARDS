@@ -1353,14 +1353,16 @@ async def confirm_cash_payment(
     }
     await db.merchant_debit_ledger.insert_one(ledger_entry)
     
-    # Update merchant stats
+    # Update merchant stats AND debit_account.balance in merchants collection
+    # This is critical: the merchant dashboard reads from merchants.debit_account.balance
     await db.merchants.update_one(
         {"id": merchant_id},
         {
             "$inc": {
                 "total_transactions": 1,
                 "total_sales": amount,
-                "total_cashback_given": cashback_amount
+                "total_cashback_given": cashback_amount,
+                "debit_account.balance": -cashback_amount  # CRITICAL: Debit merchant's account
             },
             "$set": {"updated_at": now}
         }
