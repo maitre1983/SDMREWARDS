@@ -12,6 +12,7 @@ import {
   Dimensions,
   Animated,
   Easing,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,9 +35,8 @@ export default function WelcomeScreen({ navigation }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
-  // Feature animations
+  // Feature animations (3 features now)
   const featureAnims = useRef([
-    new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
@@ -135,10 +135,9 @@ export default function WelcomeScreen({ navigation }) {
   }, []);
 
   const features = [
-    { icon: 'gift', text: 'Earn cashback rewards', color: '#F59E0B' },
-    { icon: 'qr-code', text: 'Pay merchants with QR', color: '#10B981' },
-    { icon: 'phone-portrait', text: 'Buy airtime & data', color: '#3B82F6' },
-    { icon: 'flash', text: 'ECG Payment', color: '#EF4444' },
+    { icon: 'qr-code', text: 'Pay Merchants with QR', color: '#F59E0B' },
+    { icon: 'gift', text: 'Earn Cashback Rewards', color: '#10B981' },
+    { icon: 'grid', text: 'Pay All Services', subText: 'Airtime, Data, ECG +more', color: '#8B5CF6' },
   ];
 
   const spin = logoRotate.interpolate({
@@ -241,12 +240,17 @@ export default function WelcomeScreen({ navigation }) {
             <View style={[styles.featureIcon, { backgroundColor: `${feature.color}20` }]}>
               <Ionicons name={feature.icon} size={22} color={feature.color} />
             </View>
-            <Text style={styles.featureText}>{feature.text}</Text>
+            <View style={styles.featureTextContainer}>
+              <Text style={styles.featureText}>{feature.text}</Text>
+              {feature.subText && (
+                <Text style={styles.featureSubText}>{feature.subText}</Text>
+              )}
+            </View>
           </Animated.View>
         ))}
       </View>
 
-      {/* Animated Buttons */}
+      {/* Animated Buttons - HIGHLY VISIBLE */}
       <Animated.View
         style={[
           styles.buttonsContainer,
@@ -255,19 +259,41 @@ export default function WelcomeScreen({ navigation }) {
           },
         ]}
       >
-        <Button
-          title="I'm a Customer"
-          icon="person"
+        {/* I'm a Customer - Primary Orange Button */}
+        <TouchableOpacity
           onPress={() => navigation.navigate('Login', { userType: 'client' })}
-          style={styles.primaryButton}
-        />
-        <Button
-          title="I'm a Merchant"
-          icon="storefront"
-          variant="outline"
+          style={styles.customerButton}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#F59E0B', '#EA580C', '#F59E0B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            <Ionicons name="person" size={28} color="#FFF" style={{ marginRight: 12 }} />
+            <Text style={styles.ctaButtonText}>I'm a Customer</Text>
+            <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* I'm a Merchant - Secondary Green Button */}
+        <TouchableOpacity
           onPress={() => navigation.navigate('Login', { userType: 'merchant' })}
-          style={styles.secondaryButton}
-        />
+          style={styles.merchantButton}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#10B981', '#059669', '#10B981']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            <Ionicons name="storefront" size={28} color="#FFF" style={{ marginRight: 12 }} />
+            <Text style={styles.ctaButtonText}>I'm a Merchant</Text>
+            <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
+          </LinearGradient>
+        </TouchableOpacity>
       </Animated.View>
 
       {/* Footer */}
@@ -368,20 +394,48 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.lg,
     fontWeight: '500',
   },
+  featureTextContainer: {
+    flex: 1,
+  },
+  featureSubText: {
+    color: COLORS.textMuted,
+    fontSize: FONTS.sizes.sm,
+    marginTop: 2,
+  },
   buttonsContainer: {
     marginTop: 'auto',
     gap: SPACING.md,
   },
-  primaryButton: {
-    paddingVertical: 18,
+  customerButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  secondaryButton: {
-    paddingVertical: 18,
+  merchantButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  gradientButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+  },
+  ctaButtonText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   footer: {
     color: COLORS.textMuted,

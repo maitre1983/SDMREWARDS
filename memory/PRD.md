@@ -85,6 +85,21 @@ Fraud prevention system for cash payments:
 - `/app/frontend/src/pages/HomePage.jsx` - CTA buttons & Quick Services section
 - `/app/frontend/src/translations.js` - New translations for services
 
+### ✅ Mobile App (React Native) UI Improvements - IMPLEMENTED 2026-03-11
+**WelcomeScreen modifications (`/app/mobile/src/screens/auth/WelcomeScreen.js`):**
+
+**1. CTA Buttons - Highly Visible:**
+- **"I'm a Customer"**: Orange gradient button (#F59E0B → #EA580C), paddingVertical: 22px, fontSize: 20, fontWeight: bold
+- **"I'm a Merchant"**: Green gradient button (#10B981 → #059669), same prominent styling
+- Both buttons have icons (person/storefront), arrow indicators, and shadow effects
+- Uses `LinearGradient` for modern gradient effect
+
+**2. Services Restructured (3 instead of 4):**
+- **Pay Merchants with QR** (orange icon)
+- **Earn Cashback Rewards** (green icon)
+- **Pay All Services** (purple icon) with subText: "Airtime, Data, ECG +more"
+- Removed separate "Buy airtime & data" and "ECG Payment" options
+
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
 - **AdminDashboard.jsx**: Reduced from 3,837 to 2,866 lines (25% reduction)
