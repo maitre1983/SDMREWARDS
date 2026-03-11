@@ -3,7 +3,7 @@
  * Animated & Attractive User type selection
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -13,6 +13,7 @@ import {
   Animated,
   Easing,
   TouchableOpacity,
+  ImageBackground,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,7 +30,19 @@ const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * fact
 // Company logo URL
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vc8llt43_WhatsApp%20Image%202026-03-04%20at%2020.16.26.jpeg";
 
+// Background carousel images - Beautiful Ghanaian women using SDM Rewards
+const CAROUSEL_IMAGES = [
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/167565e20cb764b757209da2ea9839b6cd452ce81712f1d4c6f36ce4c59a7c59.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/b3cc62610512e77820c246f39712518e52db3130dbe82336f969797c4627e06d.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/1f4a0821b23b0f6d55265c4a2363fe169d7e000c64c2b6d846d155808ce533c8.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/9b13ceeb06c5a2612d381745e9bdf25b440461659b1d3577422b88d29b8c9343.png",
+];
+
 export default function WelcomeScreen({ navigation }) {
+  // Carousel state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const carouselAnim = useRef(new Animated.Value(0)).current;
+  
   // Animation values
   const logoScale = useRef(new Animated.Value(0)).current;
   const logoRotate = useRef(new Animated.Value(0)).current;
@@ -45,6 +58,30 @@ export default function WelcomeScreen({ navigation }) {
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
+
+  // Carousel animation - slide images from right to left
+  useEffect(() => {
+    const animateCarousel = () => {
+      Animated.sequence([
+        Animated.timing(carouselAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.delay(4000), // Show image for 4 seconds
+        Animated.timing(carouselAnim, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
+        animateCarousel();
+      });
+    };
+    
+    animateCarousel();
+  }, []);
 
   useEffect(() => {
     // Logo entrance animation
@@ -153,6 +190,12 @@ export default function WelcomeScreen({ navigation }) {
     outputRange: [0.3, 0.8],
   });
 
+  // Carousel slide animation
+  const carouselTranslateX = carouselAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [width, 0],
+  });
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -161,6 +204,28 @@ export default function WelcomeScreen({ navigation }) {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      
+      {/* Animated Background Carousel - Ghanaian women using SDM */}
+      <Animated.View 
+        style={[
+          styles.carouselContainer, 
+          { 
+            opacity: carouselAnim,
+            transform: [{ translateX: carouselTranslateX }] 
+          }
+        ]}
+      >
+        <Image
+          source={{ uri: CAROUSEL_IMAGES[currentImageIndex] }}
+          style={styles.carouselImage}
+          resizeMode="cover"
+        />
+        {/* Overlay gradient to make text readable */}
+        <LinearGradient
+          colors={['rgba(15, 23, 42, 0.7)', 'rgba(30, 27, 75, 0.85)', 'rgba(15, 23, 42, 0.95)']}
+          style={styles.carouselOverlay}
+        />
+      </Animated.View>
       
       {/* Animated background particles */}
       <View style={styles.particlesContainer}>
@@ -314,9 +379,21 @@ const styles = StyleSheet.create({
     paddingTop: verticalScale(20),
     paddingBottom: verticalScale(16),
   },
+  carouselContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  carouselImage: {
+    width: '100%',
+    height: '100%',
+  },
+  carouselOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   particlesContainer: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+    zIndex: 1,
   },
   particle: {
     position: 'absolute',
