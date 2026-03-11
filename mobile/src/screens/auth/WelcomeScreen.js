@@ -30,12 +30,12 @@ const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * fact
 // Company logo URL
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vc8llt43_WhatsApp%20Image%202026-03-04%20at%2020.16.26.jpeg";
 
-// Background carousel images - Beautiful Ghanaian women using SDM Rewards
+// Background carousel images - Beautiful Ghanaian women using SDM Rewards (Optimized for low bandwidth)
 const CAROUSEL_IMAGES = [
-  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/167565e20cb764b757209da2ea9839b6cd452ce81712f1d4c6f36ce4c59a7c59.png",
-  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/b3cc62610512e77820c246f39712518e52db3130dbe82336f969797c4627e06d.png",
-  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/1f4a0821b23b0f6d55265c4a2363fe169d7e000c64c2b6d846d155808ce533c8.png",
-  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/9b13ceeb06c5a2612d381745e9bdf25b440461659b1d3577422b88d29b8c9343.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/01b1df557fb0b9b58ab0869db1bfe6667fb94c6ee469d2cb0bedd4a754670fdc.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/e1923f2d8da8b45d43f9d74219b04906dd4b54a45ed360cb4b43927a0cc4a2a7.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/aa160bba66dc42fe80a8a6629b5040893f84a10d1bbbebad5fa330bb25a81388.png",
+  "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/3194f47457d24bb9b5086ab083814e6b2d0d976fe9cc46b95b910da532b29452.png",
 ];
 
 export default function WelcomeScreen({ navigation }) {
@@ -220,9 +220,9 @@ export default function WelcomeScreen({ navigation }) {
           style={styles.carouselImage}
           resizeMode="cover"
         />
-        {/* Overlay gradient to make text readable */}
+        {/* Light overlay gradient - images are more visible */}
         <LinearGradient
-          colors={['rgba(15, 23, 42, 0.7)', 'rgba(30, 27, 75, 0.85)', 'rgba(15, 23, 42, 0.95)']}
+          colors={['rgba(15, 23, 42, 0.3)', 'rgba(30, 27, 75, 0.5)', 'rgba(15, 23, 42, 0.7)']}
           style={styles.carouselOverlay}
         />
       </Animated.View>
