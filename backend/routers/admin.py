@@ -3288,11 +3288,15 @@ async def send_email(
     current_admin: dict = Depends(get_current_admin)
 ):
     """Send email to clients, merchants, or individual users via OneSignal"""
-    from push_notifications import ONESIGNAL_APP_ID, ONESIGNAL_API_KEY
     import httpx
+    import os
+    
+    # Load directly from environment
+    ONESIGNAL_APP_ID = os.environ.get("ONESIGNAL_APP_ID", "")
+    ONESIGNAL_API_KEY = os.environ.get("ONESIGNAL_API_KEY", "")
     
     if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
-        raise HTTPException(status_code=500, detail="OneSignal not configured")
+        raise HTTPException(status_code=500, detail="OneSignal not configured. Please set ONESIGNAL_APP_ID and ONESIGNAL_API_KEY in environment.")
     
     recipients = []
     recipient_count = 0
