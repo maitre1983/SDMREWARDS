@@ -21,6 +21,11 @@ import { COLORS, SPACING, FONTS } from '../../utils/constants';
 
 const { width, height } = Dimensions.get('window');
 
+// Responsive scaling based on screen size
+const scale = (size) => (width / 375) * size; // 375 is iPhone base width
+const verticalScale = (size) => (height / 812) * size; // 812 is iPhone X base height
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
+
 // Company logo URL
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vc8llt43_WhatsApp%20Image%202026-03-04%20at%2020.16.26.jpeg";
 
@@ -35,9 +40,8 @@ export default function WelcomeScreen({ navigation }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
-  // Feature animations (3 features now)
+  // Feature animations (2 features now)
   const featureAnims = useRef([
-    new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
   ]).current;
@@ -137,7 +141,6 @@ export default function WelcomeScreen({ navigation }) {
   const features = [
     { icon: 'qr-code', text: 'Pay Merchants with QR', color: '#F59E0B' },
     { icon: 'gift', text: 'Earn Cashback Rewards', color: '#10B981' },
-    { icon: 'grid', text: 'Pay All Services', subText: 'Airtime, Data, ECG +more', color: '#8B5CF6' },
   ];
 
   const spin = logoRotate.interpolate({
@@ -307,7 +310,9 @@ export default function WelcomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: SPACING.xl,
+    paddingHorizontal: moderateScale(16),
+    paddingTop: verticalScale(20),
+    paddingBottom: verticalScale(16),
   },
   particlesContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -322,76 +327,77 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 50,
-    marginBottom: 30,
+    marginTop: verticalScale(20),
+    marginBottom: verticalScale(15),
   },
   logoGlow: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
     backgroundColor: '#3B82F6',
-    top: -10,
+    top: -5,
   },
   logoWrapper: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: moderateScale(85),
+    height: moderateScale(85),
+    borderRadius: moderateScale(42.5),
     overflow: 'hidden',
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: '#F59E0B',
     backgroundColor: '#1E3A5F',
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 20,
+    shadowRadius: 15,
     elevation: 10,
   },
   logoImage: {
-    width: 180,
-    height: 180,
-    marginLeft: -25,
-    marginTop: -25,
+    width: moderateScale(120),
+    height: moderateScale(120),
+    marginLeft: moderateScale(-17),
+    marginTop: moderateScale(-17),
   },
   title: {
     color: COLORS.text,
-    fontSize: 32,
+    fontSize: moderateScale(26),
     fontWeight: 'bold',
-    marginTop: SPACING.xl,
+    marginTop: verticalScale(12),
     textShadowColor: 'rgba(245, 158, 11, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
   },
   subtitle: {
     color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.lg,
+    fontSize: moderateScale(14),
     marginTop: SPACING.xs,
     textAlign: 'center',
   },
   features: {
-    marginBottom: 20,
+    marginBottom: verticalScale(12),
+    marginTop: verticalScale(8),
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: verticalScale(10),
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: SPACING.md,
+    padding: moderateScale(12),
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   featureIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
   },
   featureText: {
     color: COLORS.text,
-    fontSize: FONTS.sizes.lg,
+    fontSize: moderateScale(15),
     fontWeight: '500',
   },
   featureTextContainer: {
@@ -399,49 +405,50 @@ const styles = StyleSheet.create({
   },
   featureSubText: {
     color: COLORS.textMuted,
-    fontSize: FONTS.sizes.sm,
+    fontSize: moderateScale(12),
     marginTop: 2,
   },
   buttonsContainer: {
     marginTop: 'auto',
-    gap: SPACING.md,
+    gap: verticalScale(12),
+    paddingBottom: verticalScale(8),
   },
   customerButton: {
-    borderRadius: 20,
+    borderRadius: moderateScale(16),
     overflow: 'hidden',
     shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
   },
   merchantButton: {
-    borderRadius: 20,
+    borderRadius: moderateScale(16),
     overflow: 'hidden',
     shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
   },
   gradientButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 22,
-    paddingHorizontal: 24,
+    paddingVertical: verticalScale(18),
+    paddingHorizontal: moderateScale(20),
+    minHeight: verticalScale(60),
   },
   ctaButtonText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: moderateScale(18),
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
   footer: {
     color: COLORS.textMuted,
-    fontSize: FONTS.sizes.sm,
+    fontSize: moderateScale(11),
     textAlign: 'center',
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.md,
+    marginTop: verticalScale(12),
   },
 });
