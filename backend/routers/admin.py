@@ -155,6 +155,12 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
     ).to_list(100000)
     total_welcome_bonus = sum(t.get("amount", 0) for t in welcome_txs if t.get("amount", 0) > 0)
     
+    # Pending Cash Confirmations count
+    pending_cash_confirmations = await db.transactions.count_documents({
+        "payment_method": "cash",
+        "status": "pending_confirmation"
+    })
+    
     # 2. Total Cashback Used - sum of all cashback spent by clients on services/payments
     # Services from service_transactions collection: airtime, data_bundle, ecg_payment, withdrawal
     service_txs = await db.service_transactions.find(
@@ -245,7 +251,8 @@ async def get_admin_dashboard(current_admin: dict = Depends(get_current_admin)):
             "email": current_admin["email"],
             "name": current_admin.get("name"),
             "is_super_admin": current_admin.get("is_super_admin", False)
-        }
+        },
+        "pending_cash_confirmations": pending_cash_confirmations
     }
 
 

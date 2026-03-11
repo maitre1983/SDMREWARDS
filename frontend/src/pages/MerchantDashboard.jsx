@@ -35,7 +35,8 @@ import {
   Banknote,
   ArrowUpRight,
   AlertTriangle,
-  Smartphone
+  Smartphone,
+  XCircle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -97,6 +98,12 @@ export default function MerchantDashboard() {
   const [topUpPhone, setTopUpPhone] = useState('');
   const [topUpNetwork, setTopUpNetwork] = useState('MTN');
   const [isProcessingTopUp, setIsProcessingTopUp] = useState(false);
+  
+  // Pending Cash Confirmations states
+  const [pendingConfirmations, setPendingConfirmations] = useState([]);
+  const [isLoadingPending, setIsLoadingPending] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(null);
+  const [isRejecting, setIsRejecting] = useState(null);
 
   const token = localStorage.getItem('sdm_merchant_token');
 
@@ -109,6 +116,7 @@ export default function MerchantDashboard() {
     fetchPinStatus();
     fetchDebitAccount();
     fetchTodayCashStats();
+    fetchPendingConfirmations();
   }, [token]);
 
   const fetchPinStatus = async () => {
@@ -212,6 +220,54 @@ export default function MerchantDashboard() {
       });
     } catch (error) {
       console.error('Today cash stats fetch error:', error);
+    }
+  };
+
+  // ============== PENDING CONFIRMATIONS FUNCTIONS ==============
+  
+  const fetchPendingConfirmations = async () => {
+    try {
+      setIsLoadingPending(true);
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.get(`${API_URL}/api/merchants/pending-confirmations`, { headers });
+      setPendingConfirmations(res.data.transactions || []);
+    } catch (error) {
+      console.error('Pending confirmations fetch error:', error);
+    } finally {
+      setIsLoadingPending(false);
+    }
+  };
+
+  const handleConfirmPayment = async (transactionId) => {
+    try {
+      setIsConfirming(transactionId);
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(`${API_URL}/api/merchants/confirm-cash-payment/${transactionId}`, {}, { headers });
+      toast.success(res.data.message || 'Payment confirmed!');
+      fetchPendingConfirmations();
+      fetchDebitAccount();
+      fetchTodayCashStats();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to confirm payment');
+    } finally {
+      setIsConfirming(null);
+    }
+  };
+
+  const handleRejectPayment = async (transactionId) => {
+    if (!window.confirm('Are you sure you want to reject this payment? The customer will be notified.')) {
+      return;
+    }
+    try {
+      setIsRejecting(transactionId);
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(`${API_URL}/api/merchants/reject-cash-payment/${transactionId}?reason=Payment not received`, {}, { headers });
+      toast.success('Payment rejected. Customer has been notified.');
+      fetchPendingConfirmations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reject payment');
+    } finally {
+      setIsRejecting(null);
     }
   };
 
@@ -710,6 +766,114 @@ export default function MerchantDashboard() {
                   <p className="text-slate-400 text-sm">Loading today's stats...</p>
                 </div>
               )}
+            </div>
+
+            {/* Pending Cash Confirmations */}
+            <div className="bg-gradient-to-br from-orange-900/30 to-slate-800 border border-orange-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center relative">
+                    <Clock size={24} className="text-white" />
+                    {pendingConfirmations.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {pendingConfirmations.length}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold">Pending Confirmations</h3>
+                    <p className="text-orange-300 text-sm">Confirm cash payments to credit cashback</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={fetchPendingConfirmations}
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400"
+                  disabled={isLoadingPending}
+                >
+                  {isLoadingPending ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+                </Button>
+              </div>
+              
+              {isLoadingPending ? (
+                <div className="text-center py-6">
+                  <Loader2 className="animate-spin text-orange-400 mx-auto mb-2" size={24} />
+                  <p className="text-slate-400 text-sm">Loading pending confirmations...</p>
+                </div>
+              ) : pendingConfirmations.length === 0 ? (
+                <div className="text-center py-6 bg-slate-800/50 rounded-lg">
+                  <CheckCircle className="text-emerald-400 mx-auto mb-2" size={32} />
+                  <p className="text-slate-400">No pending confirmations</p>
+                  <p className="text-slate-500 text-sm">All cash payments have been processed</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingConfirmations.map((txn) => {
+                    const expiresAt = new Date(txn.expires_at);
+                    const hoursLeft = Math.max(0, Math.floor((expiresAt - new Date()) / (1000 * 60 * 60)));
+                    
+                    return (
+                      <div 
+                        key={txn.id} 
+                        className="bg-slate-800 rounded-lg p-4 border border-slate-700"
+                        data-testid={`pending-${txn.id}`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-white font-medium">{txn.client_name}</p>
+                            <p className="text-slate-400 text-sm">{txn.client_phone}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-emerald-400 font-bold text-lg">GHS {txn.amount?.toFixed(2)}</p>
+                            <p className="text-purple-400 text-sm">+{txn.cashback_amount?.toFixed(2)} cashback</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
+                          <span>{new Date(txn.created_at).toLocaleString()}</span>
+                          <span className={hoursLeft < 12 ? 'text-red-400' : 'text-orange-400'}>
+                            Expires in {hoursLeft}h
+                          </span>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleConfirmPayment(txn.id)}
+                            disabled={isConfirming === txn.id || isRejecting === txn.id}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                            data-testid={`confirm-${txn.id}`}
+                          >
+                            {isConfirming === txn.id ? (
+                              <Loader2 className="animate-spin mr-2" size={16} />
+                            ) : (
+                              <CheckCircle className="mr-2" size={16} />
+                            )}
+                            Confirm Receipt
+                          </Button>
+                          <Button
+                            onClick={() => handleRejectPayment(txn.id)}
+                            disabled={isConfirming === txn.id || isRejecting === txn.id}
+                            variant="outline"
+                            className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                            data-testid={`reject-${txn.id}`}
+                          >
+                            {isRejecting === txn.id ? (
+                              <Loader2 className="animate-spin" size={16} />
+                            ) : (
+                              <XCircle size={16} />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              <p className="text-slate-500 text-xs mt-4 text-center">
+                Payments auto-expire after 72 hours if not confirmed. Max 3 pending per customer.
+              </p>
             </div>
 
             {/* Debit Account Overview */}

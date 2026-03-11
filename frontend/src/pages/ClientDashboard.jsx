@@ -1468,19 +1468,43 @@ export default function ClientDashboard() {
                       {getTransactionIcon(txn.type)}
                       <div>
                         <p className="text-white text-sm">{txn.description || txn.type.replace('_', ' ')}</p>
-                        <p className="text-slate-500 text-xs">
-                          {new Date(txn.created_at).toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-slate-500 text-xs">
+                            {new Date(txn.created_at).toLocaleString()}
+                          </p>
+                          {txn.status === 'pending_confirmation' && (
+                            <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-xs rounded-full">
+                              Awaiting Confirmation
+                            </span>
+                          )}
+                          {txn.status === 'rejected' && (
+                            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full">
+                              Rejected
+                            </span>
+                          )}
+                          {txn.status === 'expired' && (
+                            <span className="px-2 py-0.5 bg-slate-500/20 text-slate-400 text-xs rounded-full">
+                              Expired
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <p className={`font-medium ${
-                      txn.type.includes('earned') || txn.type.includes('bonus') 
-                        ? 'text-emerald-400' 
-                        : 'text-slate-400'
-                    }`}>
-                      {txn.type.includes('earned') || txn.type.includes('bonus') ? '+' : '-'}
-                      GHS {txn.amount?.toFixed(2)}
-                    </p>
+                    <div className="text-right">
+                      <p className={`font-medium ${
+                        txn.status === 'pending_confirmation' ? 'text-orange-400' :
+                        txn.status === 'rejected' || txn.status === 'expired' ? 'text-slate-500' :
+                        txn.type.includes('earned') || txn.type.includes('bonus') 
+                          ? 'text-emerald-400' 
+                          : 'text-slate-400'
+                      }`}>
+                        {txn.type.includes('earned') || txn.type.includes('bonus') ? '+' : '-'}
+                        GHS {txn.amount?.toFixed(2)}
+                      </p>
+                      {txn.status === 'pending_confirmation' && txn.cashback_amount && (
+                        <p className="text-purple-400 text-xs">+{txn.cashback_amount?.toFixed(2)} pending</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

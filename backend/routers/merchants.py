@@ -1083,10 +1083,12 @@ async def record_cash_transaction(
     current_merchant: dict = Depends(get_current_merchant)
 ):
     """
-    Record a cash payment transaction
+    Record a cash payment transaction (PENDING CONFIRMATION)
     - Customer pays cash directly to merchant
-    - Cashback is credited to customer's wallet
-    - Merchant's debit account is debited by cashback amount
+    - Transaction created with 'pending_confirmation' status
+    - Merchant must confirm receipt before cashback is credited
+    - Max 3 pending confirmations per customer
+    - Auto-expires after 72 hours if not confirmed
     """
     merchant_id = current_merchant["id"]
     
@@ -1116,6 +1118,19 @@ async def record_cash_transaction(
     if customer.get("status") != "active":
         raise HTTPException(status_code=400, detail="Customer account is not active")
     
+    # Check max pending confirmations per customer (limit: 3)
+    pending_count = await db.transactions.count_documents({
+        "client_id": customer["id"],
+        "payment_method": "cash",
+        "status": "pending_confirmation"
+    })
+    
+    if pending_count >= 3:
+        raise HTTPException(
+            status_code=400, 
+            detail="Customer has reached maximum pending cash payments (3). Previous payments must be confirmed first."
+        )
+    
     # Get merchant's debit account
     debit_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
     
@@ -1140,11 +1155,11 @@ async def record_cash_transaction(
             detail="Your debit account is blocked. Please top up your account or contact support."
         )
     
-    # Calculate cashback
+    # Calculate cashback (will be credited upon confirmation)
     cashback_rate = current_merchant.get("cashback_rate", 5)
     cashback_amount = round(request.amount * cashback_rate / 100, 2)
     
-    # Check if this would exceed debit limit
+    # Check if this would exceed debit limit (when confirmed)
     debit_limit = debit_account.get("debit_limit", 0)
     current_balance = debit_account.get("balance", 0)
     new_balance = current_balance - cashback_amount
@@ -1155,9 +1170,10 @@ async def record_cash_transaction(
             detail=f"This transaction would exceed your debit limit. Available: GHS {max(0, debit_limit + current_balance):.2f}"
         )
     
-    # Create transaction record
+    # Create transaction record with PENDING status
     transaction_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=72)  # 72-hour expiration
     
     transaction = {
         "id": transaction_id,
@@ -1165,15 +1181,142 @@ async def record_cash_transaction(
         "payment_method": "cash",
         "merchant_id": merchant_id,
         "client_id": customer["id"],
+        "client_name": customer.get("full_name", "Unknown"),
+        "client_phone": customer.get("phone", ""),
+        "merchant_name": current_merchant.get("business_name", "Unknown"),
         "amount": request.amount,
         "cashback_amount": cashback_amount,
         "cashback_rate": cashback_rate,
         "description": request.description or f"Cash payment at {current_merchant.get('business_name', 'merchant')}",
-        "status": "completed",
-        "created_at": now
+        "status": "pending_confirmation",  # NEW: Pending merchant confirmation
+        "expires_at": expires_at.isoformat(),
+        "created_at": now.isoformat()
     }
     
     await db.transactions.insert_one(transaction)
+    
+    # NOTE: Cashback NOT credited yet - will be credited upon confirmation
+    # NOTE: Merchant debit NOT debited yet - will be debited upon confirmation
+    
+    return {
+        "success": True,
+        "message": "Cash payment recorded. Awaiting your confirmation.",
+        "transaction": {
+            "id": transaction_id,
+            "amount": request.amount,
+            "cashback_amount": cashback_amount,
+            "customer_name": customer.get("full_name", "Unknown"),
+            "status": "pending_confirmation",
+            "expires_at": expires_at.isoformat()
+        },
+        "note": "Please confirm receipt of cash payment to credit customer's cashback."
+    }
+
+
+@router.get("/pending-confirmations")
+async def get_pending_confirmations(
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get all pending cash payment confirmations for this merchant"""
+    merchant_id = current_merchant["id"]
+    now = datetime.now(timezone.utc)
+    
+    # Find pending transactions
+    pending = await db.transactions.find({
+        "merchant_id": merchant_id,
+        "payment_method": "cash",
+        "status": "pending_confirmation"
+    }).sort("created_at", -1).to_list(length=50)
+    
+    result = []
+    for txn in pending:
+        # Check if expired
+        expires_at = txn.get("expires_at")
+        is_expired = False
+        if expires_at:
+            exp_time = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            is_expired = now > exp_time
+            
+            # Auto-expire if past 72 hours
+            if is_expired and txn.get("status") == "pending_confirmation":
+                await db.transactions.update_one(
+                    {"id": txn["id"]},
+                    {"$set": {"status": "expired", "expired_at": now.isoformat()}}
+                )
+                continue  # Don't include expired in pending list
+        
+        result.append({
+            "id": txn["id"],
+            "client_name": txn.get("client_name", "Unknown"),
+            "client_phone": txn.get("client_phone", ""),
+            "amount": txn.get("amount", 0),
+            "cashback_amount": txn.get("cashback_amount", 0),
+            "created_at": txn.get("created_at"),
+            "expires_at": txn.get("expires_at"),
+            "description": txn.get("description", "")
+        })
+    
+    return {
+        "pending_count": len(result),
+        "transactions": result
+    }
+
+
+@router.post("/confirm-cash-payment/{transaction_id}")
+async def confirm_cash_payment(
+    transaction_id: str,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Confirm receipt of cash payment
+    - Credits cashback to customer
+    - Debits merchant's debit account
+    """
+    merchant_id = current_merchant["id"]
+    
+    # Find the transaction
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "merchant_id": merchant_id,
+        "payment_method": "cash",
+        "status": "pending_confirmation"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found or already processed")
+    
+    # Check if expired
+    expires_at = transaction.get("expires_at")
+    if expires_at:
+        exp_time = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        if datetime.now(timezone.utc) > exp_time:
+            await db.transactions.update_one(
+                {"id": transaction_id},
+                {"$set": {"status": "expired", "expired_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            raise HTTPException(status_code=400, detail="Transaction has expired (72 hours)")
+    
+    # Get customer
+    customer = await db.clients.find_one({"id": transaction["client_id"]})
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Get merchant's debit account
+    debit_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
+    
+    now = datetime.now(timezone.utc).isoformat()
+    cashback_amount = transaction.get("cashback_amount", 0)
+    amount = transaction.get("amount", 0)
+    
+    # Update transaction status
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "completed",
+            "confirmed_at": now,
+            "updated_at": now
+        }}
+    )
     
     # Credit customer's cashback balance
     await db.clients.update_one(
@@ -1185,6 +1328,9 @@ async def record_cash_transaction(
     )
     
     # Debit merchant's account
+    current_balance = debit_account.get("balance", 0) if debit_account else 0
+    new_balance = current_balance - cashback_amount
+    
     await db.merchant_debit_accounts.update_one(
         {"merchant_id": merchant_id},
         {
@@ -1213,83 +1359,88 @@ async def record_cash_transaction(
         {
             "$inc": {
                 "total_transactions": 1,
-                "total_sales": request.amount,
+                "total_sales": amount,
                 "total_cashback_given": cashback_amount
             },
             "$set": {"updated_at": now}
         }
     )
     
-    # Check if alert should be sent (75% threshold)
-    updated_account = await db.merchant_debit_accounts.find_one({"merchant_id": merchant_id})
-    new_balance = updated_account.get("balance", 0)
-    debit_limit = updated_account.get("debit_limit", 0)
-    
+    # Check debit limit alerts
+    debit_limit = debit_account.get("debit_limit", 0) if debit_account else 0
     if debit_limit > 0:
         usage_percentage = abs(new_balance) / debit_limit * 100 if new_balance < 0 else 0
         
-        # Send alert at 75%
-        if usage_percentage >= 75 and usage_percentage < 100:
-            last_alert = updated_account.get("last_alert_sent")
-            should_send_alert = True
-            
-            if last_alert:
-                last_alert_time = datetime.fromisoformat(last_alert.replace('Z', '+00:00'))
-                if (datetime.now(timezone.utc) - last_alert_time).days < 1:
-                    should_send_alert = False
-            
-            if should_send_alert:
-                # Send SMS alert
-                try:
-                    from services.sms_service import get_sms
-                    sms_service = get_sms()
-                    merchant_phone = current_merchant.get("phone")
-                    if merchant_phone:
-                        message = f"SDM REWARDS ALERT: Your debit account is at {usage_percentage:.0f}% of your limit. Please top up to continue processing transactions."
-                        await sms_service.send_sms(merchant_phone, message)
-                        
-                        await db.merchant_debit_accounts.update_one(
-                            {"merchant_id": merchant_id},
-                            {"$set": {"last_alert_sent": now, "status": "warning"}}
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to send debit alert SMS: {e}")
-        
-        # Block at 100%
         if usage_percentage >= 100:
             await db.merchant_debit_accounts.update_one(
                 {"merchant_id": merchant_id},
                 {"$set": {"status": "blocked"}}
             )
-            
-            # Send block notification
-            try:
-                from services.sms_service import get_sms
-                sms_service = get_sms()
-                merchant_phone = current_merchant.get("phone")
-                if merchant_phone:
-                    message = f"SDM REWARDS: Your debit account has reached its limit and is now BLOCKED. Please top up immediately to continue accepting cash payments."
-                    await sms_service.send_sms(merchant_phone, message)
-            except Exception as e:
-                logger.error(f"Failed to send block notification SMS: {e}")
     
     return {
         "success": True,
-        "transaction": {
-            "id": transaction_id,
-            "amount": request.amount,
-            "cashback_amount": cashback_amount,
-            "customer_name": customer.get("full_name", "Customer"),
-            "created_at": now
-        },
-        "debit_account": {
-            "new_balance": round(new_balance, 2),
-            "debit_limit": round(debit_limit, 2)
-        },
-        "message": f"Cash transaction recorded. GHS {cashback_amount:.2f} cashback credited to customer."
+        "message": f"Payment confirmed. GHS {cashback_amount:.2f} cashback credited to {customer.get('full_name', 'customer')}",
+        "transaction_id": transaction_id,
+        "cashback_credited": cashback_amount
     }
 
 
+@router.post("/reject-cash-payment/{transaction_id}")
+async def reject_cash_payment(
+    transaction_id: str,
+    reason: str = "Payment not received",
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Reject a cash payment (merchant did not receive cash)
+    - No cashback credited
+    - Customer notified via SMS
+    """
+    merchant_id = current_merchant["id"]
+    
+    # Find the transaction
+    transaction = await db.transactions.find_one({
+        "id": transaction_id,
+        "merchant_id": merchant_id,
+        "payment_method": "cash",
+        "status": "pending_confirmation"
+    })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found or already processed")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Update transaction status
+    await db.transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {
+            "status": "rejected",
+            "rejection_reason": reason,
+            "rejected_at": now,
+            "updated_at": now
+        }}
+    )
+    
+    # Get customer for SMS notification
+    customer = await db.clients.find_one({"id": transaction["client_id"]})
+    merchant_name = transaction.get("merchant_name", "the merchant")
+    
+    # Send SMS notification to customer
+    if customer and customer.get("phone"):
+        try:
+            from services.sms_service import get_sms
+            sms_service = get_sms()
+            message = f"SDM REWARDS: Your cash payment of GHS {transaction.get('amount', 0):.2f} at {merchant_name} was rejected. Reason: {reason}. No cashback was credited. If this is an error, please contact the merchant."
+            await sms_service.send_sms(customer["phone"], message)
+        except Exception as e:
+            logger.error(f"Failed to send rejection SMS: {e}")
+    
+    return {
+        "success": True,
+        "message": "Payment rejected. Customer has been notified via SMS.",
+        "transaction_id": transaction_id
+    }
 @router.post("/topup-debit-account")
 async def topup_debit_account(
     request: TopUpDebitAccountRequest,
@@ -1337,7 +1488,7 @@ async def topup_debit_account(
             amount=request.amount,
             network=request.momo_network,
             reference=f"TOPUP-{payment_id}",
-            description=f"SDM Debit Account Top-up"
+            description="SDM Debit Account Top-up"
         )
         
         if momo_result.get("success"):
@@ -1422,7 +1573,7 @@ async def topup_callback(payment_id: str, status: str):
             "balance_after": new_balance,
             "reference_type": "topup",
             "reference_id": payment_id,
-            "description": f"Debit account top-up via MoMo",
+            "description": "Debit account top-up via MoMo",
             "created_at": now
         }
         await db.merchant_debit_ledger.insert_one(ledger_entry)
