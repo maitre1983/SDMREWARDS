@@ -3290,10 +3290,16 @@ async def send_email(
     """Send email to clients, merchants, or individual users via OneSignal"""
     import httpx
     import os
+    from dotenv import load_dotenv
+    
+    # Ensure env variables are loaded
+    load_dotenv()
     
     # Load directly from environment
     ONESIGNAL_APP_ID = os.environ.get("ONESIGNAL_APP_ID", "")
     ONESIGNAL_API_KEY = os.environ.get("ONESIGNAL_API_KEY", "")
+    
+    logger.info(f"OneSignal APP_ID exists: {bool(ONESIGNAL_APP_ID)}, API_KEY exists: {bool(ONESIGNAL_API_KEY)}")
     
     if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
         raise HTTPException(status_code=500, detail="OneSignal not configured. Please set ONESIGNAL_APP_ID and ONESIGNAL_API_KEY in environment.")
