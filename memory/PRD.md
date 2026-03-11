@@ -56,6 +56,13 @@ Fraud prevention system for cash payments:
 - **Fix**: Added `"debit_account.balance": -cashback_amount` to the `$inc` operation at line 1365
 - **Testing**: 100% pass rate - verified with 2 transactions (see /app/test_reports/iteration_49.json)
 
+### ✅ NEW: Push Notification for Pending Cash Payments - IMPLEMENTED 2026-03-11
+**Feature**: Merchants receive a OneSignal push notification when a client initiates a cash payment.
+- **Implementation**: Added notification in `/app/backend/routers/payments.py` (function `initiate_cash_payment`)
+- **Notification content**: "💵 Pending Cash Payment - {client_name} paid GHS {amount} in cash. Please confirm receipt."
+- **Data payload**: Includes `transaction_id`, `amount`, `client_name`, `cashback_amount` for deep linking
+- **Note**: Requires merchant to have registered their device with OneSignal to receive notifications
+
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
 - **AdminDashboard.jsx**: Reduced from 3,837 to 2,866 lines (25% reduction)

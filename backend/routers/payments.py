@@ -43,6 +43,17 @@ def get_sms():
     return _sms_service
 
 
+# Import Push Notification service (lazy)
+_push_service = None
+
+def get_push_service():
+    global _push_service
+    if _push_service is None:
+        from push_notifications import OneSignalService
+        _push_service = OneSignalService(db)
+    return _push_service
+
+
 # ============== HELPERS ==============
 def detect_network(phone: str) -> Optional[str]:
     """Detect network provider from phone number (Ghana networks)"""
@@ -582,6 +593,30 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
     
     # NOTE: Cashback NOT credited - will be credited when merchant confirms
     # NOTE: Merchant debit NOT debited - will be debited when merchant confirms
+    
+    # Send push notification to merchant about pending cash payment
+    try:
+        from push_notifications import PushNotificationPayload
+        push_service = get_push_service()
+        
+        notification_payload = PushNotificationPayload(
+            title="💵 Pending Cash Payment",
+            message=f"{client.get('full_name', 'A customer')} paid GHS {request.amount:.2f} in cash. Please confirm receipt.",
+            url="/merchant",  # Redirect to merchant dashboard
+            data={
+                "type": "cash_payment_pending",
+                "transaction_id": transaction_id,
+                "amount": request.amount,
+                "client_name": client.get("full_name", "Customer"),
+                "cashback_amount": cashback_amount
+            }
+        )
+        
+        push_result = await push_service.send_to_user(merchant["id"], notification_payload)
+        logger.info(f"Push notification to merchant {merchant['id']}: {push_result}")
+    except Exception as e:
+        logger.error(f"Failed to send push notification to merchant: {e}")
+        # Don't fail the transaction if push fails
     
     logger.info(f"Cash payment pending confirmation: {payment_ref}, amount={request.amount}, cashback={cashback_amount}")
     
