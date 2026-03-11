@@ -38,15 +38,16 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
   - `/api/merchants/cash-transaction` - Records cash payments
   - `/api/merchants/topup-debit-account` - Top up debit balance
 
-### Cash Payment Confirmation Feature - COMPLETED 2026-03-11
+### Cash Payment Confirmation Feature - COMPLETED & TESTED 2026-03-11
 Fraud prevention system for cash payments:
-- **Flow**: Cash payment → Pending → Merchant Confirms → Cashback Credited
-- **Limits**: Max 3 pending confirmations per customer
+- **Flow**: Client pays cash → Status: `pending_confirmation` → Merchant confirms → Cashback credited
+- **Limits**: Max 3 pending confirmations per customer (enforced)
 - **Timeout**: Auto-expires after 72 hours if not confirmed
 - **Rejection**: Customer notified via SMS if merchant rejects payment
 - **Merchant UI**: New "Pending Confirmations" section in Cash tab with Confirm/Reject buttons
-- **Client UI**: Shows pending/rejected/expired status on transactions
+- **Client UI**: Shows "Awaiting Confirmation" status and pending cashback amount
 - **Admin**: Pending count shown in dashboard overview
+- **Testing**: 100% pass rate - all flows verified (see /app/test_reports/iteration_48.json)
 
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
