@@ -561,12 +561,13 @@ app.include_router(seo_router, tags=["SEO"])
 import os
 mobile_static_path = os.path.join(os.path.dirname(__file__), "static", "mobile")
 if os.path.exists(mobile_static_path):
-    # Mount static assets for mobile app
-    app.mount("/mobile/_expo", StaticFiles(directory=os.path.join(mobile_static_path, "_expo")), name="mobile_expo")
-    app.mount("/mobile/assets", StaticFiles(directory=os.path.join(mobile_static_path, "assets")), name="mobile_assets")
+    # Mount static assets for mobile app (with /api prefix for Kubernetes ingress)
+    app.mount("/api/mobile/_expo", StaticFiles(directory=os.path.join(mobile_static_path, "_expo")), name="mobile_expo")
+    app.mount("/api/mobile/assets", StaticFiles(directory=os.path.join(mobile_static_path, "assets")), name="mobile_assets")
     
-    @app.get("/mobile")
-    @app.get("/mobile/{full_path:path}")
+    @app.get("/api/mobile")
+    @app.get("/api/mobile/")
+    @app.get("/api/mobile/{full_path:path}")
     async def serve_mobile_app(full_path: str = ""):
         """Serve the mobile web app"""
         # For any route, serve index.html (SPA routing)
