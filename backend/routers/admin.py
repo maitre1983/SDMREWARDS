@@ -3267,3 +3267,213 @@ async def delete_admin(
         raise HTTPException(status_code=404, detail="Admin not found")
     
     return {"success": True, "message": "Admin deleted"}
+
+
+
+# ============== EMAIL MANAGEMENT VIA ONESIGNAL ==============
+
+class EmailRequest(BaseModel):
+    """Request model for sending emails"""
+    recipient_type: str  # 'clients', 'merchants', 'individual'
+    filter: Optional[str] = 'all'  # 'all', 'active', 'silver', 'gold', 'platinum'
+    individual_email: Optional[str] = None  # For individual emails
+    individual_phone: Optional[str] = None  # To find user by phone
+    subject: str
+    message: str
+    template: Optional[str] = 'default'  # 'default', 'promo', 'announcement'
+
+@router.post("/email/send")
+async def send_email(
+    request: EmailRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Send email to clients, merchants, or individual users via OneSignal"""
+    from push_notifications import ONESIGNAL_APP_ID, ONESIGNAL_API_KEY
+    import httpx
+    
+    if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
+        raise HTTPException(status_code=500, detail="OneSignal not configured")
+    
+    recipients = []
+    recipient_count = 0
+    
+    # Build recipient list based on type
+    if request.recipient_type == 'individual':
+        # Find individual user by email or phone
+        user = None
+        if request.individual_email:
+            user = await db.clients.find_one({"email": request.individual_email.lower()}, {"_id": 0})
+            if not user:
+                user = await db.merchants.find_one({"email": request.individual_email.lower()}, {"_id": 0})
+        elif request.individual_phone:
+            user = await db.clients.find_one({"phone": request.individual_phone}, {"_id": 0})
+            if not user:
+                user = await db.merchants.find_one({"phone": request.individual_phone}, {"_id": 0})
+        
+        if not user or not user.get('email'):
+            raise HTTPException(status_code=404, detail="User not found or has no email")
+        
+        recipients.append(user['email'])
+        recipient_count = 1
+        
+    elif request.recipient_type == 'clients':
+        # Get clients based on filter
+        query = {}
+        if request.filter == 'active':
+            query['is_active'] = True
+        elif request.filter in ['silver', 'gold', 'platinum']:
+            query['card_type'] = request.filter
+        
+        clients = await db.clients.find(query, {"_id": 0, "email": 1}).to_list(10000)
+        recipients = [c['email'] for c in clients if c.get('email')]
+        recipient_count = len(recipients)
+        
+    elif request.recipient_type == 'merchants':
+        # Get merchants based on filter
+        query = {}
+        if request.filter == 'active':
+            query['is_active'] = True
+        
+        merchants = await db.merchants.find(query, {"_id": 0, "email": 1}).to_list(10000)
+        recipients = [m['email'] for m in merchants if m.get('email')]
+        recipient_count = len(recipients)
+    
+    if not recipients:
+        raise HTTPException(status_code=400, detail="No recipients with valid email addresses")
+    
+    # Build HTML email template
+    email_html = f"""
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+            .header {{ background: linear-gradient(135deg, #F59E0B, #EA580C); padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+            .header h1 {{ color: white; margin: 0; font-size: 24px; }}
+            .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+            .message {{ white-space: pre-wrap; }}
+            .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>SDM REWARDS</h1>
+            </div>
+            <div class="content">
+                <h2>{request.subject}</h2>
+                <div class="message">{request.message}</div>
+            </div>
+            <div class="footer">
+                <p>© 2026 SDM Rewards - GIT NFT GHANA LTD</p>
+                <p>You received this email because you're a valued member of SDM Rewards.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # Send via OneSignal Email API
+    try:
+        async with httpx.AsyncClient() as client:
+            # OneSignal requires sending emails in batches
+            batch_size = 2000  # OneSignal limit
+            success_count = 0
+            
+            for i in range(0, len(recipients), batch_size):
+                batch = recipients[i:i + batch_size]
+                
+                payload = {
+                    "app_id": ONESIGNAL_APP_ID,
+                    "include_email_tokens": batch,
+                    "email_subject": request.subject,
+                    "email_body": email_html,
+                    "email_from_name": "SDM Rewards",
+                    "email_from_address": "noreply@sdmrewards.com"
+                }
+                
+                response = await client.post(
+                    "https://onesignal.com/api/v1/notifications",
+                    json=payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Basic {ONESIGNAL_API_KEY}"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    success_count += len(batch)
+        
+        # Log the email send
+        await db.email_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": request.recipient_type,
+            "filter": request.filter,
+            "subject": request.subject,
+            "message": request.message[:500],
+            "recipient_count": recipient_count,
+            "sent_count": success_count,
+            "status": "sent" if success_count > 0 else "failed",
+            "sent_by": current_admin["id"],
+            "admin_email": current_admin.get("email"),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        return {
+            "success": True,
+            "message": f"Email sent to {success_count} recipients",
+            "recipient_count": success_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Email send error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
+@router.get("/email/history")
+async def get_email_history(
+    limit: int = 20,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get email send history"""
+    emails = await db.email_logs.find(
+        {}, {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return {"emails": emails}
+
+
+@router.get("/email/recipients")
+async def get_email_recipients(
+    recipient_type: str = "clients",
+    filter: str = "all",
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get count of potential email recipients"""
+    query = {}
+    
+    if recipient_type == "clients":
+        if filter == "active":
+            query["is_active"] = True
+        elif filter in ["silver", "gold", "platinum"]:
+            query["card_type"] = filter
+        
+        total = await db.clients.count_documents(query)
+        with_email = await db.clients.count_documents({**query, "email": {"$exists": True, "$ne": ""}})
+        
+    elif recipient_type == "merchants":
+        if filter == "active":
+            query["is_active"] = True
+        
+        total = await db.merchants.count_documents(query)
+        with_email = await db.merchants.count_documents({**query, "email": {"$exists": True, "$ne": ""}})
+    else:
+        total = 0
+        with_email = 0
+    
+    return {
+        "total": total,
+        "with_email": with_email,
+        "recipient_type": recipient_type,
+        "filter": filter
+    }
