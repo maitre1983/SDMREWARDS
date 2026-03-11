@@ -49,6 +49,13 @@ Fraud prevention system for cash payments:
 - **Admin**: Pending count shown in dashboard overview
 - **Testing**: 100% pass rate - all flows verified (see /app/test_reports/iteration_48.json)
 
+### 🔴 BUG FIX: Merchant Debit Account Debiting - FIXED & TESTED 2026-03-11
+**Critical Financial Bug Fixed:**
+- **Problem**: When a merchant confirmed a cash payment, the client received cashback but the merchant's `debit_account.balance` was NOT debited
+- **Root Cause**: The `confirm_cash_payment` endpoint in `/app/backend/routers/merchants.py` was missing the `$inc: {"debit_account.balance": -cashback_amount}` in the db.merchants update
+- **Fix**: Added `"debit_account.balance": -cashback_amount` to the `$inc` operation at line 1365
+- **Testing**: 100% pass rate - verified with 2 transactions (see /app/test_reports/iteration_49.json)
+
 ### AdminDashboard Refactoring - COMPLETED 2026-03-11
 Successfully extracted settings section into modular components:
 - **AdminDashboard.jsx**: Reduced from 3,837 to 2,866 lines (25% reduction)
