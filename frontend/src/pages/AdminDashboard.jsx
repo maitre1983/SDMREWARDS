@@ -60,6 +60,7 @@ import AdminOverview from '../components/admin/AdminOverview';
 import AdminClients from '../components/admin/AdminClients';
 import AdminMerchants from '../components/admin/AdminMerchants';
 import SEODashboard from '../components/admin/SEODashboard';
+import AdminSettings from '../components/admin/AdminSettings';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
