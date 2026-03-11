@@ -349,6 +349,7 @@ export default function WelcomeScreen({ navigation }) {
         {/* I'm a Customer - Primary Orange Button */}
         <TouchableOpacity
           onPress={() => handleNavigate('client')}
+          onClick={() => { window.location.href = 'https://web-boost-seo.preview.emergentagent.com/client'; }}
           style={styles.customerButton}
           activeOpacity={0.8}
         >
@@ -367,6 +368,7 @@ export default function WelcomeScreen({ navigation }) {
         {/* I'm a Merchant - Secondary Green Button */}
         <TouchableOpacity
           onPress={() => handleNavigate('merchant')}
+          onClick={() => { window.location.href = 'https://web-boost-seo.preview.emergentagent.com/merchant'; }}
           style={styles.merchantButton}
           activeOpacity={0.8}
         >
