@@ -2,6 +2,23 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-12 - "Remember This Device" Feature
+**New Feature: Trusted Device Management**
+- Users can now check "Remember this device" during login
+- Trusted devices skip 2FA/OTP verification for 90 days
+- Maximum 5 trusted devices per user
+- Backend service: `/app/backend/services/device_trust_service.py`
+- New endpoints:
+  - `POST /api/auth/client/login/v2` - Enhanced login with device trust
+  - `POST /api/auth/merchant/login/v2` - Enhanced merchant login
+  - `POST /api/auth/admin/login/v2` - Enhanced admin login
+  - `GET /api/auth/devices/list` - List trusted devices
+  - `POST /api/auth/devices/revoke` - Revoke single device
+  - `POST /api/auth/devices/revoke-all` - Revoke all devices
+- Frontend: Added checkbox to client and merchant login forms
+- Mobile: Created `/app/mobile/src/utils/deviceTrust.js` for React Native
+- **Status**: ✅ Implemented and tested
+
 ### 2026-03-12 - Password Reset Improvements
 **Bug Fix: Admin Forgot Password "Network Error"**
 - **Issue**: Admin forgot password endpoint returned HTTP 400 for non-existent emails, causing "Network error" message

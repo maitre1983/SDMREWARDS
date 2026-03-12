@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
 import { 
   ArrowLeft, 
   Phone, 
@@ -19,9 +20,11 @@ import {
   Shield,
   Sparkles,
   CheckCircle,
-  KeyRound
+  KeyRound,
+  Smartphone
 } from 'lucide-react';
 import ForgotPassword from '../components/ForgotPassword';
+import { getDeviceInfo, getDeviceToken, storeDeviceToken, hasDeviceToken } from '../utils/deviceTrust';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
@@ -51,6 +54,10 @@ export default function ClientAuthPage() {
   const [requestId, setRequestId] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
   const [ussdCode, setUssdCode] = useState('');
+  
+  // Remember device state
+  const [rememberDevice, setRememberDevice] = useState(false);
+  const [deviceIsTrusted, setDeviceIsTrusted] = useState(false);
 
   useEffect(() => {
     // Check for referral code in URL
@@ -65,6 +72,9 @@ export default function ClientAuthPage() {
     if (token) {
       navigate('/client/dashboard');
     }
+    
+    // Check if this device is already trusted
+    setDeviceIsTrusted(hasDeviceToken('client'));
   }, [searchParams, navigate]);
 
   const normalizePhone = (phone) => {
@@ -88,15 +98,42 @@ export default function ClientAuthPage() {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/auth/client/login`, {
+      // Use enhanced login endpoint with device trust support
+      const loginPayload = {
         phone: normalizePhone(phone),
-        password
-      });
+        password,
+        device_token: getDeviceToken('client'),
+        remember_device: rememberDevice,
+        device_info: getDeviceInfo()
+      };
+      
+      const response = await axios.post(`${API_URL}/api/auth/client/login/v2`, loginPayload);
 
+      // Handle 2FA requirement
+      if (response.data.requires_2fa) {
+        toast.info('Please enter your 2FA code');
+        // Store user info for 2FA completion
+        sessionStorage.setItem('pending_2fa', JSON.stringify({
+          user_id: response.data.user_id,
+          user_type: response.data.user_type
+        }));
+        // Navigate to 2FA screen or show 2FA input
+        return;
+      }
+
+      // Store auth token
       localStorage.setItem('sdm_client_token', response.data.access_token);
       localStorage.setItem('sdm_client_data', JSON.stringify(response.data.client));
       
-      toast.success('Welcome back!');
+      // Store device token if provided (remember device was enabled)
+      if (response.data.device_token) {
+        storeDeviceToken('client', response.data.device_token);
+        toast.success('Device registered! You won\'t need to verify on this device next time.');
+      } else if (response.data.device_trusted) {
+        toast.success('Welcome back from your trusted device!');
+      } else {
+        toast.success('Welcome back!');
+      }
       
       // Check if there's a pending merchant payment from QR scan
       const pendingMerchant = sessionStorage.getItem('pending_merchant_payment');
@@ -359,6 +396,27 @@ export default function ClientAuthPage() {
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                </div>
+
+                {/* Remember Device Checkbox */}
+                <div className="flex items-center space-x-3 py-2">
+                  <Checkbox 
+                    id="remember-device"
+                    checked={rememberDevice}
+                    onCheckedChange={setRememberDevice}
+                    className="border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                    data-testid="remember-device-checkbox"
+                  />
+                  <label 
+                    htmlFor="remember-device" 
+                    className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-slate-300"
+                  >
+                    <Smartphone size={14} />
+                    Remember this device
+                    {deviceIsTrusted && (
+                      <span className="text-xs text-emerald-400 ml-1">(Already trusted)</span>
+                    )}
+                  </label>
                 </div>
 
                 <Button

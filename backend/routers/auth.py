@@ -129,6 +129,58 @@ class AdminForgotPasswordRequest(BaseModel):
     email: str
 
 
+# ============== TRUSTED DEVICE MODELS ==============
+
+class DeviceInfo(BaseModel):
+    device_name: Optional[str] = "Unknown Device"
+    device_type: Optional[str] = "web"  # 'web', 'android', 'ios'
+    user_agent: Optional[str] = ""
+    platform: Optional[str] = ""
+    browser: Optional[str] = ""
+
+
+class TrustDeviceRequest(BaseModel):
+    user_id: str
+    user_type: str  # 'client', 'merchant', 'admin'
+    device_info: DeviceInfo
+
+
+class VerifyTrustedDeviceRequest(BaseModel):
+    user_id: str
+    user_type: str
+    device_token: str
+    device_info: Optional[DeviceInfo] = None
+
+
+class RevokeDeviceRequest(BaseModel):
+    device_created_at: str  # ISO format datetime
+
+
+# Extended login requests with device trust support
+class ClientLoginWithDeviceRequest(BaseModel):
+    phone: str
+    password: str
+    device_token: Optional[str] = None  # If provided, skip OTP if device is trusted
+    remember_device: Optional[bool] = False  # If true, trust this device after login
+    device_info: Optional[DeviceInfo] = None
+
+
+class MerchantLoginWithDeviceRequest(BaseModel):
+    phone: str
+    password: str
+    device_token: Optional[str] = None
+    remember_device: Optional[bool] = False
+    device_info: Optional[DeviceInfo] = None
+
+
+class AdminLoginWithDeviceRequest(BaseModel):
+    email: str
+    password: str
+    device_token: Optional[str] = None
+    remember_device: Optional[bool] = False
+    device_info: Optional[DeviceInfo] = None
+
+
 
 # ============== HELPER FUNCTIONS ==============
 
@@ -1166,4 +1218,311 @@ async def reset_admin_password(request: Request, reset_request: AdminResetPasswo
     return {
         "success": True,
         "message": "Password reset successful. You can now login with your new password."
+    }
+
+
+
+# ============== TRUSTED DEVICE ENDPOINTS ==============
+
+@router.post("/client/login/v2")
+@limiter.limit("5/minute")
+async def login_client_v2(request: Request, login_request: ClientLoginWithDeviceRequest):
+    """
+    Enhanced client login with trusted device support.
+    - If device_token is provided and valid, login proceeds without 2FA
+    - If remember_device is true, returns a device_token to store
+    """
+    from services.device_trust_service import get_device_trust_service
+    
+    phone = normalize_phone(login_request.phone)
+    
+    client_doc = await db.clients.find_one({"phone": phone})
+    if not client_doc:
+        raise HTTPException(status_code=401, detail="Invalid phone number or password")
+    
+    if not verify_password(login_request.password, client_doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid phone number or password")
+    
+    if client_doc.get("status") == ClientStatus.SUSPENDED.value:
+        raise HTTPException(status_code=403, detail="Account suspended")
+    
+    if client_doc.get("status") == ClientStatus.DELETED.value:
+        raise HTTPException(status_code=403, detail="Account deleted")
+    
+    device_service = get_device_trust_service(db)
+    device_is_trusted = False
+    
+    # Check if device is trusted (skip 2FA if so)
+    if login_request.device_token:
+        device_info = login_request.device_info.model_dump() if login_request.device_info else {}
+        device_info["ip_address"] = request.client.host if request.client else ""
+        device_is_trusted = await device_service.verify_trusted_device(
+            client_doc["id"], "client", login_request.device_token, device_info
+        )
+        if device_is_trusted:
+            logger.info(f"Client {client_doc['id']} logged in from trusted device")
+    
+    # Check if 2FA is enabled and device is NOT trusted
+    if client_doc.get("two_factor_enabled") and not device_is_trusted:
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "user_id": client_doc["id"],
+            "user_type": "client",
+            "message": "Please enter your 2FA code"
+        }
+    
+    # Update last login
+    await db.clients.update_one(
+        {"id": client_doc["id"]},
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Create token
+    token = create_token(client_doc["id"], "client")
+    
+    # Register trusted device if requested
+    new_device_token = None
+    if login_request.remember_device and login_request.device_info:
+        device_info = login_request.device_info.model_dump()
+        device_info["ip_address"] = request.client.host if request.client else ""
+        new_device_token = await device_service.register_trusted_device(
+            client_doc["id"], "client", device_info
+        )
+    
+    # Remove sensitive data
+    del client_doc["password_hash"]
+    del client_doc["_id"]
+    
+    response = {
+        "success": True,
+        "access_token": token,
+        "token_type": "bearer",
+        "client": client_doc,
+        "device_trusted": device_is_trusted
+    }
+    
+    if new_device_token:
+        response["device_token"] = new_device_token
+        response["message"] = "Device registered as trusted"
+    
+    return response
+
+
+@router.post("/merchant/login/v2")
+@limiter.limit("5/minute")
+async def login_merchant_v2(request: Request, login_request: MerchantLoginWithDeviceRequest):
+    """Enhanced merchant login with trusted device support"""
+    from services.device_trust_service import get_device_trust_service
+    
+    phone = normalize_phone(login_request.phone)
+    
+    merchant_doc = await db.merchants.find_one({"phone": phone})
+    if not merchant_doc:
+        raise HTTPException(status_code=401, detail="Invalid phone number or password")
+    
+    if not verify_password(login_request.password, merchant_doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid phone number or password")
+    
+    if merchant_doc.get("status") == MerchantStatus.SUSPENDED.value:
+        raise HTTPException(status_code=403, detail="Account suspended")
+    
+    if merchant_doc.get("status") == MerchantStatus.DELETED.value:
+        raise HTTPException(status_code=403, detail="Account deleted")
+    
+    device_service = get_device_trust_service(db)
+    device_is_trusted = False
+    
+    if login_request.device_token:
+        device_info = login_request.device_info.model_dump() if login_request.device_info else {}
+        device_info["ip_address"] = request.client.host if request.client else ""
+        device_is_trusted = await device_service.verify_trusted_device(
+            merchant_doc["id"], "merchant", login_request.device_token, device_info
+        )
+    
+    if merchant_doc.get("two_factor_enabled") and not device_is_trusted:
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "user_id": merchant_doc["id"],
+            "user_type": "merchant",
+            "message": "Please enter your 2FA code"
+        }
+    
+    await db.merchants.update_one(
+        {"id": merchant_doc["id"]},
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    token = create_token(merchant_doc["id"], "merchant")
+    
+    new_device_token = None
+    if login_request.remember_device and login_request.device_info:
+        device_info = login_request.device_info.model_dump()
+        device_info["ip_address"] = request.client.host if request.client else ""
+        new_device_token = await device_service.register_trusted_device(
+            merchant_doc["id"], "merchant", device_info
+        )
+    
+    del merchant_doc["password_hash"]
+    del merchant_doc["_id"]
+    
+    response = {
+        "success": True,
+        "access_token": token,
+        "token_type": "bearer",
+        "merchant": merchant_doc,
+        "device_trusted": device_is_trusted
+    }
+    
+    if new_device_token:
+        response["device_token"] = new_device_token
+        response["message"] = "Device registered as trusted"
+    
+    return response
+
+
+@router.post("/admin/login/v2")
+@limiter.limit("3/minute")
+async def login_admin_v2(request: Request, login_request: AdminLoginWithDeviceRequest):
+    """Enhanced admin login with trusted device support"""
+    from services.device_trust_service import get_device_trust_service
+    
+    admin_doc = await db.admins.find_one({"email": login_request.email.lower()})
+    if not admin_doc:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    if not verify_password(login_request.password, admin_doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    if not admin_doc.get("is_active"):
+        raise HTTPException(status_code=403, detail="Account disabled")
+    
+    device_service = get_device_trust_service(db)
+    device_is_trusted = False
+    
+    if login_request.device_token:
+        device_info = login_request.device_info.model_dump() if login_request.device_info else {}
+        device_info["ip_address"] = request.client.host if request.client else ""
+        device_is_trusted = await device_service.verify_trusted_device(
+            admin_doc["id"], "admin", login_request.device_token, device_info
+        )
+    
+    if admin_doc.get("two_factor_enabled") and not device_is_trusted:
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "user_id": admin_doc["id"],
+            "user_type": "admin",
+            "message": "Please enter your 2FA code"
+        }
+    
+    await db.admins.update_one(
+        {"id": admin_doc["id"]},
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    token = create_token(admin_doc["id"], "admin")
+    
+    new_device_token = None
+    if login_request.remember_device and login_request.device_info:
+        device_info = login_request.device_info.model_dump()
+        device_info["ip_address"] = request.client.host if request.client else ""
+        new_device_token = await device_service.register_trusted_device(
+            admin_doc["id"], "admin", device_info
+        )
+    
+    response = {
+        "success": True,
+        "access_token": token,
+        "token_type": "bearer",
+        "admin": {
+            "id": admin_doc["id"],
+            "email": admin_doc["email"],
+            "name": admin_doc.get("name"),
+            "is_super_admin": admin_doc.get("is_super_admin", False)
+        },
+        "device_trusted": device_is_trusted
+    }
+    
+    if new_device_token:
+        response["device_token"] = new_device_token
+        response["message"] = "Device registered as trusted"
+    
+    return response
+
+
+# ============== DEVICE MANAGEMENT ENDPOINTS ==============
+
+@router.get("/devices/list")
+async def list_trusted_devices(authorization: str = Header(...)):
+    """List all trusted devices for the authenticated user"""
+    from services.device_trust_service import get_device_trust_service
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    
+    user_id = payload.get("sub")
+    user_type = payload.get("type")
+    
+    device_service = get_device_trust_service(db)
+    devices = await device_service.get_user_devices(user_id, user_type)
+    
+    return {
+        "success": True,
+        "devices": devices,
+        "count": len(devices)
+    }
+
+
+@router.post("/devices/revoke")
+async def revoke_trusted_device(
+    revoke_request: RevokeDeviceRequest,
+    authorization: str = Header(...)
+):
+    """Revoke a specific trusted device"""
+    from services.device_trust_service import get_device_trust_service
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    
+    user_id = payload.get("sub")
+    user_type = payload.get("type")
+    
+    device_service = get_device_trust_service(db)
+    success = await device_service.revoke_device(user_id, user_type, revoke_request.device_created_at)
+    
+    if success:
+        return {"success": True, "message": "Device removed from trusted devices"}
+    else:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+
+@router.post("/devices/revoke-all")
+async def revoke_all_trusted_devices(authorization: str = Header(...)):
+    """Revoke all trusted devices for the authenticated user"""
+    from services.device_trust_service import get_device_trust_service
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    
+    user_id = payload.get("sub")
+    user_type = payload.get("type")
+    
+    device_service = get_device_trust_service(db)
+    count = await device_service.revoke_all_devices(user_id, user_type)
+    
+    return {
+        "success": True,
+        "message": f"Removed {count} trusted device(s)",
+        "revoked_count": count
     }
