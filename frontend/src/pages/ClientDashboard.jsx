@@ -11,6 +11,7 @@ import WithdrawalModal from '../components/client/WithdrawalModal';
 import PaymentSettingsModal from '../components/client/PaymentSettingsModal';
 import AIAssistant from '../components/client/AIAssistant';
 import AIWidget from '../components/client/AIWidget';
+import NotificationSettings from '../components/client/NotificationSettings';
 import { QRCodeSVG } from 'qrcode.react';
 import ServicesPage from './ServicesPage';
 import { 
@@ -52,7 +53,8 @@ import {
   ExternalLink,
   Navigation,
   Search,
-  Brain
+  Brain,
+  Bell
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -134,6 +136,9 @@ export default function ClientDashboard() {
   
   // Services page
   const [showServices, setShowServices] = useState(false);
+  
+  // Notification settings
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -1049,6 +1054,13 @@ export default function ClientDashboard() {
             <span className="font-bold text-white">SDM</span>
           </div>
           <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowNotificationSettings(true)} 
+              className="text-slate-400 hover:text-amber-400"
+              data-testid="notifications-btn"
+            >
+              <Bell size={20} />
+            </button>
             <button 
               onClick={() => navigate('/client/profile')} 
               className="text-slate-400 hover:text-white"
@@ -2008,6 +2020,26 @@ export default function ClientDashboard() {
           onClose={() => setShowPaymentSettings(false)}
           onSave={savePaymentSettings}
         />
+      )}
+      
+      {/* Notification Settings Modal */}
+      {showNotificationSettings && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowNotificationSettings(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white z-10"
+            >
+              <X size={24} />
+            </button>
+            <div className="p-4">
+              <NotificationSettings
+                clientToken={token}
+                language={client?.language || 'en'}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
