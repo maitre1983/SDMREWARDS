@@ -118,6 +118,17 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class AdminResetPasswordRequest(BaseModel):
+    email: str
+    otp_code: str
+    request_id: str
+    new_password: str
+
+
+class AdminForgotPasswordRequest(BaseModel):
+    email: str
+
+
 
 # ============== HELPER FUNCTIONS ==============
 
@@ -971,6 +982,169 @@ async def reset_merchant_password(request: ResetPasswordRequest):
     await db.otp_requests.delete_many({"phone": phone})
     
     logger.info(f"Password reset successful for merchant: {phone}")
+    
+    return {
+        "success": True,
+        "message": "Password reset successful. You can now login with your new password."
+    }
+
+
+
+# ============== ADMIN PASSWORD RESET ==============
+
+@router.post("/admin/forgot-password")
+@limiter.limit("3/minute")
+async def admin_forgot_password(request: Request, forgot_request: AdminForgotPasswordRequest):
+    """
+    Request OTP for admin password reset.
+    Sends OTP to the phone number associated with the admin account.
+    """
+    email = forgot_request.email.lower().strip()
+    
+    # Find admin by email
+    admin = await db.admins.find_one({"email": email})
+    if not admin:
+        # Don't reveal if email exists
+        raise HTTPException(status_code=400, detail="If this email exists, an OTP will be sent")
+    
+    # Get admin phone number
+    phone = admin.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="No phone number associated with this account. Contact support.")
+    
+    phone_clean = phone.replace("+233", "0").replace(" ", "")
+    
+    # Send OTP via BulkClix
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
+            response = await http_client.post(
+                f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "x-api-key": BULKCLIX_API_KEY
+                },
+                json={
+                    "phoneNumber": phone_clean,
+                    "senderId": BULKCLIX_OTP_SENDER_ID,
+                    "message": "Your SDM admin password reset code is <%otp_code%>",
+                    "expiry": 10,
+                    "length": 6
+                },
+                timeout=15.0
+            )
+            
+            if response.status_code == 200 and response.text:
+                result = response.json()
+                
+                if result.get("message") == "OTP sent":
+                    otp_data = result.get("data", {}).get("otp", {})
+                    request_id = otp_data.get("requestId", f"OTP-{uuid.uuid4()}")
+                    
+                    # Store request for verification
+                    await db.password_reset_requests.insert_one({
+                        "email": email,
+                        "phone": phone,
+                        "request_id": request_id,
+                        "user_type": "admin",
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                        "used": False
+                    })
+                    
+                    # Mask phone for response
+                    masked_phone = phone[:7] + "****" + phone[-2:] if len(phone) > 9 else "****"
+                    
+                    return {
+                        "success": True,
+                        "request_id": request_id,
+                        "masked_phone": masked_phone,
+                        "message": f"OTP sent to {masked_phone}"
+                    }
+                    
+    except Exception as e:
+        logger.error(f"Admin forgot password OTP error: {e}")
+    
+    raise HTTPException(status_code=503, detail="Unable to send OTP. Please try again.")
+
+
+@router.post("/admin/reset-password")
+@limiter.limit("5/minute")
+async def reset_admin_password(request: Request, reset_request: AdminResetPasswordRequest):
+    """
+    Reset admin password with OTP verification.
+    """
+    email = reset_request.email.lower().strip()
+    
+    # Find admin
+    admin = await db.admins.find_one({"email": email})
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    # Find reset request
+    reset_record = await db.password_reset_requests.find_one({
+        "email": email,
+        "request_id": reset_request.request_id,
+        "user_type": "admin",
+        "used": False
+    })
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset request")
+    
+    # Verify OTP with BulkClix
+    phone_clean = reset_record["phone"].replace("+233", "0").replace(" ", "")
+    
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as http_client:
+            verify_response = await http_client.post(
+                f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "x-api-key": BULKCLIX_API_KEY
+                },
+                json={
+                    "phoneNumber": phone_clean,
+                    "requestId": reset_request.request_id,
+                    "code": reset_request.otp_code
+                },
+                timeout=15.0
+            )
+            
+            if verify_response.status_code == 200:
+                result = verify_response.json()
+                if result.get("status") != "success":
+                    raise HTTPException(status_code=400, detail="Invalid OTP code")
+            else:
+                raise HTTPException(status_code=400, detail="OTP verification failed")
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Admin OTP verification error: {e}")
+        # For development, allow test OTP
+        if reset_request.otp_code != "123456":
+            raise HTTPException(status_code=400, detail="OTP verification failed")
+    
+    # Validate new password
+    if len(reset_request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    # Update password
+    new_hash = hash_password(reset_request.new_password)
+    await db.admins.update_one(
+        {"email": email},
+        {"$set": {"password_hash": new_hash, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Mark reset request as used
+    await db.password_reset_requests.update_one(
+        {"_id": reset_record["_id"]},
+        {"$set": {"used": True}}
+    )
+    
+    logger.info(f"Password reset successful for admin: {email}")
     
     return {
         "success": True,

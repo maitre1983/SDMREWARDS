@@ -19,8 +19,10 @@ import {
   Shield,
   TrendingUp,
   Users,
-  CheckCircle
+  CheckCircle,
+  KeyRound
 } from 'lucide-react';
+import ForgotPassword from '../components/ForgotPassword';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
@@ -30,7 +32,7 @@ const MERCHANT_HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/2b0
 export default function MerchantAuthPage() {
   const navigate = useNavigate();
   
-  // Mode: 'login', 'register', 'otp'
+  // Mode: 'login', 'register', 'otp', 'forgot'
   const [mode, setMode] = useState('login');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -355,8 +357,28 @@ export default function MerchantAuthPage() {
                       Register business
                     </button>
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setMode('forgot')}
+                    className="text-slate-500 hover:text-emerald-400 text-sm mt-3 flex items-center justify-center gap-1 mx-auto transition-colors"
+                  >
+                    <KeyRound size={14} />
+                    Forgot password?
+                  </button>
                 </div>
               </form>
+            )}
+
+            {/* Forgot Password */}
+            {mode === 'forgot' && (
+              <ForgotPassword
+                userType="merchant"
+                onBack={() => setMode('login')}
+                onSuccess={() => {
+                  setMode('login');
+                  toast.success('Password reset! Please login with your new password.');
+                }}
+              />
             )}
 
             {/* OTP Verification */}

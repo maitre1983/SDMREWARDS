@@ -74,6 +74,9 @@ import {
   SetPinModal
 } from '../components/admin/modals';
 
+// Shared Components
+import ForgotPassword from '../components/ForgotPassword';
+
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
@@ -92,6 +95,7 @@ export default function AdminDashboard() {
   const passwordRef = useRef();
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   
   // Data states
   const [stats, setStats] = useState(null);
@@ -1289,6 +1293,22 @@ export default function AdminDashboard() {
     m.owner_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Admin Forgot Password Screen  
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <ForgotPassword 
+          userType="admin"
+          onBack={() => setShowForgotPassword(false)}
+          onSuccess={() => {
+            setShowForgotPassword(false);
+            toast.success('Password reset! Please login with your new password.');
+          }}
+        />
+      </div>
+    );
+  }
+
   // Login Screen
   if (showLogin) {
     return (
@@ -1345,6 +1365,14 @@ export default function AdminDashboard() {
               >
                 {loginLoading ? <Loader2 className="animate-spin" /> : 'Sign In'}
               </Button>
+              
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="w-full mt-3 text-slate-400 hover:text-amber-400 text-sm transition-colors"
+              >
+                Forgot password?
+              </button>
             </form>
           </div>
         </div>
