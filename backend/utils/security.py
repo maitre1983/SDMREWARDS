@@ -144,16 +144,26 @@ def get_cors_origins() -> list:
     Returns:
         List of allowed origin strings
     """
+    # Always include these production domains
+    default_origins = [
+        "https://sdmrewards.com",
+        "https://www.sdmrewards.com",
+        "https://web-boost-seo.preview.emergentagent.com",
+        "https://web-boost-seo.emergent.host",
+        "http://localhost:3000",
+    ]
+    
     origins_str = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     
-    if not origins_str:
-        # Default to production URL only
-        return ["https://web-boost-seo.preview.emergentagent.com"]
+    if origins_str:
+        # Add any additional origins from environment
+        env_origins = [origin.strip() for origin in origins_str.split(",") if origin.strip()]
+        # Combine and deduplicate
+        all_origins = list(set(default_origins + env_origins))
+    else:
+        all_origins = default_origins
     
-    # Split and clean origins
-    origins = [origin.strip() for origin in origins_str.split(",") if origin.strip()]
-    
-    return origins
+    return all_origins
 
 
 # ============== RATE LIMITING HELPERS ==============
