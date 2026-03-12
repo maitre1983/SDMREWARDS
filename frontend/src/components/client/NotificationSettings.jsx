@@ -21,7 +21,8 @@ import {
   History
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function NotificationSettings({ clientToken, language = 'en' }) {
   const [isLoading, setIsLoading] = useState(true);

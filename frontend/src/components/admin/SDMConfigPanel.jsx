@@ -9,7 +9,8 @@ import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function SDMConfigPanel({ token }) {
   const [config, setConfig] = useState(null);

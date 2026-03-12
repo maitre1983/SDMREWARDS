@@ -6,7 +6,8 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { CreditCard, Medal, Award, Crown, Save, Loader2 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function SettingsCards({ token, platformConfig, onConfigUpdate }) {
   const [isLoading, setIsLoading] = useState(false);

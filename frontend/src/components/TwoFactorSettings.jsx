@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Shield, ShieldCheck, ShieldOff, Copy, Check, Loader2, Key, AlertTriangle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function TwoFactorSettings({ userType = 'client', token }) {
   const [status, setStatus] = useState(null);

@@ -26,8 +26,8 @@ import {
 } from 'lucide-react';
 import ForgotPassword from '../components/ForgotPassword';
 import { getDeviceInfo, getDeviceToken, storeDeviceToken, hasDeviceToken } from '../utils/deviceTrust';
+import { API_URL } from '@/config/api';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 const MERCHANT_AUTH_BG = "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/d2e4f27e2dd3b2de36587426228761cdbb5a04ac05cfdc00de630a55fb37f563.png";
 const MERCHANT_HERO_IMG = "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/c834226229fbb437ca2fce6db6411ff2a5e0e20058d7d43e564336da8fbe55f6.png";

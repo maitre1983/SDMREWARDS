@@ -7,7 +7,8 @@ import { Label } from '../../ui/label';
 import { Sliders, Save, Loader2, Percent, DollarSign } from 'lucide-react';
 import ServiceFeesAnalytics from '../ServiceFeesAnalytics';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function SettingsServices({ token, platformConfig, onConfigUpdate }) {
   const [isLoading, setIsLoading] = useState(false);

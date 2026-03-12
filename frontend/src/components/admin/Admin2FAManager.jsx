@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, ShieldOff, Search, Loader2, AlertTriangle, User, Store, UserCog } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function Admin2FAManager({ token }) {
   const [users, setUsers] = useState([]);

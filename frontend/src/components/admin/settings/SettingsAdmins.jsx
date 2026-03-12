@@ -8,7 +8,8 @@ import {
   Users, UserPlus, Trash2, Shield, Loader2, X, CheckCircle, Crown
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function SettingsAdmins({ token, currentAdmin }) {
   const [allAdmins, setAllAdmins] = useState([]);

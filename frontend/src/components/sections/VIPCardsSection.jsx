@@ -6,7 +6,8 @@ import { Button } from '../ui/button';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 // Tier icons and colors
 const tierConfig = {

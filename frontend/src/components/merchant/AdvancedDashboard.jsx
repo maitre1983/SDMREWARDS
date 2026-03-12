@@ -10,7 +10,8 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, Banknote, CreditCard
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function AdvancedDashboard({ token, basicStats, merchant }) {
   const [period, setPeriod] = useState('day');

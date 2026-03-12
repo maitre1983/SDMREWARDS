@@ -4,7 +4,8 @@ import { Users, UserPlus, DollarSign, Clock, CheckCircle, Search, Filter, ArrowR
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function ReferralHistoryPanel({ token }) {
   const [referralData, setReferralData] = useState(null);

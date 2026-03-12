@@ -20,7 +20,8 @@ import SettingsSecurity from './settings/SettingsSecurity';
 import SettingsAdmins from './settings/SettingsAdmins';
 import SettingsGamification from './settings/SettingsGamification';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function AdminSettings({ token, admin, pinVerified, setPinVerified, setShowPinModal }) {
   const [settingsTab, setSettingsTab] = useState('cards');

@@ -4,8 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
-
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+import { API_URL } from '@/config/api';
 
 export default function ForgotPassword({ userType = 'client', onBack, onSuccess }) {
   const [step, setStep] = useState(1); // 1: Enter phone/email, 2: Enter OTP, 3: New password

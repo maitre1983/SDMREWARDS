@@ -23,7 +23,8 @@ import {
   X
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function ReferralShare({ clientToken, language = 'en', onClose }) {
   const [isLoading, setIsLoading] = useState(true);

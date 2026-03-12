@@ -8,7 +8,8 @@ import { Input } from '../ui/input';
 import { toast } from 'sonner';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 const ROLE_LABELS = {
   super_admin: { label: 'Super Admin', color: 'bg-purple-100 text-purple-700', icon: Crown },

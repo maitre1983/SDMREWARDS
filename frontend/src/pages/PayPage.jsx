@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { Loader2, Store, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
 export default function PayPage() {

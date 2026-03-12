@@ -10,7 +10,8 @@ import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function MessagesPanel({ token }) {
   const [activeSubTab, setActiveSubTab] = useState('inbox');

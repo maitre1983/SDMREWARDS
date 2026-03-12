@@ -10,7 +10,8 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 const ONESIGNAL_APP_ID = process.env.REACT_APP_ONESIGNAL_APP_ID;
 
 export default function PushNotificationManager({ token, userType = 'user' }) {

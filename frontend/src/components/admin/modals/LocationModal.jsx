@@ -6,7 +6,8 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { XCircle, MapPin, Loader2, Link2 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function LocationModal({ 
   isOpen, 

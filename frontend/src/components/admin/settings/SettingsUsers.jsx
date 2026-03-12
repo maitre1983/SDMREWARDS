@@ -8,7 +8,8 @@ import {
   UserPlus, Users, Store, Loader2, X, CheckCircle
 } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL;
+// API URL imported from config
+import { API_URL } from '@/config/api';
 
 export default function SettingsUsers({ token }) {
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
