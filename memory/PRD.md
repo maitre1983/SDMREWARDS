@@ -26,6 +26,33 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Completed Features (Updated 2026-03-12)
 
+### ✅ NEW: Real-time Push Notifications for Gamification - IMPLEMENTED 2026-03-12
+**Users receive instant push notifications when:**
+
+1. **Mission Completed** - "Mission Complete! You earned {xp} XP and GHS {cashback}!"
+2. **Level Up** - "Level Up! Congratulations! You're now {level_name} with +{bonus}% cashback bonus!"
+3. **Badge Earned** - "New Badge Earned! You earned the '{badge_name}' badge! +{xp} XP"
+4. **Streak Milestone** - "{days} day streak! You're on fire!" (at 3, 7, 14, 30, 60, 100 days)
+5. **XP Milestone** - "You've reached {xp} XP!" (at 500, 1000, 2500, 5000, 10000 XP)
+
+**Technical Implementation:**
+- New service: `/app/backend/services/gamification_notification_service.py`
+- Modified `gamification_service.py` to trigger notifications on events
+- New API endpoints:
+  - `GET /api/notifications/gamification/unread` - Get unread notifications
+  - `POST /api/notifications/gamification/mark-read` - Mark as read
+- Notifications stored in `notification_history` collection for history
+- Supports multiple languages (EN/FR)
+
+**Push Integration:** OneSignal (requires player_id linked to user account)
+
+### ✅ Code Refactoring - IMPLEMENTED 2026-03-12
+**Created modular components for AdminDashboard:**
+- `/app/frontend/src/components/admin/modals/ClientDetailsModal.jsx`
+- `/app/frontend/src/components/admin/modals/MerchantDetailsModal.jsx`
+- `/app/frontend/src/components/admin/modals/SendSMSModal.jsx`
+- `/app/frontend/src/components/admin/modals/index.js` (barrel export)
+
 ### ✅ NEW: Mobile App AI/Gamification/Referral Features - IMPLEMENTED 2026-03-12
 **All new AI features are now available on the mobile app:**
 

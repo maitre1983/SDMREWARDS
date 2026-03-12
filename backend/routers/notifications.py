@@ -179,3 +179,44 @@ async def admin_process_inactive_notifications(
     """
     result = await notification_service.process_inactive_user_notifications(days_threshold)
     return {"success": True, **result}
+
+
+
+# ============== GAMIFICATION NOTIFICATIONS ==============
+
+@router.get("/gamification/unread")
+async def get_unread_gamification_notifications(
+    current_client: dict = Depends(get_current_client),
+    limit: int = 20
+):
+    """Get unread gamification notifications for a client"""
+    from services.gamification_notification_service import GamificationNotificationService
+    
+    gam_notif_service = GamificationNotificationService(db)
+    notifications = await gam_notif_service.get_unread_notifications(
+        current_client["id"],
+        limit
+    )
+    
+    return {
+        "success": True,
+        "notifications": notifications,
+        "count": len(notifications)
+    }
+
+
+@router.post("/gamification/mark-read")
+async def mark_gamification_notifications_read(
+    current_client: dict = Depends(get_current_client),
+    notification_ids: List[str] = None
+):
+    """Mark gamification notifications as read"""
+    from services.gamification_notification_service import GamificationNotificationService
+    
+    gam_notif_service = GamificationNotificationService(db)
+    await gam_notif_service.mark_notifications_read(
+        current_client["id"],
+        notification_ids
+    )
+    
+    return {"success": True, "message": "Notifications marked as read"}

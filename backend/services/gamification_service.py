@@ -371,6 +371,9 @@ class GamificationService:
     
     async def add_xp(self, client_id: str, amount: int, reason: str) -> Dict:
         """Add XP to a client and check for level up"""
+        from services.gamification_notification_service import GamificationNotificationService
+        notif_service = GamificationNotificationService(self.db)
+        
         # Get current data
         gam_data = await self.db.gamification.find_one({"client_id": client_id})
         current_xp = gam_data.get("xp", 0) if gam_data else 0
@@ -395,8 +398,27 @@ class GamificationService:
             upsert=True
         )
         
-        # Check for level up
+        # Check for level up and send notification
         leveled_up = new_level_info["level"] > current_level
+        if leveled_up:
+            try:
+                await notif_service.notify_level_up(
+                    client_id=client_id,
+                    new_level=new_level_info["level"],
+                    level_name=new_level_info["name"],
+                    cashback_bonus=new_level_info["cashback_bonus"]
+                )
+            except Exception as e:
+                logger.error(f"Failed to send level up notification: {e}")
+        
+        # Check for XP milestones
+        xp_milestones = [500, 1000, 2500, 5000, 10000]
+        for milestone in xp_milestones:
+            if current_xp < milestone <= new_xp:
+                try:
+                    await notif_service.notify_xp_milestone(client_id, milestone)
+                except Exception as e:
+                    logger.error(f"Failed to send XP milestone notification: {e}")
         
         return {
             "success": True,
@@ -411,6 +433,9 @@ class GamificationService:
     
     async def award_badge(self, client_id: str, badge_id: str) -> Dict:
         """Award a badge to a client"""
+        from services.gamification_notification_service import GamificationNotificationService
+        notif_service = GamificationNotificationService(self.db)
+        
         if badge_id not in BADGES:
             return {"success": False, "error": "Invalid badge"}
         
@@ -437,6 +462,17 @@ class GamificationService:
             },
             upsert=True
         )
+        
+        # Send notification
+        try:
+            await notif_service.notify_badge_earned(
+                client_id=client_id,
+                badge_id=badge_id,
+                badge_name=badge["name"],
+                xp_reward=badge["xp_reward"]
+            )
+        except Exception as e:
+            logger.error(f"Failed to send badge notification: {e}")
         
         return {
             "success": True,
@@ -588,6 +624,9 @@ class GamificationService:
         increment: float = 1
     ) -> List[Dict]:
         """Update progress for missions of a specific type"""
+        from services.gamification_notification_service import GamificationNotificationService
+        notif_service = GamificationNotificationService(self.db)
+        
         completed_missions = []
         
         # Find active missions of this type
@@ -618,10 +657,11 @@ class GamificationService:
                 # Award rewards
                 await self.add_xp(client_id, mission["xp_reward"], f"Mission: {mission['name']}")
                 
-                if mission.get("cashback_reward", 0) > 0:
+                cashback_reward = mission.get("cashback_reward", 0)
+                if cashback_reward > 0:
                     await self.db.clients.update_one(
                         {"id": client_id},
-                        {"$inc": {"cashback_balance": mission["cashback_reward"]}}
+                        {"$inc": {"cashback_balance": cashback_reward}}
                     )
                 
                 # Update missions completed count
@@ -631,10 +671,21 @@ class GamificationService:
                     upsert=True
                 )
                 
+                # Send notification for mission completion
+                try:
+                    await notif_service.notify_mission_completed(
+                        client_id=client_id,
+                        mission_name=mission["name"],
+                        xp_earned=mission["xp_reward"],
+                        cashback_earned=cashback_reward
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send mission notification: {e}")
+                
                 completed_missions.append({
                     "mission": mission,
                     "xp_earned": mission["xp_reward"],
-                    "cashback_earned": mission.get("cashback_reward", 0)
+                    "cashback_earned": cashback_reward
                 })
             else:
                 # Update progress
