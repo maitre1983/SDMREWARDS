@@ -348,8 +348,14 @@ export default function WelcomeScreen({ navigation }) {
       >
         {/* I'm a Customer - Primary Orange Button */}
         <TouchableOpacity
-          onPress={() => handleNavigate('client')}
-          onClick={() => { window.location.href = 'https://web-boost-seo.preview.emergentagent.com/client'; }}
+          onPress={() => {
+            // For web: use direct navigation
+            if (typeof window !== 'undefined' && window.location) {
+              window.location.href = '/client';
+            } else {
+              navigation.navigate('Login', { userType: 'client' });
+            }
+          }}
           style={styles.customerButton}
           activeOpacity={0.8}
         >
@@ -367,8 +373,14 @@ export default function WelcomeScreen({ navigation }) {
 
         {/* I'm a Merchant - Secondary Green Button */}
         <TouchableOpacity
-          onPress={() => handleNavigate('merchant')}
-          onClick={() => { window.location.href = 'https://web-boost-seo.preview.emergentagent.com/merchant'; }}
+          onPress={() => {
+            // For web: use direct navigation
+            if (typeof window !== 'undefined' && window.location) {
+              window.location.href = '/merchant';
+            } else {
+              navigation.navigate('Login', { userType: 'merchant' });
+            }
+          }}
           style={styles.merchantButton}
           activeOpacity={0.8}
         >
@@ -507,9 +519,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   buttonsContainer: {
-    marginTop: verticalScale(20),
+    marginTop: verticalScale(40),
     gap: verticalScale(12),
     paddingBottom: verticalScale(8),
+    paddingHorizontal: moderateScale(4),
   },
   customerButton: {
     borderRadius: moderateScale(16),
