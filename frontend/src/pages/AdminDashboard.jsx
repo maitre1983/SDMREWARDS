@@ -62,6 +62,17 @@ import AdminMerchants from '../components/admin/AdminMerchants';
 import SEODashboard from '../components/admin/SEODashboard';
 import AdminSettings from '../components/admin/AdminSettings';
 
+// Modals
+import {
+  LimitsModal,
+  LocationModal,
+  ResetPasswordModal,
+  CreateClientModal,
+  CreateMerchantModal,
+  PinModal,
+  SetPinModal
+} from '../components/admin/modals';
+
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
@@ -2019,353 +2030,48 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* LIMITS MODAL */}
-      {showLimitsModal && selectedClient && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <Sliders className="text-blue-400" size={20} />
-              Manage Limits for {selectedClient.full_name}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300 mb-2 block">Withdrawal Limit (GHS)</Label>
-                <Input
-                  type="number"
-                  value={limitsForm.withdrawal_limit}
-                  onChange={(e) => setLimitsForm({...limitsForm, withdrawal_limit: parseFloat(e.target.value)})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Transaction Limit (GHS)</Label>
-                <Input
-                  type="number"
-                  value={limitsForm.transaction_limit}
-                  onChange={(e) => setLimitsForm({...limitsForm, transaction_limit: parseFloat(e.target.value)})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Daily Limit (GHS)</Label>
-                <Input
-                  type="number"
-                  value={limitsForm.daily_limit}
-                  onChange={(e) => setLimitsForm({...limitsForm, daily_limit: parseFloat(e.target.value)})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button onClick={() => setShowLimitsModal(false)} variant="outline" className="flex-1 border-slate-600">
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateLimits} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
-                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
-                Save Limits
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* LIMITS MODAL - Refactored to extracted component */}
+      <LimitsModal
+        isOpen={showLimitsModal}
+        onClose={() => setShowLimitsModal(false)}
+        client={selectedClient}
+        token={token}
+        onSuccess={() => { fetchDashboardData(); }}
+      />
 
-      {/* LOCATION MODAL */}
-      {showLocationModal && selectedMerchant && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <MapPin className="text-cyan-400" size={20} />
-              Edit Location for {selectedMerchant.business_name}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300 mb-2 block">City</Label>
-                <Input
-                  type="text"
-                  value={locationForm.city}
-                  onChange={(e) => setLocationForm({...locationForm, city: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="Accra, Kumasi, Takoradi..."
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Full Address</Label>
-                <textarea
-                  value={locationForm.address}
-                  onChange={(e) => setLocationForm({...locationForm, address: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white min-h-[80px]"
-                  placeholder="Spintex Road, Accra, Ghana"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Google Maps URL (optional)</Label>
-                <Input
-                  type="url"
-                  value={locationForm.google_maps_url}
-                  onChange={(e) => setLocationForm({...locationForm, google_maps_url: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="https://maps.google.com/..."
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button onClick={() => setShowLocationModal(false)} variant="outline" className="flex-1 border-slate-600">
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateLocation} className="flex-1 bg-cyan-600 hover:bg-cyan-700" disabled={actionLoading}>
-                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-2" />}
-                Save Location
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* LOCATION MODAL - Refactored to extracted component */}
+      <LocationModal
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        merchant={selectedMerchant}
+        token={token}
+        onSuccess={() => { fetchDashboardData(); }}
+      />
 
-      {/* RESET PASSWORD MODAL */}
-      {showResetPasswordModal && resetPasswordTarget && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <Key className="text-cyan-400" size={20} />
-              Reset Password
-            </h3>
-            <p className="text-slate-400 mb-4">
-              Reset password for{' '}
-              <span className="text-white font-medium">
-                {resetPasswordTarget.data.full_name || resetPasswordTarget.data.business_name}
-              </span>
-              {' '}({resetPasswordTarget.type})
-            </p>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300 mb-2 block">New Password *</Label>
-                <Input
-                  type="password"
-                  value={resetPasswordForm.new_password}
-                  onChange={(e) => setResetPasswordForm({...resetPasswordForm, new_password: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="Enter new password (min 6 characters)"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Confirm Password *</Label>
-                <Input
-                  type="password"
-                  value={resetPasswordForm.confirm_password}
-                  onChange={(e) => setResetPasswordForm({...resetPasswordForm, confirm_password: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="Confirm new password"
-                />
-              </div>
-              {resetPasswordForm.new_password && resetPasswordForm.confirm_password && (
-                <div className={`text-sm ${resetPasswordForm.new_password === resetPasswordForm.confirm_password ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {resetPasswordForm.new_password === resetPasswordForm.confirm_password 
-                    ? '✓ Passwords match' 
-                    : '✗ Passwords do not match'}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button
-                variant="outline"
-                onClick={() => { setShowResetPasswordModal(false); setResetPasswordTarget(null); }}
-                className="flex-1 border-slate-600 text-slate-300"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleResetPassword}
-                disabled={actionLoading || !resetPasswordForm.new_password || resetPasswordForm.new_password !== resetPasswordForm.confirm_password}
-                className="flex-1 bg-cyan-600 hover:bg-cyan-700"
-              >
-                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Key size={16} className="mr-2" />}
-                Reset Password
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* RESET PASSWORD MODAL - Refactored to extracted component */}
+      <ResetPasswordModal
+        isOpen={showResetPasswordModal}
+        onClose={() => { setShowResetPasswordModal(false); setResetPasswordTarget(null); }}
+        target={resetPasswordTarget}
+        token={token}
+        onSuccess={() => { fetchDashboardData(); }}
+      />
 
-      {/* CREATE CLIENT MODAL */}
-      {showCreateClientModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <UserPlus className="text-blue-400" size={20} />
-              Create New Client
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300 mb-2 block">Full Name *</Label>
-                <Input
-                  type="text"
-                  value={newClientForm.full_name}
-                  onChange={(e) => setNewClientForm({...newClientForm, full_name: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="John Doe"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Phone Number *</Label>
-                <Input
-                  type="tel"
-                  value={newClientForm.phone}
-                  onChange={(e) => setNewClientForm({...newClientForm, phone: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="0241234567"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Username *</Label>
-                <Input
-                  type="text"
-                  value={newClientForm.username}
-                  onChange={(e) => setNewClientForm({...newClientForm, username: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="johndoe"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Email (optional)</Label>
-                <Input
-                  type="email"
-                  value={newClientForm.email}
-                  onChange={(e) => setNewClientForm({...newClientForm, email: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="john@example.com"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Card Type (optional)</Label>
-                <select
-                  value={newClientForm.card_type}
-                  onChange={(e) => setNewClientForm({...newClientForm, card_type: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
-                >
-                  <option value="">No Card</option>
-                  <option value="silver">Silver</option>
-                  <option value="gold">Gold</option>
-                  <option value="platinum">Platinum</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button onClick={() => setShowCreateClientModal(false)} variant="outline" className="flex-1 border-slate-600">
-                Cancel
-              </Button>
-              <Button onClick={handleCreateClient} className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={actionLoading}>
-                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <UserPlus size={16} className="mr-2" />}
-                Create Client
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* CREATE CLIENT MODAL - Refactored to extracted component */}
+      <CreateClientModal
+        isOpen={showCreateClientModal}
+        onClose={() => setShowCreateClientModal(false)}
+        token={token}
+        onSuccess={() => { fetchDashboardData(); }}
+      />
 
-      {/* CREATE MERCHANT MODAL */}
-      {showCreateMerchantModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-6">
-            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-              <Store className="text-emerald-400" size={20} />
-              Create New Merchant
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-slate-300 mb-2 block">Business Name *</Label>
-                <Input
-                  type="text"
-                  value={newMerchantForm.business_name}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, business_name: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="ABC Store"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Owner Name *</Label>
-                <Input
-                  type="text"
-                  value={newMerchantForm.owner_name}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, owner_name: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="John Owner"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Phone Number *</Label>
-                <Input
-                  type="tel"
-                  value={newMerchantForm.phone}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, phone: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="0241234567"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Email (optional)</Label>
-                <Input
-                  type="email"
-                  value={newMerchantForm.email}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, email: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="business@example.com"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Cashback Rate (%)</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  max="20"
-                  value={newMerchantForm.cashback_rate}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, cashback_rate: parseFloat(e.target.value)})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">City (optional)</Label>
-                <Input
-                  type="text"
-                  value={newMerchantForm.city}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, city: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="Accra"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Business Address (optional)</Label>
-                <Input
-                  type="text"
-                  value={newMerchantForm.address}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, address: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="123 Main Street, Osu"
-                />
-              </div>
-              <div>
-                <Label className="text-slate-300 mb-2 block">Google Maps URL (optional)</Label>
-                <Input
-                  type="url"
-                  value={newMerchantForm.google_maps_url}
-                  onChange={(e) => setNewMerchantForm({...newMerchantForm, google_maps_url: e.target.value})}
-                  className="bg-slate-900 border-slate-700 text-white"
-                  placeholder="https://maps.google.com/..."
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <Button onClick={() => setShowCreateMerchantModal(false)} variant="outline" className="flex-1 border-slate-600">
-                Cancel
-              </Button>
-              <Button onClick={handleCreateMerchant} className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={actionLoading}>
-                {actionLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Store size={16} className="mr-2" />}
-                Create Merchant
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* CREATE MERCHANT MODAL - Refactored to extracted component */}
+      <CreateMerchantModal
+        isOpen={showCreateMerchantModal}
+        onClose={() => setShowCreateMerchantModal(false)}
+        token={token}
+        onSuccess={() => { fetchDashboardData(); }}
+      />
 
       {/* BULK SMS MODAL */}
       {showBulkSMSModal && (

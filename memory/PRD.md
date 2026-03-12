@@ -26,6 +26,45 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Completed Features (Updated 2026-03-12)
 
+### ✅ AdminDashboard.jsx Refactoring - COMPLETED 2026-03-12
+**Extracted modular components from the 2877-line monolith to 2571 lines:**
+
+1. **New Modal Components Created:**
+   - `LimitsModal.jsx` - Client withdrawal/transaction limits
+   - `LocationModal.jsx` - Merchant location editing
+   - `ResetPasswordModal.jsx` - Password reset for clients/merchants
+   - `CreateClientModal.jsx` - New client creation
+   - `CreateMerchantModal.jsx` - New merchant creation
+   - `PinModal.jsx` + `SetPinModal` - Admin PIN verification/change
+
+2. **Benefits:**
+   - ~300 lines removed from AdminDashboard.jsx
+   - Better code organization and reusability
+   - Easier maintenance and testing
+   - Cleaner imports via `modals/index.js`
+
+3. **Files Created:**
+   - `/app/frontend/src/components/admin/modals/LimitsModal.jsx`
+   - `/app/frontend/src/components/admin/modals/LocationModal.jsx`
+   - `/app/frontend/src/components/admin/modals/ResetPasswordModal.jsx`
+   - `/app/frontend/src/components/admin/modals/CreateClientModal.jsx`
+   - `/app/frontend/src/components/admin/modals/CreateMerchantModal.jsx`
+   - `/app/frontend/src/components/admin/modals/PinModal.jsx`
+   - `/app/frontend/src/context/AdminContext.jsx` - Shared state context
+
+### ✅ Admin Gamification Display - IMPLEMENTED 2026-03-12
+**Added Level and XP visibility in admin dashboard:**
+
+1. **Clients Menu:**
+   - New "Level" column showing SDM level (Starter/Builder/Pro/Elite/Ambassador)
+   - XP points displayed next to level badge
+   - Color-coded level indicators matching gamification theme
+   - Filter by level available in backend
+
+2. **Settings > Gamification > Statistics:**
+   - User count per level displayed
+   - Visual breakdown of SDM Starter, Builder, Pro, Elite, Ambassador
+
 ### ✅ NEW: Two-Factor Authentication (2FA) - IMPLEMENTED 2026-03-12
 **TOTP-based 2FA for enhanced account security:**
 
