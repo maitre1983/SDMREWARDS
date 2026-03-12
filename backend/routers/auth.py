@@ -998,19 +998,33 @@ async def admin_forgot_password(request: Request, forgot_request: AdminForgotPas
     """
     Request OTP for admin password reset.
     Sends OTP to the phone number associated with the admin account.
+    For security, always returns success even if email doesn't exist.
     """
     email = forgot_request.email.lower().strip()
     
     # Find admin by email
     admin = await db.admins.find_one({"email": email})
     if not admin:
-        # Don't reveal if email exists
-        raise HTTPException(status_code=400, detail="If this email exists, an OTP will be sent")
+        # Security: Don't reveal if email exists - return fake success
+        logger.info(f"Admin forgot password: email not found - {email}")
+        return {
+            "success": True,
+            "request_id": f"FAKE-{uuid.uuid4()}",
+            "masked_phone": "****",
+            "message": "If this email is registered, an OTP has been sent"
+        }
     
     # Get admin phone number
     phone = admin.get("phone")
     if not phone:
-        raise HTTPException(status_code=400, detail="No phone number associated with this account. Contact support.")
+        # Security: Don't reveal the real issue
+        logger.warning(f"Admin {email} has no phone number for password reset")
+        return {
+            "success": True,
+            "request_id": f"NOPHONE-{uuid.uuid4()}",
+            "masked_phone": "****",
+            "message": "If this email is registered, an OTP has been sent"
+        }
     
     phone_clean = phone.replace("+233", "0").replace(" ", "")
     

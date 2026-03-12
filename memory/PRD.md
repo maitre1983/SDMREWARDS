@@ -1,5 +1,12 @@
 # SDM REWARDS - Product Requirements Document
 
+## Changelog (Latest First)
+
+### 2026-03-12 - Bug Fix: Admin Forgot Password "Network Error"
+- **Issue**: Admin forgot password endpoint returned HTTP 400 for non-existent emails, causing "Network error" message
+- **Fix**: Modified `/app/backend/routers/auth.py` to return success (200) even for non-existent emails (security best practice)
+- **Status**: ✅ Verified working for all user types (client, merchant, admin)
+
 ## Overview
 SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP card purchases, QR payments, referral bonuses, AI-powered insights, gamification, and comprehensive admin/merchant dashboards.
 
