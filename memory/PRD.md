@@ -310,6 +310,77 @@ Intelligent notification system that sends proactive alerts to clients via multi
 
 ---
 
+## Auto Language Detection - Phase 1B - COMPLETED 2026-03-12
+
+### Overview
+Automatic language detection based on browser/phone settings with server-side persistence.
+
+### Features Implemented
+- [x] **Language Detection**
+  - From HTTP Accept-Language header
+  - From browser's navigator.languages array
+  - Priority: browser_languages > accept_language > default (en)
+
+- [x] **Supported Languages**
+  - English (en) - Default
+  - French (fr)
+
+- [x] **Language Persistence**
+  - Auto-detect on first visit
+  - Store preference in database
+  - Manual override via settings
+  - Sync across devices
+
+- [x] **React Integration**
+  - LanguageContext provider
+  - useLanguage hook
+  - LanguageSelector component
+  - Auto-sync after login
+
+- [x] **Translation System**
+  - Server-side translation dictionary
+  - Dynamic translation loading
+  - Common UI translations (dashboard, AI, notifications)
+
+### API Endpoints Created
+- `GET /api/language/supported` - Get supported languages
+- `GET /api/language/translations/{lang}` - Get UI translations
+- `POST /api/language/detect` - Detect language (public)
+- `GET /api/language/preference` - Get user's language
+- `PUT /api/language/preference` - Set user's language
+- `POST /api/language/auto-detect` - Auto-detect and save
+
+### Files Created
+- `/app/backend/services/language_service.py` - Language detection service
+- `/app/backend/routers/language.py` - Language API endpoints
+- `/app/frontend/src/contexts/LanguageContext.jsx` - React context & hook
+
+---
+
+## Scheduled Tasks (Cron Jobs) - COMPLETED 2026-03-12
+
+### Scripts Created
+- `/app/backend/scripts/scheduled_tasks.py` - Task runner
+- `/app/backend/scripts/crontab.example` - Example crontab configuration
+
+### Available Tasks
+- `daily-notifications` - Send daily AI-powered notifications (10:00 AM)
+- `inactive-reminders` - Remind inactive users (Mon/Thu 2:00 PM)
+- `weekly-summaries` - Weekly spending summaries (Sun 9:00 AM)
+- `security-checks` - Fraud detection checks (Daily 3:00 AM)
+
+### Usage
+```bash
+# Run manually
+cd /app/backend && python scripts/scheduled_tasks.py daily-notifications
+
+# Add to crontab
+crontab -e
+# Add: 0 10 * * * cd /app/backend && python scripts/scheduled_tasks.py daily-notifications
+```
+
+---
+
 ## Future Tasks (Backlog)
 
 1. **Client Cashback History** - Detailed usage view

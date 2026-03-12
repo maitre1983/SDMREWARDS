@@ -12,6 +12,7 @@ import PaymentSettingsModal from '../components/client/PaymentSettingsModal';
 import AIAssistant from '../components/client/AIAssistant';
 import AIWidget from '../components/client/AIWidget';
 import NotificationSettings from '../components/client/NotificationSettings';
+import { useLanguage, LanguageSelector } from '../contexts/LanguageContext';
 import { QRCodeSVG } from 'qrcode.react';
 import ServicesPage from './ServicesPage';
 import { 
@@ -63,6 +64,7 @@ const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-se
 export default function ClientDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language, syncLanguageWithServer } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
   
@@ -190,6 +192,9 @@ export default function ClientDashboard() {
       setClient(dashRes.data.client);
       setCard(dashRes.data.card);
       setTransactions(dashRes.data.recent_transactions || []);
+      
+      // Sync language preference with server
+      syncLanguageWithServer(token);
       
       // Fetch card validity if client has a card
       if (dashRes.data.client?.card_type) {
@@ -1414,7 +1419,7 @@ export default function ClientDashboard() {
             {isActive && (
               <AIWidget 
                 clientToken={token}
-                language={client?.language || 'en'}
+                language={language}
                 onViewMore={() => setActiveTab('ai')}
               />
             )}
@@ -2035,7 +2040,7 @@ export default function ClientDashboard() {
             <div className="p-4">
               <NotificationSettings
                 clientToken={token}
-                language={client?.language || 'en'}
+                language={language}
               />
             </div>
           </div>

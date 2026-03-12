@@ -1,0 +1,25 @@
+# SDM REWARDS - Scheduled Tasks Crontab
+# ======================================
+# Add these entries to your crontab with: crontab -e
+# Or copy this file to /etc/cron.d/sdm-rewards
+
+# Environment variables
+MONGO_URL="your_mongo_url_here"
+DB_NAME="test_database"
+EMERGENT_LLM_KEY="your_key_here"
+BULKCLIX_API_KEY="your_key_here"
+ONESIGNAL_APP_ID="your_app_id_here"
+ONESIGNAL_API_KEY="your_api_key_here"
+RESEND_API_KEY="your_resend_key_here"
+
+# Daily notifications - Run at 10:00 AM every day
+0 10 * * * cd /app/backend && python scripts/scheduled_tasks.py daily-notifications >> /var/log/sdm-rewards/daily-notifications.log 2>&1
+
+# Inactive user reminders - Run at 2:00 PM on Mondays and Thursdays
+0 14 * * 1,4 cd /app/backend && python scripts/scheduled_tasks.py inactive-reminders 7 >> /var/log/sdm-rewards/inactive-reminders.log 2>&1
+
+# Weekly summaries - Run at 9:00 AM every Sunday
+0 9 * * 0 cd /app/backend && python scripts/scheduled_tasks.py weekly-summaries >> /var/log/sdm-rewards/weekly-summaries.log 2>&1
+
+# Security checks - Run at 3:00 AM daily
+0 3 * * * cd /app/backend && python scripts/scheduled_tasks.py security-checks >> /var/log/sdm-rewards/security-checks.log 2>&1
