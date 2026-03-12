@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import {
   Shield, CreditCard, Gift, Banknote, UserPlus,
-  MessageSquare, Users, Sliders, Loader2, Settings
+  MessageSquare, Users, Sliders, Loader2, Settings, Trophy
 } from 'lucide-react';
 
 // Import settings sub-components
@@ -18,6 +18,7 @@ import SettingsUsers from './settings/SettingsUsers';
 import SettingsSMS from './settings/SettingsSMS';
 import SettingsSecurity from './settings/SettingsSecurity';
 import SettingsAdmins from './settings/SettingsAdmins';
+import SettingsGamification from './settings/SettingsGamification';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -50,6 +51,7 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
     { id: 'cards', label: 'Card Prices', icon: CreditCard },
     { id: 'services', label: 'Service Fees', icon: Sliders },
     { id: 'referrals', label: 'Referrals', icon: Gift },
+    { id: 'gamification', label: 'Gamification', icon: Trophy },
     { id: 'debit', label: 'Merchant Debit', icon: Banknote },
     { id: 'users', label: 'Add Users', icon: UserPlus },
     { id: 'sms', label: 'SMS Center', icon: MessageSquare },
@@ -129,6 +131,11 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
           platformConfig={platformConfig}
           onConfigUpdate={fetchPlatformConfig}
         />
+      )}
+
+      {/* Gamification Settings */}
+      {settingsTab === 'gamification' && (
+        <SettingsGamification token={token} />
       )}
 
       {/* Merchant Debit Settings */}

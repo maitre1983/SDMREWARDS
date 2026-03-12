@@ -1860,7 +1860,7 @@ async def unblock_merchant_debit_account(
         from services.sms_service import get_sms
         sms_service = get_sms()
         if merchant.get("phone"):
-            message = f"SDM REWARDS: Your debit account has been unblocked by admin. You can now process cash transactions again."
+            message = "SDM REWARDS: Your debit account has been unblocked by admin. You can now process cash transactions again."
             await sms_service.send_sms(merchant["phone"], message)
     except Exception as e:
         logger.error(f"Failed to send unblock notification SMS: {e}")
@@ -3489,3 +3489,388 @@ async def get_email_recipients(
         "recipient_type": recipient_type,
         "filter": filter
     }
+
+
+# ============== GAMIFICATION ADMIN ENDPOINTS ==============
+
+class UpdateLevelsRequest(BaseModel):
+    levels: List[dict]
+
+
+class UpdateMissionsRequest(BaseModel):
+    missions: dict
+
+
+class ResetMissionsRequest(BaseModel):
+    type: str  # "daily", "weekly", "special", "all"
+
+
+@router.get("/gamification/config")
+async def get_gamification_config(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get gamification configuration (levels and missions)"""
+    from services.gamification_service import LEVELS, MISSION_TEMPLATES
+    
+    # Try to get custom config from database first
+    config = await db.gamification_config.find_one({"type": "main"}, {"_id": 0})
+    
+    if config:
+        levels = config.get("levels", [])
+        missions = config.get("missions", {})
+    else:
+        # Use default configuration from service
+        levels = [
+            {
+                "level": level_num,
+                "name": level_data["name"],
+                "min_xp": level_data["min_xp"],
+                "max_xp": level_data["max_xp"] if level_data["max_xp"] != float('inf') else None,
+                "color": level_data["color"],
+                "icon": level_data["icon"],
+                "cashback_bonus": level_data["cashback_bonus"],
+                "perks": level_data["perks"]
+            }
+            for level_num, level_data in LEVELS.items()
+        ]
+        
+        missions = {
+            "daily": MISSION_TEMPLATES.get("daily", []),
+            "weekly": MISSION_TEMPLATES.get("weekly", []),
+            "special": MISSION_TEMPLATES.get("special", [])
+        }
+    
+    return {
+        "levels": levels,
+        "missions": missions
+    }
+
+
+@router.put("/gamification/levels")
+async def update_gamification_levels(
+    request: UpdateLevelsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update level configuration (Super Admin only)"""
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Validate levels
+    if len(request.levels) < 1:
+        raise HTTPException(status_code=400, detail="At least one level is required")
+    
+    # Get existing config or create new
+    existing = await db.gamification_config.find_one({"type": "main"})
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        await db.gamification_config.update_one(
+            {"type": "main"},
+            {
+                "$set": {
+                    "levels": request.levels,
+                    "updated_at": now,
+                    "updated_by": current_admin["id"]
+                }
+            }
+        )
+    else:
+        # Initialize with default missions if creating new config
+        from services.gamification_service import MISSION_TEMPLATES
+        await db.gamification_config.insert_one({
+            "type": "main",
+            "levels": request.levels,
+            "missions": {
+                "daily": MISSION_TEMPLATES.get("daily", []),
+                "weekly": MISSION_TEMPLATES.get("weekly", []),
+                "special": MISSION_TEMPLATES.get("special", [])
+            },
+            "created_at": now,
+            "updated_at": now,
+            "updated_by": current_admin["id"]
+        })
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "admin_email": current_admin.get("email"),
+        "action": "update_gamification_levels",
+        "details": {"levels_count": len(request.levels)},
+        "created_at": now
+    })
+    
+    return {"success": True, "message": "Levels configuration updated"}
+
+
+@router.put("/gamification/missions")
+async def update_gamification_missions(
+    request: UpdateMissionsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Update mission configuration (Super Admin only)"""
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    # Get existing config or create new
+    existing = await db.gamification_config.find_one({"type": "main"})
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if existing:
+        await db.gamification_config.update_one(
+            {"type": "main"},
+            {
+                "$set": {
+                    "missions": request.missions,
+                    "updated_at": now,
+                    "updated_by": current_admin["id"]
+                }
+            }
+        )
+    else:
+        # Initialize with default levels if creating new config
+        from services.gamification_service import LEVELS
+        levels = [
+            {
+                "level": level_num,
+                "name": level_data["name"],
+                "min_xp": level_data["min_xp"],
+                "max_xp": level_data["max_xp"] if level_data["max_xp"] != float('inf') else None,
+                "color": level_data["color"],
+                "icon": level_data["icon"],
+                "cashback_bonus": level_data["cashback_bonus"],
+                "perks": level_data["perks"]
+            }
+            for level_num, level_data in LEVELS.items()
+        ]
+        
+        await db.gamification_config.insert_one({
+            "type": "main",
+            "levels": levels,
+            "missions": request.missions,
+            "created_at": now,
+            "updated_at": now,
+            "updated_by": current_admin["id"]
+        })
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "admin_email": current_admin.get("email"),
+        "action": "update_gamification_missions",
+        "details": {
+            "daily_count": len(request.missions.get("daily", [])),
+            "weekly_count": len(request.missions.get("weekly", [])),
+            "special_count": len(request.missions.get("special", []))
+        },
+        "created_at": now
+    })
+    
+    return {"success": True, "message": "Missions configuration updated"}
+
+
+@router.post("/gamification/reset-missions")
+async def reset_missions(
+    request: ResetMissionsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Reset missions for all users (Super Admin only)"""
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Build query based on type
+    if request.type == "all":
+        query = {}
+    else:
+        query = {"period": request.type}
+    
+    # Delete missions matching the query
+    result = await db.client_missions.delete_many(query)
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "admin_email": current_admin.get("email"),
+        "action": "reset_gamification_missions",
+        "details": {
+            "type": request.type,
+            "missions_deleted": result.deleted_count
+        },
+        "created_at": now
+    })
+    
+    return {
+        "success": True,
+        "message": f"Reset {result.deleted_count} {request.type} missions",
+        "deleted_count": result.deleted_count
+    }
+
+
+@router.get("/gamification/stats")
+async def get_gamification_stats(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get gamification statistics for admin dashboard"""
+    from services.gamification_service import LEVELS
+    
+    # Get custom config levels or use defaults
+    config = await db.gamification_config.find_one({"type": "main"}, {"_id": 0})
+    levels_config = config.get("levels", []) if config else None
+    
+    if not levels_config:
+        levels_config = [
+            {
+                "level": level_num,
+                "name": level_data["name"],
+                "min_xp": level_data["min_xp"],
+                "max_xp": level_data["max_xp"] if level_data["max_xp"] != float('inf') else None,
+                "color": level_data["color"]
+            }
+            for level_num, level_data in LEVELS.items()
+        ]
+    
+    # Count users with gamification data
+    total_users = await db.gamification.count_documents({})
+    
+    # Calculate total XP distributed
+    pipeline = [{"$group": {"_id": None, "total_xp": {"$sum": "$xp"}}}]
+    xp_result = await db.gamification.aggregate(pipeline).to_list(1)
+    total_xp = xp_result[0]["total_xp"] if xp_result else 0
+    
+    # Count missions completed
+    missions_completed = await db.client_missions.count_documents({"status": "completed"})
+    
+    # Count badges awarded
+    pipeline = [
+        {"$unwind": "$badges"},
+        {"$count": "total"}
+    ]
+    badges_result = await db.gamification.aggregate(pipeline).to_list(1)
+    badges_awarded = badges_result[0]["total"] if badges_result else 0
+    
+    # Users by level
+    users_by_level = []
+    for level_data in levels_config:
+        min_xp = level_data.get("min_xp", 0)
+        max_xp = level_data.get("max_xp")
+        
+        if max_xp is None:
+            query = {"xp": {"$gte": min_xp}}
+        else:
+            query = {"xp": {"$gte": min_xp, "$lte": max_xp}}
+        
+        count = await db.gamification.count_documents(query)
+        users_by_level.append({
+            "level": level_data.get("level"),
+            "name": level_data.get("name"),
+            "color": level_data.get("color", "#94a3b8"),
+            "count": count
+        })
+    
+    # Top 10 users by XP
+    top_users_cursor = db.gamification.find(
+        {}, {"_id": 0, "client_id": 1, "xp": 1, "missions_completed": 1}
+    ).sort("xp", -1).limit(10)
+    
+    top_users_raw = await top_users_cursor.to_list(10)
+    top_users = []
+    
+    for user_data in top_users_raw:
+        client = await db.clients.find_one(
+            {"id": user_data["client_id"]},
+            {"_id": 0, "full_name": 1, "username": 1}
+        )
+        
+        # Determine level based on XP
+        user_xp = user_data.get("xp", 0)
+        user_level = levels_config[0] if levels_config else {"name": "Unknown", "color": "#94a3b8"}
+        
+        for level_data in levels_config:
+            min_xp = level_data.get("min_xp", 0)
+            max_xp = level_data.get("max_xp")
+            
+            if max_xp is None:
+                if user_xp >= min_xp:
+                    user_level = level_data
+            else:
+                if min_xp <= user_xp <= max_xp:
+                    user_level = level_data
+                    break
+        
+        top_users.append({
+            "client_id": user_data["client_id"],
+            "name": client.get("full_name", "Unknown") if client else "Unknown",
+            "username": client.get("username", "") if client else "",
+            "xp": user_xp,
+            "level_name": user_level.get("name", "Unknown"),
+            "level_color": user_level.get("color", "#94a3b8"),
+            "missions_completed": user_data.get("missions_completed", 0)
+        })
+    
+    # Mission completion rates
+    total_daily = await db.client_missions.count_documents({"period": "daily"})
+    completed_daily = await db.client_missions.count_documents({"period": "daily", "status": "completed"})
+    daily_rate = round((completed_daily / total_daily * 100) if total_daily > 0 else 0, 1)
+    
+    total_weekly = await db.client_missions.count_documents({"period": "weekly"})
+    completed_weekly = await db.client_missions.count_documents({"period": "weekly", "status": "completed"})
+    weekly_rate = round((completed_weekly / total_weekly * 100) if total_weekly > 0 else 0, 1)
+    
+    total_special = await db.client_missions.count_documents({"period": "special"})
+    completed_special = await db.client_missions.count_documents({"period": "special", "status": "completed"})
+    special_rate = round((completed_special / total_special * 100) if total_special > 0 else 0, 1)
+    
+    return {
+        "total_users": total_users,
+        "total_xp": total_xp,
+        "missions_completed": missions_completed,
+        "badges_awarded": badges_awarded,
+        "users_by_level": users_by_level,
+        "top_users": top_users,
+        "daily_completion_rate": daily_rate,
+        "weekly_completion_rate": weekly_rate,
+        "special_completion_rate": special_rate
+    }
+
+
+@router.get("/gamification/export")
+async def export_gamification_data(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Export gamification data as JSON"""
+    import json
+    from fastapi.responses import Response
+    
+    # Get configuration
+    config = await db.gamification_config.find_one({"type": "main"}, {"_id": 0})
+    
+    # Get all gamification records
+    gamification_data = await db.gamification.find({}, {"_id": 0}).to_list(10000)
+    
+    # Get all missions
+    missions_data = await db.client_missions.find({}, {"_id": 0}).to_list(100000)
+    
+    export_data = {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "exported_by": current_admin.get("email"),
+        "configuration": config,
+        "gamification_records": gamification_data,
+        "missions": missions_data
+    }
+    
+    json_str = json.dumps(export_data, indent=2, default=str)
+    
+    return Response(
+        content=json_str,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename=gamification_export_{datetime.now().strftime('%Y%m%d')}.json"
+        }
+    )
+
