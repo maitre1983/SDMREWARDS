@@ -21,6 +21,7 @@ import {
   Clock,
   AlertCircle,
   Eye,
+  EyeOff,
   Ban,
   UserCheck,
   Trash2,
@@ -90,6 +91,7 @@ export default function AdminDashboard() {
   const emailRef = useRef();
   const passwordRef = useRef();
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   // Data states
   const [stats, setStats] = useState(null);
@@ -1313,13 +1315,26 @@ export default function AdminDashboard() {
 
               <div>
                 <Label className="text-slate-300">Password</Label>
-                <Input
-                  ref={passwordRef}
-                  type="password"
-                  placeholder="Enter password"
-                  className="mt-1 bg-slate-900 border-slate-700 text-white"
-                  data-testid="admin-password-input"
-                />
+                <div className="relative mt-1">
+                  <Input
+                    ref={passwordRef}
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter password"
+                    className="bg-slate-900 border-slate-700 text-white pr-12"
+                    data-testid="admin-password-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <Button
