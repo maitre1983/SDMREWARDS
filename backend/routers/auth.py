@@ -15,15 +15,21 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from pydantic import BaseModel, EmailStr
 from motor.motor_asyncio import AsyncIOMotorClient
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from models.schemas import Client, Merchant, ClientStatus, MerchantStatus
+from utils.security import sanitize_regex_input, validate_password_strength
 
 # Setup
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Rate limiter for auth endpoints
+limiter = Limiter(key_func=get_remote_address)
 
 # Database connection
 MONGO_URL = os.environ.get('MONGO_URL')
@@ -31,8 +37,11 @@ DB_NAME = os.environ.get('DB_NAME', 'sdm_rewards')
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-# JWT Config
-JWT_SECRET = os.environ.get('JWT_SECRET', 'sdm-rewards-secret-key-2024')
+# JWT Config - Load from environment with secure fallback behavior
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET or len(JWT_SECRET) < 32:
+    logger.warning("⚠️ JWT_SECRET not configured properly - using development key")
+    JWT_SECRET = 'sdm-rewards-dev-key-not-for-production-use'
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
 
@@ -218,9 +227,10 @@ async def get_current_admin(authorization: str = Header(...)) -> dict:
 # ============== OTP ENDPOINTS ==============
 
 @router.post("/otp/send")
-async def send_otp(request: SendOTPRequest):
+@limiter.limit("3/minute")  # Rate limit: 3 OTP requests per minute per IP
+async def send_otp(request: Request, otp_request: SendOTPRequest):
     """Send OTP to phone number via BulkClix OTP API"""
-    phone = normalize_phone(request.phone)
+    phone = normalize_phone(otp_request.phone)
     phone_clean = phone.replace("+233", "0")
     
     # Check if API key is configured
@@ -469,15 +479,16 @@ async def register_client(request: ClientRegisterRequest):
 
 
 @router.post("/client/login")
-async def login_client(request: ClientLoginRequest):
+@limiter.limit("5/minute")  # Rate limit: 5 login attempts per minute per IP
+async def login_client(request: Request, login_request: ClientLoginRequest):
     """Login client"""
-    phone = normalize_phone(request.phone)
+    phone = normalize_phone(login_request.phone)
     
     client_doc = await db.clients.find_one({"phone": phone})
     if not client_doc:
         raise HTTPException(status_code=401, detail="Invalid phone number or password")
     
-    if not verify_password(request.password, client_doc["password_hash"]):
+    if not verify_password(login_request.password, client_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid phone number or password")
     
     if client_doc.get("status") == ClientStatus.SUSPENDED.value:
@@ -578,15 +589,16 @@ async def register_merchant(request: MerchantRegisterRequest):
 
 
 @router.post("/merchant/login")
-async def login_merchant(request: MerchantLoginRequest):
+@limiter.limit("5/minute")  # Rate limit: 5 login attempts per minute per IP
+async def login_merchant(request: Request, login_request: MerchantLoginRequest):
     """Login merchant"""
-    phone = normalize_phone(request.phone)
+    phone = normalize_phone(login_request.phone)
     
     merchant_doc = await db.merchants.find_one({"phone": phone})
     if not merchant_doc:
         raise HTTPException(status_code=401, detail="Invalid phone number or password")
     
-    if not verify_password(request.password, merchant_doc["password_hash"]):
+    if not verify_password(login_request.password, merchant_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid phone number or password")
     
     if merchant_doc.get("status") == MerchantStatus.SUSPENDED.value:
@@ -619,13 +631,14 @@ async def login_merchant(request: MerchantLoginRequest):
 # ============== ADMIN AUTH ==============
 
 @router.post("/admin/login")
-async def login_admin(request: AdminLoginRequest):
+@limiter.limit("3/minute")  # Rate limit: 3 admin login attempts per minute per IP
+async def login_admin(request: Request, login_request: AdminLoginRequest):
     """Login admin"""
-    admin_doc = await db.admins.find_one({"email": request.email.lower()})
+    admin_doc = await db.admins.find_one({"email": login_request.email.lower()})
     if not admin_doc:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    if not verify_password(request.password, admin_doc["password_hash"]):
+    if not verify_password(login_request.password, admin_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     if not admin_doc.get("is_active"):

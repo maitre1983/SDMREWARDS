@@ -16,8 +16,12 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'smart-digital-solutions-secret-key-2024')
+# JWT Settings - secure configuration
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET or len(JWT_SECRET) < 32:
+    import warnings
+    warnings.warn("JWT_SECRET not properly configured")
+    JWT_SECRET = "sdm-dev-key-not-for-production-use-32chars"
 JWT_ALGORITHM = "HS256"
 
 # Resend Settings

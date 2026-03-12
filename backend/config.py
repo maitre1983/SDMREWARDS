@@ -13,7 +13,11 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # ============== JWT Configuration ==============
-JWT_SECRET = os.environ.get('JWT_SECRET', 'smart-digital-solutions-secret-key-2024')
+JWT_SECRET = os.environ.get('JWT_SECRET')
+if not JWT_SECRET or len(JWT_SECRET) < 32:
+    import warnings
+    warnings.warn("JWT_SECRET not properly configured")
+    JWT_SECRET = "sdm-dev-key-not-for-production-use-32chars"
 JWT_ALGORITHM = "HS256"
 
 # ============== Email Configuration ==============

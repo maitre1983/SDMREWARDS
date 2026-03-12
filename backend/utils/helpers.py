@@ -14,8 +14,12 @@ import base64
 import phonenumbers
 from datetime import datetime, timezone, timedelta
 
-# JWT Secret from environment
-JWT_SECRET = os.environ.get("JWT_SECRET", "smart-digital-solutions-secret-key-2024")
+# JWT Secret from environment - no fallback for security
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET or len(JWT_SECRET) < 32:
+    import warnings
+    warnings.warn("JWT_SECRET not properly configured - using development key")
+    JWT_SECRET = "sdm-dev-key-not-for-production-use-32chars"
 
 
 def hash_password(password: str) -> str:

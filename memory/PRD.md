@@ -26,6 +26,46 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Completed Features (Updated 2026-03-12)
 
+### ✅ NEW: Security Hardening - IMPLEMENTED 2026-03-12
+**Complete security audit and hardening of the platform:**
+
+1. **JWT Secret Key Strengthened**
+   - Generated new 64-character cryptographic key
+   - Removed hardcoded fallback values
+   - Centralized in `/app/backend/.env` as `JWT_SECRET`
+
+2. **CORS Policy Restricted**
+   - Changed from `allow_origins=["*"]` to specific domains only
+   - Allowed origins: `https://web-boost-seo.preview.emergentagent.com`, `http://localhost:3000`
+   - Configurable via `CORS_ALLOWED_ORIGINS` env variable
+
+3. **Rate Limiting Implemented**
+   - Using `slowapi` library
+   - `/api/auth/otp/send`: 3 requests/minute per IP
+   - `/api/auth/client/login`: 5 requests/minute per IP
+   - `/api/auth/merchant/login`: 5 requests/minute per IP
+   - `/api/auth/admin/login`: 3 requests/minute per IP
+   - Global default: 200 requests/minute
+
+4. **NoSQL Injection Prevention**
+   - Created `/app/backend/utils/security.py` with sanitization functions
+   - All `$regex` queries now use `sanitize_regex_input()` to escape special characters
+   - Prevents ReDoS attacks and injection via regex metacharacters
+
+5. **Security Headers** (Already in place)
+   - Content-Security-Policy
+   - X-Frame-Options: SAMEORIGIN
+   - X-Content-Type-Options: nosniff
+   - Strict-Transport-Security (HSTS)
+   - X-XSS-Protection
+
+**Files Created/Modified:**
+- `/app/backend/utils/security.py` - NEW: Security utilities module
+- `/app/backend/.env` - Added JWT_SECRET and CORS_ALLOWED_ORIGINS
+- `/app/backend/server.py` - Updated CORS and added rate limiting middleware
+- `/app/backend/routers/auth.py` - Added rate limiting decorators
+- `/app/backend/routers/admin.py` - Added input sanitization for search
+
 ### ✅ NEW: Real-time Push Notifications for Gamification - IMPLEMENTED 2026-03-12
 **Users receive instant push notifications when:**
 

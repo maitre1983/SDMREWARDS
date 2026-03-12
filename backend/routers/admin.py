@@ -675,15 +675,18 @@ async def list_clients(
     current_admin: dict = Depends(get_current_admin)
 ):
     """List all clients"""
+    from utils.security import sanitize_regex_input
+    
     query = {}
     
     if status:
         query["status"] = status
     if search:
+        safe_search = sanitize_regex_input(search)
         query["$or"] = [
-            {"full_name": {"$regex": search, "$options": "i"}},
-            {"phone": {"$regex": search, "$options": "i"}},
-            {"username": {"$regex": search, "$options": "i"}}
+            {"full_name": {"$regex": safe_search, "$options": "i"}},
+            {"phone": {"$regex": safe_search, "$options": "i"}},
+            {"username": {"$regex": safe_search, "$options": "i"}}
         ]
     
     clients = await db.clients.find(
@@ -1187,15 +1190,18 @@ async def list_merchants(
     current_admin: dict = Depends(get_current_admin)
 ):
     """List all merchants"""
+    from utils.security import sanitize_regex_input
+    
     query = {}
     
     if status:
         query["status"] = status
     if search:
+        safe_search = sanitize_regex_input(search)
         query["$or"] = [
-            {"business_name": {"$regex": search, "$options": "i"}},
-            {"phone": {"$regex": search, "$options": "i"}},
-            {"owner_name": {"$regex": search, "$options": "i"}}
+            {"business_name": {"$regex": safe_search, "$options": "i"}},
+            {"phone": {"$regex": safe_search, "$options": "i"}},
+            {"owner_name": {"$regex": safe_search, "$options": "i"}}
         ]
     
     merchants = await db.merchants.find(

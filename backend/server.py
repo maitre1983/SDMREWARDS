@@ -76,11 +76,16 @@ app = FastAPI(
 )
 
 # ============== CORS ==============
+# Load allowed origins from environment for security
+from utils.security import get_cors_origins
+CORS_ORIGINS = get_cors_origins()
+logger.info(f"🔒 CORS allowed origins: {CORS_ORIGINS}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -90,6 +95,18 @@ from starlette.middleware.gzip import GZipMiddleware
 # Enable GZIP compression for responses > 500 bytes
 # This significantly reduces bandwidth usage for low-connectivity users
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# ============== RATE LIMITING ==============
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # ============== SECURITY HEADERS MIDDLEWARE ==============
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -449,18 +466,22 @@ async def get_public_merchants(
     Get list of active merchants with public info for clients.
     Includes: business name, city, address, phone, google maps link.
     """
+    from utils.security import sanitize_regex_input
+    
     query = {"status": "active"}
     
-    # City filter
+    # City filter - sanitize input
     if city:
-        query["city"] = {"$regex": city, "$options": "i"}
+        safe_city = sanitize_regex_input(city)
+        query["city"] = {"$regex": safe_city, "$options": "i"}
     
-    # Search filter
+    # Search filter - sanitize input
     if search:
+        safe_search = sanitize_regex_input(search)
         query["$or"] = [
-            {"business_name": {"$regex": search, "$options": "i"}},
-            {"business_type": {"$regex": search, "$options": "i"}},
-            {"city": {"$regex": search, "$options": "i"}}
+            {"business_name": {"$regex": safe_search, "$options": "i"}},
+            {"business_type": {"$regex": safe_search, "$options": "i"}},
+            {"city": {"$regex": safe_search, "$options": "i"}}
         ]
     
     # Pagination
