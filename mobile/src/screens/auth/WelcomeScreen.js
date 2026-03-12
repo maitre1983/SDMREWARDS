@@ -47,20 +47,8 @@ export default function WelcomeScreen({ navigation }) {
   
   // Handle navigation - works on both native and web
   const handleNavigate = (userType) => {
-    // Direct approach that works on web - use React Navigation
-    try {
-      if (userType === 'client') {
-        navigation.navigate('Login', { userType: 'client' });
-      } else if (userType === 'merchant') {
-        navigation.navigate('MerchantLogin');
-      }
-    } catch (e) {
-      // Fallback: use window.location for web
-      if (typeof window !== 'undefined') {
-        const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
-        window.location.href = baseUrl;
-      }
-    }
+    // Navigate using React Navigation
+    navigation.navigate('Login', { userType: userType });
   };
   
   // Animation values
@@ -356,21 +344,16 @@ export default function WelcomeScreen({ navigation }) {
           accessibilityRole="button"
           accessibilityLabel="I'm a Customer"
         >
-          <View 
-            style={styles.gradientButtonWrapper}
-            onClick={() => Platform.OS === 'web' && handleNavigate('client')}
+          <LinearGradient
+            colors={['#F59E0B', '#EA580C', '#F59E0B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
           >
-            <LinearGradient
-              colors={['#F59E0B', '#EA580C', '#F59E0B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              <Ionicons name="person" size={28} color="#FFF" style={{ marginRight: 12 }} />
-              <Text style={styles.ctaButtonText}>I'm a Customer</Text>
-              <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
-            </LinearGradient>
-          </View>
+            <Ionicons name="person" size={28} color="#FFF" style={{ marginRight: 12 }} />
+            <Text style={styles.ctaButtonText}>I'm a Customer</Text>
+            <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
+          </LinearGradient>
         </TouchableOpacity>
 
         {/* I'm a Merchant - Secondary Green Button */}
@@ -381,21 +364,16 @@ export default function WelcomeScreen({ navigation }) {
           accessibilityRole="button"
           accessibilityLabel="I'm a Merchant"
         >
-          <View 
-            style={styles.gradientButtonWrapper}
-            onClick={() => Platform.OS === 'web' && handleNavigate('merchant')}
+          <LinearGradient
+            colors={['#10B981', '#059669', '#10B981']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
           >
-            <LinearGradient
-              colors={['#10B981', '#059669', '#10B981']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              <Ionicons name="storefront" size={28} color="#FFF" style={{ marginRight: 12 }} />
-              <Text style={styles.ctaButtonText}>I'm a Merchant</Text>
-              <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
-            </LinearGradient>
-          </View>
+            <Ionicons name="storefront" size={28} color="#FFF" style={{ marginRight: 12 }} />
+            <Text style={styles.ctaButtonText}>I'm a Merchant</Text>
+            <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
+          </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
 
@@ -521,9 +499,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   buttonsContainer: {
-    marginTop: verticalScale(20),
+    marginTop: verticalScale(30),
     gap: verticalScale(14),
-    paddingBottom: verticalScale(10),
+    paddingBottom: verticalScale(20),
     paddingHorizontal: moderateScale(4),
     zIndex: 100,
   },
