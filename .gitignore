@@ -457,3 +457,8 @@ frontend/node_modules/.cache/default-development/70.pack
 *.env
 *.env.*
 frontend/node_modules/.cache/default-development/72.pack
+-e 
+# Environment files
+*.env
+*.env.*
+frontend/node_modules/.cache/default-development/76.pack
