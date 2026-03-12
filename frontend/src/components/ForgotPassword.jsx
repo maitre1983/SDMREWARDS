@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KeyRound, Phone, Mail, ArrowLeft, Eye, EyeOff, Loader2, CheckCircle, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { API_URL } from '@/config/api';
+
+// Debug: Log API URL on component mount (can be removed after debugging)
+console.log('[ForgotPassword] API_URL:', API_URL, 'hostname:', window.location.hostname);
 
 export default function ForgotPassword({ userType = 'client', onBack, onSuccess }) {
   const [step, setStep] = useState(1); // 1: Enter phone/email, 2: Enter OTP, 3: New password
@@ -46,13 +49,18 @@ export default function ForgotPassword({ userType = 'client', onBack, onSuccess 
         body = { phone: identifier };
       }
       
-      const res = await fetch(`${API_URL}${endpoint}`, {
+      const fullUrl = `${API_URL}${endpoint}`;
+      console.log('[ForgotPassword] Calling:', fullUrl, 'Body:', JSON.stringify(body));
+      
+      const res = await fetch(fullUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       
+      console.log('[ForgotPassword] Response status:', res.status, res.statusText);
       const data = await res.json();
+      console.log('[ForgotPassword] Data:', data);
       
       if (data.success || res.ok) {
         setRequestId(data.request_id);
