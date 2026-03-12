@@ -543,6 +543,7 @@ from routers.admin import router as admin_router
 from routers import payments as payments_router_module
 from routers.services import router as services_router
 from routers.seo import router as seo_router
+from routers.ai import router as ai_router
 
 # Set database for payments router
 payments_router_module.set_db(db)
@@ -556,6 +557,7 @@ app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 app.include_router(payments_router_module.router, prefix="/api/payments", tags=["Payments"])
 app.include_router(services_router, prefix="/api/services", tags=["Services"])
 app.include_router(seo_router, tags=["SEO"])
+app.include_router(ai_router, prefix="/api/ai", tags=["AI"])
 
 # ============== MOBILE APP STATIC FILES ==============
 import os

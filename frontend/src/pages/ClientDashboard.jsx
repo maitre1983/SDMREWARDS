@@ -9,6 +9,8 @@ import ReferralQRCode from '../components/client/ReferralQRCode';
 import MerchantPayModal from '../components/client/MerchantPayModal';
 import WithdrawalModal from '../components/client/WithdrawalModal';
 import PaymentSettingsModal from '../components/client/PaymentSettingsModal';
+import AIAssistant from '../components/client/AIAssistant';
+import AIWidget from '../components/client/AIWidget';
 import { QRCodeSVG } from 'qrcode.react';
 import ServicesPage from './ServicesPage';
 import { 
@@ -49,7 +51,8 @@ import {
   Building2,
   ExternalLink,
   Navigation,
-  Search
+  Search,
+  Brain
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -1394,6 +1397,15 @@ export default function ClientDashboard() {
                 <p className="text-slate-500 text-center py-4">No transactions yet</p>
               )}
             </div>
+
+            {/* AI Widget */}
+            {isActive && (
+              <AIWidget 
+                clientToken={token}
+                language={client?.language || 'en'}
+                onViewMore={() => setActiveTab('ai')}
+              />
+            )}
           </div>
         )}
 
@@ -1593,6 +1605,14 @@ export default function ClientDashboard() {
           </div>
         )}
 
+        {/* AI Assistant Tab */}
+        {activeTab === 'ai' && isActive && (
+          <AIAssistant
+            clientToken={token}
+            language={client?.language || 'en'}
+          />
+        )}
+
         {/* Partners Tab */}
         {activeTab === 'partners' && (
           <div className="space-y-4">
@@ -1727,12 +1747,13 @@ export default function ClientDashboard() {
             <span className="text-xs">Home</span>
           </button>
           <button
-            onClick={() => { setActiveTab('partners'); fetchPartners(); }}
-            className={`flex flex-col items-center gap-1 ${activeTab === 'partners' ? 'text-amber-400' : 'text-slate-500'}`}
-            data-testid="nav-partners"
+            onClick={() => setActiveTab('ai')}
+            className={`flex flex-col items-center gap-1 ${activeTab === 'ai' ? 'text-amber-400' : 'text-slate-500'}`}
+            disabled={!isActive}
+            data-testid="nav-ai"
           >
-            <Store size={22} />
-            <span className="text-xs">Partners</span>
+            <Brain size={22} />
+            <span className="text-xs">AI</span>
           </button>
           <button
             onClick={() => { setActiveTab('qr'); }}
