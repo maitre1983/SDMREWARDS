@@ -672,10 +672,12 @@ async def list_clients(
     offset: int = 0,
     status: Optional[str] = None,
     search: Optional[str] = None,
+    level: Optional[int] = None,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """List all clients"""
+    """List all clients with gamification data (level, XP)"""
     from utils.security import sanitize_regex_input
+    from services.gamification_service import LEVELS
     
     query = {}
     
@@ -689,10 +691,39 @@ async def list_clients(
             {"username": {"$regex": safe_search, "$options": "i"}}
         ]
     
+    # Filter by level if specified
+    if level:
+        level_data = LEVELS.get(level)
+        if level_data:
+            min_xp = level_data["min_xp"]
+            max_xp = level_data["max_xp"] if level_data["max_xp"] != float('inf') else 999999999
+            query["gamification.total_xp"] = {"$gte": min_xp, "$lte": max_xp}
+    
     clients = await db.clients.find(
         query,
         {"_id": 0, "password_hash": 0}
     ).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+    
+    # Add level info to each client
+    for client in clients:
+        xp = client.get("gamification", {}).get("total_xp", 0)
+        client_level = 1
+        level_name = "SDM Starter"
+        level_color = "#94a3b8"
+        
+        for lvl, data in LEVELS.items():
+            if data["min_xp"] <= xp <= (data["max_xp"] if data["max_xp"] != float('inf') else 999999999):
+                client_level = lvl
+                level_name = data["name"]
+                level_color = data["color"]
+                break
+        
+        client["level_info"] = {
+            "level": client_level,
+            "name": level_name,
+            "color": level_color,
+            "xp": xp
+        }
     
     total = await db.clients.count_documents(query)
     
@@ -3741,37 +3772,62 @@ async def get_gamification_stats(
             for level_num, level_data in LEVELS.items()
         ]
     
-    # Count users with gamification data
-    total_users = await db.gamification.count_documents({})
+    # Count users with gamification data from clients collection
+    total_clients = await db.clients.count_documents({"status": {"$ne": "deleted"}})
     
-    # Calculate total XP distributed
-    pipeline = [{"$group": {"_id": None, "total_xp": {"$sum": "$xp"}}}]
-    xp_result = await db.gamification.aggregate(pipeline).to_list(1)
+    # Calculate total XP distributed from clients
+    pipeline = [
+        {"$match": {"gamification.total_xp": {"$exists": True}}},
+        {"$group": {"_id": None, "total_xp": {"$sum": "$gamification.total_xp"}}}
+    ]
+    xp_result = await db.clients.aggregate(pipeline).to_list(1)
     total_xp = xp_result[0]["total_xp"] if xp_result else 0
     
     # Count missions completed
     missions_completed = await db.client_missions.count_documents({"status": "completed"})
     
-    # Count badges awarded
+    # Count badges awarded from clients collection
     pipeline = [
-        {"$unwind": "$badges"},
+        {"$match": {"gamification.badges": {"$exists": True, "$ne": []}}},
+        {"$unwind": "$gamification.badges"},
         {"$count": "total"}
     ]
-    badges_result = await db.gamification.aggregate(pipeline).to_list(1)
+    badges_result = await db.clients.aggregate(pipeline).to_list(1)
     badges_awarded = badges_result[0]["total"] if badges_result else 0
     
-    # Users by level
+    # Users by level - count from clients collection
     users_by_level = []
     for level_data in levels_config:
         min_xp = level_data.get("min_xp", 0)
         max_xp = level_data.get("max_xp")
         
         if max_xp is None:
-            query = {"xp": {"$gte": min_xp}}
+            # Top level - no upper limit
+            query = {
+                "status": {"$ne": "deleted"},
+                "gamification.total_xp": {"$gte": min_xp}
+            }
         else:
-            query = {"xp": {"$gte": min_xp, "$lte": max_xp}}
+            query = {
+                "status": {"$ne": "deleted"},
+                "$or": [
+                    {"gamification.total_xp": {"$gte": min_xp, "$lte": max_xp}},
+                    # Also count users without gamification data as level 1
+                    {"gamification": {"$exists": False}} if min_xp == 0 else {"_id": None}
+                ]
+            }
+            # For level 1, include users with no gamification data
+            if min_xp == 0:
+                query = {
+                    "status": {"$ne": "deleted"},
+                    "$or": [
+                        {"gamification.total_xp": {"$gte": min_xp, "$lte": max_xp}},
+                        {"gamification.total_xp": {"$exists": False}},
+                        {"gamification": {"$exists": False}}
+                    ]
+                }
         
-        count = await db.gamification.count_documents(query)
+        count = await db.clients.count_documents(query)
         users_by_level.append({
             "level": level_data.get("level"),
             "name": level_data.get("name"),
@@ -3779,22 +3835,18 @@ async def get_gamification_stats(
             "count": count
         })
     
-    # Top 10 users by XP
-    top_users_cursor = db.gamification.find(
-        {}, {"_id": 0, "client_id": 1, "xp": 1, "missions_completed": 1}
-    ).sort("xp", -1).limit(10)
+    # Top 10 users by XP from clients collection
+    top_users_cursor = db.clients.find(
+        {"gamification.total_xp": {"$exists": True, "$gt": 0}},
+        {"_id": 0, "id": 1, "full_name": 1, "username": 1, "phone": 1, "gamification": 1}
+    ).sort("gamification.total_xp", -1).limit(10)
     
     top_users_raw = await top_users_cursor.to_list(10)
     top_users = []
     
-    for user_data in top_users_raw:
-        client = await db.clients.find_one(
-            {"id": user_data["client_id"]},
-            {"_id": 0, "full_name": 1, "username": 1}
-        )
-        
+    for client in top_users_raw:
         # Determine level based on XP
-        user_xp = user_data.get("xp", 0)
+        user_xp = client.get("gamification", {}).get("total_xp", 0)
         user_level = levels_config[0] if levels_config else {"name": "Unknown", "color": "#94a3b8"}
         
         for level_data in levels_config:
@@ -3810,13 +3862,15 @@ async def get_gamification_stats(
                     break
         
         top_users.append({
-            "client_id": user_data["client_id"],
-            "name": client.get("full_name", "Unknown") if client else "Unknown",
-            "username": client.get("username", "") if client else "",
+            "client_id": client.get("id"),
+            "name": client.get("full_name", "Unknown"),
+            "username": client.get("username", ""),
+            "phone": client.get("phone", ""),
             "xp": user_xp,
+            "level": user_level.get("level", 1),
             "level_name": user_level.get("name", "Unknown"),
             "level_color": user_level.get("color", "#94a3b8"),
-            "missions_completed": user_data.get("missions_completed", 0)
+            "missions_completed": client.get("gamification", {}).get("missions_completed", 0)
         })
     
     # Mission completion rates
@@ -3833,7 +3887,7 @@ async def get_gamification_stats(
     special_rate = round((completed_special / total_special * 100) if total_special > 0 else 0, 1)
     
     return {
-        "total_users": total_users,
+        "total_users": total_clients,
         "total_xp": total_xp,
         "missions_completed": missions_completed,
         "badges_awarded": badges_awarded,
