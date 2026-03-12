@@ -104,6 +104,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Enhanced login with device trust support
+  const loginClientV2 = async (loginPayload) => {
+    try {
+      const response = await authAPI.loginClientV2(loginPayload);
+      
+      // Handle 2FA requirement
+      if (response.requires_2fa) {
+        return {
+          success: false,
+          requires_2fa: true,
+          user_id: response.user_id,
+          user_type: response.user_type
+        };
+      }
+      
+      if (response.access_token || response.token) {
+        await setAuthToken(response.access_token || response.token);
+        await setUserType('client');
+        setUserTypeState('client');
+        setUser(response.client);
+        await setUserData(response.client);
+        setIsAuthenticated(true);
+        await refreshDashboard('client');
+        return { 
+          success: true,
+          device_token: response.device_token,
+          device_trusted: response.device_trusted
+        };
+      }
+      return { success: false, error: 'Login failed' };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Login failed',
+      };
+    }
+  };
+
   const loginMerchant = async (phone, password) => {
     try {
       const response = await authAPI.loginMerchant(phone, password);
@@ -116,6 +154,44 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         await refreshDashboard('merchant');
         return { success: true };
+      }
+      return { success: false, error: 'Login failed' };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Login failed',
+      };
+    }
+  };
+
+  // Enhanced merchant login with device trust support
+  const loginMerchantV2 = async (loginPayload) => {
+    try {
+      const response = await authAPI.loginMerchantV2(loginPayload);
+      
+      // Handle 2FA requirement
+      if (response.requires_2fa) {
+        return {
+          success: false,
+          requires_2fa: true,
+          user_id: response.user_id,
+          user_type: response.user_type
+        };
+      }
+      
+      if (response.access_token || response.token) {
+        await setAuthToken(response.access_token || response.token);
+        await setUserType('merchant');
+        setUserTypeState('merchant');
+        setUser(response.merchant);
+        await setUserData(response.merchant);
+        setIsAuthenticated(true);
+        await refreshDashboard('merchant');
+        return { 
+          success: true,
+          device_token: response.device_token,
+          device_trusted: response.device_trusted
+        };
       }
       return { success: false, error: 'Login failed' };
     } catch (error) {
@@ -190,7 +266,9 @@ export const AuthProvider = ({ children }) => {
     user,
     dashboardData,
     loginClient,
+    loginClientV2,
     loginMerchant,
+    loginMerchantV2,
     registerClient,
     registerMerchant,
     switchUserType,

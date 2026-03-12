@@ -158,6 +158,12 @@ export const authAPI = {
     return response.data;
   },
 
+  // Client Login V2 with device trust support
+  loginClientV2: async (loginPayload) => {
+    const response = await api.post('/auth/client/login/v2', loginPayload);
+    return response.data;
+  },
+
   // Merchant Registration
   registerMerchant: async (data) => {
     const response = await api.post('/auth/merchant/register', data);
@@ -170,9 +176,35 @@ export const authAPI = {
     return response.data;
   },
 
+  // Merchant Login V2 with device trust support
+  loginMerchantV2: async (loginPayload) => {
+    const response = await api.post('/auth/merchant/login/v2', loginPayload);
+    return response.data;
+  },
+
   // Get current user
   getMe: async () => {
     const response = await api.get('/auth/me');
+    return response.data;
+  },
+
+  // List trusted devices
+  listDevices: async () => {
+    const response = await api.get('/auth/devices/list');
+    return response.data;
+  },
+
+  // Revoke a single device
+  revokeDevice: async (deviceCreatedAt) => {
+    const response = await api.post('/auth/devices/revoke', {
+      device_created_at: deviceCreatedAt
+    });
+    return response.data;
+  },
+
+  // Revoke all devices
+  revokeAllDevices: async () => {
+    const response = await api.post('/auth/devices/revoke-all');
     return response.data;
   },
 };

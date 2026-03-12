@@ -15,9 +15,13 @@
   - `GET /api/auth/devices/list` - List trusted devices
   - `POST /api/auth/devices/revoke` - Revoke single device
   - `POST /api/auth/devices/revoke-all` - Revoke all devices
-- Frontend: Added checkbox to client and merchant login forms
-- Mobile: Created `/app/mobile/src/utils/deviceTrust.js` for React Native
-- **Status**: ✅ Implemented and tested
+- Frontend Web: Added checkbox to client and merchant login forms
+- Mobile App Implementation:
+  - Updated `/app/mobile/src/screens/auth/LoginScreen.js` with toggle switch
+  - Updated `/app/mobile/src/contexts/AuthContext.js` with loginClientV2/loginMerchantV2
+  - Updated `/app/mobile/src/services/api.js` with v2 login endpoints
+  - Created `/app/mobile/src/utils/deviceTrust.js` for device token management
+- **Status**: ✅ Implemented and tested for Web and Mobile
 
 ### 2026-03-12 - Password Reset Improvements
 **Bug Fix: Admin Forgot Password "Network Error"**

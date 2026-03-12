@@ -1,6 +1,6 @@
 /**
  * SDM REWARDS Mobile - Login Screen
- * Animated & Attractive Design
+ * Animated & Attractive Design with Remember Device Feature
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -17,9 +17,11 @@ import {
   Easing,
   Image,
   Dimensions,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button, Input, LoadingOverlay } from '../../components/Common';
 import { useAuth } from '../../contexts/AuthContext';
 import { COLORS, SPACING, FONTS, normalizePhone } from '../../utils/constants';
@@ -27,14 +29,21 @@ import { COLORS, SPACING, FONTS, normalizePhone } from '../../utils/constants';
 const { width } = Dimensions.get('window');
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vc8llt43_WhatsApp%20Image%202026-03-04%20at%2020.16.26.jpeg";
 
+// Device Trust Keys
+const DEVICE_TOKEN_KEY_PREFIX = '@sdm_device_token_';
+
 export default function LoginScreen({ navigation, route }) {
   const { userType } = route.params || { userType: 'client' };
-  const { loginClient, loginMerchant } = useAuth();
+  const { loginClient, loginMerchant, loginClientV2, loginMerchantV2 } = useAuth();
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  
+  // Remember device state
+  const [rememberDevice, setRememberDevice] = useState(false);
+  const [deviceIsTrusted, setDeviceIsTrusted] = useState(false);
 
   // Animations
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -45,6 +54,52 @@ export default function LoginScreen({ navigation, route }) {
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   const isClient = userType === 'client';
+
+  // Check for existing device token on mount
+  useEffect(() => {
+    checkDeviceToken();
+  }, [userType]);
+
+  const checkDeviceToken = async () => {
+    try {
+      const key = `${DEVICE_TOKEN_KEY_PREFIX}${userType}`;
+      const token = await AsyncStorage.getItem(key);
+      setDeviceIsTrusted(!!token);
+    } catch (error) {
+      console.log('Error checking device token:', error);
+    }
+  };
+
+  // Get device info for registration
+  const getDeviceInfo = () => {
+    return {
+      device_name: `${Platform.OS === 'ios' ? 'iPhone' : 'Android'} Device`,
+      device_type: Platform.OS,
+      user_agent: `SDM-Mobile/${Platform.OS}/${Platform.Version}`,
+      platform: `${Platform.OS} ${Platform.Version}`,
+      browser: 'SDM Mobile App'
+    };
+  };
+
+  // Get stored device token
+  const getDeviceToken = async () => {
+    try {
+      const key = `${DEVICE_TOKEN_KEY_PREFIX}${userType}`;
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  // Store device token after successful login
+  const storeDeviceToken = async (token) => {
+    try {
+      const key = `${DEVICE_TOKEN_KEY_PREFIX}${userType}`;
+      await AsyncStorage.setItem(key, token);
+    } catch (error) {
+      console.log('Error storing device token:', error);
+    }
+  };
 
   useEffect(() => {
     // Entrance animations
@@ -143,13 +198,54 @@ export default function LoginScreen({ navigation, route }) {
     setLoading(true);
     try {
       const normalizedPhone = normalizePhone(phone);
+      const deviceToken = await getDeviceToken();
+      const deviceInfo = getDeviceInfo();
+      
+      // Use v2 login endpoints with device trust support
+      const loginPayload = {
+        phone: normalizedPhone,
+        password,
+        device_token: deviceToken,
+        remember_device: rememberDevice,
+        device_info: deviceInfo
+      };
+      
       const result = isClient
-        ? await loginClient(normalizedPhone, password)
-        : await loginMerchant(normalizedPhone, password);
+        ? await loginClientV2(loginPayload)
+        : await loginMerchantV2(loginPayload);
 
       if (!result.success) {
+        // Handle 2FA requirement
+        if (result.requires_2fa) {
+          Alert.alert(
+            'Verification Required',
+            'Please enter your 2FA code',
+            [{ text: 'OK' }]
+          );
+          // TODO: Navigate to 2FA screen
+          return;
+        }
         Alert.alert('Login Failed', result.error);
+        return;
       }
+      
+      // Store device token if provided (remember device was enabled)
+      if (result.device_token) {
+        await storeDeviceToken(result.device_token);
+        Alert.alert(
+          'Device Registered',
+          'This device is now trusted. You won\'t need to verify next time!',
+          [{ text: 'Great!' }]
+        );
+      } else if (result.device_trusted) {
+        // Device was already trusted, just show welcome
+        Alert.alert(
+          'Welcome Back!',
+          'Logged in from trusted device',
+          [{ text: 'OK' }]
+        );
+      }
+      
     } catch (error) {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
@@ -303,6 +399,42 @@ export default function LoginScreen({ navigation, route }) {
                   />
                 </LinearGradient>
               </View>
+            </View>
+
+            {/* Remember Device Toggle */}
+            <View style={styles.rememberDeviceContainer}>
+              <TouchableOpacity 
+                style={styles.rememberDeviceRow}
+                onPress={() => setRememberDevice(!rememberDevice)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.rememberDeviceLeft}>
+                  <Ionicons 
+                    name="phone-portrait-outline" 
+                    size={20} 
+                    color={rememberDevice ? COLORS.primary : COLORS.textSecondary} 
+                  />
+                  <View style={styles.rememberDeviceTextContainer}>
+                    <Text style={styles.rememberDeviceText}>Remember this device</Text>
+                    {deviceIsTrusted && (
+                      <View style={styles.trustedBadge}>
+                        <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                        <Text style={styles.trustedText}>Already trusted</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Switch
+                  value={rememberDevice}
+                  onValueChange={setRememberDevice}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: isClient ? '#F59E0B' : '#10B981' }}
+                  thumbColor={rememberDevice ? '#FFFFFF' : '#94A3B8'}
+                  ios_backgroundColor="rgba(255,255,255,0.1)"
+                />
+              </TouchableOpacity>
+              <Text style={styles.rememberDeviceHint}>
+                Skip verification on this device for 90 days
+              </Text>
             </View>
 
             <TouchableOpacity 
@@ -480,11 +612,50 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   forgotPasswordText: {
     color: COLORS.primary,
     fontSize: FONTS.sizes.md,
+  },
+  rememberDeviceContainer: {
+    marginBottom: SPACING.xl,
+    paddingHorizontal: SPACING.sm,
+  },
+  rememberDeviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.sm,
+  },
+  rememberDeviceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  rememberDeviceTextContainer: {
+    flex: 1,
+  },
+  rememberDeviceText: {
+    color: COLORS.text,
+    fontSize: FONTS.sizes.md,
+  },
+  trustedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  trustedText: {
+    color: '#10B981',
+    fontSize: FONTS.sizes.xs,
+  },
+  rememberDeviceHint: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.xs,
+    marginTop: SPACING.xs,
+    marginLeft: SPACING.xl + SPACING.sm,
   },
   loginButton: {
     flexDirection: 'row',
