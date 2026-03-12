@@ -47,18 +47,19 @@ export default function WelcomeScreen({ navigation }) {
   
   // Handle navigation - works on both native and web
   const handleNavigate = (userType) => {
-    // Direct approach that works on web
+    // Direct approach that works on web - use React Navigation
     try {
-      if (typeof window !== 'undefined') {
-        window.location.href = `https://web-boost-seo.preview.emergentagent.com/${userType}`;
-        return;
+      if (userType === 'client') {
+        navigation.navigate('Login', { userType: 'client' });
+      } else if (userType === 'merchant') {
+        navigation.navigate('MerchantLogin');
       }
     } catch (e) {
-      console.log('Web redirect failed', e);
-    }
-    // Fallback for native
-    if (navigation) {
-      navigation.navigate('Login', { userType });
+      // Fallback: use window.location for web
+      if (typeof window !== 'undefined') {
+        const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
+        window.location.href = baseUrl;
+      }
     }
   };
   
@@ -343,57 +344,58 @@ export default function WelcomeScreen({ navigation }) {
           styles.buttonsContainer,
           {
             transform: [{ translateY: buttonsTranslateY }],
+            zIndex: 100,
           },
         ]}
       >
         {/* I'm a Customer - Primary Orange Button */}
         <TouchableOpacity
-          onPress={() => {
-            // For web: use direct navigation
-            if (typeof window !== 'undefined' && window.location) {
-              window.location.href = '/client';
-            } else {
-              navigation.navigate('Login', { userType: 'client' });
-            }
-          }}
+          onPress={() => handleNavigate('client')}
           style={styles.customerButton}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="I'm a Customer"
         >
-          <LinearGradient
-            colors={['#F59E0B', '#EA580C', '#F59E0B']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
+          <View 
+            style={styles.gradientButtonWrapper}
+            onClick={() => Platform.OS === 'web' && handleNavigate('client')}
           >
-            <Ionicons name="person" size={28} color="#FFF" style={{ marginRight: 12 }} />
-            <Text style={styles.ctaButtonText}>I'm a Customer</Text>
-            <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
-          </LinearGradient>
+            <LinearGradient
+              colors={['#F59E0B', '#EA580C', '#F59E0B']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientButton}
+            >
+              <Ionicons name="person" size={28} color="#FFF" style={{ marginRight: 12 }} />
+              <Text style={styles.ctaButtonText}>I'm a Customer</Text>
+              <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
+            </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         {/* I'm a Merchant - Secondary Green Button */}
         <TouchableOpacity
-          onPress={() => {
-            // For web: use direct navigation
-            if (typeof window !== 'undefined' && window.location) {
-              window.location.href = '/merchant';
-            } else {
-              navigation.navigate('Login', { userType: 'merchant' });
-            }
-          }}
+          onPress={() => handleNavigate('merchant')}
           style={styles.merchantButton}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="I'm a Merchant"
         >
-          <LinearGradient
-            colors={['#10B981', '#059669', '#10B981']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
+          <View 
+            style={styles.gradientButtonWrapper}
+            onClick={() => Platform.OS === 'web' && handleNavigate('merchant')}
           >
-            <Ionicons name="storefront" size={28} color="#FFF" style={{ marginRight: 12 }} />
-            <Text style={styles.ctaButtonText}>I'm a Merchant</Text>
-            <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
-          </LinearGradient>
+            <LinearGradient
+              colors={['#10B981', '#059669', '#10B981']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientButton}
+            >
+              <Ionicons name="storefront" size={28} color="#FFF" style={{ marginRight: 12 }} />
+              <Text style={styles.ctaButtonText}>I'm a Merchant</Text>
+              <Ionicons name="arrow-forward" size={24} color="#FFF" style={{ marginLeft: 12 }} />
+            </LinearGradient>
+          </View>
         </TouchableOpacity>
       </Animated.View>
 
@@ -437,8 +439,8 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: verticalScale(20),
-    marginBottom: verticalScale(15),
+    marginTop: verticalScale(15),
+    marginBottom: verticalScale(10),
   },
   logoGlow: {
     position: 'absolute',
@@ -484,30 +486,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   features: {
-    marginBottom: verticalScale(12),
-    marginTop: verticalScale(8),
+    marginBottom: verticalScale(8),
+    marginTop: verticalScale(4),
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: verticalScale(10),
+    marginBottom: verticalScale(6),
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: moderateScale(12),
-    borderRadius: 12,
+    padding: moderateScale(10),
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   featureIcon: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
+    marginRight: SPACING.sm,
   },
   featureText: {
     color: COLORS.text,
-    fontSize: moderateScale(15),
+    fontSize: moderateScale(13),
     fontWeight: '500',
   },
   featureTextContainer: {
@@ -519,10 +521,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   buttonsContainer: {
-    marginTop: verticalScale(40),
-    gap: verticalScale(12),
-    paddingBottom: verticalScale(8),
+    marginTop: verticalScale(20),
+    gap: verticalScale(14),
+    paddingBottom: verticalScale(10),
     paddingHorizontal: moderateScale(4),
+    zIndex: 100,
   },
   customerButton: {
     borderRadius: moderateScale(16),
@@ -549,6 +552,9 @@ const styles = StyleSheet.create({
     paddingVertical: verticalScale(18),
     paddingHorizontal: moderateScale(20),
     minHeight: verticalScale(60),
+  },
+  gradientButtonWrapper: {
+    width: '100%',
   },
   ctaButtonText: {
     color: '#FFFFFF',
