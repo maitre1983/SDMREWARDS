@@ -51,6 +51,13 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 4. **Data Export**
    - Export all gamification data as JSON file
 
+5. **Live Preview - NEW**
+   - Interactive preview modal simulating user view
+   - XP slider to test different levels (0-15,000 XP)
+   - Dynamic level card showing name, XP, progress bar, bonus %
+   - Level perks display
+   - Missions preview with rewards and difficulty
+
 **Backend Endpoints Created:**
 - `GET /api/admin/gamification/config` - Get levels and missions config
 - `PUT /api/admin/gamification/levels` - Update level configuration

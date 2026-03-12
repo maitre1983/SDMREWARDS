@@ -8,7 +8,8 @@ import {
   Trophy, Star, Zap, Crown, Award, Target,
   Save, Loader2, RefreshCw, Users, Download,
   BarChart3, TrendingUp, Medal, Gift, Flame,
-  ChevronDown, ChevronUp, Calendar, RotateCcw
+  ChevronDown, ChevronUp, Calendar, RotateCcw,
+  Eye, X, CheckCircle, Clock, Smartphone
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -17,6 +18,7 @@ export default function SettingsGamification({ token }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('levels');
+  const [showPreview, setShowPreview] = useState(false);
   
   // Configuration data
   const [levels, setLevels] = useState([]);
@@ -168,14 +170,24 @@ export default function SettingsGamification({ token }) {
               <p className="text-slate-400 text-sm">Configurez les niveaux, XP et missions</p>
             </div>
           </div>
-          <Button
-            onClick={handleExportData}
-            variant="outline"
-            className="border-purple-500 text-purple-400 hover:bg-purple-500/10"
-            data-testid="export-gamification-btn"
-          >
-            <Download size={16} className="mr-2" /> Exporter
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowPreview(true)}
+              variant="outline"
+              className="border-cyan-500 text-cyan-400 hover:bg-cyan-500/10"
+              data-testid="preview-gamification-btn"
+            >
+              <Eye size={16} className="mr-2" /> Previsualiser
+            </Button>
+            <Button
+              onClick={handleExportData}
+              variant="outline"
+              className="border-purple-500 text-purple-400 hover:bg-purple-500/10"
+              data-testid="export-gamification-btn"
+            >
+              <Download size={16} className="mr-2" /> Exporter
+            </Button>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -641,6 +653,296 @@ export default function SettingsGamification({ token }) {
           </div>
         </div>
       )}
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <PreviewModal
+          levels={levels}
+          missions={missions}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============== PREVIEW MODAL COMPONENT ==============
+function PreviewModal({ levels, missions, onClose }) {
+  const [previewTab, setPreviewTab] = useState('levels');
+  const [previewXP, setPreviewXP] = useState(250);
+  
+  // Find current level based on XP
+  const getCurrentLevel = (xp) => {
+    for (const level of levels) {
+      const maxXp = level.max_xp === null ? Infinity : level.max_xp;
+      if (xp >= level.min_xp && xp <= maxXp) {
+        return level;
+      }
+    }
+    return levels[0] || { name: 'Unknown', color: '#94a3b8', level: 1 };
+  };
+
+  const currentLevel = getCurrentLevel(previewXP);
+  const nextLevel = levels.find(l => l.level === (currentLevel?.level || 0) + 1);
+  
+  // Calculate progress
+  const calculateProgress = () => {
+    if (!currentLevel || currentLevel.max_xp === null) return 100;
+    const range = currentLevel.max_xp - currentLevel.min_xp;
+    const current = previewXP - currentLevel.min_xp;
+    return Math.min(100, (current / range) * 100);
+  };
+
+  const getLevelIcon = (level) => {
+    const icons = { 1: Star, 2: TrendingUp, 3: Zap, 4: Crown, 5: Award };
+    return icons[level] || Star;
+  };
+
+  const LevelIcon = getLevelIcon(currentLevel?.level);
+
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-cyan-900/50 to-purple-900/50 border-b border-slate-700 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Smartphone className="text-cyan-400" size={24} />
+            <div>
+              <h2 className="text-white font-bold">Previsualisation Client</h2>
+              <p className="text-slate-400 text-xs">Vue utilisateur avec vos modifications</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Preview Content */}
+        <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+          {/* XP Slider to test levels */}
+          <div className="bg-slate-800 rounded-lg p-3 mb-4">
+            <Label className="text-slate-400 text-xs mb-2 block">
+              Testez avec differents niveaux d'XP:
+            </Label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="0"
+                max="15000"
+                value={previewXP}
+                onChange={(e) => setPreviewXP(parseInt(e.target.value))}
+                className="flex-1 accent-amber-500"
+              />
+              <span className="text-amber-400 font-bold min-w-[70px] text-right">
+                {previewXP.toLocaleString()} XP
+              </span>
+            </div>
+          </div>
+
+          {/* Level Card Preview */}
+          <div 
+            className="rounded-xl p-4 border mb-4"
+            style={{ 
+              background: `linear-gradient(135deg, ${currentLevel?.color || '#f59e0b'}20, transparent)`,
+              borderColor: `${currentLevel?.color || '#f59e0b'}40`
+            }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-14 h-14 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: `${currentLevel?.color || '#f59e0b'}30` }}
+                >
+                  <LevelIcon className="w-7 h-7" style={{ color: currentLevel?.color || '#f59e0b' }} />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-white">{currentLevel?.name || 'SDM Starter'}</p>
+                  <p className="text-sm text-slate-400">Niveau {currentLevel?.level || 1}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold" style={{ color: currentLevel?.color || '#f59e0b' }}>
+                  {previewXP.toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-500">XP</p>
+              </div>
+            </div>
+            
+            {/* XP Progress Bar */}
+            <div className="space-y-1">
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${calculateProgress()}%`,
+                    backgroundColor: currentLevel?.color || '#f59e0b'
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>{calculateProgress().toFixed(0)}%</span>
+                <span>
+                  {nextLevel ? `${(nextLevel.min_xp - previewXP).toLocaleString()} XP pour ${nextLevel.name}` : 'Niveau max atteint'}
+                </span>
+              </div>
+            </div>
+
+            {/* Bonus Display */}
+            <div className="mt-3 flex items-center gap-2">
+              <Gift className="text-green-400" size={16} />
+              <span className="text-green-400 text-sm font-medium">
+                Bonus Cashback: +{currentLevel?.cashback_bonus || 0}%
+              </span>
+            </div>
+
+            {/* Perks */}
+            {currentLevel?.perks?.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1">
+                {currentLevel.perks.map((perk, i) => (
+                  <span key={i} className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded-full">
+                    {perk}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Preview Tabs */}
+          <div className="flex gap-2 mb-4">
+            {['levels', 'missions'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setPreviewTab(tab)}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  previewTab === tab
+                    ? 'bg-amber-500 text-slate-900'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                {tab === 'levels' ? 'Niveaux' : 'Missions'}
+              </button>
+            ))}
+          </div>
+
+          {/* Levels Preview */}
+          {previewTab === 'levels' && (
+            <div className="space-y-2">
+              <h3 className="text-white font-medium mb-2">Tous les Niveaux:</h3>
+              {levels.map((level) => {
+                const Icon = getLevelIcon(level.level);
+                const isCurrent = level.level === currentLevel?.level;
+                return (
+                  <div
+                    key={level.level}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                      isCurrent 
+                        ? 'bg-slate-800 border-2' 
+                        : 'bg-slate-800/50'
+                    }`}
+                    style={{ borderColor: isCurrent ? level.color : 'transparent' }}
+                  >
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${level.color}30` }}
+                    >
+                      <Icon style={{ color: level.color }} size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium text-sm">{level.name}</p>
+                      <p className="text-slate-400 text-xs">
+                        {level.min_xp.toLocaleString()} - {level.max_xp ? level.max_xp.toLocaleString() : '+'} XP
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-green-400 text-sm font-medium">+{level.cashback_bonus}%</span>
+                      {isCurrent && (
+                        <p className="text-amber-400 text-xs">Actuel</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Missions Preview */}
+          {previewTab === 'missions' && (
+            <div className="space-y-4">
+              {/* Daily Missions */}
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3">
+                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  Quotidiennes
+                </h4>
+                <div className="space-y-2">
+                  {missions.daily?.map((mission, i) => (
+                    <MissionPreviewCard key={i} mission={mission} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Weekly Missions */}
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3">
+                <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-blue-400" />
+                  Hebdomadaires
+                </h4>
+                <div className="space-y-2">
+                  {missions.weekly?.map((mission, i) => (
+                    <MissionPreviewCard key={i} mission={mission} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Mission Preview Card
+function MissionPreviewCard({ mission }) {
+  const fakeProgress = Math.floor(Math.random() * mission.target);
+  const progressPercent = (fakeProgress / mission.target) * 100;
+  
+  return (
+    <div className="bg-slate-900/50 rounded-lg p-3">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
+          <p className="text-white font-medium text-sm">{mission.name}</p>
+          <p className="text-xs text-slate-500">{mission.description || `Objectif: ${mission.target}`}</p>
+        </div>
+        <div className="text-right flex-shrink-0 ml-2">
+          <span className="text-amber-400 text-sm font-medium">+{mission.xp_reward} XP</span>
+          {mission.cashback_reward > 0 && (
+            <p className="text-xs text-green-400">+GHS {mission.cashback_reward}</p>
+          )}
+        </div>
+      </div>
+      
+      {/* Progress */}
+      <div className="space-y-1">
+        <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+          <div 
+            className="h-full rounded-full bg-amber-500 transition-all"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-slate-500">
+          <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+            mission.difficulty === 'easy' ? 'bg-green-500/20 text-green-400' :
+            mission.difficulty === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+            'bg-red-500/20 text-red-400'
+          }`}>
+            {mission.difficulty === 'easy' ? 'Facile' : mission.difficulty === 'medium' ? 'Moyen' : 'Difficile'}
+          </span>
+          <span>{fakeProgress}/{mission.target}</span>
+        </div>
+      </div>
     </div>
   );
 }
