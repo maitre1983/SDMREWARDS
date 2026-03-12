@@ -546,6 +546,7 @@ from routers.seo import router as seo_router
 from routers.ai import router as ai_router
 from routers.notifications import router as notifications_router
 from routers.language import router as language_router
+from routers.growth import router as growth_router
 
 # Set database for payments router
 payments_router_module.set_db(db)
@@ -562,6 +563,7 @@ app.include_router(seo_router, tags=["SEO"])
 app.include_router(ai_router, prefix="/api/ai", tags=["AI"])
 app.include_router(notifications_router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(language_router, prefix="/api/language", tags=["Language"])
+app.include_router(growth_router, prefix="/api/growth", tags=["Growth & Gamification"])
 
 # ============== MOBILE APP STATIC FILES ==============
 import os

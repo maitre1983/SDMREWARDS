@@ -1,13 +1,14 @@
 # SDM REWARDS - Product Requirements Document
 
 ## Overview
-SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP card purchases, QR payments, referral bonuses, and comprehensive admin/merchant dashboards.
+SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP card purchases, QR payments, referral bonuses, AI-powered insights, gamification, and comprehensive admin/merchant dashboards.
 
 ## Core Requirements
-- **Language:** English (primary) with French option available
+- **Language:** English (primary) with French option available (auto-detected)
 - **Theme:** Dark fintech aesthetic with blue/gold accents
 - **Authentication:** JWT-based with OTP verification via BulkClix
 - **Payments:** BulkClix Mobile Money (MoMo) integration - LIVE
+- **AI Layer:** Gemini 3 Flash via Emergent LLM Key
 
 ## System Status
 **PRODUCTION MODE** - All BulkClix integrations are live:
@@ -17,9 +18,9 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ## Tech Stack
 - **Backend:** FastAPI, MongoDB (motor), JWT, Pydantic
 - **Frontend:** React, Tailwind CSS, Shadcn/UI, recharts, qrcode.react
-- **Mobile:** React Native (CashPaymentScreen tested and working)
-- **3rd Party:** BulkClix (payments, SMS, OTP, Airtime, Data Bundles), OneSignal (push notifications)
-- **AI/LLM:** Emergent LLM Key (OpenAI GPT-5.2 for SEO analysis)
+- **Mobile:** React Native (Expo)
+- **3rd Party:** BulkClix (payments, SMS), OneSignal (push), Resend (email)
+- **AI/LLM:** Emergent LLM Key (Gemini 3 Flash for AI features, GPT-5.2 for SEO)
 
 ---
 
@@ -382,6 +383,127 @@ crontab -e
 ---
 
 ## Future Tasks (Backlog)
+
+1. **ECG Payment Integration** - Ghana electricity payments
+2. **Two-Factor Authentication (2FA)** - Enhanced security
+3. **Offline Mode** - Mobile app offline transaction support
+
+---
+
+## AI Referral Growth System - COMPLETED 2026-03-12
+
+### Features
+- [x] **Smart Timing Detection** - AI identifies best moments to prompt referrals
+  - After earning cashback
+  - After completing transaction
+  - High engagement users
+  - Users with no referrals yet
+  
+- [x] **AI Message Generation** (Gemini)
+  - WhatsApp-optimized messages
+  - SMS-friendly short messages
+  - Professional email templates
+  - Telegram messages
+  
+- [x] **Multi-Channel Sharing**
+  - WhatsApp direct share
+  - SMS share
+  - Email share
+  - Telegram share
+  - QR Code display
+  - Copy to clipboard
+  
+- [x] **Ambassador Program**
+  - 25 referrals threshold
+  - 15% cashback bonus for Ambassadors
+  - Ambassador leaderboard
+  - Special perks and benefits
+  
+- [x] **Share Tracking**
+  - Track shares by platform
+  - Analytics on sharing behavior
+
+### API Endpoints
+- `GET /api/growth/referral/prompt` - Smart referral prompt data
+- `GET /api/growth/referral/messages` - AI-generated messages
+- `POST /api/growth/referral/track-share` - Track shares
+- `GET /api/growth/referral/ambassador-status` - Ambassador progress
+- `GET /api/growth/leaderboard/ambassadors` - Ambassador rankings
+
+---
+
+## SDM Rewards Missions (Gamification) - COMPLETED 2026-03-12
+
+### Level System
+| Level | Name | XP Required | Cashback Bonus |
+|-------|------|-------------|----------------|
+| 1 | SDM Starter | 0-499 | 0% |
+| 2 | SDM Builder | 500-1,499 | +2% |
+| 3 | SDM Pro | 1,500-3,999 | +5% |
+| 4 | SDM Elite | 4,000-9,999 | +10% |
+| 5 | SDM Ambassador | 10,000+ | +15% |
+
+### Mission Types
+- **Daily Missions** - Reset every 24 hours
+  - Daily Shopper (1 transaction)
+  - Spend GHS 20
+  - Share referral link
+  
+- **Weekly Missions** - Reset every Sunday
+  - Weekly Warrior (5 transactions)
+  - Bring a Friend (1 referral)
+  - Big Spender (GHS 100 spent)
+  
+- **Special Missions** - Time-limited challenges
+  - Referral Spree (5 referrals in 7 days)
+  - Merchant Explorer (3 different merchants)
+
+### Badge System
+- First Transaction, Referral Starter, Referral Pro, Referral Master
+- Big Spender, Loyal Customer, Mission Hunter, Streak Master
+- Early Adopter, Cashback King
+
+### Rewards
+- **XP** - Experience points for level progression
+- **Cashback Bonus** - Direct GHS rewards
+- **Badges** - Achievement recognition with XP bonuses
+- **Surprise Gifts** - Random rewards for Ambassadors
+
+### Features
+- [x] Activity streak tracking (daily login rewards)
+- [x] XP leaderboard
+- [x] Referral leaderboard
+- [x] Real-time progress tracking
+- [x] Mission auto-assignment
+- [x] Surprise gift system for Ambassadors
+
+### API Endpoints
+- `GET /api/growth/dashboard` - Complete gamification dashboard
+- `GET /api/growth/profile` - User's gamification profile
+- `GET /api/growth/missions` - Active missions
+- `GET /api/growth/levels` - All level definitions
+- `GET /api/growth/badges` - All badge definitions
+- `GET /api/growth/my-badges` - User's earned badges
+- `POST /api/growth/check-badges` - Check and award badges
+- `GET /api/growth/leaderboard/xp` - XP rankings
+- `GET /api/growth/leaderboard/referrals` - Referral rankings
+- `POST /api/growth/streak/update` - Update activity streak
+
+### Files Created
+**Backend:**
+- `/app/backend/services/gamification_service.py` - Gamification engine
+- `/app/backend/services/referral_growth_service.py` - Referral AI system
+- `/app/backend/routers/growth.py` - Growth & Gamification API
+
+**Frontend (Web):**
+- `/app/frontend/src/components/client/MissionsHub.jsx` - Missions page
+- `/app/frontend/src/components/client/ReferralShare.jsx` - Referral sharing modal
+
+**Mobile (React Native):**
+- `/app/mobile/src/screens/client/MissionsScreen.js` - Missions screen
+- `/app/mobile/src/screens/client/ReferralScreen.js` - Referral screen
+
+---
 
 1. **Client Cashback History** - Detailed usage view
 2. **ECG Payment** - Full integration

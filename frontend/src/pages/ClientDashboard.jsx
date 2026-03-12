@@ -12,6 +12,8 @@ import PaymentSettingsModal from '../components/client/PaymentSettingsModal';
 import AIAssistant from '../components/client/AIAssistant';
 import AIWidget from '../components/client/AIWidget';
 import NotificationSettings from '../components/client/NotificationSettings';
+import MissionsHub from '../components/client/MissionsHub';
+import ReferralShare from '../components/client/ReferralShare';
 import { useLanguage, LanguageSelector } from '../contexts/LanguageContext';
 import { QRCodeSVG } from 'qrcode.react';
 import ServicesPage from './ServicesPage';
@@ -55,7 +57,9 @@ import {
   Navigation,
   Search,
   Brain,
-  Bell
+  Bell,
+  Target,
+  Trophy
 } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -141,6 +145,9 @@ export default function ClientDashboard() {
   
   // Notification settings
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  
+  // Referral share modal
+  const [showReferralShare, setShowReferralShare] = useState(false);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -1626,7 +1633,15 @@ export default function ClientDashboard() {
         {activeTab === 'ai' && isActive && (
           <AIAssistant
             clientToken={token}
-            language={client?.language || 'en'}
+            language={language}
+          />
+        )}
+
+        {/* Missions Tab */}
+        {activeTab === 'missions' && isActive && (
+          <MissionsHub
+            clientToken={token}
+            language={language}
           />
         )}
 
@@ -1764,13 +1779,13 @@ export default function ClientDashboard() {
             <span className="text-xs">Home</span>
           </button>
           <button
-            onClick={() => setActiveTab('ai')}
-            className={`flex flex-col items-center gap-1 ${activeTab === 'ai' ? 'text-amber-400' : 'text-slate-500'}`}
+            onClick={() => setActiveTab('missions')}
+            className={`flex flex-col items-center gap-1 ${activeTab === 'missions' ? 'text-amber-400' : 'text-slate-500'}`}
             disabled={!isActive}
-            data-testid="nav-ai"
+            data-testid="nav-missions"
           >
-            <Brain size={22} />
-            <span className="text-xs">AI</span>
+            <Target size={22} />
+            <span className="text-xs">Missions</span>
           </button>
           <button
             onClick={() => { setActiveTab('qr'); }}
@@ -1782,20 +1797,22 @@ export default function ClientDashboard() {
             <span className="text-xs">QR Code</span>
           </button>
           <button
-            onClick={() => { setActiveTab('history'); fetchTransactions(); }}
-            className={`flex flex-col items-center gap-1 ${activeTab === 'history' ? 'text-amber-400' : 'text-slate-500'}`}
-            data-testid="nav-history"
+            onClick={() => setShowReferralShare(true)}
+            className={`flex flex-col items-center gap-1 text-slate-500 hover:text-amber-400`}
+            disabled={!isActive}
+            data-testid="nav-invite"
           >
-            <History size={22} />
-            <span className="text-xs">History</span>
+            <Share2 size={22} />
+            <span className="text-xs">Invite</span>
           </button>
           <button
-            onClick={() => { setActiveTab('referrals'); fetchReferrals(); }}
-            className={`flex flex-col items-center gap-1 ${activeTab === 'referrals' ? 'text-amber-400' : 'text-slate-500'}`}
-            data-testid="nav-referrals"
+            onClick={() => setActiveTab('ai')}
+            className={`flex flex-col items-center gap-1 ${activeTab === 'ai' ? 'text-amber-400' : 'text-slate-500'}`}
+            disabled={!isActive}
+            data-testid="nav-ai"
           >
-            <Users size={22} />
-            <span className="text-xs">Referrals</span>
+            <Brain size={22} />
+            <span className="text-xs">AI</span>
           </button>
         </div>
       </nav>
@@ -2041,6 +2058,21 @@ export default function ClientDashboard() {
               <NotificationSettings
                 clientToken={token}
                 language={language}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Referral Share Modal */}
+      {showReferralShare && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4">
+              <ReferralShare
+                clientToken={token}
+                language={language}
+                onClose={() => setShowReferralShare(false)}
               />
             </div>
           </div>
