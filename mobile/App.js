@@ -31,6 +31,9 @@ import WithdrawalScreen from './src/screens/client/WithdrawalScreen';
 import ProfileScreen from './src/screens/client/ProfileScreen';
 import CardScreen from './src/screens/client/CardScreen';
 import ContactsScreen from './src/screens/client/ContactsScreen';
+import MissionsScreen from './src/screens/client/MissionsScreen';
+import ReferralScreen from './src/screens/client/ReferralScreen';
+import AIAssistantScreen from './src/screens/client/AIAssistantScreen';
 
 // Merchant Screens
 import MerchantHomeScreen from './src/screens/merchant/HomeScreen';
@@ -67,6 +70,9 @@ function ClientMainNavigator() {
       <Stack.Screen name="CardDetails" component={CardScreen} />
       <Stack.Screen name="Cards" component={CardScreen} />
       <Stack.Screen name="Contacts" component={ContactsScreen} />
+      <Stack.Screen name="Missions" component={MissionsScreen} />
+      <Stack.Screen name="ReferralShare" component={ReferralScreen} />
+      <Stack.Screen name="AIAssistant" component={AIAssistantScreen} />
     </Stack.Navigator>
   );
 }

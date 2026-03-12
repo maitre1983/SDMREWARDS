@@ -401,6 +401,53 @@ export default function ClientHomeScreen({ navigation }) {
           </Animated.View>
         </View>
 
+        {/* AI & Gamification Section */}
+        <View style={styles.aiGamSection}>
+          <TouchableOpacity 
+            style={styles.aiCard}
+            onPress={() => navigation.navigate('AIAssistant')}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['rgba(168, 85, 247, 0.2)', 'rgba(168, 85, 247, 0.05)']}
+              style={styles.aiCardGradient}
+            >
+              <View style={styles.aiIconContainer}>
+                <Ionicons name="sparkles" size={24} color="#a855f7" />
+              </View>
+              <View style={styles.aiCardInfo}>
+                <Text style={styles.aiCardTitle}>AI Assistant</Text>
+                <Text style={styles.aiCardSubtitle}>Get personalized insights</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#64748b" />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.gamButtonsRow}>
+            <TouchableOpacity 
+              style={styles.gamButton}
+              onPress={() => navigation.navigate('Missions')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.gamIconContainer, { backgroundColor: '#f59e0b20' }]}>
+                <Ionicons name="trophy" size={20} color="#f59e0b" />
+              </View>
+              <Text style={styles.gamButtonText}>Missions</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.gamButton}
+              onPress={() => navigation.navigate('ReferralShare')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.gamIconContainer, { backgroundColor: '#22c55e20' }]}>
+                <Ionicons name="gift" size={20} color="#22c55e" />
+              </View>
+              <Text style={styles.gamButtonText}>Invite</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Recent Activity */}
         <Animated.View 
           style={[
@@ -898,5 +945,71 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+  },
+  // AI & Gamification Section Styles
+  aiGamSection: {
+    marginBottom: SPACING.lg,
+  },
+  aiCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: SPACING.md,
+  },
+  aiCardGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+  },
+  aiIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiCardInfo: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  aiCardTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.sizes.lg,
+    fontWeight: '600',
+  },
+  aiCardSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: FONTS.sizes.sm,
+    marginTop: 2,
+  },
+  gamButtonsRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  gamButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 41, 59, 0.8)',
+    borderRadius: 12,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(51, 65, 85, 0.5)',
+    gap: SPACING.sm,
+  },
+  gamIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gamButtonText: {
+    color: COLORS.text,
+    fontSize: FONTS.sizes.md,
+    fontWeight: '500',
   },
 });
