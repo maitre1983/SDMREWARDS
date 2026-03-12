@@ -61,10 +61,25 @@ export default function ForgotPassword({ userType = 'client', onBack, onSuccess 
         setStep(2);
         toast.success('OTP sent! Check your phone.');
       } else {
-        toast.error(data.detail || 'Failed to send OTP');
+        // More specific error messages
+        const errorMsg = data.detail || 'Failed to send OTP';
+        if (errorMsg.includes('rate limit') || res.status === 429) {
+          toast.error('Too many requests. Please wait a minute before trying again.');
+        } else if (errorMsg.includes('not found') || errorMsg.includes('not registered')) {
+          toast.error('Account not found. Please check your details.');
+        } else if (res.status === 503) {
+          toast.error('SMS service temporarily unavailable. Please try again in a moment.');
+        } else {
+          toast.error(errorMsg);
+        }
       }
     } catch (err) {
-      toast.error('Network error. Please try again.');
+      console.error('OTP request error:', err);
+      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+        toast.error('Connection error. Please check your internet and try again.');
+      } else {
+        toast.error('Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -124,10 +139,25 @@ export default function ForgotPassword({ userType = 'client', onBack, onSuccess 
         toast.success('Password reset successfully!');
         onSuccess?.();
       } else {
-        toast.error(data.detail || 'Failed to reset password');
+        // More specific error messages for password reset
+        const errorMsg = data.detail || 'Failed to reset password';
+        if (errorMsg.includes('Invalid OTP') || errorMsg.includes('expired')) {
+          toast.error('Invalid or expired OTP code. Please request a new one.');
+        } else if (errorMsg.includes('not found')) {
+          toast.error('Account not found. Please go back and try again.');
+        } else if (errorMsg.includes('password')) {
+          toast.error(errorMsg);
+        } else {
+          toast.error(errorMsg);
+        }
       }
     } catch (err) {
-      toast.error('Network error. Please try again.');
+      console.error('Password reset error:', err);
+      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+        toast.error('Connection error. Please check your internet and try again.');
+      } else {
+        toast.error('Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

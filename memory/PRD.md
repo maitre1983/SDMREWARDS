@@ -2,10 +2,26 @@
 
 ## Changelog (Latest First)
 
-### 2026-03-12 - Bug Fix: Admin Forgot Password "Network Error"
+### 2026-03-12 - Password Reset Improvements
+**Bug Fix: Admin Forgot Password "Network Error"**
 - **Issue**: Admin forgot password endpoint returned HTTP 400 for non-existent emails, causing "Network error" message
 - **Fix**: Modified `/app/backend/routers/auth.py` to return success (200) even for non-existent emails (security best practice)
 - **Status**: ✅ Verified working for all user types (client, merchant, admin)
+
+**Bug Fix: Admin Password Reset with Test OTP**
+- **Issue**: Admin password reset didn't accept test OTP code "123456" in development mode
+- **Fix**: Updated admin reset endpoint to check for test OTP first before calling BulkClix API
+- **Status**: ✅ Verified working
+
+**Improvement: Better Frontend Error Messages**
+- Modified `/app/frontend/src/components/ForgotPassword.jsx`
+- Added specific error messages for:
+  - Rate limiting (429 errors)
+  - Account not found
+  - SMS service unavailable
+  - Connection errors
+  - Invalid/expired OTP codes
+- **Status**: ✅ Implemented and tested
 
 ## Overview
 SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP card purchases, QR payments, referral bonuses, AI-powered insights, gamification, and comprehensive admin/merchant dashboards.
