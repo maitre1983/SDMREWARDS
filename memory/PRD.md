@@ -6,7 +6,7 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 ## Core Requirements
 - **Language:** English (primary) with French option available (auto-detected)
 - **Theme:** Dark fintech aesthetic with blue/gold accents
-- **Authentication:** JWT-based with OTP verification via BulkClix
+- **Authentication:** JWT-based with OTP verification via BulkClix + Optional 2FA
 - **Payments:** BulkClix Mobile Money (MoMo) integration - LIVE
 - **AI Layer:** Gemini 3 Flash via Emergent LLM Key
 
@@ -16,7 +16,7 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 - `SMS_TEST_MODE=false`
 
 ## Tech Stack
-- **Backend:** FastAPI, MongoDB (motor), JWT, Pydantic
+- **Backend:** FastAPI, MongoDB (motor), JWT, Pydantic, PyOTP
 - **Frontend:** React, Tailwind CSS, Shadcn/UI, recharts, qrcode.react
 - **Mobile:** React Native (Expo)
 - **3rd Party:** BulkClix (payments, SMS), OneSignal (push), Resend (email)
@@ -26,7 +26,44 @@ SDM REWARDS is a digital loyalty and cashback platform for Ghana, featuring VIP 
 
 ## Completed Features (Updated 2026-03-12)
 
-### ✅ NEW: Security Hardening - IMPLEMENTED 2026-03-12
+### ✅ NEW: Two-Factor Authentication (2FA) - IMPLEMENTED 2026-03-12
+**TOTP-based 2FA for enhanced account security:**
+
+1. **User Features**
+   - Setup via QR code (Google Authenticator, Authy compatible)
+   - 8 backup codes for account recovery
+   - Self-enable/disable (requires 2FA code to disable)
+   - Regenerate backup codes when needed
+
+2. **Admin Features**
+   - View all users with 2FA enabled
+   - Filter by user type (client, merchant, admin)
+   - **Admin can disable any user's 2FA** (audit logged)
+   - Reason tracking for admin overrides
+
+3. **Login Flow**
+   - After password verification, if 2FA enabled → requires 6-digit code
+   - Supports both TOTP codes and backup codes
+   - Rate limited: 10 attempts/minute
+
+**API Endpoints:**
+- `POST /api/2fa/{userType}/setup` - Initialize 2FA setup
+- `POST /api/2fa/{userType}/verify-setup` - Verify and enable
+- `POST /api/2fa/{userType}/disable` - Self-disable (requires code)
+- `GET /api/2fa/{userType}/status` - Check 2FA status
+- `POST /api/2fa/{userType}/backup-codes/regenerate` - New backup codes
+- `GET /api/2fa/admin/users-list` - List all 2FA users (admin)
+- `POST /api/2fa/admin/disable-user` - Admin disable user's 2FA
+- `POST /api/auth/complete-2fa` - Complete login with 2FA code
+
+**Files Created:**
+- `/app/backend/services/two_factor_service.py` - 2FA service with TOTP
+- `/app/backend/routers/two_factor.py` - 2FA API endpoints
+- `/app/frontend/src/components/TwoFactorSettings.jsx` - Settings UI
+- `/app/frontend/src/components/TwoFactorVerify.jsx` - Login verification UI
+- `/app/frontend/src/components/admin/Admin2FAManager.jsx` - Admin management
+
+### ✅ Security Hardening - IMPLEMENTED 2026-03-12
 **Complete security audit and hardening of the platform:**
 
 1. **JWT Secret Key Strengthened**

@@ -104,6 +104,12 @@ class AdminLoginRequest(BaseModel):
     password: str
 
 
+class Complete2FALoginRequest(BaseModel):
+    user_id: str
+    user_type: str  # 'client', 'merchant', 'admin'
+    code: str  # 2FA code
+
+
 
 class ResetPasswordRequest(BaseModel):
     phone: str
@@ -497,6 +503,17 @@ async def login_client(request: Request, login_request: ClientLoginRequest):
     if client_doc.get("status") == ClientStatus.DELETED.value:
         raise HTTPException(status_code=403, detail="Account deleted")
     
+    # Check if 2FA is enabled
+    if client_doc.get("two_factor_enabled"):
+        # Return partial response requiring 2FA verification
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "user_id": client_doc["id"],
+            "user_type": "client",
+            "message": "Please enter your 2FA code"
+        }
+    
     # Update last login
     await db.clients.update_one(
         {"id": client_doc["id"]},
@@ -607,6 +624,16 @@ async def login_merchant(request: Request, login_request: MerchantLoginRequest):
     if merchant_doc.get("status") == MerchantStatus.DELETED.value:
         raise HTTPException(status_code=403, detail="Account deleted")
     
+    # Check if 2FA is enabled
+    if merchant_doc.get("two_factor_enabled"):
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "user_id": merchant_doc["id"],
+            "user_type": "merchant",
+            "message": "Please enter your 2FA code"
+        }
+    
     # Update last login
     await db.merchants.update_one(
         {"id": merchant_doc["id"]},
@@ -644,6 +671,16 @@ async def login_admin(request: Request, login_request: AdminLoginRequest):
     if not admin_doc.get("is_active"):
         raise HTTPException(status_code=403, detail="Account disabled")
     
+    # Check if 2FA is enabled
+    if admin_doc.get("two_factor_enabled"):
+        return {
+            "success": True,
+            "requires_2fa": True,
+            "user_id": admin_doc["id"],
+            "user_type": "admin",
+            "message": "Please enter your 2FA code"
+        }
+    
     # Update last login
     await db.admins.update_one(
         {"id": admin_doc["id"]},
@@ -664,6 +701,107 @@ async def login_admin(request: Request, login_request: AdminLoginRequest):
             "is_super_admin": admin_doc.get("is_super_admin", False)
         }
     }
+
+
+# ============== 2FA LOGIN COMPLETION ==============
+
+@router.post("/complete-2fa")
+@limiter.limit("10/minute")
+async def complete_2fa_login(request: Request, login_request: Complete2FALoginRequest):
+    """
+    Complete login after 2FA verification.
+    Called after initial login returns requires_2fa=True.
+    """
+    from services.two_factor_service import get_2fa_service
+    
+    user_type = login_request.user_type
+    user_id = login_request.user_id
+    code = login_request.code
+    
+    # Get the 2FA service
+    service = get_2fa_service(db)
+    
+    # Verify 2FA code
+    success, message = await service.verify_2fa_login(user_id, user_type, code)
+    
+    if not success:
+        raise HTTPException(status_code=401, detail=message)
+    
+    # Get user data and create token
+    if user_type == "client":
+        user_doc = await db.clients.find_one({"id": user_id})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        await db.clients.update_one(
+            {"id": user_id},
+            {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        token = create_token(user_id, "client")
+        del user_doc["password_hash"]
+        del user_doc["_id"]
+        # Remove 2FA sensitive fields
+        user_doc.pop("two_factor_secret", None)
+        user_doc.pop("two_factor_backup_codes", None)
+        user_doc.pop("two_factor_setup", None)
+        
+        return {
+            "success": True,
+            "access_token": token,
+            "token_type": "bearer",
+            "client": user_doc
+        }
+    
+    elif user_type == "merchant":
+        user_doc = await db.merchants.find_one({"id": user_id})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        await db.merchants.update_one(
+            {"id": user_id},
+            {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        token = create_token(user_id, "merchant")
+        del user_doc["password_hash"]
+        del user_doc["_id"]
+        user_doc.pop("two_factor_secret", None)
+        user_doc.pop("two_factor_backup_codes", None)
+        user_doc.pop("two_factor_setup", None)
+        
+        return {
+            "success": True,
+            "access_token": token,
+            "token_type": "bearer",
+            "merchant": user_doc
+        }
+    
+    elif user_type == "admin":
+        user_doc = await db.admins.find_one({"id": user_id})
+        if not user_doc:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        await db.admins.update_one(
+            {"id": user_id},
+            {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+        token = create_token(user_id, "admin")
+        
+        return {
+            "success": True,
+            "access_token": token,
+            "token_type": "bearer",
+            "admin": {
+                "id": user_doc["id"],
+                "email": user_doc["email"],
+                "name": user_doc.get("name"),
+                "is_super_admin": user_doc.get("is_super_admin", False)
+            }
+        }
+    
+    raise HTTPException(status_code=400, detail="Invalid user type")
 
 
 # ============== TOKEN VALIDATION ==============
