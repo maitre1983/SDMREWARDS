@@ -1,6 +1,7 @@
 /**
  * SDM REWARDS Mobile - API Service
  * Handles all API calls to the backend
+ * Optimized for low-bandwidth connections
  */
 
 import axios from 'axios';
@@ -9,13 +10,57 @@ import { Platform } from 'react-native';
 // API Base URL - Change this to your production URL
 const API_BASE_URL = 'https://web-boost-seo.preview.emergentagent.com/api';
 
+// Create optimized axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 15000, // Reduced timeout for faster failure detection
   headers: {
     'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip, deflate', // Request compressed responses
   },
 });
+
+// Response cache for offline support
+const responseCache = new Map();
+const CACHE_TTL = 300000; // 5 minutes
+
+// Request interceptor - add retry logic and compression
+api.interceptors.request.use(
+  (config) => {
+    // Add timestamp for cache busting when needed
+    if (config.skipCache) {
+      config.params = { ...config.params, _t: Date.now() };
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor - cache responses and handle errors
+api.interceptors.response.use(
+  (response) => {
+    // Cache GET responses
+    if (response.config.method === 'get') {
+      const cacheKey = response.config.url;
+      responseCache.set(cacheKey, {
+        data: response.data,
+        timestamp: Date.now()
+      });
+    }
+    return response;
+  },
+  async (error) => {
+    // If offline, try to return cached data
+    if (!error.response && error.config?.method === 'get') {
+      const cacheKey = error.config.url;
+      const cached = responseCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < CACHE_TTL * 2) {
+        return { data: cached.data, fromCache: true };
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Storage helper for web/native compatibility
 const storage = {

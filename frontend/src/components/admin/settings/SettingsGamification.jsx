@@ -84,7 +84,7 @@ export default function SettingsGamification({ token }) {
   };
 
   const handleResetMissions = async (type) => {
-    if (!window.confirm(`Reinitialiser toutes les missions ${type} pour tous les utilisateurs ?`)) return;
+    if (!window.confirm(`Reset all ${type} missions for all users?`)) return;
     try {
       setIsSaving(true);
       await axios.post(`${API_URL}/api/admin/gamification/reset-missions`, { type }, { headers });
@@ -166,8 +166,8 @@ export default function SettingsGamification({ token }) {
           <div className="flex items-center gap-3">
             <Trophy className="text-amber-400" size={28} />
             <div>
-              <h2 className="text-xl font-bold text-white">Systeme de Gamification</h2>
-              <p className="text-slate-400 text-sm">Configurez les niveaux, XP et missions</p>
+              <h2 className="text-xl font-bold text-white">Gamification System</h2>
+              <p className="text-slate-400 text-sm">Configure levels, XP and missions</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -177,7 +177,7 @@ export default function SettingsGamification({ token }) {
               className="border-cyan-500 text-cyan-400 hover:bg-cyan-500/10"
               data-testid="preview-gamification-btn"
             >
-              <Eye size={16} className="mr-2" /> Previsualiser
+              <Eye size={16} className="mr-2" /> Preview
             </Button>
             <Button
               onClick={handleExportData}
@@ -185,7 +185,7 @@ export default function SettingsGamification({ token }) {
               className="border-purple-500 text-purple-400 hover:bg-purple-500/10"
               data-testid="export-gamification-btn"
             >
-              <Download size={16} className="mr-2" /> Exporter
+              <Download size={16} className="mr-2" /> Export
             </Button>
           </div>
         </div>
@@ -196,22 +196,22 @@ export default function SettingsGamification({ token }) {
             <div className="bg-slate-900/50 rounded-lg p-3 text-center">
               <Users className="text-blue-400 mx-auto mb-1" size={20} />
               <p className="text-2xl font-bold text-white">{stats.total_users || 0}</p>
-              <p className="text-slate-400 text-xs">Utilisateurs Actifs</p>
+              <p className="text-slate-400 text-xs">Active Users</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3 text-center">
               <Zap className="text-amber-400 mx-auto mb-1" size={20} />
               <p className="text-2xl font-bold text-white">{stats.total_xp || 0}</p>
-              <p className="text-slate-400 text-xs">XP Total Distribues</p>
+              <p className="text-slate-400 text-xs">Total XP Distributed</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3 text-center">
               <Target className="text-emerald-400 mx-auto mb-1" size={20} />
               <p className="text-2xl font-bold text-white">{stats.missions_completed || 0}</p>
-              <p className="text-slate-400 text-xs">Missions Completees</p>
+              <p className="text-slate-400 text-xs">Missions Completed</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3 text-center">
               <Medal className="text-purple-400 mx-auto mb-1" size={20} />
               <p className="text-2xl font-bold text-white">{stats.badges_awarded || 0}</p>
-              <p className="text-slate-400 text-xs">Badges Attribues</p>
+              <p className="text-slate-400 text-xs">Badges Awarded</p>
             </div>
           </div>
         )}
@@ -220,9 +220,9 @@ export default function SettingsGamification({ token }) {
       {/* Section Tabs */}
       <div className="flex gap-2 bg-slate-800 p-2 rounded-xl">
         {[
-          { id: 'levels', label: 'Niveaux & XP', icon: Trophy },
+          { id: 'levels', label: 'Levels & XP XP', icon: Trophy },
           { id: 'missions', label: 'Missions', icon: Target },
-          { id: 'analytics', label: 'Statistiques', icon: BarChart3 }
+          { id: 'analytics', label: 'Statistics', icon: BarChart3 }
         ].map(tab => (
           <button
             key={tab.id}
@@ -246,7 +246,7 @@ export default function SettingsGamification({ token }) {
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
               <Trophy className="text-amber-400" size={20} />
-              Configuration des Niveaux
+              Level Configuration
             </h3>
             <Button
               onClick={handleSaveLevels}
@@ -255,13 +255,13 @@ export default function SettingsGamification({ token }) {
               data-testid="save-levels-btn"
             >
               {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-              <span className="ml-2">Sauvegarder</span>
+              <span className="ml-2">Save</span>
             </Button>
           </div>
 
           <p className="text-slate-400 text-sm mb-6">
-            <strong>XP (Points d'Experience)</strong> : Les XP mesurent la progression de l'utilisateur. 
-            Chaque action (transaction, mission, parrainage) rapporte des XP qui permettent de monter de niveau.
+            <strong>XP (Experience Points)</strong>: XP measures user progression on the platform. 
+            Each action (transaction, mission, referral) earns XP that allows you to level up and unlock exclusive cashback bonuses.
           </p>
 
           <div className="space-y-4">
@@ -301,7 +301,7 @@ export default function SettingsGamification({ token }) {
                     <div className="p-4 border-t border-slate-700 space-y-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <Label className="text-slate-300">Nom du Niveau</Label>
+                          <Label className="text-slate-300">Level Name</Label>
                           <Input
                             value={level.name}
                             onChange={(e) => updateLevel(index, 'name', e.target.value)}
@@ -310,7 +310,7 @@ export default function SettingsGamification({ token }) {
                           />
                         </div>
                         <div>
-                          <Label className="text-slate-300">XP Minimum</Label>
+                          <Label className="text-slate-300">Min XP</Label>
                           <Input
                             type="number"
                             value={level.min_xp}
@@ -320,18 +320,18 @@ export default function SettingsGamification({ token }) {
                           />
                         </div>
                         <div>
-                          <Label className="text-slate-300">XP Maximum</Label>
+                          <Label className="text-slate-300">Max XP</Label>
                           <Input
                             type="number"
                             value={level.max_xp || ''}
                             onChange={(e) => updateLevel(index, 'max_xp', e.target.value ? parseInt(e.target.value) : null)}
-                            placeholder="Infini"
+                            placeholder="Unlimited"
                             className="mt-1 bg-slate-800 border-slate-600 text-white"
                             data-testid={`level-${level.level}-max-xp`}
                           />
                         </div>
                         <div>
-                          <Label className="text-slate-300">Bonus Cashback (%)</Label>
+                          <Label className="text-slate-300">Cashback Bonus (%)</Label>
                           <Input
                             type="number"
                             value={level.cashback_bonus}
@@ -342,7 +342,7 @@ export default function SettingsGamification({ token }) {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-slate-300">Couleur</Label>
+                        <Label className="text-slate-300">Color</Label>
                         <div className="flex items-center gap-2 mt-1">
                           <input
                             type="color"
@@ -358,7 +358,7 @@ export default function SettingsGamification({ token }) {
                         </div>
                       </div>
                       <div>
-                        <Label className="text-slate-300">Avantages (separes par virgule)</Label>
+                        <Label className="text-slate-300">Perks (comma separated)</Label>
                         <Input
                           value={level.perks?.join(', ') || ''}
                           onChange={(e) => updateLevel(index, 'perks', e.target.value.split(',').map(p => p.trim()))}
@@ -383,7 +383,7 @@ export default function SettingsGamification({ token }) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Calendar className="text-blue-400" size={20} />
-                Missions Quotidiennes
+                Daily Missions
               </h3>
               <div className="flex gap-2">
                 <Button
@@ -394,7 +394,7 @@ export default function SettingsGamification({ token }) {
                   disabled={isSaving}
                   data-testid="reset-daily-missions-btn"
                 >
-                  <RotateCcw size={14} className="mr-1" /> Reinitialiser
+                  <RotateCcw size={14} className="mr-1" /> Reset
                 </Button>
               </div>
             </div>
@@ -404,7 +404,7 @@ export default function SettingsGamification({ token }) {
                 <div key={mission.id} className="bg-slate-900 border border-slate-700 rounded-lg p-4">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div>
-                      <Label className="text-slate-400 text-xs">Nom</Label>
+                      <Label className="text-slate-400 text-xs">Name</Label>
                       <Input
                         value={mission.name}
                         onChange={(e) => updateMission('daily', index, 'name', e.target.value)}
@@ -412,7 +412,7 @@ export default function SettingsGamification({ token }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Objectif</Label>
+                      <Label className="text-slate-400 text-xs">Target</Label>
                       <Input
                         type="number"
                         value={mission.target}
@@ -421,7 +421,7 @@ export default function SettingsGamification({ token }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Recompense XP</Label>
+                      <Label className="text-slate-400 text-xs">XP Reward</Label>
                       <Input
                         type="number"
                         value={mission.xp_reward}
@@ -440,15 +440,15 @@ export default function SettingsGamification({ token }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Difficulte</Label>
+                      <Label className="text-slate-400 text-xs">Difficulty</Label>
                       <select
                         value={mission.difficulty}
                         onChange={(e) => updateMission('daily', index, 'difficulty', e.target.value)}
                         className="mt-1 w-full bg-slate-800 border border-slate-600 text-white text-sm rounded-md p-2"
                       >
-                        <option value="easy">Facile</option>
-                        <option value="medium">Moyen</option>
-                        <option value="hard">Difficile</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
                       </select>
                     </div>
                   </div>
@@ -462,7 +462,7 @@ export default function SettingsGamification({ token }) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Flame className="text-orange-400" size={20} />
-                Missions Hebdomadaires
+                Weekly Missions
               </h3>
               <div className="flex gap-2">
                 <Button
@@ -473,7 +473,7 @@ export default function SettingsGamification({ token }) {
                   disabled={isSaving}
                   data-testid="reset-weekly-missions-btn"
                 >
-                  <RotateCcw size={14} className="mr-1" /> Reinitialiser
+                  <RotateCcw size={14} className="mr-1" /> Reset
                 </Button>
               </div>
             </div>
@@ -483,7 +483,7 @@ export default function SettingsGamification({ token }) {
                 <div key={mission.id} className="bg-slate-900 border border-slate-700 rounded-lg p-4">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div>
-                      <Label className="text-slate-400 text-xs">Nom</Label>
+                      <Label className="text-slate-400 text-xs">Name</Label>
                       <Input
                         value={mission.name}
                         onChange={(e) => updateMission('weekly', index, 'name', e.target.value)}
@@ -491,7 +491,7 @@ export default function SettingsGamification({ token }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Objectif</Label>
+                      <Label className="text-slate-400 text-xs">Target</Label>
                       <Input
                         type="number"
                         value={mission.target}
@@ -500,7 +500,7 @@ export default function SettingsGamification({ token }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Recompense XP</Label>
+                      <Label className="text-slate-400 text-xs">XP Reward</Label>
                       <Input
                         type="number"
                         value={mission.xp_reward}
@@ -519,15 +519,15 @@ export default function SettingsGamification({ token }) {
                       />
                     </div>
                     <div>
-                      <Label className="text-slate-400 text-xs">Difficulte</Label>
+                      <Label className="text-slate-400 text-xs">Difficulty</Label>
                       <select
                         value={mission.difficulty}
                         onChange={(e) => updateMission('weekly', index, 'difficulty', e.target.value)}
                         className="mt-1 w-full bg-slate-800 border border-slate-600 text-white text-sm rounded-md p-2"
                       >
-                        <option value="easy">Facile</option>
-                        <option value="medium">Moyen</option>
-                        <option value="hard">Difficile</option>
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
                       </select>
                     </div>
                   </div>
@@ -545,7 +545,7 @@ export default function SettingsGamification({ token }) {
               data-testid="save-missions-btn"
             >
               {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-              <span className="ml-2">Sauvegarder les Missions</span>
+              <span className="ml-2">Save Missions</span>
             </Button>
           </div>
         </div>
@@ -558,7 +558,7 @@ export default function SettingsGamification({ token }) {
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Users className="text-blue-400" size={20} />
-              Repartition des Utilisateurs par Niveau
+              Users Distribution by Level
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {stats.users_by_level?.map((item) => (
@@ -584,16 +584,16 @@ export default function SettingsGamification({ token }) {
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Medal className="text-amber-400" size={20} />
-              Top 10 Utilisateurs par XP
+              Top 10 Users by XP
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="text-slate-400 text-sm border-b border-slate-700">
-                    <th className="text-left p-3">Rang</th>
-                    <th className="text-left p-3">Utilisateur</th>
+                    <th className="text-left p-3">Rank</th>
+                    <th className="text-left p-3">User</th>
                     <th className="text-right p-3">XP</th>
-                    <th className="text-left p-3">Niveau</th>
+                    <th className="text-left p-3">Level</th>
                     <th className="text-right p-3">Missions</th>
                   </tr>
                 </thead>
@@ -631,23 +631,23 @@ export default function SettingsGamification({ token }) {
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Target className="text-emerald-400" size={20} />
-              Statistiques de Completion des Missions
+              Statistics de Completion des Missions
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <h4 className="text-blue-400 font-medium mb-2">Missions Quotidiennes</h4>
+                <h4 className="text-blue-400 font-medium mb-2">Daily Missions</h4>
                 <p className="text-3xl font-bold text-white">{stats.daily_completion_rate || 0}%</p>
-                <p className="text-slate-400 text-sm">Taux de completion</p>
+                <p className="text-slate-400 text-sm">Completion rate</p>
               </div>
               <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
-                <h4 className="text-orange-400 font-medium mb-2">Missions Hebdomadaires</h4>
+                <h4 className="text-orange-400 font-medium mb-2">Weekly Missions</h4>
                 <p className="text-3xl font-bold text-white">{stats.weekly_completion_rate || 0}%</p>
-                <p className="text-slate-400 text-sm">Taux de completion</p>
+                <p className="text-slate-400 text-sm">Completion rate</p>
               </div>
               <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-                <h4 className="text-purple-400 font-medium mb-2">Missions Speciales</h4>
+                <h4 className="text-purple-400 font-medium mb-2">Special Missions</h4>
                 <p className="text-3xl font-bold text-white">{stats.special_completion_rate || 0}%</p>
-                <p className="text-slate-400 text-sm">Taux de completion</p>
+                <p className="text-slate-400 text-sm">Completion rate</p>
               </div>
             </div>
           </div>
@@ -674,7 +674,7 @@ function PreviewModal({ levels, missions, onClose }) {
   // Find current level based on XP
   const getCurrentLevel = (xp) => {
     for (const level of levels) {
-      const maxXp = level.max_xp === null ? Infinity : level.max_xp;
+      const maxXp = level.max_xp === null ? Unlimitedty : level.max_xp;
       if (xp >= level.min_xp && xp <= maxXp) {
         return level;
       }
@@ -708,8 +708,8 @@ function PreviewModal({ levels, missions, onClose }) {
           <div className="flex items-center gap-3">
             <Smartphone className="text-cyan-400" size={24} />
             <div>
-              <h2 className="text-white font-bold">Previsualisation Client</h2>
-              <p className="text-slate-400 text-xs">Vue utilisateur avec vos modifications</p>
+              <h2 className="text-white font-bold">Client Preview</h2>
+              <p className="text-slate-400 text-xs">User view with your changes</p>
             </div>
           </div>
           <button
@@ -725,7 +725,7 @@ function PreviewModal({ levels, missions, onClose }) {
           {/* XP Slider to test levels */}
           <div className="bg-slate-800 rounded-lg p-3 mb-4">
             <Label className="text-slate-400 text-xs mb-2 block">
-              Testez avec differents niveaux d'XP:
+              Test with different XP levels:
             </Label>
             <div className="flex items-center gap-3">
               <input
@@ -760,7 +760,7 @@ function PreviewModal({ levels, missions, onClose }) {
                 </div>
                 <div>
                   <p className="text-lg font-bold text-white">{currentLevel?.name || 'SDM Starter'}</p>
-                  <p className="text-sm text-slate-400">Niveau {currentLevel?.level || 1}</p>
+                  <p className="text-sm text-slate-400">Level {currentLevel?.level || 1}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -785,7 +785,7 @@ function PreviewModal({ levels, missions, onClose }) {
               <div className="flex justify-between text-xs text-slate-500">
                 <span>{calculateProgress().toFixed(0)}%</span>
                 <span>
-                  {nextLevel ? `${(nextLevel.min_xp - previewXP).toLocaleString()} XP pour ${nextLevel.name}` : 'Niveau max atteint'}
+                  {nextLevel ? `${(nextLevel.min_xp - previewXP).toLocaleString()} XP for ${nextLevel.name}` : 'Max level reached'}
                 </span>
               </div>
             </div>
@@ -794,7 +794,7 @@ function PreviewModal({ levels, missions, onClose }) {
             <div className="mt-3 flex items-center gap-2">
               <Gift className="text-green-400" size={16} />
               <span className="text-green-400 text-sm font-medium">
-                Bonus Cashback: +{currentLevel?.cashback_bonus || 0}%
+                Cashback Bonus: +{currentLevel?.cashback_bonus || 0}%
               </span>
             </div>
 
@@ -822,7 +822,7 @@ function PreviewModal({ levels, missions, onClose }) {
                     : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                 }`}
               >
-                {tab === 'levels' ? 'Niveaux' : 'Missions'}
+                {tab === 'levels' ? 'Levelx' : 'Missions'}
               </button>
             ))}
           </div>
@@ -830,7 +830,7 @@ function PreviewModal({ levels, missions, onClose }) {
           {/* Levels Preview */}
           {previewTab === 'levels' && (
             <div className="space-y-2">
-              <h3 className="text-white font-medium mb-2">Tous les Niveaux:</h3>
+              <h3 className="text-white font-medium mb-2">All Levels:</h3>
               {levels.map((level) => {
                 const Icon = getLevelIcon(level.level);
                 const isCurrent = level.level === currentLevel?.level;
@@ -859,7 +859,7 @@ function PreviewModal({ levels, missions, onClose }) {
                     <div className="text-right">
                       <span className="text-green-400 text-sm font-medium">+{level.cashback_bonus}%</span>
                       {isCurrent && (
-                        <p className="text-amber-400 text-xs">Actuel</p>
+                        <p className="text-amber-400 text-xs">Current</p>
                       )}
                     </div>
                   </div>
@@ -875,7 +875,7 @@ function PreviewModal({ levels, missions, onClose }) {
               <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3">
                 <h4 className="text-white font-medium mb-2 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-400" />
-                  Quotidiennes
+                  Daily
                 </h4>
                 <div className="space-y-2">
                   {missions.daily?.map((mission, i) => (
@@ -888,7 +888,7 @@ function PreviewModal({ levels, missions, onClose }) {
               <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-3">
                 <h4 className="text-white font-medium mb-2 flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-blue-400" />
-                  Hebdomadaires
+                  Weekly
                 </h4>
                 <div className="space-y-2">
                   {missions.weekly?.map((mission, i) => (
@@ -914,7 +914,7 @@ function MissionPreviewCard({ mission }) {
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
           <p className="text-white font-medium text-sm">{mission.name}</p>
-          <p className="text-xs text-slate-500">{mission.description || `Objectif: ${mission.target}`}</p>
+          <p className="text-xs text-slate-500">{mission.description || `Target: ${mission.target}`}</p>
         </div>
         <div className="text-right flex-shrink-0 ml-2">
           <span className="text-amber-400 text-sm font-medium">+{mission.xp_reward} XP</span>
@@ -938,7 +938,7 @@ function MissionPreviewCard({ mission }) {
             mission.difficulty === 'medium' ? 'bg-amber-500/20 text-amber-400' :
             'bg-red-500/20 text-red-400'
           }`}>
-            {mission.difficulty === 'easy' ? 'Facile' : mission.difficulty === 'medium' ? 'Moyen' : 'Difficile'}
+            {mission.difficulty === 'easy' ? 'Easy' : mission.difficulty === 'medium' ? 'Medium' : 'Hard'}
           </span>
           <span>{fakeProgress}/{mission.target}</span>
         </div>

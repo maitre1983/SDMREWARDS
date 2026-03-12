@@ -84,6 +84,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ============== GZIP COMPRESSION ==============
+from starlette.middleware.gzip import GZipMiddleware
+
+# Enable GZIP compression for responses > 500 bytes
+# This significantly reduces bandwidth usage for low-connectivity users
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # ============== SECURITY HEADERS MIDDLEWARE ==============
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
