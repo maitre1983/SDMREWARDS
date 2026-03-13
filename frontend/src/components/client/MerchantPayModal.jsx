@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Store, MapPin, Percent, CheckCircle, AlertCircle, 
-  Phone, Loader2, CreditCard, Banknote, Wallet, AlertTriangle, Smartphone
+  Phone, Loader2, CreditCard, Banknote, Wallet, AlertTriangle, Smartphone, RefreshCw
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -24,6 +24,8 @@ export default function MerchantPayModal({
   onConfirmTest,
   onCashPayment,
   onCashbackPayment,  // New: for cashback payments
+  onCheckCashStatus,  // New: for checking cash payment confirmation status
+  cashbackAmount = 0, // Cashback amount to display
   clientCashbackBalance = 0  // New: client's cashback balance
 }) {
   // Check if cash payment is available for this merchant
@@ -58,7 +60,8 @@ export default function MerchantPayModal({
   
   if (!merchant) return null;
 
-  const cashbackAmount = (parseFloat(amount) * (merchant.cashback_rate || 5) / 100 * 0.95).toFixed(2);
+  // Calculate cashback amount if not provided as prop
+  const calculatedCashbackAmount = cashbackAmount || (parseFloat(amount) * (merchant.cashback_rate || 5) / 100 * 0.95).toFixed(2);
 
   const handlePayment = () => {
     if (paymentMethod === 'cash' && onCashPayment) {
@@ -114,6 +117,30 @@ export default function MerchantPayModal({
             <p className="text-white text-lg font-semibold">Payment Successful!</p>
             <p className="text-emerald-400 mt-2">Cashback credited to your wallet</p>
           </div>
+        ) : status === 'cash_confirmed' ? (
+          <div className="text-center py-8">
+            <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <CheckCircle className="text-emerald-400" size={56} />
+            </div>
+            <div className="inline-flex items-center gap-2 bg-emerald-500 text-white px-6 py-2 rounded-full mb-4">
+              <CheckCircle size={20} />
+              <span className="font-bold text-lg">DONE</span>
+            </div>
+            <p className="text-white text-lg font-semibold">Payment Confirmed!</p>
+            <p className="text-emerald-400 mt-2">The merchant has confirmed your cash payment</p>
+            <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+              <p className="text-slate-300 text-sm">Cashback Credited:</p>
+              <p className="text-emerald-400 font-bold text-2xl">+GHS {calculatedCashbackAmount}</p>
+              <p className="text-slate-400 text-xs mt-1">Added to your wallet balance</p>
+            </div>
+            <Button
+              onClick={onClose}
+              className="mt-6 bg-emerald-500 hover:bg-emerald-600 w-full"
+            >
+              <CheckCircle className="mr-2" size={16} />
+              Done
+            </Button>
+          </div>
         ) : status === 'cash_success' ? (
           <div className="text-center py-8">
             <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -124,8 +151,20 @@ export default function MerchantPayModal({
             <p className="text-slate-400 text-sm mt-2">Please pay GHS {amount} in cash to the merchant</p>
             <div className="mt-4 p-3 bg-slate-800 rounded-lg">
               <p className="text-slate-400 text-sm">Potential Cashback:</p>
-              <p className="text-purple-400 font-bold text-lg">GHS {cashbackAmount}</p>
+              <p className="text-purple-400 font-bold text-lg">GHS {calculatedCashbackAmount}</p>
               <p className="text-slate-500 text-xs mt-1">Will be credited once merchant confirms receipt</p>
+            </div>
+            {/* Check Cash Payment Status Button */}
+            <div className="mt-4">
+              <Button
+                onClick={onCheckCashStatus}
+                disabled={isProcessing}
+                variant="outline"
+                className="w-full border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+              >
+                {isProcessing ? <Loader2 className="animate-spin mr-2" size={16} /> : <RefreshCw className="mr-2" size={16} />}
+                Check Status
+              </Button>
             </div>
           </div>
         ) : status === 'failed' ? (
@@ -151,7 +190,7 @@ export default function MerchantPayModal({
             {/* Cashback Preview */}
             <div className="mt-4 bg-slate-900 rounded-lg p-3">
               <p className="text-slate-400 text-sm">Expected Cashback</p>
-              <p className="text-emerald-400 text-xl font-bold">+GHS {cashbackAmount}</p>
+              <p className="text-emerald-400 text-xl font-bold">+GHS {calculatedCashbackAmount}</p>
             </div>
 
             {/* Check Status Button */}
@@ -418,7 +457,7 @@ export default function MerchantPayModal({
                 <div className="flex justify-between items-center">
                   <span className="text-slate-300">You'll earn</span>
                   <span className="text-emerald-400 text-xl font-bold">
-                    +GHS {cashbackAmount}
+                    +GHS {calculatedCashbackAmount}
                   </span>
                 </div>
               </div>

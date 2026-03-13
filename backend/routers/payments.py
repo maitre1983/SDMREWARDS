@@ -823,6 +823,54 @@ async def get_payment_status(payment_id: str):
     }
 
 
+@router.get("/cash/status")
+async def check_cash_payment_status(
+    client_phone: str,
+    merchant_id: str
+):
+    """
+    Check the status of a pending cash payment.
+    Returns the latest cash payment between this client and merchant.
+    """
+    # Find the latest pending/confirmed cash payment
+    payment = await db.momo_payments.find_one(
+        {
+            "type": "merchant_cash_payment",
+            "client_phone": client_phone,
+            "merchant_id": merchant_id,
+            "status": {"$in": ["pending", "confirmed", "completed"]}
+        },
+        {"_id": 0},
+        sort=[("created_at", -1)]  # Most recent first
+    )
+    
+    if not payment:
+        # Also check legacy field names
+        payment = await db.momo_payments.find_one(
+            {
+                "type": "merchant_cash_payment",
+                "phone": client_phone,
+                "merchant_id": merchant_id,
+                "status": {"$in": ["pending", "confirmed", "completed"]}
+            },
+            {"_id": 0},
+            sort=[("created_at", -1)]
+        )
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail="No cash payment found")
+    
+    return {
+        "success": True,
+        "payment_id": payment.get("id"),
+        "status": payment.get("status", "pending"),
+        "amount": payment.get("amount"),
+        "cashback_amount": payment.get("cashback_amount", 0),
+        "confirmed_at": payment.get("confirmed_at"),
+        "created_at": payment.get("created_at")
+    }
+
+
 @router.post("/callback")
 async def payment_callback(request: Request):
     """BulkClix payment callback webhook"""

@@ -652,6 +652,42 @@ export default function ClientDashboard() {
     }
   };
 
+  // ============== CHECK CASH PAYMENT STATUS ==============
+  const [currentCashPaymentId, setCurrentCashPaymentId] = useState(null);
+  
+  const checkCashPaymentStatus = async () => {
+    if (!currentCashPaymentId && !selectedMerchant) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      // Get latest pending cash payment for this client/merchant
+      const res = await axios.get(`${API_URL}/api/payments/cash/status`, {
+        params: {
+          client_phone: client?.phone,
+          merchant_id: selectedMerchant?.id || selectedMerchant?._id
+        },
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('sdm_client_token')}`
+        }
+      });
+      
+      if (res.data.status === 'confirmed' || res.data.status === 'completed') {
+        setMerchantPayStatus('cash_confirmed');
+        toast.success('Payment confirmed! Cashback credited to your wallet.');
+        fetchDashboardData();
+      } else if (res.data.status === 'pending') {
+        toast.info('Still awaiting merchant confirmation...');
+      } else if (res.data.status === 'rejected') {
+        setMerchantPayStatus('failed');
+        toast.error('Payment was rejected by merchant');
+      }
+    } catch (error) {
+      toast.error('Could not check payment status');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
   // ============== CASHBACK PAYMENT TO MERCHANT ==============
   
   const initiateCashbackPayment = async ({ paymentMethod, cashbackToUse, momoToUse, momoPhone }) => {
@@ -2002,6 +2038,8 @@ export default function ClientDashboard() {
           onConfirmTest={confirmMerchantTestPayment}
           onCashPayment={initiateCashPayment}
           onCashbackPayment={initiateCashbackPayment}
+          onCheckCashStatus={checkCashPaymentStatus}
+          cashbackAmount={((parseFloat(merchantPayAmount) || 0) * (selectedMerchant?.cashback_rate || 5) / 100).toFixed(2)}
           clientCashbackBalance={client?.cashback_balance || 0}
         />
       )}
