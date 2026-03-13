@@ -76,6 +76,8 @@ import {
 
 // Shared Components
 import ForgotPassword from '../components/ForgotPassword';
+import { Checkbox } from '../components/ui/checkbox';
+import { getDeviceInfo, getDeviceToken, storeDeviceToken, hasDeviceToken } from '../utils/deviceTrust';
 
 // API URL imported from config
 import { API_URL } from '@/config/api';
@@ -97,6 +99,10 @@ export default function AdminDashboard() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  
+  // Remember device state
+  const [rememberDevice, setRememberDevice] = useState(false);
+  const [deviceIsTrusted, setDeviceIsTrusted] = useState(false);
   
   // Data states
   const [stats, setStats] = useState(null);
@@ -205,6 +211,8 @@ export default function AdminDashboard() {
       setIsLoading(false);
       setShowLogin(true);
     }
+    // Check if this device is already trusted
+    setDeviceIsTrusted(hasDeviceToken('admin'));
   }, [token]);
 
   const verifyToken = async () => {
@@ -238,10 +246,27 @@ export default function AdminDashboard() {
 
     setLoginLoading(true);
     try {
-      const res = await axios.post(`${API_URL}/api/auth/admin/login`, {
+      // Use enhanced login endpoint with device trust support
+      const loginPayload = {
         email,
-        password
-      });
+        password,
+        device_token: getDeviceToken('admin'),
+        remember_device: rememberDevice,
+        device_info: getDeviceInfo()
+      };
+      
+      const res = await axios.post(`${API_URL}/api/auth/admin/login/v2`, loginPayload);
+      
+      // Handle 2FA requirement
+      if (res.data.requires_2fa) {
+        toast.info('Please enter your 2FA code');
+        // Store user info for 2FA completion
+        sessionStorage.setItem('pending_2fa', JSON.stringify({
+          user_id: res.data.user_id,
+          user_type: res.data.user_type
+        }));
+        return;
+      }
       
       const newToken = res.data.access_token;
       localStorage.setItem('sdm_admin_token', newToken);
@@ -249,7 +274,15 @@ export default function AdminDashboard() {
       setAdmin(res.data.admin);
       setShowLogin(false);
       
-      toast.success('Login successful!');
+      // Store device token if provided (remember device was enabled)
+      if (res.data.device_token) {
+        storeDeviceToken('admin', res.data.device_token);
+        toast.success('Device registered! You won\'t need to verify on this device next time.');
+      } else if (res.data.device_trusted) {
+        toast.success('Welcome back from your trusted device!');
+      } else {
+        toast.success('Login successful!');
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Login failed');
     } finally {
@@ -1356,6 +1389,27 @@ export default function AdminDashboard() {
                     )}
                   </button>
                 </div>
+              </div>
+
+              {/* Remember Device Checkbox */}
+              <div className="flex items-center space-x-3 py-2">
+                <Checkbox 
+                  id="admin-remember-device"
+                  checked={rememberDevice}
+                  onCheckedChange={setRememberDevice}
+                  className="border-slate-600 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                  data-testid="admin-remember-device-checkbox"
+                />
+                <label 
+                  htmlFor="admin-remember-device" 
+                  className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-slate-300"
+                >
+                  <Smartphone size={14} />
+                  Remember this device
+                  {deviceIsTrusted && (
+                    <span className="text-xs text-emerald-400 ml-1">(Already trusted)</span>
+                  )}
+                </label>
               </div>
 
               <Button
