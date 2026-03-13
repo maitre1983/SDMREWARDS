@@ -576,9 +576,13 @@ from routers.notifications import router as notifications_router
 from routers.language import router as language_router
 from routers.growth import router as growth_router
 from routers.two_factor import router as two_factor_router
+from routers import integration as integration_router_module
 
 # Set database for payments router
 payments_router_module.set_db(db)
+
+# Set database for integration router
+integration_router_module.set_database(db)
 
 # ============== REGISTER ROUTERS ==============
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
@@ -594,6 +598,7 @@ app.include_router(notifications_router, prefix="/api/notifications", tags=["Not
 app.include_router(language_router, prefix="/api/language", tags=["Language"])
 app.include_router(growth_router, prefix="/api/growth", tags=["Growth & Gamification"])
 app.include_router(two_factor_router, prefix="/api/2fa", tags=["Two-Factor Authentication"])
+app.include_router(integration_router_module.router, prefix="/api", tags=["Integration API"])
 
 # ============== MOBILE APP STATIC FILES ==============
 import os
