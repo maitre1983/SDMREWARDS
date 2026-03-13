@@ -1,22 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import QRScanner from '../components/QRScanner';
-import ReferralQRCode from '../components/client/ReferralQRCode';
-import MerchantPayModal from '../components/client/MerchantPayModal';
-import WithdrawalModal from '../components/client/WithdrawalModal';
-import PaymentSettingsModal from '../components/client/PaymentSettingsModal';
-import AIAssistant from '../components/client/AIAssistant';
-import AIWidget from '../components/client/AIWidget';
-import NotificationSettings from '../components/client/NotificationSettings';
-import MissionsHub from '../components/client/MissionsHub';
-import ReferralShare from '../components/client/ReferralShare';
 import { useLanguage, LanguageSelector } from '../contexts/LanguageContext';
 import { QRCodeSVG } from 'qrcode.react';
-import ServicesPage from './ServicesPage';
+
+// Lazy load heavy components
+const QRScanner = lazy(() => import('../components/QRScanner'));
+const ReferralQRCode = lazy(() => import('../components/client/ReferralQRCode'));
+const MerchantPayModal = lazy(() => import('../components/client/MerchantPayModal'));
+const WithdrawalModal = lazy(() => import('../components/client/WithdrawalModal'));
+const PaymentSettingsModal = lazy(() => import('../components/client/PaymentSettingsModal'));
+const AIAssistant = lazy(() => import('../components/client/AIAssistant'));
+const AIWidget = lazy(() => import('../components/client/AIWidget'));
+const NotificationSettings = lazy(() => import('../components/client/NotificationSettings'));
+const MissionsHub = lazy(() => import('../components/client/MissionsHub'));
+const ReferralShare = lazy(() => import('../components/client/ReferralShare'));
+const ServicesPage = lazy(() => import('./ServicesPage'));
+
+// Mini loader for lazy components
+const MiniLoader = () => (
+  <div className="flex items-center justify-center p-4">
+    <div className="w-6 h-6 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+  </div>
+);
 import { 
   Sparkles, 
   CreditCard, 

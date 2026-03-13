@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -56,16 +56,26 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-// Admin Components
-import ServiceFeesAnalytics from '../components/admin/ServiceFeesAnalytics';
-import CardTypesManager from '../components/admin/CardTypesManager';
-import AdminOverview from '../components/admin/AdminOverview';
-import AdminClients from '../components/admin/AdminClients';
-import AdminMerchants from '../components/admin/AdminMerchants';
-import SEODashboard from '../components/admin/SEODashboard';
-import AdminSettings from '../components/admin/AdminSettings';
+// Lazy load admin components for better performance
+const ServiceFeesAnalytics = lazy(() => import('../components/admin/ServiceFeesAnalytics'));
+const CardTypesManager = lazy(() => import('../components/admin/CardTypesManager'));
+const AdminOverview = lazy(() => import('../components/admin/AdminOverview'));
+const AdminClients = lazy(() => import('../components/admin/AdminClients'));
+const AdminMerchants = lazy(() => import('../components/admin/AdminMerchants'));
+const SEODashboard = lazy(() => import('../components/admin/SEODashboard'));
+const AdminSettings = lazy(() => import('../components/admin/AdminSettings'));
 
-// Modals
+// Mini loader for lazy components
+const TabLoader = () => (
+  <div className="flex items-center justify-center p-12 bg-slate-900/50 rounded-xl">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-10 h-10 border-3 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+      <p className="text-slate-400 text-sm">Loading...</p>
+    </div>
+  </div>
+);
+
+// Modals - keep synchronous for immediate response
 import {
   LimitsModal,
   LocationModal,
@@ -1607,25 +1617,27 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <AdminOverview
-            stats={stats}
-            advancedStats={advancedStats}
-            clients={clients}
-            merchants={merchants}
-            token={token}
-            getStatusBadge={getStatusBadge}
-            selectedMonth={selectedMonth}
-            setSelectedMonth={setSelectedMonth}
-            monthlyStats={monthlyStats}
-            loadingMonthlyStats={loadingMonthlyStats}
-            paymentMethods={globalPaymentMethods}
-            cashbackEcosystem={cashbackEcosystem}
-          />
+          <Suspense fallback={<TabLoader />}>
+            <AdminOverview
+              stats={stats}
+              advancedStats={advancedStats}
+              clients={clients}
+              merchants={merchants}
+              token={token}
+              getStatusBadge={getStatusBadge}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              monthlyStats={monthlyStats}
+              loadingMonthlyStats={loadingMonthlyStats}
+              paymentMethods={globalPaymentMethods}
+              cashbackEcosystem={cashbackEcosystem}
+            />
+          </Suspense>
         )}
 
         {/* Clients Tab */}
         {activeTab === 'clients' && (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <AdminClients
               clients={clients}
               searchQuery={searchQuery}
@@ -1648,12 +1660,12 @@ export default function AdminDashboard() {
               totalItems={filteredClients.length}
               itemsPerPage={ITEMS_PER_PAGE}
             />
-          </>
+          </Suspense>
         )}
 
         {/* Merchants Tab */}
         {activeTab === 'merchants' && (
-          <>
+          <Suspense fallback={<TabLoader />}>
             <AdminMerchants
               merchants={merchants}
               searchQuery={searchQuery}
@@ -1679,23 +1691,27 @@ export default function AdminDashboard() {
               totalItems={filteredMerchants.length}
               itemsPerPage={ITEMS_PER_PAGE}
             />
-          </>
+          </Suspense>
         )}
 
         {/* SEO & Analytics Tab */}
         {activeTab === 'seo' && (
-          <SEODashboard token={token} />
+          <Suspense fallback={<TabLoader />}>
+            <SEODashboard token={token} />
+          </Suspense>
         )}
 
         {/* Settings Tab */}
         {activeTab === 'settings' && (
-          <AdminSettings 
-            token={token}
-            admin={admin}
-            pinVerified={pinVerified}
-            setPinVerified={setPinVerified}
-            setShowPinModal={setShowPinModal}
-          />
+          <Suspense fallback={<TabLoader />}>
+            <AdminSettings 
+              token={token}
+              admin={admin}
+              pinVerified={pinVerified}
+              setPinVerified={setPinVerified}
+              setShowPinModal={setShowPinModal}
+            />
+          </Suspense>
         )}
       </div>
 

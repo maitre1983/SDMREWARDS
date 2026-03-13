@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -43,16 +43,23 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
-// Merchant Components
-import PinModal from '../components/merchant/PinModal';
-import ForgotPinModal from '../components/merchant/ForgotPinModal';
-import CashierManager from '../components/merchant/CashierManager';
-import BusinessInfoEditor from '../components/merchant/BusinessInfoEditor';
-import PinSettings from '../components/merchant/PinSettings';
-import AdvancedDashboard from '../components/merchant/AdvancedDashboard';
-import MonthlyStatements from '../components/merchant/MonthlyStatements';
-import APIKeysManager from '../components/merchant/APIKeysManager';
-import WebhooksManager from '../components/merchant/WebhooksManager';
+// Lazy load merchant components for better performance
+const PinModal = lazy(() => import('../components/merchant/PinModal'));
+const ForgotPinModal = lazy(() => import('../components/merchant/ForgotPinModal'));
+const CashierManager = lazy(() => import('../components/merchant/CashierManager'));
+const BusinessInfoEditor = lazy(() => import('../components/merchant/BusinessInfoEditor'));
+const PinSettings = lazy(() => import('../components/merchant/PinSettings'));
+const AdvancedDashboard = lazy(() => import('../components/merchant/AdvancedDashboard'));
+const MonthlyStatements = lazy(() => import('../components/merchant/MonthlyStatements'));
+const APIKeysManager = lazy(() => import('../components/merchant/APIKeysManager'));
+const WebhooksManager = lazy(() => import('../components/merchant/WebhooksManager'));
+
+// Mini loader for lazy components
+const MiniLoader = () => (
+  <div className="flex items-center justify-center p-8">
+    <div className="w-8 h-8 border-3 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+  </div>
+);
 
 // API URL imported from config
 import { API_URL } from '@/config/api';
