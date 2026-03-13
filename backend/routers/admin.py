@@ -2411,6 +2411,9 @@ async def create_merchant_manual(
     password_hash = bcrypt.hashpw(temp_password.encode(), bcrypt.gensalt()).decode()
     
     merchant_id = str(uuid.uuid4())[:8]
+    payment_qr_code = f"SDM-PAY-{merchant_id.upper()}-{uuid.uuid4().hex[:6].upper()}"
+    recruitment_qr_code = f"SDM-REF-{merchant_id.upper()}-{uuid.uuid4().hex[:6].upper()}"
+    
     merchant_data = {
         "id": merchant_id,
         "business_name": request.business_name,
@@ -2424,6 +2427,8 @@ async def create_merchant_manual(
         "business_address": request.address,
         "google_maps_url": request.google_maps_url,
         "qr_code": f"SDM-MERCHANT-{merchant_id.upper()}",
+        "payment_qr_code": payment_qr_code,
+        "recruitment_qr_code": recruitment_qr_code,
         "total_transactions": 0,
         "total_revenue": 0,
         "debit_account": {
