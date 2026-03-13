@@ -832,38 +832,65 @@ async def check_cash_payment_status(
     Check the status of a pending cash payment.
     Returns the latest cash payment between this client and merchant.
     """
-    # Find the latest pending/confirmed cash payment
-    payment = await db.momo_payments.find_one(
+    # Normalize phone number - try multiple formats
+    phone_variants = [client_phone]
+    if client_phone.startswith('+'):
+        phone_variants.append(client_phone[1:])  # Without +
+        phone_variants.append(client_phone[4:])  # Without +233
+    elif client_phone.startswith('233'):
+        phone_variants.append('+' + client_phone)  # With +
+        phone_variants.append(client_phone[3:])  # Without 233
+    elif client_phone.startswith('0'):
+        phone_variants.append('+233' + client_phone[1:])  # Convert 0 to +233
+        phone_variants.append('233' + client_phone[1:])  # Convert 0 to 233
+    else:
+        phone_variants.append('+233' + client_phone)
+        phone_variants.append('233' + client_phone)
+        phone_variants.append('0' + client_phone)
+    
+    # Cash payments are stored in 'transactions' collection
+    # They have type="payment" and payment_method="cash"
+    payment = await db.transactions.find_one(
         {
-            "type": "merchant_cash_payment",
-            "client_phone": client_phone,
+            "payment_method": "cash",
+            "client_phone": {"$in": phone_variants},
             "merchant_id": merchant_id,
-            "status": {"$in": ["pending", "confirmed", "completed"]}
+            "status": {"$in": ["pending_confirmation", "confirmed", "completed"]}
         },
         {"_id": 0},
         sort=[("created_at", -1)]  # Most recent first
     )
     
     if not payment:
-        # Also check legacy field names
-        payment = await db.momo_payments.find_one(
-            {
-                "type": "merchant_cash_payment",
-                "phone": client_phone,
-                "merchant_id": merchant_id,
-                "status": {"$in": ["pending", "confirmed", "completed"]}
-            },
-            {"_id": 0},
-            sort=[("created_at", -1)]
+        # Try with client_id lookup
+        client = await db.clients.find_one(
+            {"phone": {"$in": phone_variants}}, 
+            {"_id": 0, "id": 1}
         )
+        if client:
+            payment = await db.transactions.find_one(
+                {
+                    "payment_method": "cash",
+                    "client_id": client["id"],
+                    "merchant_id": merchant_id,
+                    "status": {"$in": ["pending_confirmation", "confirmed", "completed"]}
+                },
+                {"_id": 0},
+                sort=[("created_at", -1)]
+            )
     
     if not payment:
         raise HTTPException(status_code=404, detail="No cash payment found")
     
+    # Map status for frontend
+    status = payment.get("status", "pending_confirmation")
+    if status == "pending_confirmation":
+        status = "pending"
+    
     return {
         "success": True,
         "payment_id": payment.get("id"),
-        "status": payment.get("status", "pending"),
+        "status": status,
         "amount": payment.get("amount"),
         "cashback_amount": payment.get("cashback_amount", 0),
         "confirmed_at": payment.get("confirmed_at"),
