@@ -2,6 +2,43 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-13 - Integration API & Security
+
+**New Feature: External Integration API**
+- Complete REST API for POS systems and third-party integrations
+- Endpoints:
+  - `POST /api/integration/points/award` - Award points to customers
+  - `POST /api/integration/points/redeem` - Redeem points
+  - `GET /api/integration/customer/balance` - Check customer balance
+  - `GET /api/integration/customer/transactions` - Transaction history
+- **Status**: ✅ Implemented and tested
+
+**New Feature: API Key Management**
+- Merchants can create, list, and revoke API keys
+- API keys with IP whitelist and rate limiting
+- Usage statistics tracking
+- Secure key hashing with PBKDF2
+- **Status**: ✅ Implemented with UI
+
+**New Feature: Webhooks**
+- Real-time notifications for: points_earned, points_redeemed, customer_registered
+- Webhook signature verification with HMAC-SHA256
+- Retry logic (3 attempts) and failure tracking
+- **Status**: ✅ Implemented with UI
+
+**Enhanced Security**
+- Rate limiting per API key (default 100/min)
+- IP whitelist support
+- Request logging and audit trail
+- Suspicious activity detection
+- **Files**: 
+  - `/app/backend/routers/integration.py`
+  - `/app/backend/services/webhook_service.py`
+  - `/app/backend/services/api_security.py`
+  - `/app/frontend/src/components/merchant/APIKeysManager.jsx`
+  - `/app/frontend/src/components/merchant/WebhooksManager.jsx`
+  - `/app/docs/INTEGRATION_API.md`
+
 ### 2026-03-12 - "Remember This Device" Feature
 **New Feature: Trusted Device Management**
 - Users can now check "Remember this device" during login

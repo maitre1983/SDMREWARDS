@@ -37,7 +37,9 @@ import {
   AlertTriangle,
   Smartphone,
   XCircle,
-  FileText
+  FileText,
+  Key,
+  Webhook
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -49,6 +51,8 @@ import BusinessInfoEditor from '../components/merchant/BusinessInfoEditor';
 import PinSettings from '../components/merchant/PinSettings';
 import AdvancedDashboard from '../components/merchant/AdvancedDashboard';
 import MonthlyStatements from '../components/merchant/MonthlyStatements';
+import APIKeysManager from '../components/merchant/APIKeysManager';
+import WebhooksManager from '../components/merchant/WebhooksManager';
 
 // API URL imported from config
 import { API_URL } from '@/config/api';
@@ -1121,7 +1125,8 @@ export default function MerchantDashboard() {
                 { id: 'statements', label: 'Relevés', icon: FileText },
                 { id: 'cashiers', label: 'Caissiers', icon: UserCog },
                 { id: 'business', label: 'Commerce', icon: Building },
-                { id: 'security', label: 'Sécurité', icon: Shield }
+                { id: 'security', label: 'Sécurité', icon: Shield },
+                { id: 'api', label: 'API & Webhooks', icon: Key }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1367,6 +1372,14 @@ export default function MerchantDashboard() {
                   pinStatus={pinStatus} 
                   onPinStatusChange={handlePinStatusChange}
                 />
+              </div>
+            )}
+
+            {/* API & Webhooks Settings */}
+            {settingsTab === 'api' && (
+              <div className="space-y-8">
+                <APIKeysManager />
+                <WebhooksManager />
               </div>
             )}
           </div>

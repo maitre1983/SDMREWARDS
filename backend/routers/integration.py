@@ -3,10 +3,12 @@ SDM REWARDS - External Integration API
 ======================================
 API endpoints for POS systems and third-party integrations.
 Supports API Key and OAuth 2.0 authentication.
+Enhanced with security features, rate limiting, and webhook notifications.
 """
 
 import os
 import uuid
+import time
 import secrets
 import hashlib
 import logging
@@ -93,9 +95,19 @@ async def verify_api_key(
     x_merchant_id: str = Header(..., description="Merchant ID"),
     request: Request = None
 ) -> dict:
-    """Verify API key and return merchant info"""
+    """Verify API key with enhanced security checks"""
+    start_time = time.time()
+    
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
+    
+    # Validate API key format first
+    if not x_api_key.startswith("sdm_live_") or len(x_api_key) < 20:
+        logger.warning(f"Malformed API key attempt for merchant {x_merchant_id}")
+        raise HTTPException(
+            status_code=401,
+            detail={"error": True, "code": "INVALID_API_KEY_FORMAT", "message": "Invalid API key format"}
+        )
     
     api_key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
     
@@ -105,13 +117,26 @@ async def verify_api_key(
         "is_active": True
     })
     
+    client_ip = request.client.host if request and request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "") if request else ""
+    
     if not key_doc:
-        logger.warning(f"Invalid API key attempt for merchant {x_merchant_id}")
+        # Log failed attempt
+        await db.failed_auth_attempts.insert_one({
+            "merchant_id": x_merchant_id,
+            "ip_address": client_ip,
+            "user_agent": user_agent[:500],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "reason": "invalid_key"
+        })
+        
+        logger.warning(f"Invalid API key attempt for merchant {x_merchant_id} from {client_ip}")
         raise HTTPException(
             status_code=401,
             detail={"error": True, "code": "INVALID_API_KEY", "message": "Invalid or inactive API key"}
         )
     
+    # Check expiry
     if key_doc.get("expires_at"):
         expires = datetime.fromisoformat(key_doc["expires_at"].replace("Z", "+00:00"))
         if datetime.now(timezone.utc) > expires:
@@ -120,17 +145,55 @@ async def verify_api_key(
                 detail={"error": True, "code": "API_KEY_EXPIRED", "message": "API key has expired"}
             )
     
-    if key_doc.get("allowed_ips") and request:
-        client_ip = request.client.host if request.client else None
-        if client_ip and client_ip not in key_doc["allowed_ips"]:
+    # Check IP whitelist
+    if key_doc.get("allowed_ips"):
+        if client_ip not in key_doc["allowed_ips"]:
+            logger.warning(f"IP {client_ip} not in whitelist for key {key_doc['key_id']}")
             raise HTTPException(
                 status_code=403,
-                detail={"error": True, "code": "IP_NOT_ALLOWED", "message": "Request from unauthorized IP"}
+                detail={"error": True, "code": "IP_NOT_ALLOWED", "message": "Request from unauthorized IP address"}
             )
     
+    # Check rate limit
+    rate_limit = key_doc.get("rate_limit", 100)
+    minute_ago = datetime.now(timezone.utc) - timedelta(minutes=1)
+    
+    recent_requests = await db.api_requests.count_documents({
+        "key_id": key_doc["key_id"],
+        "timestamp": {"$gte": minute_ago.isoformat()}
+    })
+    
+    if recent_requests >= rate_limit:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": True, 
+                "code": "RATE_LIMIT_EXCEEDED", 
+                "message": f"Rate limit exceeded. Max {rate_limit} requests per minute.",
+                "retry_after": 60
+            }
+        )
+    
+    # Log this request
+    response_time_ms = (time.time() - start_time) * 1000
+    await db.api_requests.insert_one({
+        "key_id": key_doc["key_id"],
+        "merchant_id": x_merchant_id,
+        "ip_address": client_ip,
+        "user_agent": user_agent[:500],
+        "endpoint": str(request.url.path) if request else "",
+        "method": request.method if request else "",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "response_time_ms": response_time_ms
+    })
+    
+    # Update key stats
     await db.api_keys.update_one(
         {"_id": key_doc["_id"]},
-        {"$set": {"last_used_at": datetime.now(timezone.utc).isoformat()}, "$inc": {"request_count": 1}}
+        {
+            "$set": {"last_used_at": datetime.now(timezone.utc).isoformat()},
+            "$inc": {"request_count": 1}
+        }
     )
     
     merchant = await db.merchants.find_one({"id": x_merchant_id})
@@ -268,6 +331,22 @@ async def award_points(request: AwardPointsRequest, auth: dict = Depends(verify_
     await db.transactions.insert_one(transaction)
     logger.info(f"Awarded {request.points} points to {phone} via API (merchant: {auth['merchant_id']})")
     
+    # Trigger webhook notification (async, non-blocking)
+    try:
+        from services.webhook_service import get_webhook_service
+        webhook_service = get_webhook_service(db)
+        import asyncio
+        asyncio.create_task(webhook_service.trigger_points_earned(
+            merchant_id=auth["merchant_id"],
+            customer_phone=phone,
+            points=request.points,
+            new_balance=new_balance,
+            transaction_id=transaction_id,
+            reference=request.reference
+        ))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}")
+    
     return {
         "success": True,
         "transaction_id": transaction_id,
@@ -324,6 +403,22 @@ async def redeem_points(request: RedeemPointsRequest, auth: dict = Depends(verif
     
     await db.transactions.insert_one(transaction)
     logger.info(f"Redeemed {request.points} points from {phone} via API (merchant: {auth['merchant_id']})")
+    
+    # Trigger webhook notification
+    try:
+        from services.webhook_service import get_webhook_service
+        webhook_service = get_webhook_service(db)
+        import asyncio
+        asyncio.create_task(webhook_service.trigger_points_redeemed(
+            merchant_id=auth["merchant_id"],
+            customer_phone=phone,
+            points=request.points,
+            new_balance=new_balance,
+            transaction_id=transaction_id,
+            reference=request.reference
+        ))
+    except Exception as e:
+        logger.error(f"Failed to trigger webhook: {e}")
     
     return {
         "success": True,
@@ -413,6 +508,160 @@ async def get_merchant_info(auth: dict = Depends(verify_api_key)):
             "status": merchant.get("status"),
             "created_at": merchant.get("created_at")
         }
+    }
+
+
+
+
+# ============== WEBHOOK MANAGEMENT ==============
+
+class WebhookRegister(BaseModel):
+    url: str = Field(..., description="Webhook endpoint URL (HTTPS)")
+    events: List[str] = Field(..., description="Events: points_earned, points_redeemed, customer_registered")
+    secret: Optional[str] = Field(None, description="Custom secret for signature verification")
+
+
+@router.post("/webhooks/register")
+async def register_webhook(request: WebhookRegister, authorization: str = Header(...)):
+    """Register a webhook endpoint to receive real-time notifications."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    from routers.auth import decode_token
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    merchant_id = payload.get("sub")
+    
+    # Validate URL
+    if not request.url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Webhook URL must use HTTPS")
+    
+    # Validate events
+    valid_events = ["points_earned", "points_redeemed", "customer_registered", "transaction_completed"]
+    invalid_events = [e for e in request.events if e not in valid_events]
+    if invalid_events:
+        raise HTTPException(status_code=400, detail=f"Invalid events: {invalid_events}. Valid: {valid_events}")
+    
+    webhook_id = f"wh_{uuid.uuid4().hex[:12]}"
+    secret = request.secret or secrets.token_urlsafe(32)
+    secret_hash = hashlib.sha256(secret.encode()).hexdigest()
+    
+    webhook_doc = {
+        "webhook_id": webhook_id,
+        "merchant_id": merchant_id,
+        "url": request.url,
+        "events": request.events,
+        "secret_hash": secret_hash,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_triggered": None,
+        "success_count": 0,
+        "failure_count": 0
+    }
+    
+    await db.webhooks.insert_one(webhook_doc)
+    logger.info(f"Registered webhook {webhook_id} for merchant {merchant_id}")
+    
+    return {
+        "success": True,
+        "webhook_id": webhook_id,
+        "url": request.url,
+        "events": request.events,
+        "secret": secret,
+        "message": "Webhook registered. Store the secret securely for signature verification."
+    }
+
+
+@router.get("/webhooks/list")
+async def list_webhooks(authorization: str = Header(...)):
+    """List all registered webhooks for the merchant."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    from routers.auth import decode_token
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    merchant_id = payload.get("sub")
+    
+    webhooks = await db.webhooks.find(
+        {"merchant_id": merchant_id},
+        {"_id": 0, "secret_hash": 0}
+    ).to_list(length=50)
+    
+    return {"success": True, "webhooks": webhooks}
+
+
+@router.delete("/webhooks/{webhook_id}")
+async def delete_webhook(webhook_id: str, authorization: str = Header(...)):
+    """Delete a webhook endpoint."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    from routers.auth import decode_token
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    merchant_id = payload.get("sub")
+    
+    result = await db.webhooks.delete_one({
+        "webhook_id": webhook_id,
+        "merchant_id": merchant_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    
+    return {"success": True, "message": "Webhook deleted"}
+
+
+@router.get("/keys/stats/{key_id}")
+async def get_key_stats(key_id: str, days: int = Query(30, ge=1, le=90), authorization: str = Header(...)):
+    """Get usage statistics for an API key."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    from routers.auth import decode_token
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    merchant_id = payload.get("sub")
+    
+    # Verify key belongs to merchant
+    key_doc = await db.api_keys.find_one({"key_id": key_id, "merchant_id": merchant_id})
+    if not key_doc:
+        raise HTTPException(status_code=404, detail="API key not found")
+    
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    
+    # Get stats
+    pipeline = [
+        {"$match": {"key_id": key_id, "timestamp": {"$gte": start_date.isoformat()}}},
+        {"$group": {
+            "_id": None,
+            "total_requests": {"$sum": 1},
+            "unique_ips": {"$addToSet": "$ip_address"},
+            "avg_response_time": {"$avg": "$response_time_ms"}
+        }}
+    ]
+    
+    result = await db.api_requests.aggregate(pipeline).to_list(length=1)
+    
+    if result:
+        stats = result[0]
+        return {
+            "success": True,
+            "key_id": key_id,
+            "period_days": days,
+            "total_requests": stats["total_requests"],
+            "unique_ips": len(stats["unique_ips"]),
+            "avg_response_time_ms": round(stats["avg_response_time"] or 0, 2)
+        }
+    
+    return {
+        "success": True,
+        "key_id": key_id,
+        "period_days": days,
+        "total_requests": 0,
+        "unique_ips": 0,
+        "avg_response_time_ms": 0
     }
 
 
