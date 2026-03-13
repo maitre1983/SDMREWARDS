@@ -1386,7 +1386,7 @@ async def confirm_cash_payment(
                     from services.sms_service import SMSService
                     sms_service = SMSService(db)
                     await sms_service.send_sms(
-                        merchant.get("phone"),
+                        current_merchant.get("phone"),
                         f"⚠️ SDM REWARDS ALERT: Your debit account has reached {usage_percentage:.0f}% of your limit (GHS {abs(new_balance):.2f} / GHS {debit_limit:.2f}). Please top up soon to continue receiving cashback payments."
                     )
                     await db.debit_alerts.insert_one({
@@ -1414,7 +1414,7 @@ async def confirm_cash_payment(
                     from services.sms_service import SMSService
                     sms_service = SMSService(db)
                     await sms_service.send_sms(
-                        merchant.get("phone"),
+                        current_merchant.get("phone"),
                         f"🚨 SDM REWARDS URGENT: Your debit account is at {usage_percentage:.0f}% capacity! Balance: GHS {abs(new_balance):.2f} / Limit: GHS {debit_limit:.2f}. Top up NOW to avoid service interruption."
                     )
                     await db.debit_alerts.insert_one({
@@ -1441,11 +1441,43 @@ async def confirm_cash_payment(
                 from services.sms_service import SMSService
                 sms_service = SMSService(db)
                 await sms_service.send_sms(
-                    merchant.get("phone"),
+                    current_merchant.get("phone"),
                     f"🛑 SDM REWARDS: Your debit account has been BLOCKED. You have reached your limit of GHS {debit_limit:.2f}. Please top up to resume cashback services."
                 )
             except Exception as e:
                 logger.error(f"Failed to send blocked alert: {e}")
+    
+    # ============== GAMIFICATION - UPDATE MISSIONS FOR CASH PAYMENT ==============
+    try:
+        from services.gamification_service import GamificationService
+        gamification = GamificationService(db)
+        client_id = customer["id"]
+        
+        # Update daily/weekly transaction missions
+        await gamification.update_mission_progress(client_id, "transaction", 1)
+        
+        # Update daily/weekly spend missions
+        await gamification.update_mission_progress(client_id, "spend", amount)
+        
+        # Update unique merchants mission
+        await gamification.update_mission_progress(client_id, "unique_merchants", 1)
+        
+        # Update activity streak
+        await gamification.update_activity_streak(client_id)
+        
+        # Award XP for completing a transaction (5 XP base + 1 XP per 10 GHS spent)
+        base_xp = 5
+        spend_xp = int(amount / 10)
+        total_xp = base_xp + spend_xp
+        merchant_name = current_merchant.get('business_name', 'Merchant')
+        await gamification.add_xp(client_id, total_xp, f"Cash payment at {merchant_name}")
+        
+        # Check for badge achievements
+        await gamification.check_and_award_badges(client_id)
+        
+        logger.info(f"Gamification updated for client {client_id} (cash payment): +{total_xp} XP")
+    except Exception as e:
+        logger.error(f"Gamification update error for cash payment: {e}")
     
     return {
         "success": True,

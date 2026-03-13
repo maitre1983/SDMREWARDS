@@ -42,6 +42,16 @@ def get_sms():
         _sms_service = SMSService(db)
     return _sms_service
 
+# Import Gamification service (lazy)
+_gamification_service = None
+
+def get_gamification():
+    global _gamification_service
+    if _gamification_service is None:
+        from services.gamification_service import GamificationService
+        _gamification_service = GamificationService(db)
+    return _gamification_service
+
 
 # Import Push Notification service (lazy)
 _push_service = None
@@ -1280,6 +1290,35 @@ async def process_merchant_payment(payment: Dict):
         "status": "completed",
         "created_at": datetime.now(timezone.utc).isoformat()
     })
+    
+    # ============== GAMIFICATION - UPDATE MISSIONS ==============
+    try:
+        gamification = get_gamification()
+        
+        # Update daily/weekly transaction missions
+        await gamification.update_mission_progress(client_id, "transaction", 1)
+        
+        # Update daily/weekly spend missions
+        await gamification.update_mission_progress(client_id, "spend", payment["amount"])
+        
+        # Update unique merchants mission
+        await gamification.update_mission_progress(client_id, "unique_merchants", 1)
+        
+        # Update activity streak
+        await gamification.update_activity_streak(client_id)
+        
+        # Award XP for completing a transaction (5 XP base + 1 XP per 10 GHS spent)
+        base_xp = 5
+        spend_xp = int(payment["amount"] / 10)
+        total_xp = base_xp + spend_xp
+        await gamification.add_xp(client_id, total_xp, f"Payment at {merchant.get('business_name', 'Merchant')}")
+        
+        # Check for badge achievements
+        await gamification.check_and_award_badges(client_id)
+        
+        logger.info(f"Gamification updated for client {client_id}: +{total_xp} XP")
+    except Exception as e:
+        logger.error(f"Gamification update error: {e}")
     
     # ============== AUTO-PAY MERCHANT ==============
     # If merchant has configured payout method, transfer their share immediately
