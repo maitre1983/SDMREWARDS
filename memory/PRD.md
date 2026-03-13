@@ -2,6 +2,34 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-13 - Admin Remember Device & API Key Rotation (COMPLETED)
+
+**New Feature: Admin "Remember This Device"**
+- Added "Remember this device" checkbox to admin login page
+- Admin login now uses v2 endpoint with device trust support
+- Device token stored in localStorage with prefix `sdm_device_token_admin`
+- Matching functionality with client and merchant login pages
+- **Files Updated**: `/app/frontend/src/pages/AdminDashboard.jsx`
+- **Status**: ✅ Implemented and tested
+
+**New Feature: API Key Rotation**
+- `POST /api/integration/keys/rotate` - Rotate API key with grace period
+- `POST /api/integration/keys/{key_id}/extend-grace` - Extend grace period
+- Old key remains valid during grace period (default 7 days, max 30 days)
+- Prevents service interruption during key updates
+- **Files**: `/app/backend/routers/integration.py` (lines 291-416)
+- **Status**: ✅ Implemented and tested
+
+**Documentation: POS Integration Examples**
+- Complete examples for Square POS (Node.js)
+- Complete examples for Clover POS (Java)
+- Complete examples for Shopify POS
+- Complete examples for WooCommerce (PHP Plugin)
+- Python and React Native SDK examples
+- Webhook handling examples (Node.js and Python/Flask)
+- **File**: `/app/docs/POS_INTEGRATION_EXAMPLES.md` (918 lines)
+- **Status**: ✅ Completed
+
 ### 2026-03-13 - Integration API & Security
 
 **New Feature: External Integration API**
