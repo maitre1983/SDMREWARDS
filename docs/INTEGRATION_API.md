@@ -268,6 +268,238 @@ Register webhooks to receive real-time notifications about events.
 - `points_earned` - Triggered when a customer earns points
 - `points_redeemed` - Triggered when a customer redeems points
 - `customer_registered` - Triggered when a new customer registers
+- `transaction_completed` - Triggered when any transaction is completed
+
+---
+
+### Webhook Payload Format
+
+When an event occurs, SDM Rewards sends a POST request to your webhook URL:
+
+```json
+{
+  "event": "points_earned",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "data": {
+    "customer_phone": "+233551234567",
+    "points": 100,
+    "new_balance": 1250,
+    "transaction_id": "txn_abc123def456",
+    "reference": "INV-2024-001"
+  }
+}
+```
+
+**Headers Sent:**
+| Header | Description |
+|--------|-------------|
+| `Content-Type` | `application/json` |
+| `X-SDM-Event` | Event type (e.g., `points_earned`) |
+| `X-SDM-Timestamp` | ISO 8601 timestamp |
+| `X-SDM-Signature` | HMAC-SHA256 signature for verification |
+| `X-SDM-Webhook-ID` | Your webhook ID |
+
+---
+
+### Webhook Signature Verification
+
+**IMPORTANT:** Always verify webhook signatures to ensure requests are legitimate.
+
+SDM Rewards signs each webhook payload using HMAC-SHA256 with your webhook secret.
+
+#### How Signatures Work
+
+1. SDM Rewards creates a signature by hashing the JSON payload with your secret
+2. The signature is sent in the `X-SDM-Signature` header
+3. You recreate the signature and compare it
+
+#### Verification Examples
+
+**Node.js:**
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+  
+  // Use timing-safe comparison to prevent timing attacks
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
+// Express middleware
+app.post('/webhooks/sdm', express.json(), (req, res) => {
+  const signature = req.headers['x-sdm-signature'];
+  const webhookSecret = process.env.SDM_WEBHOOK_SECRET;
+  
+  if (!signature) {
+    return res.status(401).json({ error: 'Missing signature' });
+  }
+  
+  if (!verifyWebhookSignature(req.body, signature, webhookSecret)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Signature verified - process the event
+  const { event, data, timestamp } = req.body;
+  
+  switch (event) {
+    case 'points_earned':
+      console.log(`Customer ${data.customer_phone} earned ${data.points} points`);
+      break;
+    case 'points_redeemed':
+      console.log(`Customer ${data.customer_phone} redeemed ${data.points} points`);
+      break;
+  }
+  
+  res.status(200).json({ received: true });
+});
+```
+
+**Python (Flask):**
+```python
+import hmac
+import hashlib
+import json
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+WEBHOOK_SECRET = "your_webhook_secret"
+
+def verify_signature(payload, signature):
+    """Verify HMAC-SHA256 signature"""
+    expected = hmac.new(
+        WEBHOOK_SECRET.encode('utf-8'),
+        json.dumps(payload, separators=(',', ':')).encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+@app.route('/webhooks/sdm', methods=['POST'])
+def handle_webhook():
+    signature = request.headers.get('X-SDM-Signature')
+    
+    if not signature:
+        return jsonify({"error": "Missing signature"}), 401
+    
+    if not verify_signature(request.json, signature):
+        return jsonify({"error": "Invalid signature"}), 401
+    
+    # Signature verified - process the event
+    event = request.json.get('event')
+    data = request.json.get('data')
+    
+    if event == 'points_earned':
+        print(f"Points earned: {data}")
+    elif event == 'points_redeemed':
+        print(f"Points redeemed: {data}")
+    
+    return jsonify({"received": True}), 200
+```
+
+**PHP:**
+```php
+<?php
+function verifyWebhookSignature($payload, $signature, $secret) {
+    $expectedSignature = hash_hmac(
+        'sha256', 
+        json_encode($payload, JSON_UNESCAPED_SLASHES), 
+        $secret
+    );
+    return hash_equals($expectedSignature, $signature);
+}
+
+// Handle incoming webhook
+$payload = json_decode(file_get_contents('php://input'), true);
+$signature = $_SERVER['HTTP_X_SDM_SIGNATURE'] ?? '';
+$secret = getenv('SDM_WEBHOOK_SECRET');
+
+if (empty($signature)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Missing signature']);
+    exit;
+}
+
+if (!verifyWebhookSignature($payload, $signature, $secret)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Invalid signature']);
+    exit;
+}
+
+// Process verified webhook
+$event = $payload['event'];
+$data = $payload['data'];
+
+switch ($event) {
+    case 'points_earned':
+        // Handle points earned
+        break;
+    case 'points_redeemed':
+        // Handle points redeemed
+        break;
+}
+
+http_response_code(200);
+echo json_encode(['received' => true]);
+```
+
+**Java:**
+```java
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.MessageDigest;
+
+public class WebhookVerifier {
+    
+    public static boolean verifySignature(String payload, String signature, String secret) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(
+                secret.getBytes("UTF-8"), "HmacSHA256"
+            );
+            mac.init(secretKeySpec);
+            byte[] hash = mac.doFinal(payload.getBytes("UTF-8"));
+            
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            
+            return MessageDigest.isEqual(
+                hexString.toString().getBytes(),
+                signature.getBytes()
+            );
+        } catch (Exception e) {
+            return false;
+        }
+    }
+}
+```
+
+#### Best Practices for Webhook Handling
+
+1. **Always verify signatures** - Never skip verification, even in development
+2. **Respond quickly** - Return 200 within 30 seconds to avoid retries
+3. **Process asynchronously** - Queue long-running tasks and respond immediately
+4. **Handle duplicates** - Use `transaction_id` to detect duplicate events
+5. **Log everything** - Keep logs of received webhooks for debugging
+6. **Secure your endpoint** - Use HTTPS only, never expose webhook secrets
+
+#### Retry Policy
+
+If your endpoint fails to respond with 2xx status, SDM Rewards will retry:
+- **Attempt 1:** Immediate
+- **Attempt 2:** After 1 minute
+- **Attempt 3:** After 5 minutes
+
+After 3 failed attempts, the webhook delivery is marked as failed.
 
 ---
 
@@ -315,6 +547,80 @@ Phone numbers can be provided in multiple formats. They will be normalized to th
 
 - Default: 100 requests per minute per API key
 - Custom limits can be configured when creating an API key
+
+---
+
+## API Key Security Features
+
+### IP Whitelisting
+
+Restrict API key usage to specific IP addresses for enhanced security.
+
+**Creating a key with IP whitelist:**
+```bash
+curl -X POST "https://web-boost-seo.emergent.host/api/integration/keys/create" \
+  -H "Authorization: Bearer YOUR_MERCHANT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "POS System",
+    "description": "Restricted to store network",
+    "allowed_ips": ["192.168.1.100", "10.0.0.50"],
+    "rate_limit": 100
+  }'
+```
+
+**Notes:**
+- If `allowed_ips` is empty or not provided, the key works from any IP
+- Requests from non-whitelisted IPs return `403 IP_NOT_ALLOWED`
+- Use CIDR notation for IP ranges if needed
+
+---
+
+### API Key Rotation
+
+Rotate API keys without service interruption using grace periods.
+
+**Rotate a key:**
+```bash
+curl -X POST "https://web-boost-seo.emergent.host/api/integration/keys/rotate" \
+  -H "Authorization: Bearer YOUR_MERCHANT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key_id": "key_abc123def456",
+    "grace_period_days": 7
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "API key rotated successfully. Old key valid until 2024-01-22 10:30 UTC",
+  "old_key_id": "key_abc123def456",
+  "new_key_id": "key_xyz789ghi012",
+  "new_api_key": "sdm_live_NewApiKeyHere123456789",
+  "grace_period_end": "2024-01-22T10:30:00Z",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**Grace Period:**
+- During the grace period, **both old and new keys work**
+- Default: 7 days, Maximum: 30 days
+- Update your systems to use the new key, then let the old one expire
+
+**Extend grace period:**
+```bash
+curl -X POST "https://web-boost-seo.emergent.host/api/integration/keys/key_abc123def456/extend-grace?days=14" \
+  -H "Authorization: Bearer YOUR_MERCHANT_TOKEN"
+```
+
+**Recommended rotation workflow:**
+1. Call `/keys/rotate` with desired grace period
+2. Store the new API key securely
+3. Update your POS/integration to use the new key
+4. Test the new key
+5. Let the old key expire naturally (or revoke it early)
 
 ---
 

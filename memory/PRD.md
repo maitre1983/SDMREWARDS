@@ -2,6 +2,35 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-13 - Documentation & UI Enhancements (COMPLETED)
+
+**Enhanced Documentation: Webhook Signature Verification**
+- Added comprehensive webhook signature verification examples:
+  - Node.js/Express with timing-safe comparison
+  - Python/Flask with HMAC-SHA256
+  - PHP with hash_equals()
+  - Java with SecretKeySpec
+- Documented webhook payload format and headers
+- Added retry policy documentation
+- Best practices for webhook handling
+- **File**: `/app/docs/INTEGRATION_API.md` (711 lines)
+- **Status**: ✅ Completed
+
+**Enhanced Documentation: API Key Security**
+- Added IP Whitelisting documentation with examples
+- Added API Key Rotation workflow documentation
+- Grace period management examples
+- **Status**: ✅ Completed
+
+**UI Enhancement: API Key Rotation Interface**
+- Added "Rotate" button for active API keys
+- New rotation modal with grace period configuration
+- Visual indicators for rotated keys and grace periods
+- Improved IP whitelist display (restricted vs open)
+- Support for viewing rotation status and expiry dates
+- **File**: `/app/frontend/src/components/merchant/APIKeysManager.jsx`
+- **Status**: ✅ Completed
+
 ### 2026-03-13 - Admin Remember Device & API Key Rotation (COMPLETED)
 
 **New Feature: Admin "Remember This Device"**
