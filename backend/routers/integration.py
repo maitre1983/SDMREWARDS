@@ -288,6 +288,134 @@ async def revoke_api_key(key_id: str, authorization: str = Header(...)):
     return {"success": True, "message": "API key revoked"}
 
 
+class KeyRotationRequest(BaseModel):
+    key_id: str = Field(..., description="ID of the key to rotate")
+    grace_period_days: Optional[int] = Field(7, ge=0, le=30, description="Days old key remains valid")
+
+
+@router.post("/keys/rotate")
+async def rotate_api_key(request: KeyRotationRequest, authorization: str = Header(...)):
+    """
+    Rotate an API key - generates a new key while keeping the old one valid for a grace period.
+    
+    The old key will continue to work for the specified grace period (default 7 days),
+    allowing you to update your systems without downtime.
+    """
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    from routers.auth import decode_token
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    merchant_id = payload.get("sub")
+    
+    # Find existing key
+    existing_key = await db.api_keys.find_one({
+        "key_id": request.key_id,
+        "merchant_id": merchant_id,
+        "is_active": True
+    })
+    
+    if not existing_key:
+        raise HTTPException(status_code=404, detail="API key not found or already revoked")
+    
+    # Check if key was already rotated
+    if existing_key.get("rotated_to"):
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Key already rotated to {existing_key['rotated_to']}. Rotate the new key instead."
+        )
+    
+    # Generate new key
+    new_api_key = f"sdm_live_{secrets.token_urlsafe(32)}"
+    new_key_hash = hashlib.sha256(new_api_key.encode()).hexdigest()
+    new_key_id = f"key_{uuid.uuid4().hex[:12]}"
+    
+    now = datetime.now(timezone.utc)
+    grace_period_end = now + timedelta(days=request.grace_period_days)
+    
+    # Create new key document
+    new_key_doc = {
+        "key_id": new_key_id,
+        "merchant_id": merchant_id,
+        "name": existing_key["name"],
+        "description": f"Rotated from {request.key_id} on {now.strftime('%Y-%m-%d')}",
+        "key_hash": new_key_hash,
+        "key_prefix": new_api_key[:15] + "...",
+        "allowed_ips": existing_key.get("allowed_ips"),
+        "rate_limit": existing_key.get("rate_limit", 100),
+        "is_active": True,
+        "created_at": now.isoformat(),
+        "rotated_from": request.key_id,
+        "expires_at": None,
+        "last_used_at": None,
+        "request_count": 0
+    }
+    
+    # Update old key with grace period
+    await db.api_keys.update_one(
+        {"key_id": request.key_id},
+        {
+            "$set": {
+                "rotated_to": new_key_id,
+                "rotation_date": now.isoformat(),
+                "grace_period_end": grace_period_end.isoformat(),
+                "description": f"{existing_key.get('description', '')} [Rotated - expires {grace_period_end.strftime('%Y-%m-%d')}]"
+            }
+        }
+    )
+    
+    # Insert new key
+    await db.api_keys.insert_one(new_key_doc)
+    
+    logger.info(f"Rotated API key {request.key_id} -> {new_key_id} for merchant {merchant_id}")
+    
+    return {
+        "success": True,
+        "message": f"API key rotated successfully. Old key valid until {grace_period_end.strftime('%Y-%m-%d %H:%M UTC')}",
+        "old_key_id": request.key_id,
+        "new_key_id": new_key_id,
+        "new_api_key": new_api_key,
+        "grace_period_end": grace_period_end.isoformat(),
+        "created_at": now.isoformat()
+    }
+
+
+@router.post("/keys/{key_id}/extend-grace")
+async def extend_grace_period(key_id: str, days: int = Query(7, ge=1, le=30), authorization: str = Header(...)):
+    """Extend the grace period for a rotated key"""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    from routers.auth import decode_token
+    token = authorization.replace("Bearer ", "")
+    payload = decode_token(token)
+    merchant_id = payload.get("sub")
+    
+    key = await db.api_keys.find_one({
+        "key_id": key_id,
+        "merchant_id": merchant_id,
+        "rotated_to": {"$exists": True}
+    })
+    
+    if not key:
+        raise HTTPException(status_code=404, detail="Rotated key not found")
+    
+    new_grace_end = datetime.now(timezone.utc) + timedelta(days=days)
+    
+    await db.api_keys.update_one(
+        {"key_id": key_id},
+        {"$set": {"grace_period_end": new_grace_end.isoformat()}}
+    )
+    
+    return {
+        "success": True,
+        "message": f"Grace period extended to {new_grace_end.strftime('%Y-%m-%d %H:%M UTC')}",
+        "key_id": key_id,
+        "new_grace_period_end": new_grace_end.isoformat()
+    }
+
+
 # ============== POINTS OPERATIONS ==============
 
 @router.post("/points/award")
