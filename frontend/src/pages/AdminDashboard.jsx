@@ -51,7 +51,9 @@ import {
   AlertTriangle,
   Unlock,
   Smartphone,
-  Sparkles
+  Sparkles,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 // Admin Components
@@ -111,6 +113,11 @@ export default function AdminDashboard() {
   const [merchants, setMerchants] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [config, setConfig] = useState(null);
+  
+  // Pagination states
+  const [clientsPage, setClientsPage] = useState(1);
+  const [merchantsPage, setMerchantsPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
   
   // Modal states
   const [selectedClient, setSelectedClient] = useState(null);
@@ -1327,6 +1334,111 @@ export default function AdminDashboard() {
     m.owner_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Pagination calculations
+  const totalClientsPages = Math.ceil(filteredClients.length / ITEMS_PER_PAGE);
+  const totalMerchantsPages = Math.ceil(filteredMerchants.length / ITEMS_PER_PAGE);
+  
+  const paginatedClients = filteredClients.slice(
+    (clientsPage - 1) * ITEMS_PER_PAGE,
+    clientsPage * ITEMS_PER_PAGE
+  );
+  
+  const paginatedMerchants = filteredMerchants.slice(
+    (merchantsPage - 1) * ITEMS_PER_PAGE,
+    merchantsPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when search changes
+  useEffect(() => {
+    setClientsPage(1);
+    setMerchantsPage(1);
+  }, [searchQuery]);
+
+  // Pagination component
+  const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage }) => {
+    if (totalPages <= 1) return null;
+    
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700 bg-slate-800/50">
+        <div className="text-sm text-slate-400">
+          Showing <span className="font-medium text-white">{startItem}</span> to{' '}
+          <span className="font-medium text-white">{endItem}</span> of{' '}
+          <span className="font-medium text-white">{totalItems}</span> results
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(1)}
+            disabled={currentPage === 1}
+            className="border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+          >
+            First
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+          >
+            <ChevronLeft size={16} />
+          </Button>
+          <div className="flex items-center gap-1">
+            {[...Array(Math.min(5, totalPages))].map((_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onPageChange(pageNum)}
+                  className={currentPage === pageNum 
+                    ? "bg-purple-600 hover:bg-purple-700" 
+                    : "border-slate-600 text-slate-300 hover:bg-slate-700"
+                  }
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+          >
+            <ChevronRight size={16} />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(totalPages)}
+            disabled={currentPage === totalPages}
+            className="border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+          >
+            Last
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   // Admin Forgot Password Screen  
   if (showForgotPassword) {
     return (
@@ -1513,43 +1625,61 @@ export default function AdminDashboard() {
 
         {/* Clients Tab */}
         {activeTab === 'clients' && (
-          <AdminClients
-            clients={clients}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            filteredClients={filteredClients}
-            getStatusBadge={getStatusBadge}
-            handleViewClientTransactions={handleViewClientTransactions}
-            setSelectedClient={setSelectedClient}
-            setSmsRecipientType={setSmsRecipientType}
-            setShowSMSModal={setShowSMSModal}
-            handleUpdateClientStatus={handleUpdateClientStatus}
-            handleBlockClient={handleBlockClient}
-            handleDeleteClient={handleDeleteClient}
-            handleOpenResetPassword={handleOpenResetPassword}
-          />
+          <>
+            <AdminClients
+              clients={clients}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              filteredClients={paginatedClients}
+              getStatusBadge={getStatusBadge}
+              handleViewClientTransactions={handleViewClientTransactions}
+              setSelectedClient={setSelectedClient}
+              setSmsRecipientType={setSmsRecipientType}
+              setShowSMSModal={setShowSMSModal}
+              handleUpdateClientStatus={handleUpdateClientStatus}
+              handleBlockClient={handleBlockClient}
+              handleDeleteClient={handleDeleteClient}
+              handleOpenResetPassword={handleOpenResetPassword}
+            />
+            <Pagination
+              currentPage={clientsPage}
+              totalPages={totalClientsPages}
+              onPageChange={setClientsPage}
+              totalItems={filteredClients.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+            />
+          </>
         )}
 
         {/* Merchants Tab */}
         {activeTab === 'merchants' && (
-          <AdminMerchants
-            merchants={merchants}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            filteredMerchants={filteredMerchants}
-            getStatusBadge={getStatusBadge}
-            handleViewMerchantTransactions={handleViewMerchantTransactions}
-            setSelectedMerchant={setSelectedMerchant}
-            setSmsRecipientType={setSmsRecipientType}
-            setShowSMSModal={setShowSMSModal}
-            setLocationForm={setLocationForm}
-            setShowLocationModal={setShowLocationModal}
-            handleUpdateMerchantStatus={handleUpdateMerchantStatus}
-            handleRejectMerchant={handleRejectMerchant}
-            handleBlockMerchant={handleBlockMerchant}
-            handleDeleteMerchant={handleDeleteMerchant}
-            handleOpenResetPassword={handleOpenResetPassword}
-          />
+          <>
+            <AdminMerchants
+              merchants={merchants}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              filteredMerchants={paginatedMerchants}
+              getStatusBadge={getStatusBadge}
+              handleViewMerchantTransactions={handleViewMerchantTransactions}
+              setSelectedMerchant={setSelectedMerchant}
+              setSmsRecipientType={setSmsRecipientType}
+              setShowSMSModal={setShowSMSModal}
+              setLocationForm={setLocationForm}
+              setShowLocationModal={setShowLocationModal}
+              handleUpdateMerchantStatus={handleUpdateMerchantStatus}
+              handleRejectMerchant={handleRejectMerchant}
+              handleBlockMerchant={handleBlockMerchant}
+              handleDeleteMerchant={handleDeleteMerchant}
+              handleOpenResetPassword={handleOpenResetPassword}
+            />
+            <Pagination
+              currentPage={merchantsPage}
+              totalPages={totalMerchantsPages}
+              onPageChange={setMerchantsPage}
+              totalItems={filteredMerchants.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+            />
+          </>
         )}
 
         {/* SEO & Analytics Tab */}
