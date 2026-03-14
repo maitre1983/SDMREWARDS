@@ -1,39 +1,65 @@
 /**
  * API Configuration
  * Centralized API URL configuration for SDM Rewards
+ * 
+ * IMPORTANT: This file determines which backend the frontend talks to.
+ * The production backend is on preview.emergentagent.com
  */
+
+// Production backend URL - HARDCODED for reliability
+const PRODUCTION_BACKEND = 'https://web-boost-seo.preview.emergentagent.com';
 
 // Get API URL based on deployment environment
 const getApiUrl = () => {
-  // 1. Use environment variable if set (injected during build)
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
+  // Safety check for SSR
+  if (typeof window === 'undefined') {
+    return PRODUCTION_BACKEND;
   }
   
-  // 2. Smart detection based on hostname
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Production domain - use Emergent backend
-    if (hostname === 'sdmrewards.com' || hostname === 'www.sdmrewards.com') {
-      return 'https://web-boost-seo.preview.emergentagent.com';
-    }
-    
-    // Emergent preview/deployed - use same origin
-    if (hostname.includes('emergentagent.com') || hostname.includes('emergent.host')) {
-      return window.location.origin;
-    }
-    
-    // Local development
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8001';
-    }
-    
-    // Fallback to same origin
-    return window.location.origin;
+  const hostname = window.location.hostname;
+  
+  // ============================================
+  // PRODUCTION: sdmrewards.com -> preview backend
+  // This is the definitive fix for the CORS issue
+  // ============================================
+  if (hostname === 'sdmrewards.com' || hostname === 'www.sdmrewards.com') {
+    console.log('[API] Production mode -> using:', PRODUCTION_BACKEND);
+    return PRODUCTION_BACKEND;
   }
   
-  return '';
+  // ============================================
+  // EMERGENT DEPLOYED: .emergent.host domains
+  // These should ALSO use the preview backend
+  // because .emergent.host has issues
+  // ============================================
+  if (hostname.includes('emergent.host')) {
+    console.log('[API] Emergent host detected -> redirecting to:', PRODUCTION_BACKEND);
+    return PRODUCTION_BACKEND;
+  }
+  
+  // ============================================
+  // PREVIEW: .preview.emergentagent.com
+  // Use same origin (works correctly)
+  // ============================================
+  if (hostname.includes('preview.emergentagent.com')) {
+    const origin = window.location.origin;
+    console.log('[API] Preview mode -> using:', origin);
+    return origin;
+  }
+  
+  // ============================================
+  // LOCAL DEVELOPMENT
+  // ============================================
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log('[API] Local dev mode');
+    return 'http://localhost:8001';
+  }
+  
+  // ============================================
+  // FALLBACK: Use production backend
+  // ============================================
+  console.log('[API] Fallback -> using:', PRODUCTION_BACKEND);
+  return PRODUCTION_BACKEND;
 };
 
 export const API_URL = getApiUrl();

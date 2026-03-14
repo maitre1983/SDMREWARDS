@@ -144,12 +144,16 @@ def get_cors_origins() -> list:
     Returns:
         List of allowed origin strings
     """
-    # ALWAYS include production domains
+    # ALWAYS include these domains - this is the definitive fix
     default_origins = [
+        # Production domains
         "https://sdmrewards.com",
         "https://www.sdmrewards.com",
+        # Emergent preview backend
         "https://web-boost-seo.preview.emergentagent.com",
+        # Emergent deployed (may have issues but include anyway)
         "https://web-boost-seo.emergent.host",
+        # Local development
         "http://localhost:3000",
         "http://localhost:8001",
     ]
@@ -158,7 +162,7 @@ def get_cors_origins() -> list:
     origins_str = os.environ.get("CORS_ORIGINS") or os.environ.get("CORS_ALLOWED_ORIGINS", "")
     
     if origins_str == "*":
-        # Allow all origins (useful for development/preview)
+        # Allow all origins
         return ["*"]
     
     if origins_str:
