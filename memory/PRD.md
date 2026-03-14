@@ -2,6 +2,33 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-14 - Remember Device Mobile & Admin Bug Fix (COMPLETED)
+
+**Remember Device Mobile Feature - TESTED ✅**
+- Mobile endpoints V2 tested:
+  - `POST /api/auth/client/login/v2` ✅
+  - `POST /api/auth/merchant/login/v2` ✅
+  - `GET /api/auth/devices/list` ✅
+- Device token generation and storage working
+- Login with existing device_token returns `device_trusted: true`
+- Devices list shows all trusted devices with expiry dates
+- **Files**: `/app/mobile/src/screens/auth/LoginScreen.js`, `/app/mobile/src/services/api.js`
+- **Status**: ✅ Backend Tested, Ready for Mobile Testing
+
+**Admin Dashboard Bug Fix - Create Users**
+- Fixed endpoints in 3 files:
+  - `CreateClientModal.jsx`: URL → `/api/admin/clients/create-manual`
+  - `CreateMerchantModal.jsx`: URL → `/api/admin/merchants/create-manual`
+  - `SettingsUsers.jsx`: Both URLs corrected, `owner_name` required
+- Auto-generation of `username` if not provided
+- **Status**: ✅ Tested via UI - Working
+
+**Production Database Backup**
+- Latest backup: `/app/backups/production_backup_20260314_135652/`
+- **Download link**: https://web-boost-seo.preview.emergentagent.com/sdm_backup_20260314.tar.gz
+- Contains: 91 transactions, 7 merchants, 1 client, 3 admins, 4 trusted devices
+- **Status**: ✅ Available for download
+
 ### 2026-03-14 - Production Database Backup & Partner Coordinates (COMPLETED)
 
 **Database Backup Created**

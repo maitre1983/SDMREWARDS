@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"de800b0a526947aca65488acc099ea5c","collectionName":"merchant_payouts","type":"collection"}
