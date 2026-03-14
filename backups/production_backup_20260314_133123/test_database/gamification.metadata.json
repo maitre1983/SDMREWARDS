@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"d7057c8744bb4995a3dbac608396de8b","collectionName":"gamification","type":"collection"}
