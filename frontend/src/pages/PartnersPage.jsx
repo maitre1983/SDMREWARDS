@@ -15,7 +15,11 @@ import {
   Phone,
   Loader2,
   Filter,
-  ChevronRight
+  ChevronRight,
+  ExternalLink,
+  Navigation,
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 
 // API URL imported from config
@@ -28,8 +32,15 @@ export default function PartnersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedMerchant, setSelectedMerchant] = useState(null);
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
   const token = localStorage.getItem('sdm_client_token');
+
+  const copyPhone = (phone) => {
+    navigator.clipboard.writeText(phone);
+    setCopiedPhone(true);
+    setTimeout(() => setCopiedPhone(false), 2000);
+  };
 
   useEffect(() => {
     fetchMerchants();
@@ -221,7 +232,7 @@ export default function PartnersPage() {
       {/* Merchant Detail Modal */}
       {selectedMerchant && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end justify-center z-50">
-          <div className="bg-slate-800 border-t border-slate-700 rounded-t-3xl w-full max-w-lg p-6 animate-slide-up">
+          <div className="bg-slate-800 border-t border-slate-700 rounded-t-3xl w-full max-w-lg p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
             {/* Handle bar */}
             <div className="w-12 h-1 bg-slate-600 rounded-full mx-auto mb-6" />
             
@@ -232,16 +243,95 @@ export default function PartnersPage() {
               </div>
               <h2 className="text-white text-xl font-bold">{selectedMerchant.business_name}</h2>
               <p className="text-slate-400">{selectedMerchant.business_type || 'General Merchant'}</p>
+            </div>
+
+            {/* Contact & Location Section */}
+            <div className="bg-slate-900/50 rounded-xl p-4 mb-4 space-y-3">
+              <h3 className="text-slate-300 font-semibold text-sm uppercase tracking-wide mb-3">Contact & Location</h3>
               
+              {/* Phone Number */}
+              {selectedMerchant.phone && (
+                <div className="flex items-center justify-between bg-slate-800 rounded-lg p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                      <Phone className="text-emerald-400" size={18} />
+                    </div>
+                    <div>
+                      <p className="text-slate-400 text-xs">Phone Number</p>
+                      <p className="text-white font-medium">{selectedMerchant.phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => copyPhone(selectedMerchant.phone)}
+                      className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                      title="Copy number"
+                    >
+                      {copiedPhone ? (
+                        <CheckCircle className="text-emerald-400" size={18} />
+                      ) : (
+                        <Copy className="text-slate-400" size={18} />
+                      )}
+                    </button>
+                    <a
+                      href={`tel:${selectedMerchant.phone}`}
+                      className="p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
+                      title="Call"
+                    >
+                      <Phone className="text-white" size={18} />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Address */}
               {selectedMerchant.business_address && (
-                <p className="text-slate-500 text-sm flex items-center justify-center gap-1 mt-2">
-                  <MapPin size={14} /> {selectedMerchant.business_address}
-                </p>
+                <div className="flex items-start gap-3 bg-slate-800 rounded-lg p-3">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center shrink-0">
+                    <MapPin className="text-blue-400" size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-slate-400 text-xs">Address</p>
+                    <p className="text-white">{selectedMerchant.business_address}</p>
+                    {selectedMerchant.city && (
+                      <p className="text-slate-500 text-sm">{selectedMerchant.city}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Google Maps Link */}
+              {selectedMerchant.google_maps_url && (
+                <a
+                  href={selectedMerchant.google_maps_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-lg p-3 hover:from-blue-500/30 hover:to-cyan-500/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Navigation className="text-white" size={18} />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">View on Google Maps</p>
+                      <p className="text-slate-400 text-xs">Get directions to this location</p>
+                    </div>
+                  </div>
+                  <ExternalLink className="text-blue-400" size={20} />
+                </a>
+              )}
+
+              {/* No location info message */}
+              {!selectedMerchant.phone && !selectedMerchant.business_address && !selectedMerchant.google_maps_url && (
+                <div className="text-center py-4">
+                  <MapPin className="text-slate-600 mx-auto mb-2" size={24} />
+                  <p className="text-slate-500 text-sm">No contact information available</p>
+                </div>
               )}
             </div>
 
             {/* Cashback Highlight */}
-            <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-xl p-4 mb-6 text-center">
+            <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-xl p-4 mb-4 text-center">
               <p className="text-slate-400 text-sm">Earn Cashback</p>
               <p className="text-emerald-400 text-4xl font-bold">{selectedMerchant.cashback_rate || 5}%</p>
               <p className="text-slate-500 text-xs mt-1">on every purchase</p>

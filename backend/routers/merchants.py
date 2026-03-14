@@ -131,9 +131,12 @@ async def get_partner_merchants():
             "business_type": 1,
             "business_address": 1,
             "business_description": 1,
+            "city": 1,
             "cashback_rate": 1,
             "payment_qr_code": 1,
-            "logo_url": 1
+            "logo_url": 1,
+            "phone": 1,
+            "google_maps_url": 1
         }
     ).to_list(500)
     
