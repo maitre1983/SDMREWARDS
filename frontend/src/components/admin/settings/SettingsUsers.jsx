@@ -35,7 +35,9 @@ export default function SettingsUsers({ token }) {
 
     try {
       setIsLoading(true);
-      const res = await axios.post(`${API_URL}/api/admin/clients`, newClientForm, { headers });
+      // Auto-generate username from full_name if not provided
+      const username = newClientForm.username || newClientForm.full_name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString().slice(-4);
+      const res = await axios.post(`${API_URL}/api/admin/clients/create-manual`, { ...newClientForm, username }, { headers });
       toast.success(`Client created! Temp password: ${res.data.temp_password}`);
       setShowCreateClientModal(false);
       setNewClientForm({ full_name: '', phone: '', username: '', email: '', card_type: 'silver' });
@@ -47,14 +49,14 @@ export default function SettingsUsers({ token }) {
   };
 
   const handleCreateMerchant = async () => {
-    if (!newMerchantForm.business_name || !newMerchantForm.phone) {
-      toast.error('Business name and phone are required');
+    if (!newMerchantForm.business_name || !newMerchantForm.phone || !newMerchantForm.owner_name) {
+      toast.error('Business name, owner name, and phone are required');
       return;
     }
 
     try {
       setIsLoading(true);
-      const res = await axios.post(`${API_URL}/api/admin/merchants`, newMerchantForm, { headers });
+      const res = await axios.post(`${API_URL}/api/admin/merchants/create-manual`, newMerchantForm, { headers });
       toast.success(`Merchant created! Temp password: ${res.data.temp_password}`);
       setShowCreateMerchantModal(false);
       setNewMerchantForm({ 
@@ -214,7 +216,7 @@ export default function SettingsUsers({ token }) {
                 />
               </div>
               <div>
-                <Label className="text-slate-400">Owner Name</Label>
+                <Label className="text-slate-400">Owner Name *</Label>
                 <Input
                   value={newMerchantForm.owner_name}
                   onChange={(e) => setNewMerchantForm({...newMerchantForm, owner_name: e.target.value})}

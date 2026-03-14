@@ -41,7 +41,7 @@ export default function CreateMerchantModal({
     
     try {
       await axios.post(
-        `${API_URL}/api/admin/merchants/create`,
+        `${API_URL}/api/admin/merchants/create-manual`,
         form,
         { headers: { Authorization: `Bearer ${token}` } }
       );

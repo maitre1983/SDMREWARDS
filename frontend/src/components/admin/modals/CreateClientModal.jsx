@@ -38,9 +38,12 @@ export default function CreateClientModal({
     setLoading(true);
     
     try {
+      // Auto-generate username from full_name if not provided
+      const username = form.username || form.full_name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now().toString().slice(-4);
+      
       await axios.post(
-        `${API_URL}/api/admin/clients/create`,
-        form,
+        `${API_URL}/api/admin/clients/create-manual`,
+        { ...form, username },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
