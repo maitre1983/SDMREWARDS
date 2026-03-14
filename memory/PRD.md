@@ -2,6 +2,23 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-14 - Production Database Backup & Partner Coordinates (COMPLETED)
+
+**Database Backup Created**
+- Full MongoDB backup at `/app/backups/production_backup_20260314_133459/`
+- Contains: 91 transactions, 7 merchants, 1 client, 3 admins
+- All collections backed up successfully
+- **Status**: ✅ Completed
+
+**Partner Merchant Coordinates Feature**
+- Merchant contact details visible in partner modal:
+  - Phone number with copy & call buttons
+  - Address with city
+  - Google Maps link for directions
+- API endpoint `/api/merchants/partners` returns all contact fields
+- Frontend `/app/frontend/src/pages/PartnersPage.jsx` displays full modal
+- **Status**: ✅ Already Implemented & Verified
+
 ### 2026-03-13 - Documentation & UI Enhancements (COMPLETED)
 
 **Enhanced Documentation: Webhook Signature Verification**

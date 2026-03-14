@@ -36,6 +36,11 @@
 
 ## Backups
 
+### Backup le Plus Récent
+- **Date:** 14 Mars 2026, 13:35
+- **Emplacement:** `/app/backups/production_backup_20260314_133459/`
+- **Contenu:** Toutes les collections MongoDB (91 transactions, 7 marchands, 3 admins)
+
 ### Backup Initial
 - **Date:** 14 Mars 2026, 13:31
 - **Emplacement:** `/app/backups/production_backup_20260314_133123/`
