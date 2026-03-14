@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"636c183b1ba54d02b9585b18acfb0847","collectionName":"debit_ledger","type":"collection"}

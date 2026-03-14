@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"198bbdb9ce07417f964c9b21d03e8b59","collectionName":"momo_payments","type":"collection"}

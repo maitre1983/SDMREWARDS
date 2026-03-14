@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"referrer_id":{"$numberInt":"1"}},"name":"referrer_id_1"},{"v":{"$numberInt":"2"},"key":{"referred_id":{"$numberInt":"1"}},"name":"referred_id_1"}],"uuid":"62b6c4e3b68b4ef8b67e8b2b5e1e520a","collectionName":"referrals","type":"collection"}
