@@ -76,14 +76,11 @@ app = FastAPI(
 )
 
 # ============== CORS ==============
-# Load allowed origins from environment for security
-from utils.security import get_cors_origins
-CORS_ORIGINS = get_cors_origins()
-logger.info(f"🔒 CORS allowed origins: {CORS_ORIGINS}")
-
+# IMPORTANT: Allow all origins to fix CORS issues with sdmrewards.com
+# This is necessary because the deployed frontend may call from various domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
