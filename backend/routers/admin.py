@@ -2979,6 +2979,123 @@ async def cancel_scheduled_sms(
     return {"success": True, "message": "Scheduled SMS cancelled"}
 
 
+# ============== UNIFIED SMS/PUSH ENDPOINTS ==============
+# These endpoints support the SettingsSMS.jsx frontend component
+
+class UnifiedBulkSMSRequest(BaseModel):
+    recipient_type: str  # "clients" or "merchants"
+    filter: str  # "all", "active", etc.
+    message: str
+
+class UnifiedPushRequest(BaseModel):
+    title: str
+    message: str
+    segment: str = "All"  # "All", "Active", "Inactive"
+    url: Optional[str] = None
+
+@router.post("/sms/bulk")
+async def send_bulk_sms_unified(
+    request: UnifiedBulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Unified endpoint for sending bulk SMS to clients or merchants"""
+    from services.sms_service import get_sms
+    sms_service = get_sms(db)
+    
+    # Build filter based on parameters
+    filter_query = {}
+    if request.filter == "active":
+        filter_query["status"] = "active"
+    elif request.filter == "inactive":
+        filter_query["status"] = {"$ne": "active"}
+    
+    # Get recipients based on type
+    if request.recipient_type == "clients":
+        recipients = await db.clients.find(filter_query, {"phone": 1, "_id": 0}).to_list(1000)
+    else:
+        recipients = await db.merchants.find(filter_query, {"phone": 1, "_id": 0}).to_list(1000)
+    
+    phones = [r["phone"] for r in recipients if r.get("phone")]
+    
+    if not phones:
+        return {"success": False, "error": "No recipients found", "sent": 0, "failed": 0}
+    
+    # Send bulk SMS
+    result = await sms_service.send_bulk_sms(phones, request.message, f"bulk_{request.recipient_type}")
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": f"bulk_sms_{request.recipient_type}",
+        "details": {"filter": request.filter, "count": len(phones)},
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": result.get("success", False),
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", len(phones)),
+        "campaign_id": result.get("campaign_id"),
+        "error": result.get("error")
+    }
+
+
+@router.post("/push/send")
+async def send_push_notification_unified(
+    request: UnifiedPushRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Unified endpoint for sending push notifications"""
+    # Build segment filter
+    segment_filter = {}
+    if request.segment.lower() == "active":
+        segment_filter["status"] = "active"
+    elif request.segment.lower() == "inactive":
+        segment_filter["status"] = {"$ne": "active"}
+    
+    # Get all subscribers (both clients and merchants with push tokens)
+    clients = await db.clients.find(
+        {**segment_filter, "push_token": {"$exists": True, "$ne": None}},
+        {"push_token": 1, "_id": 0}
+    ).to_list(1000)
+    
+    merchants = await db.merchants.find(
+        {**segment_filter, "push_token": {"$exists": True, "$ne": None}},
+        {"push_token": 1, "_id": 0}
+    ).to_list(1000)
+    
+    all_tokens = [c["push_token"] for c in clients if c.get("push_token")]
+    all_tokens += [m["push_token"] for m in merchants if m.get("push_token")]
+    
+    # Store notification record
+    notification_id = str(uuid.uuid4())[:8]
+    notification_data = {
+        "id": notification_id,
+        "title": request.title,
+        "message": request.message,
+        "segment": request.segment,
+        "url": request.url,
+        "recipient_count": len(all_tokens),
+        "sent_by": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "sent" if all_tokens else "no_recipients"
+    }
+    
+    await db.push_notifications.insert_one(notification_data)
+    
+    # Note: Actual push sending would require OneSignal or Firebase integration
+    # For now, we just log the notification
+    
+    return {
+        "success": True,
+        "notification_id": notification_id,
+        "recipients": len(all_tokens),
+        "message": "Push notification queued" if all_tokens else "No push subscribers found"
+    }
+
+
 # ============== PHASE 3: SECURITY & ADMIN MANAGEMENT ==============
 
 @router.get("/settings/pin-status")

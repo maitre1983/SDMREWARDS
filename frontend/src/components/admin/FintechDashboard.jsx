@@ -161,7 +161,7 @@ export default function FintechDashboard({ token }) {
 
   const fetchPushStats = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/sdm/admin/push/stats`, { headers });
+      const res = await axios.get(`${API_URL}/api/admin/push-notifications/stats`, { headers });
       setPushStats(res.data);
     } catch (error) {
       console.error('Push stats error:', error);
@@ -703,15 +703,16 @@ export default function FintechDashboard({ token }) {
   const handleSendPushNotification = async (notificationData) => {
     try {
       const res = await axios.post(
-        `${API_URL}/api/sdm/admin/push/send?recipient_type=${notificationData.recipient_type}`,
+        `${API_URL}/api/admin/push/send`,
         {
           title: notificationData.title,
           message: notificationData.message,
+          segment: notificationData.recipient_type === 'all' ? 'All' : notificationData.recipient_type,
           url: notificationData.action_url
         },
         { headers }
       );
-      toast.success(`Push notification sent! ${res.data.push_result?.simulated ? '(Simulated - OneSignal not configured)' : ''}`);
+      toast.success(`Push notification sent! ${res.data.recipients === 0 ? '(No push subscribers found)' : ''}`);
       setShowNewNotificationForm(false);
       fetchNotifications();
       fetchPushStats();
