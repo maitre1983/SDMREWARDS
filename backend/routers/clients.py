@@ -927,3 +927,69 @@ async def get_client_withdrawals(
         "withdrawals": withdrawals,
         "total": len(withdrawals)
     }
+
+
+
+# ============== PUSH NOTIFICATIONS ==============
+
+class PushRegisterRequest(BaseModel):
+    player_id: str
+    platform: str = "web"
+    device_model: Optional[str] = None
+
+class PushUnregisterRequest(BaseModel):
+    player_id: str
+
+@router.post("/push/register")
+async def register_push_notification(
+    request: PushRegisterRequest,
+    current_client: dict = Depends(get_current_client)
+):
+    """Register client for push notifications"""
+    # Update client with OneSignal player_id
+    await db.clients.update_one(
+        {"id": current_client["id"]},
+        {
+            "$set": {
+                "onesignal_player_id": request.player_id,
+                "push_platform": request.platform,
+                "push_device_model": request.device_model,
+                "push_registered_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    logger.info(f"Push registered for client {current_client['id']}: {request.player_id}")
+    
+    return {
+        "success": True,
+        "message": "Push notifications enabled",
+        "player_id": request.player_id
+    }
+
+@router.post("/push/unregister")
+async def unregister_push_notification(
+    request: PushUnregisterRequest,
+    current_client: dict = Depends(get_current_client)
+):
+    """Unregister client from push notifications"""
+    await db.clients.update_one(
+        {"id": current_client["id"]},
+        {
+            "$unset": {
+                "onesignal_player_id": "",
+                "push_platform": "",
+                "push_device_model": ""
+            },
+            "$set": {
+                "push_unregistered_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    logger.info(f"Push unregistered for client {current_client['id']}")
+    
+    return {
+        "success": True,
+        "message": "Push notifications disabled"
+    }

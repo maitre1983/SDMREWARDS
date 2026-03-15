@@ -248,6 +248,109 @@ class PushNotificationService:
             logger.error(f"Failed to get OneSignal stats: {e}")
             return {"success": False, "subscribers": 0, "error": str(e)}
 
+    async def send_to_players(self, player_ids: List[str], title: str, message: str, url: Optional[str] = None, data: Optional[Dict] = None) -> Dict:
+        """
+        Send push notification to specific player IDs
+        
+        Args:
+            player_ids: List of OneSignal player/subscription IDs
+            title: Notification title
+            message: Notification body
+            url: Optional URL to open when clicked
+            data: Optional custom data payload
+        
+        Returns: {"success": bool, "notification_id": str, "recipients": int, "error": str}
+        """
+        if not player_ids:
+            return {"success": False, "error": "No player IDs provided", "recipients": 0}
+        
+        notification_record = {
+            "id": str(__import__('uuid').uuid4()),
+            "title": title,
+            "message": message,
+            "url": url,
+            "target": "players",
+            "player_count": len(player_ids),
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        if self.db is not None:
+            await self.db.push_notifications.insert_one(notification_record)
+        
+        if not self.is_configured():
+            error = "OneSignal not configured - missing API key"
+            logger.warning(error)
+            return {"success": False, "error": error, "recipients": 0}
+        
+        try:
+            payload = {
+                "app_id": self.app_id,
+                "include_subscription_ids": player_ids,  # OneSignal v2 format
+                "headings": {"en": title},
+                "contents": {"en": message}
+            }
+            
+            if url:
+                payload["url"] = url
+            
+            if data:
+                payload["data"] = data
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/notifications",
+                    headers={
+                        "Authorization": f"Basic {self.api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=payload,
+                    timeout=30.0
+                )
+                
+                result = response.json()
+                logger.info(f"OneSignal players response: {result}")
+                
+                if response.status_code == 200 and result.get("id"):
+                    if self.db is not None:
+                        await self.db.push_notifications.update_one(
+                            {"id": notification_record["id"]},
+                            {
+                                "$set": {
+                                    "status": "sent",
+                                    "onesignal_id": result.get("id"),
+                                    "recipients": result.get("recipients", len(player_ids)),
+                                    "sent_at": datetime.now(timezone.utc).isoformat()
+                                }
+                            }
+                        )
+                    return {
+                        "success": True,
+                        "notification_id": result.get("id"),
+                        "recipients": result.get("recipients", len(player_ids)),
+                        "message": "Notification sent successfully"
+                    }
+                else:
+                    error = result.get("errors", ["Unknown error"])[0] if result.get("errors") else "Failed to send"
+                    if self.db is not None:
+                        await self.db.push_notifications.update_one(
+                            {"id": notification_record["id"]},
+                            {"$set": {"status": "failed", "error": str(error)}}
+                        )
+                    return {"success": False, "error": str(error), "recipients": 0}
+                    
+        except Exception as e:
+            error = str(e)
+            logger.error(f"Push notification to players error: {error}")
+            if self.db is not None:
+                await self.db.push_notifications.update_one(
+                    {"id": notification_record["id"]},
+                    {"$set": {"status": "failed", "error": error}}
+                )
+            return {"success": False, "error": error, "recipients": 0}
+
+
+
 
 # Singleton instance
 _push_service = None

@@ -2865,3 +2865,68 @@ async def download_monthly_statement(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+# ============== PUSH NOTIFICATIONS ==============
+
+class MerchantPushRegisterRequest(BaseModel):
+    player_id: str
+    platform: str = "web"
+    device_model: Optional[str] = None
+
+class MerchantPushUnregisterRequest(BaseModel):
+    player_id: str
+
+@router.post("/push/register")
+async def register_merchant_push(
+    request: MerchantPushRegisterRequest,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Register merchant for push notifications"""
+    await db.merchants.update_one(
+        {"id": current_merchant["id"]},
+        {
+            "$set": {
+                "onesignal_player_id": request.player_id,
+                "push_platform": request.platform,
+                "push_device_model": request.device_model,
+                "push_registered_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    logger.info(f"Push registered for merchant {current_merchant['id']}: {request.player_id}")
+    
+    return {
+        "success": True,
+        "message": "Push notifications enabled",
+        "player_id": request.player_id
+    }
+
+@router.post("/push/unregister")
+async def unregister_merchant_push(
+    request: MerchantPushUnregisterRequest,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Unregister merchant from push notifications"""
+    await db.merchants.update_one(
+        {"id": current_merchant["id"]},
+        {
+            "$unset": {
+                "onesignal_player_id": "",
+                "push_platform": "",
+                "push_device_model": ""
+            },
+            "$set": {
+                "push_unregistered_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    logger.info(f"Push unregistered for merchant {current_merchant['id']}")
+    
+    return {
+        "success": True,
+        "message": "Push notifications disabled"
+    }
+

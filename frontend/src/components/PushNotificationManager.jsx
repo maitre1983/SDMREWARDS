@@ -108,17 +108,14 @@ export default function PushNotificationManager({ token, userType = 'user' }) {
       if (subscriptionId) {
         // Register with backend
         const endpoint = userType === 'merchant' 
-          ? '/api/sdm/merchant/push/register' 
-          : '/api/sdm/user/push/register';
+          ? '/api/merchants/push/register' 
+          : '/api/clients/push/register';
         
-        await axios.post(endpoint, {
+        await axios.post(`${API_URL}${endpoint}`, {
           player_id: subscriptionId,
           platform: 'web',
           device_model: navigator.userAgent.substring(0, 100)
-        }, { 
-          baseURL: API_URL,
-          headers 
-        });
+        }, { headers });
 
         setPlayerId(subscriptionId);
         setIsSubscribed(true);
@@ -149,13 +146,10 @@ export default function PushNotificationManager({ token, userType = 'user' }) {
 
       // Unregister from backend
       const endpoint = userType === 'merchant' 
-        ? '/api/sdm/merchant/push/unregister' 
-        : '/api/sdm/user/push/unregister';
+        ? '/api/merchants/push/unregister' 
+        : '/api/clients/push/unregister';
       
-      await axios.post(`${endpoint}?player_id=${playerId}`, {}, { 
-        baseURL: API_URL,
-        headers 
-      });
+      await axios.post(`${API_URL}${endpoint}`, { player_id: playerId }, { headers });
 
       setPlayerId(null);
       setIsSubscribed(false);

@@ -3047,52 +3047,85 @@ async def send_push_notification_unified(
     request: UnifiedPushRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Unified endpoint for sending push notifications"""
-    # Build segment filter
-    segment_filter = {}
-    if request.segment.lower() == "active":
-        segment_filter["status"] = "active"
-    elif request.segment.lower() == "inactive":
-        segment_filter["status"] = {"$ne": "active"}
+    """Unified endpoint for sending push notifications via OneSignal"""
+    from services.push_notification_service import PushNotificationService
     
-    # Get all subscribers (both clients and merchants with push tokens)
-    clients = await db.clients.find(
-        {**segment_filter, "push_token": {"$exists": True, "$ne": None}},
-        {"push_token": 1, "_id": 0}
-    ).to_list(1000)
+    push_service = PushNotificationService(db)
     
-    merchants = await db.merchants.find(
-        {**segment_filter, "push_token": {"$exists": True, "$ne": None}},
-        {"push_token": 1, "_id": 0}
-    ).to_list(1000)
+    # Check if OneSignal is configured
+    if not push_service.is_configured():
+        return {
+            "success": False,
+            "error": "OneSignal not configured",
+            "message": "Please configure ONESIGNAL_API_KEY in environment"
+        }
     
-    all_tokens = [c["push_token"] for c in clients if c.get("push_token")]
-    all_tokens += [m["push_token"] for m in merchants if m.get("push_token")]
+    # Determine segments based on request
+    segment = request.segment.lower()
     
-    # Store notification record
-    notification_id = str(uuid.uuid4())[:8]
-    notification_data = {
-        "id": notification_id,
-        "title": request.title,
-        "message": request.message,
-        "segment": request.segment,
-        "url": request.url,
-        "recipient_count": len(all_tokens),
-        "sent_by": current_admin["id"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": "sent" if all_tokens else "no_recipients"
-    }
+    if segment == "all":
+        # Send to all subscribers
+        result = await push_service.send_to_all(
+            title=request.title,
+            message=request.message,
+            url=request.url
+        )
+    else:
+        # Get player IDs based on segment filter
+        segment_filter = {"onesignal_player_id": {"$exists": True, "$ne": None}}
+        
+        if segment == "active":
+            segment_filter["status"] = "active"
+        elif segment == "inactive":
+            segment_filter["status"] = {"$ne": "active"}
+        
+        # Get player IDs from clients and merchants
+        clients = await db.clients.find(
+            segment_filter,
+            {"onesignal_player_id": 1, "_id": 0}
+        ).to_list(5000)
+        
+        merchants = await db.merchants.find(
+            segment_filter,
+            {"onesignal_player_id": 1, "_id": 0}
+        ).to_list(1000)
+        
+        player_ids = [c["onesignal_player_id"] for c in clients if c.get("onesignal_player_id")]
+        player_ids += [m["onesignal_player_id"] for m in merchants if m.get("onesignal_player_id")]
+        
+        if not player_ids:
+            return {
+                "success": False,
+                "recipients": 0,
+                "message": f"No push subscribers found for segment: {segment}"
+            }
+        
+        result = await push_service.send_to_players(
+            player_ids=player_ids,
+            title=request.title,
+            message=request.message,
+            url=request.url
+        )
     
-    await db.push_notifications.insert_one(notification_data)
-    
-    # Note: Actual push sending would require OneSignal or Firebase integration
-    # For now, we just log the notification
+    # Log admin action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "send_push_notification",
+        "details": {
+            "title": request.title,
+            "segment": request.segment,
+            "recipients": result.get("recipients", 0)
+        },
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
     
     return {
-        "success": True,
-        "notification_id": notification_id,
-        "recipients": len(all_tokens),
-        "message": "Push notification queued" if all_tokens else "No push subscribers found"
+        "success": result.get("success", False),
+        "notification_id": result.get("notification_id"),
+        "recipients": result.get("recipients", 0),
+        "message": result.get("message", "Notification sent"),
+        "error": result.get("error")
     }
 
 
