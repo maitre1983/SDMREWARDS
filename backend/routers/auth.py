@@ -905,49 +905,63 @@ async def get_current_user(authorization: str = Header(...)):
 async def reset_client_password(request: ResetPasswordRequest):
     """Reset client password after OTP verification"""
     phone = normalize_phone(request.phone)
+    phone_clean = phone.replace("+233", "0")
     
     # Find the client
     client_doc = await db.clients.find_one({"phone": phone})
     if not client_doc:
         raise HTTPException(status_code=404, detail="Account not found with this phone number")
     
-    # Verify OTP using stored request
-    stored_otp = await db.otp_requests.find_one({
+    # Verify OTP using stored record
+    stored_otp = await db.otp_records.find_one({
         "request_id": request.request_id,
-        "phone": phone,
         "verified": True
     })
     
     if not stored_otp:
-        # If not pre-verified, try to verify now
-        # In test mode (no BulkClix config), accept test OTP
-        if not BULKCLIX_OTP_USER:
+        # If not pre-verified, try to verify now via BulkClix API
+        # Test mode - accept 123456
+        if request.request_id.startswith("TEST_"):
+            if request.otp_code != "123456":
+                raise HTTPException(status_code=400, detail="Invalid OTP code")
+        elif not BULKCLIX_API_KEY:
+            # No API key configured - test mode
             if request.otp_code != "123456":
                 raise HTTPException(status_code=400, detail="Invalid OTP code. Use 123456 for testing.")
         else:
             try:
-                async with httpx.AsyncClient() as http_client:
+                async with httpx.AsyncClient(follow_redirects=True) as http_client:
                     verify_response = await http_client.post(
-                        f"{BULKCLIX_BASE_URL}/otp/verify",
+                        f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
+                        headers={
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                            "x-api-key": BULKCLIX_API_KEY
+                        },
                         json={
-                            "username": BULKCLIX_OTP_USER,
-                            "password": BULKCLIX_OTP_PASS,
-                            "reqid": request.request_id,
-                            "otp": request.otp_code
+                            "requestId": request.request_id,
+                            "phoneNumber": phone_clean,
+                            "code": request.otp_code
                         },
                         timeout=30.0
                     )
                     
-                    if verify_response.status_code != 200:
-                        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
-                    
                     result = verify_response.json()
-                    if result.get("status") != "success":
-                        raise HTTPException(status_code=400, detail="OTP verification failed")
+                    logger.info(f"Client password reset OTP verify response: {result}")
+                    
+                    if verify_response.status_code != 200 or "successful" not in result.get("message", "").lower():
+                        error_msg = result.get("message", "Invalid or expired OTP code")
+                        raise HTTPException(status_code=400, detail=error_msg)
+                    
+                    # Mark as verified
+                    await db.otp_records.update_one(
+                        {"request_id": request.request_id},
+                        {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
+                    )
                         
-            except httpx.RequestError:
-                if request.otp_code != "123456":
-                    raise HTTPException(status_code=400, detail="OTP service unavailable")
+            except httpx.RequestError as e:
+                logger.error(f"OTP verify request error: {e}")
+                raise HTTPException(status_code=500, detail="OTP service unavailable. Please try again.")
     
     # Validate new password
     if len(request.new_password) < 6:
@@ -960,8 +974,8 @@ async def reset_client_password(request: ResetPasswordRequest):
         {"$set": {"password_hash": new_hash, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
-    # Clean up OTP request
-    await db.otp_requests.delete_many({"phone": phone})
+    # Clean up OTP records
+    await db.otp_records.delete_many({"phone": phone})
     
     logger.info(f"Password reset successful for client: {phone}")
     
@@ -975,49 +989,63 @@ async def reset_client_password(request: ResetPasswordRequest):
 async def reset_merchant_password(request: ResetPasswordRequest):
     """Reset merchant password after OTP verification"""
     phone = normalize_phone(request.phone)
+    phone_clean = phone.replace("+233", "0")
     
     # Find the merchant
     merchant_doc = await db.merchants.find_one({"phone": phone})
     if not merchant_doc:
         raise HTTPException(status_code=404, detail="Account not found with this phone number")
     
-    # Verify OTP using stored request
-    stored_otp = await db.otp_requests.find_one({
+    # Verify OTP using stored record
+    stored_otp = await db.otp_records.find_one({
         "request_id": request.request_id,
-        "phone": phone,
         "verified": True
     })
     
     if not stored_otp:
-        # If not pre-verified, try to verify now
-        # In test mode (no BulkClix config), accept test OTP
-        if not BULKCLIX_OTP_USER:
+        # If not pre-verified, try to verify now via BulkClix API
+        # Test mode - accept 123456
+        if request.request_id.startswith("TEST_"):
+            if request.otp_code != "123456":
+                raise HTTPException(status_code=400, detail="Invalid OTP code")
+        elif not BULKCLIX_API_KEY:
+            # No API key configured - test mode
             if request.otp_code != "123456":
                 raise HTTPException(status_code=400, detail="Invalid OTP code. Use 123456 for testing.")
         else:
             try:
-                async with httpx.AsyncClient() as http_client:
+                async with httpx.AsyncClient(follow_redirects=True) as http_client:
                     verify_response = await http_client.post(
-                        f"{BULKCLIX_BASE_URL}/otp/verify",
+                        f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
+                        headers={
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                            "x-api-key": BULKCLIX_API_KEY
+                        },
                         json={
-                            "username": BULKCLIX_OTP_USER,
-                            "password": BULKCLIX_OTP_PASS,
-                            "reqid": request.request_id,
-                            "otp": request.otp_code
+                            "requestId": request.request_id,
+                            "phoneNumber": phone_clean,
+                            "code": request.otp_code
                         },
                         timeout=30.0
                     )
                     
-                    if verify_response.status_code != 200:
-                        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
-                    
                     result = verify_response.json()
-                    if result.get("status") != "success":
-                        raise HTTPException(status_code=400, detail="OTP verification failed")
+                    logger.info(f"Merchant password reset OTP verify response: {result}")
+                    
+                    if verify_response.status_code != 200 or "successful" not in result.get("message", "").lower():
+                        error_msg = result.get("message", "Invalid or expired OTP code")
+                        raise HTTPException(status_code=400, detail=error_msg)
+                    
+                    # Mark as verified
+                    await db.otp_records.update_one(
+                        {"request_id": request.request_id},
+                        {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
+                    )
                         
-            except httpx.RequestError:
-                if request.otp_code != "123456":
-                    raise HTTPException(status_code=400, detail="OTP service unavailable")
+            except httpx.RequestError as e:
+                logger.error(f"OTP verify request error: {e}")
+                raise HTTPException(status_code=500, detail="OTP service unavailable. Please try again.")
     
     # Validate new password
     if len(request.new_password) < 6:
@@ -1030,8 +1058,8 @@ async def reset_merchant_password(request: ResetPasswordRequest):
         {"$set": {"password_hash": new_hash, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
-    # Clean up OTP request
-    await db.otp_requests.delete_many({"phone": phone})
+    # Clean up OTP records
+    await db.otp_records.delete_many({"phone": phone})
     
     logger.info(f"Password reset successful for merchant: {phone}")
     
