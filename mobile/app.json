@@ -19,7 +19,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.sdmrewards.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "SDM Rewards needs camera access to scan merchant QR codes for payments."
+        "NSCameraUsageDescription": "SDM Rewards needs camera access to scan merchant QR codes for payments.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
@@ -30,13 +31,22 @@
       "package": "com.sdmrewards.app",
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.READ_CONTACTS"
+        "android.permission.READ_CONTACTS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ],
+      "googleServicesFile": "./google-services.json",
       "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#7C3AED",
+      "androidMode": "default",
+      "androidCollapsedTitle": "SDM Rewards"
     },
     "plugins": [
       [
@@ -57,12 +67,21 @@
           "contactsPermission": "SDM Rewards needs access to your contacts to invite friends and see who's already a member."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7C3AED",
+          "sounds": ["./assets/notification-sound.wav"]
+        }
+      ],
       "expo-secure-store"
     ],
     "extra": {
       "eas": {
         "projectId": "sdm-rewards"
-      }
+      },
+      "oneSignalAppId": "5c95e6f8-d2e8-4c22-b070-dfd556d746a0"
     }
   }
 }

@@ -16,6 +16,7 @@ import {
   clientAPI,
   merchantAPI,
 } from '../services/api';
+import pushNotifications from '../services/pushNotifications';
 
 const AuthContext = createContext(null);
 
@@ -49,6 +50,13 @@ export const AuthProvider = ({ children }) => {
         setUserTypeState(type);
         setUser(savedUser);
         setIsAuthenticated(true);
+        
+        // Initialize push notifications
+        try {
+          await pushNotifications.initialize(type);
+        } catch (pushError) {
+          console.log('Push notification init error (non-blocking):', pushError);
+        }
         
         // Fetch fresh dashboard data
         await refreshDashboard(type);
@@ -127,6 +135,14 @@ export const AuthProvider = ({ children }) => {
         await setUserData(response.client);
         setIsAuthenticated(true);
         await refreshDashboard('client');
+        
+        // Initialize push notifications after successful login
+        try {
+          await pushNotifications.initialize('client');
+        } catch (pushError) {
+          console.log('Push notification init error (non-blocking):', pushError);
+        }
+        
         return { 
           success: true,
           device_token: response.device_token,
@@ -187,6 +203,14 @@ export const AuthProvider = ({ children }) => {
         await setUserData(response.merchant);
         setIsAuthenticated(true);
         await refreshDashboard('merchant');
+        
+        // Initialize push notifications after successful login
+        try {
+          await pushNotifications.initialize('merchant');
+        } catch (pushError) {
+          console.log('Push notification init error (non-blocking):', pushError);
+        }
+        
         return { 
           success: true,
           device_token: response.device_token,
@@ -252,6 +276,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // Unregister from push notifications
+    try {
+      await pushNotifications.unregister(userType);
+    } catch (error) {
+      console.log('Push unregister error (non-blocking):', error);
+    }
+    
     await clearAuthToken();
     setIsAuthenticated(false);
     setUser(null);
