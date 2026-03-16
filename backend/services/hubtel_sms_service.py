@@ -392,6 +392,233 @@ class HubtelSMSService:
             "errors": errors[:5] if errors else None
         }
     
+    async def send_personalized_bulk_sms(
+        self, 
+        recipients: List[Dict[str, str]], 
+        sms_type: str = "personalized_bulk"
+    ) -> Dict:
+        """
+        Send personalized SMS to multiple recipients using Hubtel Batch Personalized API
+        
+        API Endpoint: POST https://sms.hubtel.com/v1/messages/batch/personalized/send
+        
+        Args:
+            recipients: List of dicts with "phone" and "message" keys
+                        e.g. [{"phone": "0241234567", "message": "Hello John..."}, ...]
+        
+        Request Format:
+            {
+                "From": "SDMRewards",
+                "personalizedRecipients": [
+                    {"To": "233241234567", "Content": "Hello John..."},
+                    {"To": "233201234567", "Content": "Hello Mary..."}
+                ]
+            }
+        
+        Returns: {"success": bool, "sent": int, "failed": int, "batch_id": str}
+        """
+        if not recipients:
+            return {"success": False, "error": "No recipients provided", "sent": 0, "failed": 0}
+        
+        # Format recipients for Hubtel API
+        personalized_recipients = []
+        for r in recipients:
+            phone = r.get("phone", "")
+            message = r.get("message", "")
+            if phone and message:
+                formatted_phone = self._format_phone_local(phone)
+                personalized_recipients.append({
+                    "To": formatted_phone,
+                    "Content": message
+                })
+        
+        if not personalized_recipients:
+            return {"success": False, "error": "No valid recipients after formatting", "sent": 0, "failed": 0}
+        
+        # Create bulk SMS log
+        bulk_record = {
+            "id": str(uuid.uuid4()),
+            "type": sms_type,
+            "api_type": "personalized_batch",
+            "recipient_count": len(personalized_recipients),
+            "provider": "hubtel",
+            "status": "pending",
+            "test_mode": SMS_TEST_MODE or not self.is_configured(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        if self.db is not None:
+            await self.db.bulk_sms_logs.insert_one(bulk_record)
+        
+        # Test mode
+        if SMS_TEST_MODE:
+            logger.info(f"[TEST PERSONALIZED BULK SMS - Hubtel] To: {len(personalized_recipients)} recipients")
+            for r in personalized_recipients[:3]:  # Log first 3 for debugging
+                logger.info(f"  - {r['To']}: {r['Content'][:50]}...")
+            
+            if self.db is not None:
+                await self.db.bulk_sms_logs.update_one(
+                    {"id": bulk_record["id"]},
+                    {"$set": {"status": "sent_test", "sent_at": datetime.now(timezone.utc).isoformat()}}
+                )
+            return {
+                "success": True,
+                "sent": len(personalized_recipients),
+                "failed": 0,
+                "test_mode": True,
+                "bulk_id": bulk_record["id"]
+            }
+        
+        # Check configuration
+        if not self.is_configured():
+            error = "Hubtel SMS not configured"
+            if self.db is not None:
+                await self.db.bulk_sms_logs.update_one(
+                    {"id": bulk_record["id"]},
+                    {"$set": {"status": "failed", "error": error}}
+                )
+            return {"success": False, "error": error, "sent": 0, "failed": len(personalized_recipients)}
+        
+        # Use Hubtel Batch Personalized API
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/batch/personalized/send",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": self._get_auth_header()
+                    },
+                    json={
+                        "From": self.sender_id,
+                        "personalizedRecipients": personalized_recipients
+                    },
+                    timeout=60.0
+                )
+                
+                try:
+                    result = response.json()
+                except:
+                    result = {"raw_response": response.text}
+                
+                logger.info(f"Hubtel Personalized Batch SMS response: status={response.status_code}, result={result}")
+                
+                # Check for success
+                status_code = result.get("status", result.get("Status", -1))
+                is_success = response.status_code in [200, 201] and status_code == 0
+                
+                if is_success:
+                    batch_id = result.get("batchId", result.get("BatchId", bulk_record["id"]))
+                    if self.db is not None:
+                        await self.db.bulk_sms_logs.update_one(
+                            {"id": bulk_record["id"]},
+                            {
+                                "$set": {
+                                    "status": "sent",
+                                    "batch_id": batch_id,
+                                    "provider_response": result,
+                                    "sent_at": datetime.now(timezone.utc).isoformat()
+                                }
+                            }
+                        )
+                    return {
+                        "success": True,
+                        "sent": len(personalized_recipients),
+                        "failed": 0,
+                        "batch_id": batch_id,
+                        "bulk_id": bulk_record["id"]
+                    }
+                else:
+                    error = result.get("statusDescription", result.get("Message", f"HTTP {response.status_code}"))
+                    logger.error(f"Personalized Batch SMS failed: {error}")
+                    
+                    # Fallback to individual sends
+                    logger.warning("Falling back to individual personalized sends...")
+                    return await self._send_personalized_individual(personalized_recipients, bulk_record)
+                    
+        except Exception as e:
+            error = str(e)
+            logger.error(f"Hubtel Personalized Batch SMS exception: {error}")
+            # Fallback to individual sends
+            return await self._send_personalized_individual(personalized_recipients, bulk_record)
+    
+    async def _send_personalized_individual(
+        self, 
+        recipients: List[Dict[str, str]], 
+        bulk_record: dict
+    ) -> Dict:
+        """Fallback: Send personalized SMS individually when batch API fails"""
+        sent_count = 0
+        failed_count = 0
+        message_ids = []
+        errors = []
+        
+        async with httpx.AsyncClient() as client:
+            for recipient in recipients:
+                phone = recipient.get("To", "")
+                message = recipient.get("Content", "")
+                
+                try:
+                    response = await client.post(
+                        f"{self.base_url}/send",
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": self._get_auth_header()
+                        },
+                        json={
+                            "From": self.sender_id,
+                            "To": phone,
+                            "Content": message
+                        },
+                        timeout=30.0
+                    )
+                    
+                    try:
+                        result = response.json()
+                    except:
+                        result = {}
+                    
+                    status_code = result.get("status", -1)
+                    is_success = response.status_code in [200, 201] and status_code == 0
+                    
+                    if is_success:
+                        sent_count += 1
+                        message_ids.append(result.get("messageId", ""))
+                    else:
+                        failed_count += 1
+                        errors.append(f"{phone}: {result.get('statusDescription', 'Failed')}")
+                        
+                except Exception as e:
+                    failed_count += 1
+                    errors.append(f"{phone}: {str(e)}")
+        
+        # Update bulk SMS log
+        final_status = "sent" if sent_count > 0 else "failed"
+        if self.db is not None:
+            await self.db.bulk_sms_logs.update_one(
+                {"id": bulk_record["id"]},
+                {
+                    "$set": {
+                        "status": final_status,
+                        "sent_count": sent_count,
+                        "failed_count": failed_count,
+                        "message_ids": message_ids,
+                        "errors": errors[:10],
+                        "fallback_used": True,
+                        "sent_at": datetime.now(timezone.utc).isoformat()
+                    }
+                }
+            )
+        
+        return {
+            "success": sent_count > 0,
+            "sent": sent_count,
+            "failed": failed_count,
+            "message_ids": message_ids,
+            "bulk_id": bulk_record["id"],
+            "fallback_used": True,
+            "errors": errors[:5] if errors else None
+        }
+    
     # ============== NOTIFICATION TEMPLATES ==============
     
     async def notify_card_purchase(self, phone: str, card_type: str, amount: float, welcome_bonus: float = 1.0):
