@@ -35,6 +35,8 @@ import {
 import { API_URL } from '@/config/api';
 
 const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
+  // Build version for debugging
+  const BUILD_VERSION = "2026.03.16.v3";
   const [activeService, setActiveService] = useState(null);
   const [fees, setFees] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -1105,15 +1107,20 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         {/* Submit Button */}
         {(() => {
           const calc = calculateTotal();
+          const currentBalance = balance || 0;
+          const isInsufficientBalance = calc.total > currentBalance;
+          const isFormIncomplete = 
+            (['airtime', 'withdrawal'].includes(activeService) && (!phone || !amount || parseFloat(amount) <= 0)) ||
+            (activeService === 'ecg' && (!meterNumber || !amount || parseFloat(amount) <= 0)) ||
+            (activeService === 'data' && (!phone || !selectedBundle));
+          
           return (
             <Button
               onClick={handlePurchase}
-              disabled={isLoading || calc.total > balance || 
-                (['airtime', 'withdrawal'].includes(activeService) && (!phone || !amount)) ||
-                (activeService === 'ecg' && (!meterNumber || !amount)) ||
-                (activeService === 'data' && (!phone || !selectedBundle))
-              }
-              className={`w-full h-12 bg-gradient-to-r ${service.color} hover:opacity-90 rounded-xl font-semibold`}
+              disabled={isLoading || isInsufficientBalance || isFormIncomplete}
+              className={`w-full h-12 bg-gradient-to-r ${service.color} hover:opacity-90 rounded-xl font-semibold ${
+                (isInsufficientBalance || isFormIncomplete) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
               data-testid="service-submit"
             >
               {isLoading ? (
@@ -1159,6 +1166,8 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
               Minimum GHS 2.00 required to use services
             </p>
           )}
+          {/* Build version for debugging */}
+          <p className="text-slate-600 text-xs mt-2 text-right">v{BUILD_VERSION}</p>
         </div>
         
         {activeService ? (
