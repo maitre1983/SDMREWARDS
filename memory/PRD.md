@@ -45,6 +45,11 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Chaque destinataire reçoit un message unique
   - Utilise l'API Hubtel `POST /v1/messages/batch/personalized/send`
   - Fallback automatique vers envois individuels si l'API batch échoue
+- ✅ **Interface UI SMS Personnalisés** - Modal complet dans le SMS Center
+  - Zone de composition avec variables dynamiques : `{nom}`, `{cashback}`, `{carte}`
+  - Sélecteur de destinataires avec recherche et filtres
+  - Aperçu en temps réel des messages personnalisés
+  - Support des clients et marchands
 
 ### 2026-03-16 (Session 2)
 - ✅ **Règles de paiement corrigées** - Airtime/Data/ECG: cashback only | Upgrade carte: cashback/MoMo/hybride
