@@ -49,6 +49,7 @@
       "androidCollapsedTitle": "SDM Rewards"
     },
     "plugins": [
+      "./plugins/withMavenRepositories.js",
       [
         "expo-camera",
         {
