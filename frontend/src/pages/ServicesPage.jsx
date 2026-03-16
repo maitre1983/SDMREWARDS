@@ -536,61 +536,146 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         {/* Success State */}
         {upgradeStatus === 'success' && (
           <div className="text-center py-8">
-            <CheckCircle className="text-emerald-400 mx-auto mb-4" size={64} />
-            <p className="text-white text-lg font-semibold">Upgrade Successful!</p>
-            <p className="text-slate-400 mt-2">Your new card is now active</p>
+            <div className="relative inline-block mb-4">
+              <div className="w-24 h-24 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <CheckCircle className="text-emerald-400" size={56} />
+              </div>
+              {/* Celebration sparkles */}
+              <div className="absolute -top-2 -left-2 text-2xl animate-bounce" style={{ animationDelay: '0ms' }}>✨</div>
+              <div className="absolute -top-2 -right-2 text-2xl animate-bounce" style={{ animationDelay: '100ms' }}>🎉</div>
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-2xl animate-bounce" style={{ animationDelay: '200ms' }}>🏆</div>
+            </div>
+            <p className="text-white text-2xl font-bold">Upgrade Successful!</p>
+            <p className="text-emerald-400 mt-2 font-medium">Your new card is now active</p>
+            <p className="text-slate-400 mt-1 text-sm">Redirecting to your dashboard...</p>
           </div>
         )}
         
         {/* Failed State */}
         {upgradeStatus === 'failed' && (
           <div className="text-center py-8">
-            <AlertCircle className="text-red-400 mx-auto mb-4" size={64} />
-            <p className="text-white text-lg font-semibold">Upgrade Failed</p>
-            <p className="text-slate-400 mt-2">Please try again</p>
-            <Button
-              onClick={() => setUpgradeStatus(null)}
-              className="mt-4 bg-amber-500 hover:bg-amber-600"
-            >
-              Try Again
-            </Button>
+            <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="text-red-400" size={48} />
+            </div>
+            <p className="text-white text-xl font-bold">Upgrade Failed</p>
+            <p className="text-slate-400 mt-2">The payment could not be completed</p>
+            <div className="mt-6 space-y-3">
+              <Button
+                onClick={() => setUpgradeStatus(null)}
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+              >
+                Try Again
+              </Button>
+              <Button
+                onClick={() => {
+                  setActiveService(null);
+                  setSelectedUpgradeCard(null);
+                  setUpgradeStatus(null);
+                }}
+                variant="ghost"
+                className="w-full text-slate-400 hover:text-white"
+              >
+                Go Back
+              </Button>
+            </div>
           </div>
         )}
         
-        {/* Pending/Processing State */}
+        {/* Pending/Processing State - Enhanced Payment Status Indicator */}
         {(upgradeStatus === 'pending' || upgradeStatus === 'processing') && (
           <div className="text-center py-6">
-            <div className="relative inline-block">
-              <Phone className="text-amber-400 mx-auto mb-4" size={48} />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
+            {/* Animated Phone Icon */}
+            <div className="relative inline-block mb-4">
+              <div className="w-20 h-20 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Phone className="text-amber-400" size={40} />
+              </div>
+              {/* Pulse Animation */}
+              <div className="absolute inset-0 w-20 h-20 rounded-full bg-amber-500/30 animate-ping" />
+              {/* Signal Waves */}
+              <div className="absolute -right-2 top-1/2 -translate-y-1/2">
+                <div className="flex items-center gap-0.5">
+                  <div className="w-1 h-3 bg-amber-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1 h-5 bg-amber-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1 h-7 bg-amber-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
             </div>
-            <p className="text-white text-lg font-semibold">
-              {upgradeStatus === 'processing' ? 'Processing...' : 'Waiting for Payment'}
+            
+            {/* Status Title */}
+            <p className="text-white text-xl font-bold">
+              {upgradeStatus === 'processing' ? 'Processing Payment...' : 'MoMo Prompt Sent!'}
             </p>
-            <p className="text-slate-400 mt-2 text-sm">
-              Please approve the MoMo prompt on your phone
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
-              <Loader2 className="animate-spin" size={16} />
-              <span className="text-sm">Waiting for confirmation...</span>
+            
+            {/* Instructions */}
+            <div className="mt-3 space-y-2">
+              <p className="text-amber-400 font-medium">
+                Check your phone for the payment prompt
+              </p>
+              <p className="text-slate-400 text-sm">
+                Enter your MoMo PIN to approve the payment
+              </p>
+            </div>
+            
+            {/* Payment Steps Progress */}
+            <div className="mt-6 max-w-xs mx-auto">
+              <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                <span className={upgradeStatus === 'processing' ? 'text-amber-400' : 'text-emerald-400'}>
+                  1. Request Sent
+                </span>
+                <span className={upgradeStatus === 'pending' ? 'text-amber-400 animate-pulse' : 'text-slate-500'}>
+                  2. Awaiting Approval
+                </span>
+                <span className="text-slate-500">
+                  3. Complete
+                </span>
+              </div>
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-1000 ${
+                    upgradeStatus === 'processing' 
+                      ? 'w-1/3 bg-amber-500 animate-pulse' 
+                      : 'w-2/3 bg-gradient-to-r from-emerald-500 to-amber-500'
+                  }`}
+                />
+              </div>
+            </div>
+            
+            {/* Waiting Animation */}
+            <div className="mt-6 flex items-center justify-center gap-3 text-amber-400">
+              <Loader2 className="animate-spin" size={20} />
+              <span className="text-sm font-medium">Auto-checking every 3 seconds...</span>
             </div>
             
             {/* I Have Paid Button - Only show when pending */}
             {upgradeStatus === 'pending' && upgradePaymentId && (
-              <div className="mt-6 pt-4 border-t border-slate-700">
+              <div className="mt-6 space-y-3">
                 <Button
                   onClick={checkUpgradePaymentStatus}
                   disabled={isLoading}
-                  variant="outline"
-                  className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-3"
                   data-testid="check-upgrade-status-btn"
                 >
                   {isLoading ? (
-                    <Loader2 className="animate-spin mr-2" size={16} />
+                    <Loader2 className="animate-spin mr-2" size={18} />
                   ) : (
-                    <CheckCircle className="mr-2" size={16} />
+                    <CheckCircle className="mr-2" size={18} />
                   )}
-                  I Have Paid - Check Status
+                  I Have Approved - Check Now
+                </Button>
+                
+                <Button
+                  onClick={() => {
+                    if (pollingRef.current) {
+                      clearInterval(pollingRef.current);
+                      pollingRef.current = null;
+                    }
+                    setUpgradeStatus(null);
+                    setUpgradePaymentId(null);
+                  }}
+                  variant="ghost"
+                  className="w-full text-slate-400 hover:text-white"
+                >
+                  Cancel & Try Again
                 </Button>
               </div>
             )}
