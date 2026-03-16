@@ -45,6 +45,17 @@ class SMSTemplateRequest(BaseModel):
     category: str = "general"
 
 
+class PersonalizedRecipient(BaseModel):
+    """A single personalized SMS recipient"""
+    phone: str
+    message: str
+
+
+class PersonalizedBulkSMSRequest(BaseModel):
+    """Request model for personalized bulk SMS"""
+    recipients: List[PersonalizedRecipient]
+
+
 # ============== INDIVIDUAL SMS ==============
 
 @router.post("/sms/send")
@@ -270,6 +281,90 @@ async def send_bulk_sms_merchants(
         "sent": result.get("sent", 0),
         "failed": result.get("failed", 0),
         "bulk_id": result.get("bulk_id"),
+        "error": result.get("error"),
+        "errors": result.get("errors")
+    }
+
+
+# ============== PERSONALIZED BULK SMS ==============
+
+@router.post("/sms/bulk/personalized")
+async def send_personalized_bulk_sms(
+    request: PersonalizedBulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Send personalized SMS to multiple recipients (each gets a unique message).
+    
+    This uses Hubtel's Batch Personalized API:
+    POST https://sms.hubtel.com/v1/messages/batch/personalized/send
+    
+    Request body example:
+    {
+        "recipients": [
+            {"phone": "0241234567", "message": "Bonjour John, votre cashback est de 50 GHS!"},
+            {"phone": "0201234567", "message": "Bonjour Mary, votre cashback est de 25 GHS!"}
+        ]
+    }
+    
+    Use cases:
+    - Cashback notifications with personalized amounts
+    - Birthday greetings with customer names
+    - Promotional offers with targeted discounts
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    if not request.recipients:
+        raise HTTPException(status_code=400, detail="At least one recipient is required")
+    
+    if len(request.recipients) > 10000:
+        raise HTTPException(status_code=400, detail="Maximum 10,000 recipients per request")
+    
+    from services.sms_service import get_sms
+    sms_service = get_sms(db)
+    
+    # Convert Pydantic models to dicts for the service
+    recipients_data = [
+        {"phone": r.phone, "message": r.message}
+        for r in request.recipients
+        if r.phone and r.message
+    ]
+    
+    if not recipients_data:
+        return {
+            "success": False,
+            "error": "No valid recipients after validation",
+            "total_recipients": 0,
+            "sent": 0,
+            "failed": 0
+        }
+    
+    # Send personalized bulk SMS
+    result = await sms_service.send_personalized_bulk_sms(recipients_data, "admin_personalized_bulk")
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "personalized_bulk_sms",
+        "total_recipients": len(recipients_data),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "bulk_id": result.get("bulk_id"),
+        "test_mode": result.get("test_mode", False),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": result.get("success", False),
+        "total_recipients": len(recipients_data),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "bulk_id": result.get("bulk_id"),
+        "batch_id": result.get("batch_id"),
+        "test_mode": result.get("test_mode", False),
+        "fallback_used": result.get("fallback_used", False),
         "error": result.get("error"),
         "errors": result.get("errors")
     }

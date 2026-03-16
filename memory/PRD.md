@@ -8,15 +8,26 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 /app
 ├── backend/
 │   ├── routers/
-│   │   ├── admin.py        # 4300+ lignes (à refactorer)
-│   │   ├── auth.py         # OTP migré vers Hubtel ✅
-│   │   ├── merchants.py    # 3000+ lignes (à refactorer)
-│   │   ├── payments.py     # 2200+ lignes (à refactorer)
-│   │   └── services.py     # VAS migré vers Hubtel ✅
+│   │   ├── admin/              # Package modulaire ✅
+│   │   │   ├── __init__.py     # Routeur principal
+│   │   │   └── legacy_routes.py # Routes à extraire
+│   │   ├── merchants/          # Package modulaire ✅
+│   │   │   ├── __init__.py
+│   │   │   └── legacy_routes.py
+│   │   ├── payments/           # Package modulaire complet ✅
+│   │   │   ├── __init__.py, card.py, callbacks.py, etc.
+│   │   ├── admin_modules/      # Modules admin fonctionnels
+│   │   │   ├── sms.py          # SMS Hubtel (Simple, Batch, Personalized) ✅
+│   │   │   ├── clients.py, merchants.py, etc.
+│   │   ├── auth.py             # OTP migré vers Hubtel ✅
+│   │   └── services.py         # VAS migré vers Hubtel ✅
 │   ├── services/
 │   │   ├── hubtel_momo_service.py  # Paiements MoMo ✅
-│   │   ├── hubtel_sms_service.py   # SMS OTP ✅
+│   │   ├── hubtel_sms_service.py   # SMS (Simple, Batch, Personalized) ✅
 │   │   └── hubtel_vas_service.py   # Airtime/Data/ECG ✅
+│   ├── tests/
+│   │   ├── conftest.py
+│   │   └── test_critical_endpoints.py  # 14 tests ✅
 │   └── server.py
 ├── frontend/
 │   └── src/pages/
@@ -27,6 +38,13 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 ```
 
 ## Completed Features
+
+### 2026-03-16 (Session 3)
+- ✅ **Intégration Hubtel SMS Batch Personalized** - `POST /api/admin/sms/bulk/personalized` créé et testé
+  - Endpoint fonctionnel pour envoyer des SMS personnalisés en masse
+  - Chaque destinataire reçoit un message unique
+  - Utilise l'API Hubtel `POST /v1/messages/batch/personalized/send`
+  - Fallback automatique vers envois individuels si l'API batch échoue
 
 ### 2026-03-16 (Session 2)
 - ✅ **Règles de paiement corrigées** - Airtime/Data/ECG: cashback only | Upgrade carte: cashback/MoMo/hybride
@@ -92,9 +110,13 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 | `POST /api/auth/client/reset-password` | ✅ | Reset password client |
 | `POST /api/auth/merchant/register` | ✅ | Inscription marchand avec OTP |
 | `POST /api/auth/merchant/reset-password` | ✅ | Reset password marchand |
-| `POST /api/services/airtime/purchase` | ✅ | Achat crédit Airtime |
-| `POST /api/services/data/purchase` | ✅ | Achat forfait Data |
+| `POST /api/services/airtime/purchase` | ✅ | Achat crédit Airtime (cashback only) |
+| `POST /api/services/data/purchase` | ✅ | Achat forfait Data (cashback only) |
 | `POST /api/clients/cards/upgrade` | ✅ | Mise à niveau carte |
+| `POST /api/admin/sms/send` | ✅ | Envoi SMS individuel |
+| `POST /api/admin/sms/bulk/clients` | ✅ | SMS en masse aux clients |
+| `POST /api/admin/sms/bulk/merchants` | ✅ | SMS en masse aux marchands |
+| `POST /api/admin/sms/bulk/personalized` | ✅ **NEW** | SMS personnalisés en masse |
 | `POST /api/services/cashback/withdraw` | ⚠️ BLOQUÉ | Retrait MoMo (403 en prod) |
 
 ## Technical Notes
@@ -106,3 +128,16 @@ La fonction `_execute_curl_command` dans `hubtel_momo_service.py` utilise `subpr
 - 3 requêtes OTP/minute par IP
 - 3 tentatives de vérification par OTP
 - Expiration OTP: 10 minutes
+
+### APIs Hubtel SMS Intégrées
+| API | Endpoint | Usage |
+|-----|----------|-------|
+| Simple Send | `POST /v1/messages/send` | OTP, notifications individuelles |
+| Batch Simple | `POST /v1/messages/batch/simple/send` | Annonces en masse (même message) |
+| Batch Personalized | `POST /v1/messages/batch/personalized/send` | SMS personnalisés en masse |
+
+### Credentials Hubtel SMS
+Les credentials sont stockés dans `.env`:
+- `HUBTEL_SMS_CLIENT_ID`
+- `HUBTEL_SMS_CLIENT_SECRET`
+- `HUBTEL_SMS_SENDER_ID` (par défaut: "SDMREWARDS")
