@@ -158,6 +158,9 @@ export default function ClientDashboard() {
   
   // Referral share modal
   const [showReferralShare, setShowReferralShare] = useState(false);
+  
+  // Card selection section ref for scrolling
+  const cardSelectionRef = useRef(null);
 
   const token = localStorage.getItem('sdm_client_token');
 
@@ -1219,7 +1222,13 @@ export default function ClientDashboard() {
                   Purchase a membership card to start earning cashback on all your purchases!
                 </p>
                 <Button
-                  onClick={() => setActiveTab('home')}
+                  onClick={() => {
+                    setActiveTab('home');
+                    // Scroll to card selection section after a short delay
+                    setTimeout(() => {
+                      cardSelectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                  }}
                   className="mt-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
                   size="sm"
                   data-testid="activate-account-btn"
@@ -1395,7 +1404,7 @@ export default function ClientDashboard() {
 
             {/* Buy Card Section */}
             {!isActive && (
-              <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+              <div ref={cardSelectionRef} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
                 <h3 className="text-white font-semibold mb-4">Choose your card</h3>
                 <div className="space-y-3">
                   {availableCards.map((cardItem) => (
