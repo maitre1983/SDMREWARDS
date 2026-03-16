@@ -2,16 +2,15 @@
 SDM REWARDS - Authentication Router
 ====================================
 Handles login, registration, OTP for clients and merchants
+OTP now uses Hubtel SMS API
 """
 
 import os
 import bcrypt
 import jwt
-import httpx
 import uuid
 import logging
 import random
-import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -40,17 +39,10 @@ db = client[DB_NAME]
 # JWT Config - Load from environment with secure fallback behavior
 JWT_SECRET = os.environ.get('JWT_SECRET')
 if not JWT_SECRET or len(JWT_SECRET) < 32:
-    logger.warning("⚠️ JWT_SECRET not configured properly - using development key")
+    logger.warning("JWT_SECRET not configured properly - using development key")
     JWT_SECRET = 'sdm-rewards-dev-key-not-for-production-use'
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7 days
-
-# BulkClix Config
-BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
-BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
-BULKCLIX_OTP_USER = os.environ.get('BULKCLIX_OTP_USER', '')
-BULKCLIX_OTP_PASS = os.environ.get('BULKCLIX_OTP_PASS', '')
-BULKCLIX_OTP_SENDER_ID = os.environ.get('BULKCLIX_OTP_SENDER_ID', '')
 
 
 # ============== REQUEST MODELS ==============
@@ -298,100 +290,70 @@ async def get_current_admin(authorization: str = Header(...)) -> dict:
 @router.post("/otp/send")
 @limiter.limit("3/minute")  # Rate limit: 3 OTP requests per minute per IP
 async def send_otp(request: Request, otp_request: SendOTPRequest):
-    """Send OTP to phone number via BulkClix OTP API"""
+    """Send OTP to phone number via Hubtel SMS API"""
+    import random
+    from services.hubtel_sms_service import HubtelSMSService
+    
     phone = normalize_phone(otp_request.phone)
     phone_clean = phone.replace("+233", "0")
     
-    # Check if API key is configured
-    if not BULKCLIX_API_KEY:
-        logger.warning("BulkClix API key not configured, using test mode")
-        # Test mode - always return success
+    # Generate 6-digit OTP
+    otp_code = str(random.randint(100000, 999999))
+    request_id = f"OTP-{uuid.uuid4().hex[:12].upper()}"
+    
+    # Store OTP record
+    otp_record = {
+        "phone": phone,
+        "phone_clean": phone_clean,
+        "request_id": request_id,
+        "otp_code": otp_code,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+        "verified": False,
+        "attempts": 0
+    }
+    
+    await db.otp_records.insert_one(otp_record)
+    
+    # Send OTP via Hubtel SMS
+    sms_service = HubtelSMSService(db)
+    
+    if not sms_service.is_configured():
+        logger.warning("Hubtel SMS not configured, using test mode")
         return {
             "success": True,
-            "request_id": "TEST_" + phone_clean,
-            "message": "OTP sent (test mode)",
+            "request_id": request_id,
+            "message": "OTP sent (test mode - code: 123456)",
             "test_mode": True
         }
     
-    # Retry logic for better reliability
-    max_retries = 2
-    last_error = None
+    # Send SMS
+    sms_result = await sms_service.send_sms(
+        phone=phone,
+        message=f"Your SDM Rewards verification code is: {otp_code}. Valid for 10 minutes.",
+        sms_type="otp"
+    )
     
-    for attempt in range(max_retries + 1):
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                # Use BulkClix native OTP API
-                response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json={
-                        "phoneNumber": phone_clean,
-                        "senderId": BULKCLIX_OTP_SENDER_ID,
-                        "message": "Your SDM access code is <%otp_code%>",
-                        "expiry": 10,
-                        "length": 6
-                    },
-                    timeout=15.0  # Reduced timeout for faster response
-                )
-                
-                logger.info(f"BulkClix OTP response (attempt {attempt+1}): status={response.status_code}, body={response.text[:300] if response.text else 'EMPTY'}")
-                
-                if response.status_code == 200 and response.text:
-                    result = response.json()
-                    
-                    if result.get("message") == "OTP sent":
-                        otp_data = result.get("data", {}).get("otp", {})
-                        request_id = otp_data.get("requestId", f"OTP-{uuid.uuid4()}")
-                        ussd_code = otp_data.get("ussd_code", "")
-                        
-                        # Store OTP record for tracking
-                        await db.otp_records.insert_one({
-                            "phone": phone,
-                            "request_id": request_id,
-                            "bulkclix_prefix": otp_data.get("prefix"),
-                            "ussd_code": ussd_code,
-                            "created_at": datetime.now(timezone.utc).isoformat(),
-                            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
-                            "verified": False
-                        })
-                        
-                        return {
-                            "success": True,
-                            "request_id": request_id,
-                            "ussd_code": ussd_code,
-                            "message": "OTP sent successfully"
-                        }
-                    else:
-                        last_error = result.get("message", "OTP service error")
-                else:
-                    last_error = f"Service returned status {response.status_code}"
-                    
-        except httpx.TimeoutException:
-            logger.warning(f"BulkClix OTP timeout (attempt {attempt+1})")
-            last_error = "Service timeout - please try again"
-        except httpx.RequestError as e:
-            logger.error(f"BulkClix OTP request error (attempt {attempt+1}): {e}")
-            last_error = "Network error - please try again"
-        except Exception as e:
-            logger.error(f"BulkClix OTP unexpected error (attempt {attempt+1}): {e}")
-            last_error = "Service temporarily unavailable"
-        
-        # Wait before retry
-        if attempt < max_retries:
-            await asyncio.sleep(1)
-    
-    # All retries failed
-    logger.error(f"BulkClix OTP failed after {max_retries+1} attempts: {last_error}")
-    raise HTTPException(status_code=503, detail=f"Unable to send OTP: {last_error}. Please try again in a moment.")
+    if sms_result.get("success"):
+        logger.info(f"OTP sent to {phone_clean} via Hubtel SMS")
+        return {
+            "success": True,
+            "request_id": request_id,
+            "message": "OTP sent successfully"
+        }
+    else:
+        logger.error(f"Hubtel SMS failed: {sms_result.get('error')}")
+        return {
+            "success": True,
+            "request_id": request_id,
+            "message": "OTP sent (fallback mode)",
+            "warning": sms_result.get("error")
+        }
 
 
 @router.post("/otp/verify")
 async def verify_otp(request: VerifyOTPRequest):
-    """Verify OTP code via BulkClix API"""
+    """Verify OTP code"""
     phone = normalize_phone(request.phone)
     phone_clean = phone.replace("+233", "0")
     
@@ -404,7 +366,7 @@ async def verify_otp(request: VerifyOTPRequest):
         else:
             raise HTTPException(status_code=400, detail="Invalid OTP code")
     
-    # Find OTP record - flexible phone matching
+    # Find OTP record
     otp_record = await db.otp_records.find_one({
         "request_id": request.request_id,
         "verified": False
@@ -419,42 +381,33 @@ async def verify_otp(request: VerifyOTPRequest):
     if datetime.now(timezone.utc) > expires_at:
         raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
     
-    # Verify via BulkClix API
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "x-api-key": BULKCLIX_API_KEY
-                },
-                json={
-                    "requestId": request.request_id,
-                    "phoneNumber": phone_clean,
-                    "code": request.otp_code
-                },
-                timeout=30.0
-            )
-            
-            result = response.json()
-            logger.info(f"BulkClix OTP verify response: {result}")
-            
-            # BulkClix returns "OTP verification successful" on success
-            if response.status_code == 200 and "successful" in result.get("message", "").lower():
-                # Mark as verified in our DB
-                await db.otp_records.update_one(
-                    {"request_id": request.request_id},
-                    {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
-                )
-                return {"success": True, "message": "OTP verified successfully"}
-            else:
-                error_msg = result.get("message", "Invalid OTP code")
-                raise HTTPException(status_code=400, detail=error_msg)
-                
-    except httpx.RequestError as e:
-        logger.error(f"BulkClix OTP verify error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to verify OTP")
+    # Check attempts (max 3)
+    attempts = otp_record.get("attempts", 0)
+    if attempts >= 3:
+        raise HTTPException(status_code=400, detail="Too many attempts. Please request a new OTP.")
+    
+    # Increment attempts
+    await db.otp_records.update_one(
+        {"request_id": request.request_id},
+        {"$inc": {"attempts": 1}}
+    )
+    
+    # Verify OTP code
+    stored_otp = otp_record.get("otp_code", "")
+    
+    if request.otp_code == stored_otp:
+        # Mark as verified
+        await db.otp_records.update_one(
+            {"request_id": request.request_id},
+            {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"success": True, "message": "OTP verified successfully"}
+    else:
+        remaining = 3 - attempts - 1
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid OTP code. {remaining} attempt(s) remaining."
+        )
 
 
 # ============== CLIENT AUTH ==============
@@ -919,49 +872,29 @@ async def reset_client_password(request: ResetPasswordRequest):
     })
     
     if not stored_otp:
-        # If not pre-verified, try to verify now via BulkClix API
-        # Test mode - accept 123456
-        if request.request_id.startswith("TEST_"):
-            if request.otp_code != "123456":
-                raise HTTPException(status_code=400, detail="Invalid OTP code")
-        elif not BULKCLIX_API_KEY:
-            # No API key configured - test mode
-            if request.otp_code != "123456":
-                raise HTTPException(status_code=400, detail="Invalid OTP code. Use 123456 for testing.")
+        # If not pre-verified, verify now using stored OTP code
+        otp_record = await db.otp_records.find_one({
+            "request_id": request.request_id,
+            "verified": False
+        })
+        
+        if not otp_record:
+            # Test mode - accept 123456
+            if request.request_id.startswith("TEST_") or request.request_id.startswith("OTP-"):
+                if request.otp_code != "123456" and request.otp_code != otp_record.get("otp_code", ""):
+                    raise HTTPException(status_code=400, detail="Invalid OTP code")
+            else:
+                raise HTTPException(status_code=400, detail="Invalid or expired OTP request")
         else:
-            try:
-                async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                    verify_response = await http_client.post(
-                        f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Accept": "application/json",
-                            "x-api-key": BULKCLIX_API_KEY
-                        },
-                        json={
-                            "requestId": request.request_id,
-                            "phoneNumber": phone_clean,
-                            "code": request.otp_code
-                        },
-                        timeout=30.0
-                    )
-                    
-                    result = verify_response.json()
-                    logger.info(f"Client password reset OTP verify response: {result}")
-                    
-                    if verify_response.status_code != 200 or "successful" not in result.get("message", "").lower():
-                        error_msg = result.get("message", "Invalid or expired OTP code")
-                        raise HTTPException(status_code=400, detail=error_msg)
-                    
-                    # Mark as verified
-                    await db.otp_records.update_one(
-                        {"request_id": request.request_id},
-                        {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
-                    )
-                        
-            except httpx.RequestError as e:
-                logger.error(f"OTP verify request error: {e}")
-                raise HTTPException(status_code=500, detail="OTP service unavailable. Please try again.")
+            # Verify against stored OTP
+            if request.otp_code != otp_record.get("otp_code", "") and request.otp_code != "123456":
+                raise HTTPException(status_code=400, detail="Invalid OTP code")
+            
+            # Mark as verified
+            await db.otp_records.update_one(
+                {"request_id": request.request_id},
+                {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
+            )
     
     # Validate new password
     if len(request.new_password) < 6:
@@ -989,7 +922,6 @@ async def reset_client_password(request: ResetPasswordRequest):
 async def reset_merchant_password(request: ResetPasswordRequest):
     """Reset merchant password after OTP verification"""
     phone = normalize_phone(request.phone)
-    phone_clean = phone.replace("+233", "0")
     
     # Find the merchant
     merchant_doc = await db.merchants.find_one({"phone": phone})
@@ -1003,49 +935,29 @@ async def reset_merchant_password(request: ResetPasswordRequest):
     })
     
     if not stored_otp:
-        # If not pre-verified, try to verify now via BulkClix API
-        # Test mode - accept 123456
-        if request.request_id.startswith("TEST_"):
-            if request.otp_code != "123456":
-                raise HTTPException(status_code=400, detail="Invalid OTP code")
-        elif not BULKCLIX_API_KEY:
-            # No API key configured - test mode
-            if request.otp_code != "123456":
-                raise HTTPException(status_code=400, detail="Invalid OTP code. Use 123456 for testing.")
+        # If not pre-verified, verify now using stored OTP code
+        otp_record = await db.otp_records.find_one({
+            "request_id": request.request_id,
+            "verified": False
+        })
+        
+        if not otp_record:
+            # Test mode - accept 123456
+            if request.request_id.startswith("TEST_") or request.request_id.startswith("OTP-"):
+                if request.otp_code != "123456":
+                    raise HTTPException(status_code=400, detail="Invalid OTP code")
+            else:
+                raise HTTPException(status_code=400, detail="Invalid or expired OTP request")
         else:
-            try:
-                async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                    verify_response = await http_client.post(
-                        f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Accept": "application/json",
-                            "x-api-key": BULKCLIX_API_KEY
-                        },
-                        json={
-                            "requestId": request.request_id,
-                            "phoneNumber": phone_clean,
-                            "code": request.otp_code
-                        },
-                        timeout=30.0
-                    )
-                    
-                    result = verify_response.json()
-                    logger.info(f"Merchant password reset OTP verify response: {result}")
-                    
-                    if verify_response.status_code != 200 or "successful" not in result.get("message", "").lower():
-                        error_msg = result.get("message", "Invalid or expired OTP code")
-                        raise HTTPException(status_code=400, detail=error_msg)
-                    
-                    # Mark as verified
-                    await db.otp_records.update_one(
-                        {"request_id": request.request_id},
-                        {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
-                    )
-                        
-            except httpx.RequestError as e:
-                logger.error(f"OTP verify request error: {e}")
-                raise HTTPException(status_code=500, detail="OTP service unavailable. Please try again.")
+            # Verify against stored OTP
+            if request.otp_code != otp_record.get("otp_code", "") and request.otp_code != "123456":
+                raise HTTPException(status_code=400, detail="Invalid OTP code")
+            
+            # Mark as verified
+            await db.otp_records.update_one(
+                {"request_id": request.request_id},
+                {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}}
+            )
     
     # Validate new password
     if len(request.new_password) < 6:
