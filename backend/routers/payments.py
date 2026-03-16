@@ -73,9 +73,9 @@ def detect_network(phone: str) -> Optional[str]:
     elif phone.startswith("233"):
         phone = "0" + phone[3:]
     
-    # Ghana Mobile Network Prefixes (2024 updated)
+    # Ghana Mobile Network Prefixes (2025 updated)
     # MTN Ghana - largest operator
-    mtn_prefixes = ["024", "054", "055", "059"]
+    mtn_prefixes = ["024", "025", "053", "054", "055", "059"]
     # Telecel Ghana (formerly Vodafone Ghana)
     telecel_prefixes = ["020", "050"]
     # AirtelTigo (AT) - merger of Airtel and Tigo
@@ -86,7 +86,7 @@ def detect_network(phone: str) -> Optional[str]:
     if prefix in mtn_prefixes:
         return "MTN"
     elif prefix in telecel_prefixes:
-        return "TELECEL"  # Updated from VODAFONE to TELECEL
+        return "TELECEL"
     elif prefix in airteltigo_prefixes:
         return "AIRTELTIGO"
     

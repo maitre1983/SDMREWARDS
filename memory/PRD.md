@@ -2,6 +2,45 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-16 - Hubtel Complete MoMo Integration (COMPLETED)
+
+**Hubtel MoMo Collection (Receive Money) - TESTED ✅**
+- API: `POST https://rmp.hubtel.com/merchantaccount/merchants/{POS_ID}/receive/mobilemoney`
+- Remplacé BulkClix pour:
+  - Paiements marchands (`/api/payments/merchant/initiate`)
+  - Achat de cartes avec prompt MoMo direct
+- **Test Result:** ✅ Prompt MoMo envoyé avec succès
+
+**Hubtel MoMo Transfer (Send Money) - PENDING**
+- API: `POST https://smp.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/send/mobilemoney`
+- Prepaid Deposit ID: 2021772
+- **Status:** ⚠️ 403 Forbidden - IP needs whitelist for `smp.hubtel.com`
+- Utilisé pour: Retraits cashback, paiements aux marchands
+
+**Hubtel Online Checkout - TESTED ✅**
+- API: `POST https://payproxyapi.hubtel.com/items/initiate`
+- Utilisé pour: Achat de cartes (redirection vers pay.hubtel.com)
+- **Test Result:** ✅ Checkout URL retournée
+
+**Hubtel SMS - TESTED ✅**
+- API: `https://sms.hubtel.com/v1/messages/send`
+- SMS Client ID: azcxpsni
+- **Status:** ⚠️ Requires SMS credit
+
+**Files Created/Modified:**
+- `/app/backend/services/hubtel_momo_service.py`: Service unifié MoMo
+- `/app/backend/services/hubtel_sms_service.py`: Service SMS
+- `/app/backend/routers/payments.py`: Migré vers Hubtel
+- `/app/backend/.env`: HUBTEL_PREPAID_DEPOSIT_ID=2021772
+
+**Hubtel Credentials Summary:**
+- Payment API ID: DMAN95
+- Payment API Secret: dd52533e...
+- POS Sales ID: 2038129 (for Receive Money)
+- Prepaid Deposit ID: 2021772 (for Send Money)
+- SMS Client ID: azcxpsni
+- SMS Client Secret: xslvwakk
+
 ### 2026-03-16 - Hubtel SMS & MoMo Verification Integration (COMPLETED)
 
 **Hubtel SMS API Integration - TESTED ✅**

@@ -31,8 +31,12 @@ HUBTEL_MERCHANT_ACCOUNT = os.environ.get("HUBTEL_MERCHANT_ACCOUNT", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 
 # API Endpoints
-HUBTEL_RMP_BASE_URL = "https://rmp.hubtel.com/merchantaccount/merchants"
+HUBTEL_RMP_BASE_URL = "https://rmp.hubtel.com/merchantaccount/merchants"  # For Receive Money
+HUBTEL_SEND_BASE_URL = "https://smp.hubtel.com/api/merchants"  # For Send Money
 HUBTEL_CHECKOUT_URL = "https://payproxyapi.hubtel.com/items/initiate"
+
+# Prepaid Deposit ID for Send Money
+HUBTEL_PREPAID_DEPOSIT_ID = os.environ.get("HUBTEL_PREPAID_DEPOSIT_ID", "2021772")
 
 # Test mode flag
 PAYMENT_TEST_MODE = os.environ.get("PAYMENT_TEST_MODE", "false").lower() == "true"
@@ -63,6 +67,7 @@ class HubtelMoMoService:
         self.client_id = HUBTEL_CLIENT_ID
         self.client_secret = HUBTEL_CLIENT_SECRET
         self.pos_sales_id = HUBTEL_POS_SALES_ID
+        self.prepaid_deposit_id = HUBTEL_PREPAID_DEPOSIT_ID
         self.merchant_account = HUBTEL_MERCHANT_ACCOUNT or HUBTEL_POS_SALES_ID
         self.callback_base_url = CALLBACK_BASE_URL
     
@@ -380,7 +385,8 @@ class HubtelMoMoService:
         }
         
         try:
-            url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/send/mobilemoney"
+            # Use SMP endpoint with Prepaid Deposit ID for Send Money
+            url = f"{HUBTEL_SEND_BASE_URL}/{self.prepaid_deposit_id}/send/mobilemoney"
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
