@@ -565,7 +565,7 @@ from routers.clients import router as clients_router
 from routers.merchants import router as merchants_router
 from routers.transactions import router as transactions_router
 from routers.admin import router as admin_router
-from routers import payments as payments_router_module
+from routers.payments import router as payments_router, set_db as set_payments_db
 from routers.services import router as services_router
 from routers.seo import router as seo_router
 from routers.ai import router as ai_router
@@ -575,8 +575,8 @@ from routers.growth import router as growth_router
 from routers.two_factor import router as two_factor_router
 from routers import integration as integration_router_module
 
-# Set database for payments router
-payments_router_module.set_db(db)
+# Set database for payments router (new package)
+set_payments_db(db)
 
 # Set database for integration router
 integration_router_module.set_database(db)
@@ -587,7 +587,7 @@ app.include_router(clients_router, prefix="/api/clients", tags=["Clients"])
 app.include_router(merchants_router, prefix="/api/merchants", tags=["Merchants"])
 app.include_router(transactions_router, prefix="/api/transactions", tags=["Transactions"])
 app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
-app.include_router(payments_router_module.router, prefix="/api/payments", tags=["Payments"])
+app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(services_router, prefix="/api/services", tags=["Services"])
 app.include_router(seo_router, tags=["SEO"])
 app.include_router(ai_router, prefix="/api/ai", tags=["AI"])

@@ -7,19 +7,20 @@
 |------|-------|-----------|--------|
 | `admin.py` | 4,337 | 93 | Needs refactoring |
 | `merchants.py` | 3,025 | 60+ | Needs refactoring |
-| `payments.py` | 2,252 | 35+ | **PARTIAL - Package created** |
+| `payments.py` | 2,252 | 35+ | **✅ COMPLETE - Migrated to package** |
 
-### Payments Package Progress
-The `routers/payments/` package has been created with partial extraction:
-- ✅ `__init__.py` - Package entry point with combined router
-- ✅ `shared.py` - Config, helpers, schemas (COMPLETE)
+### Payments Package - MIGRATION COMPLETE ✅
+The `routers/payments/` package has been fully migrated:
+- ✅ `__init__.py` - Package entry point with combined router (15 routes)
+- ✅ `shared.py` - Config, helpers, schemas
 - ✅ `card.py` - Card purchase endpoint (1 route)
-- ✅ `merchant.py` - Merchant payments (3 routes: initiate, cash, cashback)
-- ⏳ `callbacks.py` - Status checks and Hubtel callbacks (TODO)
-- ⏳ `withdrawal.py` - Cashback withdrawal endpoints (TODO)
-- ⏳ `processing.py` - Payment completion logic (TODO)
+- ✅ `merchant.py` - Merchant payments (3 routes)
+- ✅ `callbacks.py` - Status checks and Hubtel callbacks (4 routes)
+- ✅ `withdrawal.py` - Cashback withdrawal (5 routes)
+- ✅ `processing.py` - Payment completion logic (internal)
+- ✅ `test.py` - Test mode endpoints (2 routes)
 
-**Migration Status:** 4/35+ routes extracted. Package can be tested independently.
+**Old file:** Renamed to `_payments_legacy.py.bak` (safe to delete after verification)
 
 ### Existing Partial Refactoring (admin_modules/)
 The `admin_modules/` folder contains partial extraction of models and some routes:
