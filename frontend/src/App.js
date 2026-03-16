@@ -36,6 +36,10 @@ const ReferralTermsPage = lazy(() => import("./pages/ReferralTermsPage"));
 const CashbackRulesPage = lazy(() => import("./pages/CashbackRulesPage"));
 const AbusePolicyPage = lazy(() => import("./pages/AbusePolicyPage"));
 
+// Payment Pages - Lazy loaded
+const PaymentSuccessPage = lazy(() => import("./pages/PaymentSuccessPage"));
+const PaymentCancelledPage = lazy(() => import("./pages/PaymentCancelledPage"));
+
 // Generate admin paths with date-based security (format: DDMMYY)
 const getAdminPaths = () => {
   const paths = [];
@@ -97,6 +101,10 @@ function App() {
               <Route path="/referral-terms" element={<ReferralTermsPage />} />
               <Route path="/cashback-rules" element={<CashbackRulesPage />} />
               <Route path="/abuse-policy" element={<AbusePolicyPage />} />
+              
+              {/* Payment Result Pages */}
+              <Route path="/payment/success" element={<PaymentSuccessPage />} />
+              <Route path="/payment/cancelled" element={<PaymentCancelledPage />} />
               
               {/* Admin Routes */}
               {adminPaths.map(path => (
