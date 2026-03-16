@@ -25,8 +25,8 @@ from .dashboard import router as dashboard_router
 router.include_router(public_router, tags=["Merchant Public"])
 router.include_router(dashboard_router, tags=["Merchant Dashboard"])
 
-# Import legacy router
-from routers.merchants_legacy import router as legacy_router
+# Import legacy routes (now internal to package)
+from .legacy_routes import router as legacy_router
 
 # Paths migrated to sub-modules (exclude from legacy)
 MIGRATED_PATHS = {

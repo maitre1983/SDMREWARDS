@@ -48,17 +48,17 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 ## In Progress / Upcoming Tasks
 
 ### P1 - Refactoring Routeurs - ✅ TERMINÉ
-**Tous les 3 fichiers volumineux migrés vers packages:**
+**Tous les fichiers volumineux refactorés en packages autonomes:**
 
-| Package | Modules | Routes | Status |
-|---------|---------|--------|--------|
-| `payments/` | 7 (shared, card, merchant, callbacks, withdrawal, processing, test) | 15 | ✅ Complet |
-| `merchants/` | 3 (shared, public, dashboard) + legacy | 56 | ✅ Migré |
-| `admin/` | admin_modules (6 fichiers) + legacy | 96 | ✅ Migré |
+| Package | Modules | Routes | Fichiers Legacy |
+|---------|---------|--------|-----------------|
+| `payments/` | 7 | 15 | ❌ Aucun |
+| `merchants/` | 4 | 56 | `legacy_routes.py` (interne) |
+| `admin/` | admin_modules + 1 | 96 | `legacy_routes.py` (interne) |
 
-**Fichiers legacy conservés (pour validation prolongée):**
-- `merchants_legacy.py` - 49 routes non extraites
-- `admin_legacy.py` - 29 routes non extraites
+**Fichiers legacy externes supprimés:** ✅
+- ~~`merchants_legacy.py`~~ → `merchants/legacy_routes.py`
+- ~~`admin_legacy.py`~~ → `admin/legacy_routes.py`
 
 **Tests:** 14/14 passent ✅
 

@@ -45,8 +45,8 @@ for sub_router in [dashboard_router, clients_router, merchants_router,
         path = getattr(route, 'path', '')
         MIGRATED_PATHS.add(path)
 
-# Import legacy router for remaining routes (gamification, email, debit mgmt, etc.)
-from routers.admin_legacy import router as legacy_router
+# Import legacy routes (now internal to package)
+from .legacy_routes import router as legacy_router
 
 # Include non-migrated legacy routes
 for route in legacy_router.routes:
