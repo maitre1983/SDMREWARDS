@@ -239,6 +239,7 @@ class HubtelMoMoService:
         payload = {
             "CustomerMsisdn": normalized_phone,
             "Amount": amount,
+            "Channel": network,  # mtn-gh, vodafone-gh, tigo-gh
             "PrimaryCallbackUrl": callback_url,
             "Description": description,
             "ClientReference": client_reference
@@ -371,6 +372,7 @@ class HubtelMoMoService:
         payload = {
             "RecipientMsisdn": normalized_phone,
             "Amount": amount,
+            "Channel": network,  # mtn-gh, vodafone-gh, tigo-gh
             "PrimaryCallbackUrl": callback_url,
             "Description": description,
             "ClientReference": client_reference,
