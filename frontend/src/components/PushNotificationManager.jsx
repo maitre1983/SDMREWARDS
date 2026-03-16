@@ -124,9 +124,9 @@ export default function PushNotificationManager({ token, userType = 'user' }) {
     } catch (error) {
       console.error('Subscribe error:', error);
       if (error.message?.includes('denied')) {
-        toast.error('Notifications bloquées. Activez-les dans les paramètres du navigateur.');
+        toast.error('Notifications blocked. Enable them in browser settings.');
       } else {
-        toast.error('Erreur lors de l\'activation des notifications');
+        toast.error('Error enabling notifications');
       }
     } finally {
       setIsLoading(false);
@@ -153,10 +153,10 @@ export default function PushNotificationManager({ token, userType = 'user' }) {
 
       setPlayerId(null);
       setIsSubscribed(false);
-      toast.success('Notifications push désactivées');
+      toast.success('Push notifications disabled');
     } catch (error) {
       console.error('Unsubscribe error:', error);
-      toast.error('Erreur lors de la désactivation');
+      toast.error('Error disabling notifications');
     } finally {
       setIsLoading(false);
     }

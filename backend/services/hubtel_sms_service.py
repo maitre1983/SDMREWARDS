@@ -619,81 +619,81 @@ class HubtelSMSService:
             "errors": errors[:5] if errors else None
         }
     
-    # ============== NOTIFICATION TEMPLATES ==============
+    # ============== NOTIFICATION TEMPLATES (ENGLISH) ==============
     
     async def notify_card_purchase(self, phone: str, card_type: str, amount: float, welcome_bonus: float = 1.0):
         """Notify client of successful card purchase"""
         message = (
-            f"SDM Rewards: Votre carte {card_type.capitalize()} (GHS {amount}) est maintenant active! "
-            f"Bonus de bienvenue de GHS {welcome_bonus} credite. "
-            f"Gagnez du cashback sur chaque achat."
+            f"SDM Rewards: Your {card_type.capitalize()} card (GHS {amount}) is now active! "
+            f"Welcome bonus of GHS {welcome_bonus} credited. "
+            f"Earn cashback on every purchase."
         )
         return await self.send_sms(phone, message, "card_purchase")
     
     async def notify_payment_received(self, phone: str, amount: float, merchant_name: str, cashback: float):
         """Notify client of payment and cashback"""
         message = (
-            f"SDM Rewards: Paiement de GHS {amount:.2f} chez {merchant_name} confirme. "
-            f"Cashback gagne: +GHS {cashback:.2f}. "
-            f"Merci d'utiliser SDM!"
+            f"SDM Rewards: Payment of GHS {amount:.2f} at {merchant_name} confirmed. "
+            f"Cashback earned: +GHS {cashback:.2f}. "
+            f"Thanks for using SDM!"
         )
         return await self.send_sms(phone, message, "payment_cashback")
     
     async def notify_merchant_payment(self, phone: str, amount: float, client_name: str):
         """Notify merchant of incoming payment"""
         message = (
-            f"SDM Rewards: Vous avez recu GHS {amount:.2f} de {client_name}. "
-            f"Les fonds seront transferes sur votre compte."
+            f"SDM Rewards: You received GHS {amount:.2f} from {client_name}. "
+            f"Funds will be transferred to your account."
         )
         return await self.send_sms(phone, message, "merchant_payment")
     
     async def notify_referral_bonus(self, phone: str, bonus: float, referred_name: str):
         """Notify referrer of bonus earned"""
         message = (
-            f"SDM Rewards: {referred_name} a rejoint avec votre code! "
-            f"Bonus credite: +GHS {bonus:.2f}. Continuez a partager!"
+            f"SDM Rewards: {referred_name} joined with your code! "
+            f"Bonus credited: +GHS {bonus:.2f}. Keep sharing!"
         )
         return await self.send_sms(phone, message, "referral_bonus")
     
     async def notify_welcome_bonus(self, phone: str, bonus: float):
         """Notify new client of welcome bonus"""
         message = (
-            f"SDM Rewards: Bienvenue! Votre compte est actif. "
-            f"Bonus de bienvenue: +GHS {bonus:.2f}. "
-            f"Visitez nos marchands partenaires!"
+            f"SDM Rewards: Welcome! Your account is active. "
+            f"Welcome bonus: +GHS {bonus:.2f}. "
+            f"Visit our partner merchants!"
         )
         return await self.send_sms(phone, message, "welcome_bonus")
     
     async def notify_payment_pending(self, phone: str, amount: float, description: str):
         """Notify client that MoMo prompt was sent"""
         message = (
-            f"SDM Rewards: Un paiement MoMo de GHS {amount:.2f} pour {description} est en attente. "
-            f"Veuillez approuver sur votre telephone."
+            f"SDM Rewards: A MoMo payment of GHS {amount:.2f} for {description} is pending. "
+            f"Please approve on your phone."
         )
         return await self.send_sms(phone, message, "payment_pending")
     
     async def notify_payment_failed(self, phone: str, amount: float, reason: str = ""):
         """Notify client of failed payment"""
-        reason_text = f" Raison: {reason}" if reason else ""
+        reason_text = f" Reason: {reason}" if reason else ""
         message = (
-            f"SDM Rewards: Votre paiement de GHS {amount:.2f} a echoue.{reason_text} "
-            f"Veuillez reessayer ou contacter le support."
+            f"SDM Rewards: Your payment of GHS {amount:.2f} failed.{reason_text} "
+            f"Please try again or contact support."
         )
         return await self.send_sms(phone, message, "payment_failed")
     
     async def notify_card_expiring(self, phone: str, card_type: str, days_remaining: int):
         """Notify client that their card is expiring soon"""
         message = (
-            f"SDM Rewards: Votre carte {card_type.capitalize()} expire dans {days_remaining} jour(s)! "
-            f"Renouvelez maintenant pour continuer a gagner du cashback."
+            f"SDM Rewards: Your {card_type.capitalize()} card expires in {days_remaining} day(s)! "
+            f"Renew now to keep earning cashback."
         )
         return await self.send_sms(phone, message, "card_expiring")
     
     async def notify_card_expired(self, phone: str, card_type: str):
         """Notify client that their card has expired"""
         message = (
-            f"SDM Rewards: Votre carte {card_type.capitalize()} a expire. "
-            f"Renouvelez votre abonnement pour profiter des recompenses cashback."
+            f"SDM Rewards: Your {card_type.capitalize()} card has expired. "
+            f"Renew your subscription to enjoy cashback rewards."
         )
         return await self.send_sms(phone, message, "card_expired")
     

@@ -45,7 +45,7 @@ export default function SettingsGamification({ token }) {
       setMissions(res.data.missions || { daily: [], weekly: [], special: [] });
     } catch (error) {
       console.error('Error fetching gamification config:', error);
-      toast.error('Erreur lors du chargement de la configuration');
+      toast.error('Error loading configuration');
     } finally {
       setIsLoading(false);
     }
@@ -64,9 +64,9 @@ export default function SettingsGamification({ token }) {
     try {
       setIsSaving(true);
       await axios.put(`${API_URL}/api/admin/gamification/levels`, { levels }, { headers });
-      toast.success('Configuration des niveaux mise a jour');
+      toast.success('Level configuration updated');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la sauvegarde');
+      toast.error(error.response?.data?.detail || 'Error saving');
     } finally {
       setIsSaving(false);
     }
@@ -76,9 +76,9 @@ export default function SettingsGamification({ token }) {
     try {
       setIsSaving(true);
       await axios.put(`${API_URL}/api/admin/gamification/missions`, { missions }, { headers });
-      toast.success('Configuration des missions mise a jour');
+      toast.success('Mission configuration updated');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la sauvegarde');
+      toast.error(error.response?.data?.detail || 'Error saving');
     } finally {
       setIsSaving(false);
     }
@@ -89,10 +89,10 @@ export default function SettingsGamification({ token }) {
     try {
       setIsSaving(true);
       await axios.post(`${API_URL}/api/admin/gamification/reset-missions`, { type }, { headers });
-      toast.success(`Missions ${type} reinitialisees`);
+      toast.success(`${type} missions reset`);
       fetchGamificationStats();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la reinitialisation');
+      toast.error(error.response?.data?.detail || 'Error resetting');
     } finally {
       setIsSaving(false);
     }
@@ -111,9 +111,9 @@ export default function SettingsGamification({ token }) {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      toast.success('Donnees exportees avec succes');
+      toast.success('Data exported successfully');
     } catch (error) {
-      toast.error('Erreur lors de l\'export');
+      toast.error('Error exporting');
     }
   };
 

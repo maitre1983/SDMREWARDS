@@ -107,8 +107,8 @@ const PaymentSuccessPage = () => {
                 <CheckCircle className="w-12 h-12 text-white" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold text-white mt-6 mb-2">Paiement Réussi!</h1>
-            <p className="text-slate-400">Votre carte SDM Rewards est maintenant active</p>
+            <h1 className="text-3xl font-bold text-white mt-6 mb-2">Payment Successful!</h1>
+            <p className="text-slate-400">Your SDM Rewards card is now active</p>
           </div>
 
           {/* Card Preview */}
@@ -124,7 +124,7 @@ const PaymentSuccessPage = () => {
                 </div>
                 
                 <div className="mb-4">
-                  <p className="text-white/60 text-xs mb-1">Numéro de carte</p>
+                  <p className="text-white/60 text-xs mb-1">Card Number</p>
                   <p className="text-white text-lg font-mono tracking-wider">
                     {cardData?.card_number || "SDM-****-****"}
                   </p>
@@ -136,10 +136,10 @@ const PaymentSuccessPage = () => {
                     <p className="text-white font-semibold capitalize">{cardType}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-white/60 text-xs mb-1">Expire le</p>
+                    <p className="text-white/60 text-xs mb-1">Expires</p>
                     <p className="text-white font-medium">
                       {cardData?.expires_at 
-                        ? new Date(cardData.expires_at).toLocaleDateString('fr-FR')
+                        ? new Date(cardData.expires_at).toLocaleDateString('en-US')
                         : "---"
                       }
                     </p>
@@ -155,8 +155,8 @@ const PaymentSuccessPage = () => {
                   <Gift className="w-6 h-6 text-purple-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-white font-semibold">Bonus de bienvenue crédité!</p>
-                  <p className="text-slate-400 text-sm">GHS {welcomeBonus.toFixed(2)} ajouté à votre solde cashback</p>
+                  <p className="text-white font-semibold">Welcome bonus credited!</p>
+                  <p className="text-slate-400 text-sm">GHS {welcomeBonus.toFixed(2)} added to your cashback balance</p>
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-bold text-green-400">+{welcomeBonus}</span>
@@ -172,7 +172,7 @@ const PaymentSuccessPage = () => {
               onClick={() => navigate("/client/dashboard")}
               className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
             >
-              Accéder à mon tableau de bord
+              Go to my dashboard
               <ArrowRight className="w-5 h-5" />
             </button>
             <button
@@ -180,7 +180,7 @@ const PaymentSuccessPage = () => {
               className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
             >
               <Home className="w-5 h-5" />
-              Retour à l'accueil
+              Back to home
             </button>
           </div>
         </div>
@@ -197,19 +197,19 @@ const PaymentSuccessPage = () => {
             <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Clock className="w-10 h-10 text-amber-400 animate-pulse" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Paiement en cours...</h1>
-            <p className="text-slate-400">Veuillez confirmer le paiement sur votre téléphone</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Payment in progress...</h1>
+            <p className="text-slate-400">Please confirm the payment on your phone</p>
           </div>
 
           <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-800 p-6 mb-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Référence</span>
+                <span className="text-slate-400">Reference</span>
                 <span className="text-white font-mono text-sm">{clientReference}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Statut</span>
-                <span className="text-amber-400 font-medium">En attente</span>
+                <span className="text-slate-400">Status</span>
+                <span className="text-amber-400 font-medium">Pending</span>
               </div>
             </div>
           </div>
@@ -220,13 +220,13 @@ const PaymentSuccessPage = () => {
               className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
             >
               <RefreshCw className="w-5 h-5" />
-              Vérifier le statut
+              Check status
             </button>
             <button
               onClick={() => navigate("/client")}
               className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors"
             >
-              Retour
+              Go back
             </button>
           </div>
         </div>
@@ -241,9 +241,9 @@ const PaymentSuccessPage = () => {
         <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <CreditCard className="w-10 h-10 text-red-400" />
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Paiement échoué</h1>
+        <h1 className="text-2xl font-bold text-white mb-2">Payment Failed</h1>
         <p className="text-slate-400 mb-6">
-          {paymentData?.message || "Une erreur s'est produite lors du traitement de votre paiement."}
+          {paymentData?.message || "An error occurred while processing your payment."}
         </p>
         
         <div className="space-y-3">
@@ -251,13 +251,13 @@ const PaymentSuccessPage = () => {
             onClick={() => navigate("/client/dashboard")}
             className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-semibold transition-colors"
           >
-            Réessayer l'achat
+            Try again
           </button>
           <button
             onClick={() => navigate("/")}
             className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors"
           >
-            Retour à l'accueil
+            Back to home
           </button>
         </div>
       </div>

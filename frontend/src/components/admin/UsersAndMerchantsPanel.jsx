@@ -172,7 +172,7 @@ export default function UsersAndMerchantsPanel({ token }) {
       }
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.detail || 'Erreur lors de la vérification');
+      toast.error(error.response?.data?.detail || 'Error during verification');
     }
   };
 

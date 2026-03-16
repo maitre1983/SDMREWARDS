@@ -41,25 +41,11 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ### 2026-03-16 (Session 3)
 - ✅ **Intégration Hubtel SMS Batch Personalized** - `POST /api/admin/sms/bulk/personalized` créé et testé
-  - Endpoint fonctionnel pour envoyer des SMS personnalisés en masse
-  - Chaque destinataire reçoit un message unique
-  - Utilise l'API Hubtel `POST /v1/messages/batch/personalized/send`
-  - Fallback automatique vers envois individuels si l'API batch échoue
 - ✅ **Interface UI SMS Personnalisés** - Modal complet dans le SMS Center
-  - Zone de composition avec variables dynamiques : `{nom}`, `{cashback}`, `{carte}`
-  - Sélecteur de destinataires avec recherche et filtres
-  - Aperçu en temps réel des messages personnalisés
-  - Support des clients et marchands
-- ✅ **Templates SMS Prédéfinis** - 12 templates prêts à l'emploi
-  - 💰 Rappel Cashback | 🎂 Anniversaire | 👋 Relance Client Inactif
-  - 🎉 Nouvelle Promotion | ⚠️ Expiration Carte | 🌟 Bonus Bienvenue
-  - 🤝 Parrainage Réussi | ⬆️ Invitation Upgrade | 🏪 Promo Marchand
-  - ❤️ Remerciement | 🎄 Fêtes/Nouvel An | ✏️ Message Personnalisé
+- ✅ **Templates SMS Prédéfinis** - 12 templates (tous en anglais)
 - ✅ **Programmation d'envoi SMS** - Fonctionnalité de scheduling complète
-  - Option "Programmer l'envoi" avec sélection date/heure
-  - Worker de fond qui traite les SMS programmés toutes les 60 secondes
-  - Section "SMS Programmés" avec liste, détails et bouton d'annulation
-  - Endpoints: `POST /api/admin/sms/schedule/personalized`, `GET /scheduled/personalized`, `DELETE /{id}`
+- ✅ **Interface Services simplifiée** - Suppression du sélecteur Network, bandeau "Paid from Cashback Balance"
+- ✅ **Traduction complète en anglais** - Admin dashboard, SMS templates, notifications, pages de paiement
 
 ### 2026-03-16 (Session 2)
 - ✅ **Règles de paiement corrigées** - Airtime/Data/ECG: cashback only | Upgrade carte: cashback/MoMo/hybride

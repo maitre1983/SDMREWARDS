@@ -55,77 +55,77 @@ export default function SettingsSMS({ token }) {
   const [scheduledSMSList, setScheduledSMSList] = useState([]);
   const [showScheduledList, setShowScheduledList] = useState(false);
 
-  // Predefined SMS Templates
+  // Predefined SMS Templates - ALL IN ENGLISH
   const SMS_TEMPLATES = [
     {
       id: 'cashback_reminder',
-      name: '💰 Rappel Cashback',
+      name: '💰 Cashback Reminder',
       category: 'engagement',
-      message: 'Bonjour {nom}! Vous avez {cashback} GHS de cashback disponible. Utilisez-le chez nos marchands partenaires avant qu\'il n\'expire! SDM Rewards'
+      message: 'Hi {name}! You have {cashback} GHS cashback available. Use it at our partner merchants before it expires! SDM Rewards'
     },
     {
       id: 'birthday',
-      name: '🎂 Anniversaire',
+      name: '🎂 Birthday',
       category: 'celebration',
-      message: 'Joyeux anniversaire {nom}! SDM Rewards vous souhaite une excellente journée. Profitez de 10% de cashback bonus sur vos achats aujourd\'hui!'
+      message: 'Happy Birthday {name}! SDM Rewards wishes you a wonderful day. Enjoy 10% bonus cashback on your purchases today!'
     },
     {
       id: 'inactive_reactivation',
-      name: '👋 Relance Client Inactif',
+      name: '👋 Inactive Customer',
       category: 'retention',
-      message: 'Bonjour {nom}, vous nous manquez! Revenez profiter de vos avantages SDM Rewards. Votre cashback de {cashback} GHS vous attend!'
+      message: 'Hi {name}, we miss you! Come back and enjoy your SDM Rewards benefits. Your {cashback} GHS cashback is waiting!'
     },
     {
       id: 'new_promotion',
-      name: '🎉 Nouvelle Promotion',
+      name: '🎉 New Promotion',
       category: 'marketing',
-      message: 'Bonne nouvelle {nom}! Promotion exceptionnelle chez nos marchands: jusqu\'à 15% de cashback ce weekend! Ne ratez pas cette offre. SDM Rewards'
+      message: 'Great news {name}! Special promotion at our merchants: up to 15% cashback this weekend! Don\'t miss out. SDM Rewards'
     },
     {
       id: 'card_expiry',
-      name: '⚠️ Expiration Carte',
+      name: '⚠️ Card Expiry',
       category: 'alert',
-      message: 'Attention {nom}! Votre carte {carte} expire bientôt. Renouvelez-la pour continuer à profiter de vos avantages cashback. SDM Rewards'
+      message: 'Attention {name}! Your {card} card expires soon. Renew it to continue enjoying your cashback benefits. SDM Rewards'
     },
     {
       id: 'welcome_bonus',
-      name: '🌟 Bonus Bienvenue',
+      name: '🌟 Welcome Bonus',
       category: 'onboarding',
-      message: 'Bienvenue {nom}! Merci de rejoindre SDM Rewards. Votre bonus de bienvenue a été crédité. Découvrez nos marchands partenaires!'
+      message: 'Welcome {name}! Thanks for joining SDM Rewards. Your welcome bonus has been credited. Discover our partner merchants!'
     },
     {
       id: 'referral_success',
-      name: '🤝 Parrainage Réussi',
+      name: '🤝 Referral Success',
       category: 'referral',
-      message: 'Félicitations {nom}! Votre filleul a rejoint SDM Rewards. Votre bonus de parrainage de 3 GHS a été crédité. Continuez à parrainer!'
+      message: 'Congratulations {name}! Your referral has joined SDM Rewards. Your 3 GHS referral bonus has been credited. Keep referring!'
     },
     {
       id: 'upgrade_invitation',
-      name: '⬆️ Invitation Upgrade',
+      name: '⬆️ Upgrade Invitation',
       category: 'upsell',
-      message: '{nom}, passez à la carte Gold ou Platinum et gagnez jusqu\'à 10% de cashback! Votre solde actuel: {cashback} GHS. Upgrader maintenant!'
+      message: '{name}, upgrade to Gold or Platinum card and earn up to 10% cashback! Current balance: {cashback} GHS. Upgrade now!'
     },
     {
       id: 'merchant_promo',
-      name: '🏪 Promo Marchand',
+      name: '🏪 Merchant Promo',
       category: 'marketing',
-      message: 'Bonjour {nom}! Offre spéciale chez [NOM MARCHAND]: double cashback aujourd\'hui seulement! Présentez votre carte SDM Rewards.'
+      message: 'Hi {name}! Special offer at [MERCHANT NAME]: double cashback today only! Present your SDM Rewards card.'
     },
     {
       id: 'thank_you',
-      name: '❤️ Remerciement',
+      name: '❤️ Thank You',
       category: 'engagement',
-      message: 'Merci {nom} pour votre fidélité! Grâce à vous, SDM Rewards grandit. Vous avez cumulé {cashback} GHS de cashback. Continuez!'
+      message: 'Thank you {name} for your loyalty! Thanks to you, SDM Rewards grows. You\'ve earned {cashback} GHS cashback. Keep going!'
     },
     {
       id: 'festive',
-      name: '🎄 Fêtes / Nouvel An',
+      name: '🎄 Holiday / New Year',
       category: 'celebration',
-      message: 'Bonne année {nom}! SDM Rewards vous souhaite santé et prospérité. Profitez de nos offres spéciales pour bien commencer l\'année!'
+      message: 'Happy New Year {name}! SDM Rewards wishes you health and prosperity. Enjoy our special offers to start the year right!'
     },
     {
       id: 'custom',
-      name: '✏️ Message Personnalisé',
+      name: '✏️ Custom Message',
       category: 'custom',
       message: ''
     }
@@ -190,7 +190,7 @@ export default function SettingsSMS({ token }) {
       toast.success('SMS programmé annulé');
       fetchScheduledSMS();
     } catch (error) {
-      toast.error('Erreur lors de l\'annulation');
+      toast.error('Error cancelling');
     }
   };
 
@@ -286,13 +286,13 @@ export default function SettingsSMS({ token }) {
     const categories = {
       engagement: { name: 'Engagement', templates: [] },
       marketing: { name: 'Marketing', templates: [] },
-      retention: { name: 'Rétention', templates: [] },
-      celebration: { name: 'Célébration', templates: [] },
-      alert: { name: 'Alertes', templates: [] },
+      retention: { name: 'Retention', templates: [] },
+      celebration: { name: 'Celebration', templates: [] },
+      alert: { name: 'Alerts', templates: [] },
       onboarding: { name: 'Onboarding', templates: [] },
-      referral: { name: 'Parrainage', templates: [] },
+      referral: { name: 'Referral', templates: [] },
       upsell: { name: 'Upsell', templates: [] },
-      custom: { name: 'Personnalisé', templates: [] }
+      custom: { name: 'Custom', templates: [] }
     };
     
     SMS_TEMPLATES.forEach(template => {
@@ -315,26 +315,26 @@ export default function SettingsSMS({ token }) {
   // Handle sending personalized SMS
   const handleSendPersonalizedSMS = async () => {
     if (!personalizedTemplate.trim()) {
-      toast.error('Veuillez entrer un message template');
+      toast.error('Please enter a message template');
       return;
     }
 
     if (selectedRecipients.length === 0) {
-      toast.error('Veuillez sélectionner au moins un destinataire');
+      toast.error('Please select at least one recipient');
       return;
     }
 
     // Validate scheduling if enabled
     if (isScheduled) {
       if (!scheduledDate || !scheduledTime) {
-        toast.error('Veuillez sélectionner une date et heure pour la programmation');
+        toast.error('Please select a date and time for scheduling');
         return;
       }
       
       const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
       const now = new Date();
       if (scheduledDateTime <= now) {
-        toast.error('La date programmée doit être dans le futur');
+        toast.error('Scheduled time must be in the future');
         return;
       }
     }
@@ -360,12 +360,12 @@ export default function SettingsSMS({ token }) {
         }, { headers });
         
         if (res.data.success) {
-          toast.success(`SMS programmé pour ${formatScheduledDateTime(scheduledAt)}`);
+          toast.success(`SMS scheduled for ${formatScheduledDateTime(scheduledAt)}`);
           setShowPersonalizedModal(false);
           resetPersonalizedForm();
           fetchScheduledSMS();
         } else {
-          toast.error(res.data.error || 'Échec de la programmation');
+          toast.error(res.data.error || 'Scheduling failed');
         }
       } else {
         // Send immediately
@@ -374,16 +374,16 @@ export default function SettingsSMS({ token }) {
         }, { headers });
         
         if (res.data.success) {
-          toast.success(`${res.data.sent} SMS personnalisés envoyés avec succès!`);
+          toast.success(`${res.data.sent} personalized SMS sent successfully!`);
           setShowPersonalizedModal(false);
           resetPersonalizedForm();
           fetchSMSHistory();
         } else {
-          toast.error(res.data.error || 'Échec de l\'envoi');
+          toast.error(res.data.error || 'Send failed');
         }
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'opération');
+      toast.error(error.response?.data?.detail || 'Operation failed');
     } finally {
       setIsLoading(false);
     }
@@ -542,10 +542,10 @@ export default function SettingsSMS({ token }) {
         {/* NEW: Personalized SMS Card */}
         <div className="bg-gradient-to-br from-slate-800 to-indigo-900/30 border border-indigo-500/30 rounded-xl p-6">
           <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
-            <Sparkles size={20} className="text-indigo-400" /> SMS Personnalisés
+            <Sparkles size={20} className="text-indigo-400" /> Personalized SMS
           </h3>
           <p className="text-slate-400 text-xs mb-4">
-            Variables: {'{nom}'}, {'{cashback}'}, {'{carte}'}
+            Variables: {'{name}'}, {'{cashback}'}, {'{card}'}
           </p>
           <Button 
             onClick={() => { 
@@ -555,7 +555,7 @@ export default function SettingsSMS({ token }) {
             className="w-full bg-indigo-600 hover:bg-indigo-700"
             data-testid="personalized-sms-btn"
           >
-            <Sparkles size={16} className="mr-2" /> Composer
+            <Sparkles size={16} className="mr-2" /> Compose
           </Button>
         </div>
         
@@ -633,7 +633,7 @@ export default function SettingsSMS({ token }) {
       <div className="bg-gradient-to-r from-slate-800 to-amber-900/20 border border-amber-500/30 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-white font-semibold flex items-center gap-2">
-            <Timer size={20} className="text-amber-400" /> SMS Programmés
+            <Timer size={20} className="text-amber-400" /> Scheduled SMS
             {scheduledSMSList.length > 0 && (
               <span className="bg-amber-500 text-black text-xs px-2 py-0.5 rounded-full font-bold">
                 {scheduledSMSList.length}
@@ -641,7 +641,7 @@ export default function SettingsSMS({ token }) {
             )}
           </h3>
           <Button onClick={fetchScheduledSMS} variant="outline" size="sm" className="border-amber-600/50 text-amber-400 hover:bg-amber-900/30">
-            <RefreshCw size={14} className="mr-1" /> Actualiser
+            <RefreshCw size={14} className="mr-1" /> Refresh
           </Button>
         </div>
         
@@ -653,7 +653,7 @@ export default function SettingsSMS({ token }) {
                   <div className="flex items-center gap-3">
                     <span className="text-amber-400 font-medium">{scheduled.template_name || 'Custom'}</span>
                     <span className="text-slate-500 text-xs">
-                      {scheduled.recipient_count} destinataire{scheduled.recipient_count > 1 ? 's' : ''}
+                      {scheduled.recipient_count} recipient{scheduled.recipient_count > 1 ? 's' : ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -666,22 +666,22 @@ export default function SettingsSMS({ token }) {
                       variant="ghost" 
                       size="sm" 
                       className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-1"
-                      title="Annuler"
+                      title="Cancel"
                     >
                       <X size={16} />
                     </Button>
                   </div>
                 </div>
                 <p className="text-slate-400 text-sm truncate">
-                  {scheduled.preview_message || 'Message personnalisé...'}
+                  {scheduled.preview_message || 'Personalized message...'}
                 </p>
               </div>
             ))
           ) : (
             <div className="text-center py-8 text-slate-500">
               <Timer size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">Aucun SMS programmé</p>
-              <p className="text-xs mt-1">Utilisez "SMS Personnalisés" avec l'option "Programmer l'envoi"</p>
+              <p className="text-sm">No scheduled SMS</p>
+              <p className="text-xs mt-1">Use "Personalized SMS" with "Schedule send" option</p>
             </div>
           )}
         </div>
@@ -994,7 +994,7 @@ export default function SettingsSMS({ token }) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-semibold text-lg flex items-center gap-2">
                 <Sparkles className="text-indigo-400" />
-                SMS Personnalisés en Masse
+                Bulk Personalized SMS
               </h3>
               <button 
                 onClick={() => setShowPersonalizedModal(false)}
@@ -1007,7 +1007,7 @@ export default function SettingsSMS({ token }) {
             <div className="grid lg:grid-cols-5 gap-6 flex-1 overflow-hidden">
               {/* Left Column: Templates */}
               <div className="lg:col-span-1 overflow-auto border-r border-slate-700 pr-4">
-                <Label className="text-slate-400 text-sm mb-3 block">Templates Prédéfinis</Label>
+                <Label className="text-slate-400 text-sm mb-3 block">Pre-built Templates</Label>
                 <div className="space-y-1">
                   {SMS_TEMPLATES.map(template => (
                     <button
@@ -1033,7 +1033,7 @@ export default function SettingsSMS({ token }) {
                   <Label className="text-slate-400 flex items-center gap-2">
                     Message Template
                     <span className="text-indigo-400 text-xs font-normal">
-                      Variables: {'{nom}'} {'{cashback}'} {'{carte}'}
+                      Variables: {'{name}'} {'{cashback}'} {'{card}'}
                     </span>
                   </Label>
                   <textarea
@@ -1043,17 +1043,17 @@ export default function SettingsSMS({ token }) {
                       setSelectedTemplateId('custom');
                     }}
                     className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white min-h-[100px]"
-                    placeholder="Bonjour {nom}, votre cashback est de {cashback} GHS! Profitez-en..."
+                    placeholder="Hi {name}, your cashback is {cashback} GHS! Enjoy..."
                     maxLength={320}
                     data-testid="personalized-template-input"
                   />
-                  <p className="text-slate-500 text-xs mt-1">{personalizedTemplate.length}/320 caractères</p>
+                  <p className="text-slate-500 text-xs mt-1">{personalizedTemplate.length}/320 characters</p>
                 </div>
 
                 {/* Recipient Type & Filter */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-slate-400">Type de destinataire</Label>
+                    <Label className="text-slate-400">Recipient Type</Label>
                     <select
                       value={personalizedRecipientType}
                       onChange={(e) => {
@@ -1065,11 +1065,11 @@ export default function SettingsSMS({ token }) {
                       data-testid="personalized-recipient-type"
                     >
                       <option value="clients">Clients</option>
-                      <option value="merchants">Marchands</option>
+                      <option value="merchants">Merchants</option>
                     </select>
                   </div>
                   <div>
-                    <Label className="text-slate-400">Filtre</Label>
+                    <Label className="text-slate-400">Filter</Label>
                     <select
                       value={personalizedFilter}
                       onChange={(e) => {
@@ -1078,13 +1078,13 @@ export default function SettingsSMS({ token }) {
                       }}
                       className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
                     >
-                      <option value="all">Tous</option>
-                      <option value="active">Actifs uniquement</option>
+                      <option value="all">All</option>
+                      <option value="active">Active only</option>
                       {personalizedRecipientType === 'clients' && (
                         <>
-                          <option value="silver">Carte Silver</option>
-                          <option value="gold">Carte Gold</option>
-                          <option value="platinum">Carte Platinum</option>
+                          <option value="silver">Silver Card</option>
+                          <option value="gold">Gold Card</option>
+                          <option value="platinum">Platinum Card</option>
                         </>
                       )}
                     </select>
@@ -1095,21 +1095,21 @@ export default function SettingsSMS({ token }) {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-slate-400">
-                      Sélectionner destinataires ({selectedRecipients.length} sélectionné{selectedRecipients.length > 1 ? 's' : ''})
+                      Select recipients ({selectedRecipients.length} selected)
                     </Label>
                     <div className="flex gap-2">
                       <button 
                         onClick={selectAllRecipients}
                         className="text-xs text-indigo-400 hover:text-indigo-300"
                       >
-                        Tout sélectionner
+                        Select all
                       </button>
                       <span className="text-slate-600">|</span>
                       <button 
                         onClick={clearAllSelections}
                         className="text-xs text-slate-400 hover:text-white"
                       >
-                        Désélectionner tout
+                        Clear all
                       </button>
                     </div>
                   </div>
@@ -1121,7 +1121,7 @@ export default function SettingsSMS({ token }) {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 bg-slate-900 border-slate-700 text-white"
-                      placeholder="Rechercher par nom ou téléphone..."
+                      placeholder="Search by name or phone..."
                     />
                   </div>
 
@@ -1161,7 +1161,7 @@ export default function SettingsSMS({ token }) {
                         </div>
                       ))
                     ) : (
-                      <p className="text-slate-500 text-center py-4">Aucun destinataire trouvé</p>
+                      <p className="text-slate-500 text-center py-4">No recipients found</p>
                     )}
                   </div>
                 </div>
@@ -1171,7 +1171,7 @@ export default function SettingsSMS({ token }) {
               <div className="lg:col-span-2 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-slate-400 flex items-center gap-2">
-                    <Eye size={16} /> Aperçu des messages
+                    <Eye size={16} /> Message Preview
                   </Label>
                   <Button
                     onClick={() => setShowPreview(!showPreview)}
@@ -1187,14 +1187,14 @@ export default function SettingsSMS({ token }) {
                   {selectedRecipients.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-500">
                       <Users size={40} className="mb-2 opacity-50" />
-                      <p className="text-sm">Sélectionnez des destinataires</p>
-                      <p className="text-xs">pour voir l'aperçu</p>
+                      <p className="text-sm">Select recipients</p>
+                      <p className="text-xs">to see preview</p>
                     </div>
                   ) : !personalizedTemplate.trim() ? (
                     <div className="flex flex-col items-center justify-center h-full text-slate-500">
                       <MessageSquare size={40} className="mb-2 opacity-50" />
-                      <p className="text-sm">Écrivez un message template</p>
-                      <p className="text-xs">pour voir l'aperçu</p>
+                      <p className="text-sm">Write a message template</p>
+                      <p className="text-xs">to see preview</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -1218,7 +1218,7 @@ export default function SettingsSMS({ token }) {
                       ))}
                       {selectedRecipients.length > 5 && (
                         <p className="text-slate-500 text-center text-xs py-2">
-                          ... et {selectedRecipients.length - 5} autre(s) destinataire(s)
+                          ... and {selectedRecipients.length - 5} more recipient(s)
                         </p>
                       )}
                     </div>
@@ -1239,7 +1239,7 @@ export default function SettingsSMS({ token }) {
                   />
                   <span className="text-slate-300 flex items-center gap-2">
                     <Timer size={16} className="text-amber-400" />
-                    Programmer l'envoi
+                    Schedule send
                   </span>
                 </label>
                 
@@ -1281,7 +1281,7 @@ export default function SettingsSMS({ token }) {
                 variant="outline"
                 className="flex-1 border-slate-700 text-slate-300"
               >
-                Annuler
+                Cancel
               </Button>
               <Button
                 onClick={handleSendPersonalizedSMS}
@@ -1296,7 +1296,7 @@ export default function SettingsSMS({ token }) {
                 ) : (
                   <Send className="mr-2" size={16} />
                 )}
-                {isScheduled ? `Programmer ${selectedRecipients.length} SMS` : `Envoyer ${selectedRecipients.length} SMS`}
+                {isScheduled ? `Schedule ${selectedRecipients.length} SMS` : `Send ${selectedRecipients.length} SMS`}
               </Button>
             </div>
           </div>

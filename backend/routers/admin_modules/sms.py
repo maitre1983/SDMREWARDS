@@ -311,8 +311,8 @@ async def send_personalized_bulk_sms(
     Request body example:
     {
         "recipients": [
-            {"phone": "0241234567", "message": "Bonjour John, votre cashback est de 50 GHS!"},
-            {"phone": "0201234567", "message": "Bonjour Mary, votre cashback est de 25 GHS!"}
+            {"phone": "0241234567", "message": "Hi John, your cashback is 50 GHS!"},
+            {"phone": "0201234567", "message": "Hi Mary, your cashback is 25 GHS!"}
         ]
     }
     

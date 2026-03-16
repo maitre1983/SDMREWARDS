@@ -62,7 +62,7 @@ export default function CardTypesManager({ token, onUpdate }) {
       });
       setCardTypes(res.data.card_types || []);
     } catch (error) {
-      toast.error('Erreur lors du chargement des cartes');
+      toast.error('Error loading cards');
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +99,7 @@ export default function CardTypesManager({ token, onUpdate }) {
 
   const handleSave = async () => {
     if (!formData.name || !formData.slug || !formData.price) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
+      toast.error('Please fill all required fields');
       return;
     }
 
