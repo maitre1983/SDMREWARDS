@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Eye, MessageSquare, MapPin, CheckCircle, Ban, XCircle, UserCheck, Trash2, Key } from 'lucide-react';
+import { Search, Eye, MessageSquare, MapPin, CheckCircle, Ban, XCircle, UserCheck, Trash2, Key, Phone, BadgeCheck } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
@@ -19,7 +19,8 @@ export default function AdminMerchants({
   handleRejectMerchant,
   handleBlockMerchant,
   handleDeleteMerchant,
-  handleOpenResetPassword
+  handleOpenResetPassword,
+  handleVerifyMoMo
 }) {
   return (
     <div className="space-y-4">
@@ -56,7 +57,17 @@ export default function AdminMerchants({
                     <p className="text-white font-medium">{merchant.business_name}</p>
                     <p className="text-slate-500 text-sm">{merchant.owner_name}</p>
                   </td>
-                  <td className="p-4 text-slate-300">{merchant.phone}</td>
+                  <td className="p-4 text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <span>{merchant.phone}</span>
+                      {merchant.momo_verified && (
+                        <BadgeCheck size={14} className="text-emerald-400" title="MoMo Verified" />
+                      )}
+                    </div>
+                    {merchant.momo_account_name && (
+                      <p className="text-emerald-400 text-xs mt-0.5">{merchant.momo_account_name}</p>
+                    )}
+                  </td>
                   <td className="p-4">
                     {merchant.city ? (
                       <span className="text-slate-300 text-sm">{merchant.city}</span>
@@ -104,6 +115,18 @@ export default function AdminMerchants({
                       >
                         <Key size={14} />
                       </Button>
+                      {handleVerifyMoMo && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleVerifyMoMo(merchant)}
+                          className={merchant.momo_verified ? "text-emerald-400 hover:bg-emerald-500/10" : "text-yellow-400 hover:bg-yellow-500/10"}
+                          title={merchant.momo_verified ? "MoMo Verified" : "Verify MoMo"}
+                          data-testid={`verify-momo-${merchant.id}`}
+                        >
+                          <Phone size={14} />
+                        </Button>
+                      )}
                       {merchant.status === 'pending' && (
                         <>
                           <Button

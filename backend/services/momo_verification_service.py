@@ -1,214 +1,159 @@
 """
-SDM REWARDS - Hubtel Mobile Money Verification Service
-=======================================================
-Verifies merchant MoMo numbers to ensure correct fund routing
-API: https://cs.hubtel.com/commissionservices/{POS_ID}/{KEY}?destination={number}
+SDM REWARDS - Hubtel Verification Services
+==========================================
+Verifies MoMo numbers and Bank accounts for merchants
+
+APIs:
+1. MSISDN Name Query: https://cs.hubtel.com/commissionservices/{POS_ID}/{KEY}?destination={number}
+2. MoMo Registration: https://rnv.hubtel.com/v2/merchantaccount/merchants/{POS_ID}/mobilemoney/verify
 """
 
 import os
 import httpx
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional, Dict
 from pydantic import BaseModel
-import re
 
 logger = logging.getLogger(__name__)
 
-# Hubtel Verification API Configuration
-HUBTEL_POS_SALES_ID = os.environ.get("HUBTEL_POS_SALES_ID", "")
+# Hubtel Verification Configuration
+HUBTEL_POS_SALES_ID = os.environ.get("HUBTEL_POS_SALES_ID", "2038129")
 HUBTEL_VERIFICATION_KEY = os.environ.get("HUBTEL_VERIFICATION_KEY", "3e0841e70afc42fb97d13d19abd36384")
-HUBTEL_VERIFICATION_BASE_URL = "https://cs.hubtel.com/commissionservices"
 
 
-class MoMoVerificationResult(BaseModel):
-    """Result of MoMo number verification"""
+class VerificationResult(BaseModel):
+    """Result of number/account verification"""
     success: bool
     verified: bool = False
     account_name: Optional[str] = None
     network: Optional[str] = None
     phone: Optional[str] = None
+    is_registered: Optional[bool] = None
     message: Optional[str] = None
     error: Optional[str] = None
-    raw_response: Optional[Dict] = None
 
 
-class HubtelMoMoVerificationService:
+class MerchantVerificationService:
     """
-    Service to verify Mobile Money numbers via Hubtel API
+    Service to verify merchant payment details via Hubtel APIs
     
-    This ensures merchants' MoMo numbers are valid before they can receive payments.
-    SDM REWARDS never holds merchant funds - payments go directly to verified accounts.
+    Ensures merchants' MoMo numbers and bank accounts are valid
+    before they can receive payments.
     """
     
     def __init__(self, db=None):
         self.db = db
         self.pos_sales_id = HUBTEL_POS_SALES_ID
         self.verification_key = HUBTEL_VERIFICATION_KEY
-        self.base_url = HUBTEL_VERIFICATION_BASE_URL
         
     def is_configured(self) -> bool:
-        """Check if Hubtel verification credentials are configured"""
-        return bool(self.pos_sales_id)
+        """Check if verification is configured"""
+        return bool(self.pos_sales_id and self.verification_key)
     
     def _normalize_phone(self, phone: str) -> str:
-        """
-        Normalize phone number to format expected by Hubtel
-        Accepts: +233xxxxxxxxx, 233xxxxxxxxx, 0xxxxxxxxx
-        Returns: 0xxxxxxxxx or 233xxxxxxxxx (Hubtel accepts both)
-        """
-        phone = re.sub(r'[\s\-\(\)]', '', phone)  # Remove spaces, dashes, parentheses
+        """Normalize phone to local format (0XXXXXXXXX)"""
+        phone = re.sub(r'[\s\-\(\)\+]', '', phone)
         
-        if phone.startswith('+233'):
-            phone = '0' + phone[4:]
-        elif phone.startswith('233'):
+        if phone.startswith('233'):
             phone = '0' + phone[3:]
+        elif not phone.startswith('0'):
+            phone = '0' + phone
         
         return phone
     
-    def _detect_network(self, phone: str) -> Optional[str]:
-        """
-        Detect mobile network from phone number prefix
-        Ghana networks:
-        - MTN: 024, 025, 053, 054, 055, 059
-        - Vodafone: 020, 050
-        - AirtelTigo: 026, 027, 056, 057
-        """
+    def _detect_network(self, phone: str) -> str:
+        """Detect mobile network from phone prefix"""
         phone = self._normalize_phone(phone)
+        prefix = phone[1:4] if len(phone) >= 4 else ""
         
-        if not phone.startswith('0') or len(phone) < 10:
-            return None
+        mtn_prefixes = ['24', '25', '53', '54', '55', '59']
+        vodafone_prefixes = ['20', '50']
+        airteltigo_prefixes = ['26', '27', '56', '57']
         
-        prefix = phone[:3]
+        if any(phone[1:3] == p for p in mtn_prefixes):
+            return "mtn-gh"
+        elif any(phone[1:3] == p for p in vodafone_prefixes):
+            return "vodafone-gh"
+        elif any(phone[1:3] == p for p in airteltigo_prefixes):
+            return "tigo-gh"
         
-        mtn_prefixes = ['024', '025', '053', '054', '055', '059']
-        vodafone_prefixes = ['020', '050']
-        airteltigo_prefixes = ['026', '027', '056', '057']
-        
-        if prefix in mtn_prefixes:
-            return 'mtn-gh'
-        elif prefix in vodafone_prefixes:
-            return 'vodafone-gh'
-        elif prefix in airteltigo_prefixes:
-            return 'tigo-gh'
-        
-        return None
+        return "mtn-gh"  # Default
     
-    async def verify_momo_number(self, phone: str, merchant_id: Optional[str] = None) -> MoMoVerificationResult:
+    async def verify_msisdn_name(self, phone: str) -> VerificationResult:
         """
-        Verify a Mobile Money number using Hubtel API
+        Query the name registered to a SIM card
         
-        Args:
-            phone: The MoMo number to verify
-            merchant_id: Optional merchant ID for logging
-            
-        Returns:
-            MoMoVerificationResult with verification status
+        API: GET https://cs.hubtel.com/commissionservices/{POS_ID}/{KEY}?destination={number}
         """
         normalized_phone = self._normalize_phone(phone)
         network = self._detect_network(phone)
         
         # Log verification attempt
-        verification_record = {
-            "id": str(__import__('uuid').uuid4()),
+        log_entry = {
             "phone": normalized_phone,
-            "original_phone": phone,
-            "merchant_id": merchant_id,
+            "type": "msisdn_name",
             "network": network,
             "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         if self.db is not None:
-            await self.db.momo_verifications.insert_one(verification_record)
+            await self.db.verification_logs.insert_one(log_entry)
         
-        # Check if API is configured
         if not self.is_configured():
-            logger.warning("Hubtel verification not configured - simulating success")
-            return MoMoVerificationResult(
-                success=True,
-                verified=True,
+            return VerificationResult(
+                success=False,
                 phone=normalized_phone,
                 network=network,
-                message="Verification simulated (API not configured)",
-                account_name="[Verification Pending]"
+                error="Verification service not configured"
             )
         
         try:
-            # Build verification URL
-            verification_url = f"{self.base_url}/{self.pos_sales_id}/{self.verification_key}"
+            url = f"https://cs.hubtel.com/commissionservices/{self.pos_sales_id}/{self.verification_key}"
+            params = {"destination": normalized_phone}
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    verification_url,
-                    params={"destination": normalized_phone},
-                    headers={
-                        "Accept": "application/json",
-                        "Content-Type": "application/json"
-                    },
-                    timeout=30.0
-                )
+                response = await client.get(url, params=params, timeout=30.0)
                 
-                logger.info(f"Hubtel verification response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
+                try:
+                    data = response.json()
+                except:
+                    data = {"raw": response.text}
                 
-                if response.status_code == 200:
-                    try:
-                        result = response.json()
-                    except:
-                        result = {"raw": response.text}
-                    
-                    # Parse response - Hubtel typically returns account details on success
-                    response_code = result.get("ResponseCode", result.get("responseCode", ""))
-                    data = result.get("Data", result.get("data", {}))
-                    message = result.get("Message", result.get("message", ""))
-                    
-                    # Check for successful verification
-                    is_verified = (
-                        response_code in ["0000", "0001", "00", "Success"] or
-                        bool(data.get("AccountName") or data.get("accountName") or 
-                             data.get("CustomerName") or data.get("customerName"))
-                    )
-                    
-                    account_name = (
-                        data.get("AccountName") or data.get("accountName") or
-                        data.get("CustomerName") or data.get("customerName") or
-                        data.get("SubscriberName") or data.get("subscriberName")
-                    )
-                    
-                    # Update verification record
-                    update_data = {
-                        "status": "verified" if is_verified else "failed",
-                        "account_name": account_name,
-                        "hubtel_response": result,
-                        "verified_at": datetime.now(timezone.utc).isoformat() if is_verified else None
-                    }
+                logger.info(f"MSISDN verification response: {data}")
+                
+                # Check for success (ResponseCode 0000 or 0001)
+                response_code = data.get("ResponseCode", "")
+                
+                if response_code in ["0000", "0001"]:
+                    account_name = data.get("Data", {}).get("AccountName") or data.get("AccountName")
                     
                     if self.db is not None:
-                        await self.db.momo_verifications.update_one(
-                            {"id": verification_record["id"]},
-                            {"$set": update_data}
+                        await self.db.verification_logs.update_one(
+                            {"phone": normalized_phone, "status": "pending"},
+                            {"$set": {"status": "verified", "account_name": account_name, "response": data}}
                         )
                     
-                    return MoMoVerificationResult(
+                    return VerificationResult(
                         success=True,
-                        verified=is_verified,
-                        account_name=account_name,
-                        network=network,
+                        verified=True,
                         phone=normalized_phone,
-                        message=message or ("Account verified" if is_verified else "Verification failed"),
-                        raw_response=result
+                        network=network,
+                        account_name=account_name,
+                        message="Number verified successfully"
                     )
                 else:
-                    # Non-200 response
-                    error_msg = f"API returned status {response.status_code}"
+                    error_msg = data.get("Message", f"Verification failed (code: {response_code})")
                     
                     if self.db is not None:
-                        await self.db.momo_verifications.update_one(
-                            {"id": verification_record["id"]},
-                            {"$set": {"status": "error", "error": error_msg}}
+                        await self.db.verification_logs.update_one(
+                            {"phone": normalized_phone, "status": "pending"},
+                            {"$set": {"status": "failed", "error": error_msg, "response": data}}
                         )
                     
-                    return MoMoVerificationResult(
+                    return VerificationResult(
                         success=False,
                         verified=False,
                         phone=normalized_phone,
@@ -216,79 +161,149 @@ class HubtelMoMoVerificationService:
                         error=error_msg
                     )
                     
-        except httpx.TimeoutException:
-            logger.error("Hubtel verification timeout")
-            if self.db is not None:
-                await self.db.momo_verifications.update_one(
-                    {"id": verification_record["id"]},
-                    {"$set": {"status": "timeout", "error": "API timeout"}}
-                )
-            return MoMoVerificationResult(
-                success=False,
-                verified=False,
-                phone=normalized_phone,
-                error="Verification service timeout. Please try again."
-            )
         except Exception as e:
-            logger.error(f"Hubtel verification error: {e}")
-            if self.db is not None:
-                await self.db.momo_verifications.update_one(
-                    {"id": verification_record["id"]},
-                    {"$set": {"status": "error", "error": str(e)}}
-                )
-            return MoMoVerificationResult(
+            logger.error(f"MSISDN verification error: {e}")
+            return VerificationResult(
                 success=False,
-                verified=False,
                 phone=normalized_phone,
-                error=f"Verification error: {str(e)}"
+                network=network,
+                error=str(e)
             )
     
-    async def get_verification_status(self, phone: str, merchant_id: Optional[str] = None) -> Dict:
+    async def verify_momo_registration(self, phone: str) -> VerificationResult:
         """
-        Check if a MoMo number has been verified
+        Check if number is registered for Mobile Money and get username
         
-        Args:
-            phone: The MoMo number to check
-            merchant_id: Optional merchant ID to scope the check
-            
-        Returns:
-            Dict with verification status
+        API: GET https://rnv.hubtel.com/v2/merchantaccount/merchants/{POS_ID}/mobilemoney/verify
         """
-        if self.db is None:
-            return {"verified": False, "error": "Database not available"}
-        
         normalized_phone = self._normalize_phone(phone)
+        network = self._detect_network(phone)
         
-        # Find latest verification for this number
-        query = {"phone": normalized_phone, "status": "verified"}
-        if merchant_id:
-            query["merchant_id"] = merchant_id
+        log_entry = {
+            "phone": normalized_phone,
+            "type": "momo_registration",
+            "network": network,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
         
-        verification = await self.db.momo_verifications.find_one(
-            query,
-            {"_id": 0},
-            sort=[("verified_at", -1)]
-        )
+        if self.db is not None:
+            await self.db.verification_logs.insert_one(log_entry)
         
-        if verification:
-            return {
-                "verified": True,
-                "account_name": verification.get("account_name"),
-                "network": verification.get("network"),
-                "verified_at": verification.get("verified_at")
+        if not self.is_configured():
+            return VerificationResult(
+                success=False,
+                phone=normalized_phone,
+                network=network,
+                error="Verification service not configured"
+            )
+        
+        try:
+            url = f"https://rnv.hubtel.com/v2/merchantaccount/merchants/{self.pos_sales_id}/mobilemoney/verify"
+            params = {
+                "channel": network,
+                "customerMsisdn": normalized_phone
             }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params, timeout=30.0)
+                
+                try:
+                    data = response.json()
+                except:
+                    data = {"raw": response.text, "status_code": response.status_code}
+                
+                logger.info(f"MoMo registration verification response: {data}")
+                
+                if response.status_code == 200:
+                    is_registered = data.get("Data", {}).get("IsRegistered", False)
+                    account_name = data.get("Data", {}).get("CustomerName") or data.get("Data", {}).get("AccountName")
+                    
+                    if self.db is not None:
+                        await self.db.verification_logs.update_one(
+                            {"phone": normalized_phone, "type": "momo_registration", "status": "pending"},
+                            {"$set": {
+                                "status": "verified" if is_registered else "not_registered",
+                                "account_name": account_name,
+                                "is_registered": is_registered,
+                                "response": data
+                            }}
+                        )
+                    
+                    return VerificationResult(
+                        success=True,
+                        verified=is_registered,
+                        is_registered=is_registered,
+                        phone=normalized_phone,
+                        network=network,
+                        account_name=account_name,
+                        message="MoMo registered" if is_registered else "Not registered for MoMo"
+                    )
+                else:
+                    error_msg = data.get("Message", f"API returned status {response.status_code}")
+                    
+                    if self.db is not None:
+                        await self.db.verification_logs.update_one(
+                            {"phone": normalized_phone, "type": "momo_registration", "status": "pending"},
+                            {"$set": {"status": "failed", "error": error_msg, "response": data}}
+                        )
+                    
+                    return VerificationResult(
+                        success=False,
+                        phone=normalized_phone,
+                        network=network,
+                        error=error_msg
+                    )
+                    
+        except Exception as e:
+            logger.error(f"MoMo registration verification error: {e}")
+            return VerificationResult(
+                success=False,
+                phone=normalized_phone,
+                network=network,
+                error=str(e)
+            )
+    
+    async def verify_merchant_momo(self, merchant_id: str, phone: str = None) -> VerificationResult:
+        """
+        Verify a merchant's MoMo number
+        Uses both MSISDN and MoMo registration APIs
+        """
+        if self.db is not None and not phone:
+            merchant = await self.db.merchants.find_one({"id": merchant_id}, {"_id": 0, "phone": 1, "momo_number": 1})
+            if merchant:
+                phone = merchant.get("momo_number") or merchant.get("phone")
         
-        return {"verified": False}
+        if not phone:
+            return VerificationResult(success=False, error="No phone number provided")
+        
+        # Try MoMo registration first (more reliable)
+        result = await self.verify_momo_registration(phone)
+        
+        # If that fails, try MSISDN name query
+        if not result.success:
+            result = await self.verify_msisdn_name(phone)
+        
+        # Update merchant verification status
+        if self.db is not None and result.verified:
+            await self.db.merchants.update_one(
+                {"id": merchant_id},
+                {"$set": {
+                    "momo_verified": True,
+                    "momo_verified_name": result.account_name,
+                    "momo_verified_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        
+        return result
 
 
-# Singleton instance
-_momo_verification_service = None
+# Global service instance
+_verification_service = None
 
-def get_momo_verification_service(db=None) -> HubtelMoMoVerificationService:
-    """Get or create MoMo verification service instance"""
-    global _momo_verification_service
-    if _momo_verification_service is None:
-        _momo_verification_service = HubtelMoMoVerificationService(db)
-    elif db is not None:
-        _momo_verification_service.db = db
-    return _momo_verification_service
+def get_verification_service(db=None) -> MerchantVerificationService:
+    """Get or create verification service instance"""
+    global _verification_service
+    if _verification_service is None or db is not None:
+        _verification_service = MerchantVerificationService(db)
+    return _verification_service

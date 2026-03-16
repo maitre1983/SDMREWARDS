@@ -2,33 +2,40 @@
 
 ## Changelog (Latest First)
 
-### 2026-03-16 - Hubtel SMS Integration (COMPLETED)
+### 2026-03-16 - Hubtel SMS & MoMo Verification Integration (COMPLETED)
 
 **Hubtel SMS API Integration - TESTED ✅**
 - Replaced BulkClix SMS service with Hubtel SMS API
 - API Endpoint: `https://sms.hubtel.com/v1/messages/send`
 - Batch Endpoint: `https://sms.hubtel.com/v1/messages/batch/simple/send`
-- Authentication: Basic Auth with separate SMS credentials
-- **SMS Credentials (separate from payment):**
+- **SMS Credentials:**
   - SMS Client ID: azcxpsni
   - SMS Client Secret: xslvwakk
   - Sender ID: SDMREWARDS
 - **Admin SMS Endpoints:**
   - `GET /api/admin/sms/stats`: SMS statistics
   - `POST /api/admin/sms/send`: Send to individual user
-  - `POST /api/admin/sms/category/{category}`: Send to card category (silver/gold/platinum)
-  - `POST /api/admin/bulk-sms/clients`: Bulk SMS to clients with filters
+  - `POST /api/admin/sms/category/{category}`: Send to card category
+  - `POST /api/admin/bulk-sms/clients`: Bulk SMS to clients
   - `POST /api/admin/bulk-sms/merchants`: Bulk SMS to merchants
-- **Files Created/Modified:**
-  - `/app/backend/services/hubtel_sms_service.py`: New Hubtel SMS service
-  - `/app/backend/services/sms_service.py`: Re-exports Hubtel service
-  - `/app/backend/routers/admin.py`: Added new SMS endpoints
-- **Status:** ✅ API integrated (requires Hubtel SMS credit to send)
+- **Status:** ✅ Integrated (requires Hubtel SMS credit to send)
+
+**Hubtel MoMo Verification API - IMPLEMENTED ✅**
+- Two verification methods:
+  1. MSISDN Name Query: `https://cs.hubtel.com/commissionservices/{POS_ID}/{KEY}?destination={number}`
+  2. MoMo Registration Query: `https://rnv.hubtel.com/v2/merchantaccount/merchants/{POS_ID}/mobilemoney/verify`
+- **Purpose:** Verify merchant MoMo numbers before receiving payments
+- **Admin Endpoints:**
+  - `POST /api/admin/momo/verify`: Verify any phone number
+  - `POST /api/admin/merchants/{id}/verify-momo`: Verify specific merchant
+  - `GET /api/admin/momo/verifications`: Get verification history
+- **UI Added:**
+  - MoMo verification button in merchant list (UsersAndMerchantsPanel.jsx)
+  - Shows verified badge and account name when verified
+- **Status:** ⚠️ API returns 4101 error - needs Hubtel account activation
 
 **Payment Logos Updated - COMPLETED ✅**
-- Updated homepage payment logos section
-- New logos: Visa/Mastercard combo, MTN MoMo, Hubtel
-- Removed: old Visa, Mastercard, Telecel, BulkClix text
+- Updated homepage payment logos: Visa/Mastercard, MTN MoMo, Hubtel
 
 ### 2026-03-16 - Hubtel Online Checkout Integration (COMPLETED)
 

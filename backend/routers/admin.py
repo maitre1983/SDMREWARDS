@@ -4216,6 +4216,7 @@ class AdminMoMoVerificationRequest(BaseModel):
     phone: str
     merchant_id: Optional[str] = None
 
+
 @router.post("/momo/verify")
 async def admin_verify_momo_number(
     request: AdminMoMoVerificationRequest,
@@ -4225,13 +4226,14 @@ async def admin_verify_momo_number(
     Admin endpoint to verify any Mobile Money number
     
     Used to verify merchant MoMo numbers before they can receive payments.
+    Returns the account name registered to the MoMo number.
     """
-    from services.momo_verification_service import get_momo_verification_service
+    from services.momo_verification_service import get_verification_service
     
-    verification_service = get_momo_verification_service(db)
-    result = await verification_service.verify_momo_number(
-        phone=request.phone,
-        merchant_id=request.merchant_id
+    verification_service = get_verification_service(db)
+    result = await verification_service.verify_merchant_momo(
+        merchant_id=request.merchant_id,
+        phone=request.phone
     )
     
     # If merchant_id provided and verified, update merchant
@@ -4270,6 +4272,53 @@ async def admin_verify_momo_number(
         "phone": result.phone,
         "account_name": result.account_name,
         "network": result.network,
+        "is_registered": result.is_registered,
+        "message": result.message,
+        "error": result.error
+    }
+
+
+@router.post("/merchants/{merchant_id}/verify-momo")
+async def verify_merchant_momo(
+    merchant_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Verify a specific merchant's MoMo number
+    Uses the phone/momo_number stored in merchant profile
+    """
+    from services.momo_verification_service import get_verification_service
+    
+    merchant = await db.merchants.find_one({"id": merchant_id}, {"_id": 0})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    phone = merchant.get("momo_number") or merchant.get("phone")
+    if not phone:
+        raise HTTPException(status_code=400, detail="Merchant has no phone/MoMo number")
+    
+    verification_service = get_verification_service(db)
+    result = await verification_service.verify_merchant_momo(merchant_id, phone)
+    
+    # Log action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "verify_merchant_momo",
+        "merchant_id": merchant_id,
+        "phone": phone,
+        "verified": result.verified,
+        "account_name": result.account_name,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": result.success,
+        "verified": result.verified,
+        "phone": result.phone,
+        "account_name": result.account_name,
+        "network": result.network,
+        "merchant_name": merchant.get("business_name"),
         "message": result.message,
         "error": result.error
     }

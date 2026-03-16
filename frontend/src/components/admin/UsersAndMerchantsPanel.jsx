@@ -135,6 +135,47 @@ export default function UsersAndMerchantsPanel({ token }) {
     }
   };
 
+  // Verify MoMo Number
+  const handleVerifyMoMo = async (merchant) => {
+    if (!merchant?.phone) {
+      toast.error('Merchant has no phone number');
+      return;
+    }
+    
+    toast.loading('Verification MoMo en cours...');
+    
+    try {
+      const response = await axios.post(
+        `${API_URL}/api/admin/merchants/${merchant.id}/verify-momo`,
+        {},
+        { headers }
+      );
+      
+      toast.dismiss();
+      
+      if (response.data.verified) {
+        toast.success(
+          <div>
+            <p className="font-semibold">MoMo Vérifié!</p>
+            <p className="text-sm">Nom: {response.data.account_name || 'N/A'}</p>
+            <p className="text-xs text-slate-400">Réseau: {response.data.network}</p>
+          </div>
+        );
+        fetchData(); // Refresh to show verified status
+      } else {
+        toast.error(
+          <div>
+            <p className="font-semibold">Vérification échouée</p>
+            <p className="text-sm">{response.data.error || 'Numéro non trouvé'}</p>
+          </div>
+        );
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.detail || 'Erreur lors de la vérification');
+    }
+  };
+
   const openUserModal = (user) => {
     setSelectedUser(user);
     setShowUserModal(true);
@@ -353,7 +394,17 @@ export default function UsersAndMerchantsPanel({ token }) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs">{merchant.phone}</td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        <div className="flex items-center gap-1">
+                          <span>{merchant.phone}</span>
+                          {merchant.momo_verified && (
+                            <CheckCircle size={12} className="text-emerald-500" title="MoMo Verified" />
+                          )}
+                        </div>
+                        {merchant.momo_account_name && (
+                          <span className="text-emerald-600 text-xs block">{merchant.momo_account_name}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-semibold text-emerald-600">
                         {merchant.cashback_rate || 5}%
                       </td>
@@ -408,7 +459,17 @@ export default function UsersAndMerchantsPanel({ token }) {
                           </Button>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleVerifyMoMo(merchant)}
+                          className={`h-7 text-xs gap-1 ${merchant.momo_verified ? 'text-emerald-600 border-emerald-200' : 'text-yellow-600 border-yellow-200'}`}
+                          title={merchant.momo_verified ? "MoMo Vérifié" : "Vérifier MoMo"}
+                        >
+                          <Phone size={12} />
+                          {merchant.momo_verified ? 'Vérifié' : 'MoMo'}
+                        </Button>
                         <Button 
                           size="sm" 
                           variant="outline"
@@ -416,7 +477,7 @@ export default function UsersAndMerchantsPanel({ token }) {
                           className="h-7 text-xs gap-1"
                         >
                           <Settings size={12} />
-                          Manage
+                          Gérer
                         </Button>
                       </td>
                     </tr>
