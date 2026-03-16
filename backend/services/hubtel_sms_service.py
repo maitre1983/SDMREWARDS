@@ -272,7 +272,7 @@ class HubtelSMSService:
                     },
                     json={
                         "From": self.sender_id,
-                        "To": formatted_phones,
+                        "Recipients": formatted_phones,  # Hubtel batch uses "Recipients" array
                         "Content": message
                     },
                     timeout=60.0
