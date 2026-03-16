@@ -47,13 +47,20 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## In Progress / Upcoming Tasks
 
-### P1 - Refactoring Routeurs (Planifié - Voir REFACTORING_PLAN.md)
-- [ ] Créer tests pytest pour endpoints critiques (prérequis)
-- [ ] Diviser `payments.py` en sous-modules (cards, momo, vas, callbacks)
-- [ ] Diviser `merchants.py` en sous-modules (public, dashboard, transactions, debit, settings)
-- [ ] Utiliser `admin_modules/` existant + compléter 29 endpoints manquants
+### P1 - Refactoring Routeurs (EN COURS - Voir REFACTORING_PLAN.md)
+**payments.py - Package créé, migration partielle:**
+- [x] `payments/shared.py` - Config, helpers, schemas
+- [x] `payments/card.py` - Card purchase (1 route)
+- [x] `payments/merchant.py` - Merchant payments (3 routes)
+- [ ] `payments/callbacks.py` - Hubtel callbacks + status
+- [ ] `payments/withdrawal.py` - Cashback withdrawals
+- [ ] `payments/processing.py` - Payment completion logic
 
-**Note**: Module `admin_modules/` existe déjà avec 64/93 endpoints. Migration progressive recommandée.
+**Prochains fichiers:**
+- [ ] Diviser `merchants.py` en sous-modules
+- [ ] Utiliser `admin_modules/` existant + compléter
+
+**Note**: Le fichier `payments.py` original reste actif. Le nouveau package est prêt pour activation progressive.
 
 ### P2 - Migration Restante
 - [ ] Migrer `notification_service.py` (références BulkClix)

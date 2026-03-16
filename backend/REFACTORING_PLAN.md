@@ -7,9 +7,21 @@
 |------|-------|-----------|--------|
 | `admin.py` | 4,337 | 93 | Needs refactoring |
 | `merchants.py` | 3,025 | 60+ | Needs refactoring |
-| `payments.py` | 2,252 | 35+ | Needs refactoring |
+| `payments.py` | 2,252 | 35+ | **PARTIAL - Package created** |
 
-### Existing Partial Refactoring
+### Payments Package Progress
+The `routers/payments/` package has been created with partial extraction:
+- ✅ `__init__.py` - Package entry point with combined router
+- ✅ `shared.py` - Config, helpers, schemas (COMPLETE)
+- ✅ `card.py` - Card purchase endpoint (1 route)
+- ✅ `merchant.py` - Merchant payments (3 routes: initiate, cash, cashback)
+- ⏳ `callbacks.py` - Status checks and Hubtel callbacks (TODO)
+- ⏳ `withdrawal.py` - Cashback withdrawal endpoints (TODO)
+- ⏳ `processing.py` - Payment completion logic (TODO)
+
+**Migration Status:** 4/35+ routes extracted. Package can be tested independently.
+
+### Existing Partial Refactoring (admin_modules/)
 The `admin_modules/` folder contains partial extraction of models and some routes:
 - `models.py` - Pydantic request/response models (COMPLETE)
 - `dependencies.py` - Shared utilities (COMPLETE)
