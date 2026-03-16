@@ -824,6 +824,44 @@ export default function HomePage() {
             </div>
           </div>
           
+          {/* We Are Hiring Section */}
+          <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-xl p-6 mb-8">
+            <div className="text-center">
+              <h4 className="font-bold text-xl text-white mb-3 flex items-center justify-center gap-2">
+                <span className="text-2xl">🚀</span> We Are Hiring – Join the SDMREWARDS Team
+              </h4>
+              <p className="text-slate-400 mb-4">
+                SDMREWARDS is expanding and looking for passionate professionals to join our commercial team.
+              </p>
+              
+              <div className="mb-4">
+                <p className="font-semibold text-purple-400 mb-3">Open Positions:</p>
+                <div className="flex flex-wrap justify-center gap-2 text-sm">
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Sales Manager</span>
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Business Development Managers</span>
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Field Sales Agents</span>
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Merchant Onboarding Officers</span>
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Telemarketing Agents</span>
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Partnership Manager</span>
+                  <span className="bg-slate-800 px-3 py-1.5 rounded-full text-slate-300">Brand Ambassadors</span>
+                </div>
+              </div>
+              
+              <p className="text-slate-400 text-sm mb-4 max-w-2xl mx-auto">
+                Your mission will be to onboard shops, restaurants, hotels, and businesses into the SDMREWARDS ecosystem, 
+                sell membership cards and help grow one of the fastest-growing rewards networks.
+              </p>
+              
+              <a 
+                href="mailto:careers@sdmrewards.com" 
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105"
+              >
+                <Mail size={18} />
+                Send your CV to careers@sdmrewards.com
+              </a>
+            </div>
+          </div>
+          
           {/* Legal Disclaimer */}
           <div className="bg-slate-800/50 rounded-xl p-4 mb-8 text-center">
             <p className="text-slate-500 text-sm">

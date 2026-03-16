@@ -123,6 +123,44 @@ export const Footer = () => {
           </div>
         </div>
 
+        {/* We Are Hiring Section */}
+        <div className="mt-12 pt-8 border-t border-slate-800">
+          <div className="max-w-3xl mx-auto text-center">
+            <h4 className="font-bold text-xl text-white mb-4 flex items-center justify-center gap-2">
+              <span className="text-2xl">🚀</span> We Are Hiring – Join the SDMREWARDS Team
+            </h4>
+            <p className="text-slate-400 mb-6">
+              SDMREWARDS is expanding and looking for passionate professionals to join our commercial team.
+            </p>
+            
+            <div className="bg-slate-900/50 rounded-xl p-6 mb-6">
+              <h5 className="font-semibold text-purple-400 mb-4">Open Positions:</h5>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Sales Manager</span>
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Business Dev Managers</span>
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Field Sales Agents</span>
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Merchant Onboarding</span>
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Telemarketing Agents</span>
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Partnership Manager</span>
+                <span className="bg-slate-800 px-3 py-2 rounded-lg text-slate-300">Brand Ambassadors</span>
+              </div>
+            </div>
+            
+            <p className="text-slate-400 text-sm mb-4">
+              Your mission will be to onboard shops, restaurants, hotels, and businesses into the SDMREWARDS ecosystem, 
+              sell membership cards and help grow one of the fastest-growing rewards networks.
+            </p>
+            
+            <a 
+              href="mailto:careers@sdmrewards.com" 
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-all transform hover:scale-105"
+            >
+              <Mail size={18} />
+              Send your CV to careers@sdmrewards.com
+            </a>
+          </div>
+        </div>
+
         {/* Copyright */}
         <div className="mt-12 pt-8 border-t border-slate-800 text-center">
           <p className="text-sm text-slate-500">
