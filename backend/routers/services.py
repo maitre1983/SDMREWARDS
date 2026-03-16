@@ -2,10 +2,10 @@
 SDM REWARDS - Services Router
 ==============================
 Handles cashback-funded services: Airtime, Data, ECG, Withdrawal
+All services now use Hubtel VAS API
 """
 
 import os
-import httpx
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -26,25 +26,6 @@ MONGO_URL = os.environ.get('MONGO_URL')
 DB_NAME = os.environ.get('DB_NAME', 'sdm_rewards')
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
-
-# BulkClix Config
-BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
-BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
-
-# BulkClix Network IDs for Airtime
-BULKCLIX_NETWORK_IDS = {
-    "MTN": "eed55cbe-ed76-4200-865b-45a80a7bb8e9",
-    "TELECEL": "1f4d8c1a-e5e2-4954-8b2a-6843d33181c7",
-    "AIRTELTIGO": "6a2c7586-bf4d-42d4-ace1-2a3386eb4bb2"
-}
-
-# BulkClix Service IDs for Data Bundles
-BULKCLIX_DATA_SERVICE_IDS = {
-    "MTN": "4a1d6ab2-df53-44fd-b42b-97753ba77508",
-    "TELECEL": "205cb30a-f67c-4d4d-983a-19c3da2ebeef",
-    "TELECEL_BROADBAND": "14e35989-2341-4be8-b5f4-63a2f31fa745",
-    "AIRTELTIGO": "442424ef-3eac-4d88-a596-65b5ec7a345f"
-}
 
 # Minimum amounts
 MIN_CASHBACK_BALANCE = 2.0
@@ -69,8 +50,8 @@ class AirtimeRequest(BaseModel):
 
 class DataBundleRequest(BaseModel):
     phone: str
-    package_id: str  # BulkClix package ID
-    service_id: str  # BulkClix service ID
+    package_id: str  # Bundle package ID
+    service_id: str  # Network service ID
     network: str  # MTN, TELECEL, AIRTELTIGO
     amount: float  # Price of the bundle
     display_name: str  # e.g. "1.37GB"
@@ -318,60 +299,57 @@ async def get_data_services():
 
 @router.get("/data/bundles/{service_id}/{phone}")
 async def get_data_bundles(service_id: str, phone: str):
-    """Get available data bundles for a specific service and phone number"""
+    """Get available data bundles for a specific service and phone number via Hubtel VAS"""
     
-    # Format phone for BulkClix (must start with 0)
-    bulkclix_phone = phone
+    from services.hubtel_vas_service import get_hubtel_vas_service
+    
+    # Normalize phone number
+    normalized_phone = phone
     if phone.startswith("+233"):
-        bulkclix_phone = "0" + phone[4:]
+        normalized_phone = "0" + phone[4:]
     elif phone.startswith("233"):
-        bulkclix_phone = "0" + phone[3:]
+        normalized_phone = "0" + phone[3:]
+    elif not phone.startswith("0"):
+        normalized_phone = "0" + phone
     
-    if not BULKCLIX_API_KEY:
-        raise HTTPException(status_code=500, detail="BulkClix API not configured")
+    # Detect network from phone
+    prefix = normalized_phone[1:3] if len(normalized_phone) >= 3 else ""
     
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            response = await http_client.get(
-                f"{BULKCLIX_BASE_URL}/databundle-api-v2/offers/{service_id}/{bulkclix_phone}",
-                headers={
-                    "Accept": "application/json",
-                    "x-api-key": BULKCLIX_API_KEY
-                },
-                timeout=30.0
-            )
-            
-            logger.info(f"BulkClix Data Bundles Response: {response.status_code}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                packages = data.get("data", {}).get("packages", {}).get("data", [])
-                user_name = data.get("data", {}).get("user", {}).get("name", "")
-                
-                # Format packages for frontend
-                formatted_packages = []
-                for pkg in packages:
-                    formatted_packages.append({
-                        "id": pkg.get("id"),
-                        "display": pkg.get("Display"),
-                        "value": pkg.get("Value"),
-                        "amount": pkg.get("Amount"),
-                        "service_id": service_id
-                    })
-                
-                return {
-                    "success": True,
-                    "packages": formatted_packages,
-                    "user_name": user_name,
-                    "phone": bulkclix_phone
-                }
-            else:
-                logger.error(f"BulkClix data bundles error: {response.status_code} - {response.text}")
-                raise HTTPException(status_code=400, detail="Failed to fetch data bundles")
-                
-    except httpx.RequestError as e:
-        logger.error(f"BulkClix data bundles network error: {e}")
-        raise HTTPException(status_code=500, detail="Network error - please try again")
+    network = "MTN"  # Default
+    if prefix in ["24", "25", "53", "54", "55", "59"]:
+        network = "MTN"
+    elif prefix in ["20", "50"]:
+        network = "VODAFONE"
+    elif prefix in ["27", "26", "56", "57"]:
+        network = "TELECEL"
+    elif prefix in ["23"]:
+        network = "GLO"
+    
+    # Get bundles from Hubtel VAS
+    hubtel_vas = get_hubtel_vas_service(db)
+    result = await hubtel_vas.get_data_bundles(phone=normalized_phone, network=network)
+    
+    if result.get("success"):
+        # Format packages for frontend compatibility
+        formatted_packages = []
+        for bundle in result.get("bundles", []):
+            formatted_packages.append({
+                "id": bundle.get("id", str(len(formatted_packages) + 1)),
+                "display": bundle.get("name", bundle.get("display", "")),
+                "value": bundle.get("validity", bundle.get("value", "")),
+                "amount": bundle.get("price", bundle.get("amount", 0)),
+                "service_id": service_id
+            })
+        
+        return {
+            "success": True,
+            "packages": formatted_packages,
+            "user_name": "",
+            "phone": normalized_phone,
+            "network": network
+        }
+    else:
+        raise HTTPException(status_code=400, detail=result.get("error", "Failed to fetch data bundles"))
 
 
 @router.post("/airtime/purchase")
