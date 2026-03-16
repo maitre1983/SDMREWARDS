@@ -1,37 +1,132 @@
 """
 SDM REWARDS - Admin SMS Routes
 ==============================
-Bulk SMS, templates, and scheduling endpoints
+SMS management via Hubtel API - Individual, Category & Bulk SMS
 """
 
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 
 from routers.auth import get_current_admin
 from routers.admin_modules.dependencies import get_db, check_is_super_admin
-from routers.admin_modules.models import BulkSMSRequest, SMSTemplateRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 db = get_db()
 
 
-@router.post("/bulk-sms/clients")
-async def send_bulk_sms_clients(
-    request: BulkSMSRequest,
+# ============== REQUEST MODELS ==============
+
+class SingleSMSRequest(BaseModel):
+    """Request model for sending SMS to a single recipient"""
+    phone: str
+    message: str
+    recipient_type: str = "client"  # client or merchant
+    recipient_id: Optional[str] = None
+
+
+class BulkSMSRequest(BaseModel):
+    """Request model for bulk SMS"""
+    message: str
+    recipient_filter: str = "all"  # all, active, inactive, silver, gold, platinum, pending, top
+    recipient_ids: Optional[List[str]] = None  # Specific IDs to send to
+    scheduled_at: Optional[str] = None
+
+
+class SMSTemplateRequest(BaseModel):
+    """Request model for SMS templates"""
+    name: str
+    message: str
+    category: str = "general"
+
+
+# ============== INDIVIDUAL SMS ==============
+
+@router.post("/sms/send")
+async def send_single_sms(
+    request: SingleSMSRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Send bulk SMS to clients with filters"""
+    """Send SMS to a single client or merchant"""
     if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     from services.sms_service import get_sms
-    sms_service = get_sms()
+    sms_service = get_sms(db)
     
+    # Validate phone number
+    phone = request.phone
+    recipient_name = "Unknown"
+    
+    # If recipient_id is provided, get the phone from database
+    if request.recipient_id:
+        if request.recipient_type == "client":
+            recipient = await db.clients.find_one({"id": request.recipient_id}, {"_id": 0, "phone": 1, "full_name": 1})
+            if recipient:
+                phone = recipient.get("phone", phone)
+                recipient_name = recipient.get("full_name", "Client")
+        elif request.recipient_type == "merchant":
+            recipient = await db.merchants.find_one({"id": request.recipient_id}, {"_id": 0, "phone": 1, "business_name": 1})
+            if recipient:
+                phone = recipient.get("phone", phone)
+                recipient_name = recipient.get("business_name", "Merchant")
+    
+    # Send SMS
+    result = await sms_service.send_sms(phone, request.message, "admin_single")
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "send_single_sms",
+        "recipient_phone": phone,
+        "recipient_name": recipient_name,
+        "recipient_type": request.recipient_type,
+        "message_preview": request.message[:100],
+        "success": result.get("success", False),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": result.get("success", False),
+        "message_id": result.get("message_id"),
+        "phone": phone,
+        "recipient_name": recipient_name,
+        "error": result.get("error")
+    }
+
+
+# ============== BULK SMS TO CLIENTS ==============
+
+@router.post("/sms/bulk/clients")
+async def send_bulk_sms_clients(
+    request: BulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Send bulk SMS to clients with filters
+    
+    Filters:
+    - all: All clients
+    - active: Clients with active cards
+    - inactive: Clients without cards
+    - silver: Silver card holders
+    - gold: Gold card holders
+    - platinum: Platinum card holders
+    - top: Top 10 clients by cashback balance
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    from services.sms_service import get_sms
+    sms_service = get_sms(db)
+    
+    # Build query based on filter
     query = {"status": {"$ne": "deleted"}}
     
     if request.recipient_filter == "active":
@@ -45,11 +140,13 @@ async def send_bulk_sms_clients(
     elif request.recipient_filter == "platinum":
         query["card_type"] = "platinum"
     elif request.recipient_filter == "top":
-        query = {"status": "active"}
+        query["status"] = "active"
     
+    # If specific IDs are provided, use those
     if request.recipient_ids:
         query["id"] = {"$in": request.recipient_ids}
     
+    # Fetch clients
     if request.recipient_filter == "top":
         clients = await db.clients.find(query, {"_id": 0, "phone": 1, "id": 1, "full_name": 1}).sort("cashback_balance", -1).limit(10).to_list(10)
     else:
@@ -59,11 +156,18 @@ async def send_bulk_sms_clients(
     phones = [c.get("phone") for c in clients if c.get("phone")]
     
     if not phones:
-        return {"success": False, "error": "No valid recipients found", "total_recipients": 0, "sent": 0, "failed": 0}
+        return {
+            "success": False, 
+            "error": "No valid recipients found", 
+            "total_recipients": 0, 
+            "sent": 0, 
+            "failed": 0
+        }
     
-    # Send bulk SMS in a single API call
+    # Send bulk SMS
     result = await sms_service.send_bulk_sms(phones, request.message, "bulk_clients")
     
+    # Log the action
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
         "admin_id": current_admin["id"],
@@ -72,7 +176,7 @@ async def send_bulk_sms_clients(
         "total_recipients": len(phones),
         "sent": result.get("sent", 0),
         "failed": result.get("failed", 0),
-        "campaign_id": result.get("campaign_id"),
+        "bulk_id": result.get("bulk_id"),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
@@ -81,23 +185,36 @@ async def send_bulk_sms_clients(
         "total_recipients": len(phones),
         "sent": result.get("sent", 0),
         "failed": result.get("failed", 0),
-        "campaign_id": result.get("campaign_id"),
-        "error": result.get("error")
+        "bulk_id": result.get("bulk_id"),
+        "error": result.get("error"),
+        "errors": result.get("errors")
     }
 
 
-@router.post("/bulk-sms/merchants")
+# ============== BULK SMS TO MERCHANTS ==============
+
+@router.post("/sms/bulk/merchants")
 async def send_bulk_sms_merchants(
     request: BulkSMSRequest,
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Send bulk SMS to merchants with filters"""
+    """
+    Send bulk SMS to merchants with filters
+    
+    Filters:
+    - all: All merchants
+    - active: Active merchants
+    - pending: Pending merchants
+    - inactive: Merchants with no transactions
+    - top: Top 10 merchants by transaction count
+    """
     if not check_is_super_admin(current_admin):
         raise HTTPException(status_code=403, detail="Super admin required")
     
     from services.sms_service import get_sms
-    sms_service = get_sms()
+    sms_service = get_sms(db)
     
+    # Build query based on filter
     query = {"status": {"$ne": "deleted"}}
     
     if request.recipient_filter == "active":
@@ -109,9 +226,11 @@ async def send_bulk_sms_merchants(
     elif request.recipient_filter == "top":
         query["status"] = "active"
     
+    # If specific IDs are provided, use those
     if request.recipient_ids:
         query["id"] = {"$in": request.recipient_ids}
     
+    # Fetch merchants
     if request.recipient_filter == "top":
         merchants = await db.merchants.find(query, {"_id": 0, "phone": 1, "id": 1, "business_name": 1}).sort("total_transactions", -1).limit(10).to_list(10)
     else:
@@ -121,11 +240,18 @@ async def send_bulk_sms_merchants(
     phones = [m.get("phone") for m in merchants if m.get("phone")]
     
     if not phones:
-        return {"success": False, "error": "No valid recipients found", "total_recipients": 0, "sent": 0, "failed": 0}
+        return {
+            "success": False, 
+            "error": "No valid recipients found", 
+            "total_recipients": 0, 
+            "sent": 0, 
+            "failed": 0
+        }
     
-    # Send bulk SMS in a single API call
+    # Send bulk SMS
     result = await sms_service.send_bulk_sms(phones, request.message, "bulk_merchants")
     
+    # Log the action
     await db.admin_logs.insert_one({
         "id": str(uuid.uuid4()),
         "admin_id": current_admin["id"],
@@ -134,7 +260,7 @@ async def send_bulk_sms_merchants(
         "total_recipients": len(phones),
         "sent": result.get("sent", 0),
         "failed": result.get("failed", 0),
-        "campaign_id": result.get("campaign_id"),
+        "bulk_id": result.get("bulk_id"),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
@@ -143,19 +269,125 @@ async def send_bulk_sms_merchants(
         "total_recipients": len(phones),
         "sent": result.get("sent", 0),
         "failed": result.get("failed", 0),
-        "campaign_id": result.get("campaign_id"),
+        "bulk_id": result.get("bulk_id"),
+        "error": result.get("error"),
+        "errors": result.get("errors")
+    }
+
+
+# ============== SMS BY CATEGORY ==============
+
+@router.post("/sms/category/{category}")
+async def send_sms_by_category(
+    category: str,
+    request: BulkSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Send SMS to users by card category
+    
+    Categories: silver, gold, platinum
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    if category not in ["silver", "gold", "platinum"]:
+        raise HTTPException(status_code=400, detail="Invalid category. Use: silver, gold, platinum")
+    
+    from services.sms_service import get_sms
+    sms_service = get_sms(db)
+    
+    # Get clients by card type
+    clients = await db.clients.find(
+        {"card_type": category, "status": {"$ne": "deleted"}},
+        {"_id": 0, "phone": 1, "full_name": 1}
+    ).to_list(10000)
+    
+    phones = [c.get("phone") for c in clients if c.get("phone")]
+    
+    if not phones:
+        return {
+            "success": False,
+            "error": f"No {category} card holders found",
+            "category": category,
+            "total_recipients": 0,
+            "sent": 0,
+            "failed": 0
+        }
+    
+    # Send bulk SMS
+    result = await sms_service.send_bulk_sms(phones, request.message, f"category_{category}")
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "sms_by_category",
+        "category": category,
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": result.get("success", False),
+        "category": category,
+        "total_recipients": len(phones),
+        "sent": result.get("sent", 0),
+        "failed": result.get("failed", 0),
+        "bulk_id": result.get("bulk_id"),
         "error": result.get("error")
     }
 
 
+# ============== SMS HISTORY & TEMPLATES ==============
+
 @router.get("/sms/history")
 async def get_sms_history(
     limit: int = 50,
+    sms_type: Optional[str] = None,
     current_admin: dict = Depends(get_current_admin)
 ):
     """Get SMS sending history"""
-    logs = await db.sms_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-    return {"logs": logs, "total": len(logs)}
+    query = {}
+    if sms_type:
+        query["type"] = sms_type
+    
+    logs = await db.sms_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    bulk_logs = await db.bulk_sms_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(20).to_list(20)
+    
+    return {
+        "individual_sms": logs,
+        "bulk_sms": bulk_logs,
+        "total_individual": len(logs),
+        "total_bulk": len(bulk_logs)
+    }
+
+
+@router.get("/sms/stats")
+async def get_sms_stats(current_admin: dict = Depends(get_current_admin)):
+    """Get SMS statistics"""
+    # Count total SMS sent
+    total_sent = await db.sms_logs.count_documents({"status": "sent"})
+    total_failed = await db.sms_logs.count_documents({"status": "failed"})
+    total_test = await db.sms_logs.count_documents({"status": "sent_test"})
+    
+    # Bulk SMS stats
+    bulk_campaigns = await db.bulk_sms_logs.count_documents({})
+    
+    # Today's stats
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    today_sent = await db.sms_logs.count_documents({"status": "sent", "created_at": {"$gte": today}})
+    
+    return {
+        "total_sent": total_sent,
+        "total_failed": total_failed,
+        "total_test": total_test,
+        "bulk_campaigns": bulk_campaigns,
+        "today_sent": today_sent,
+        "provider": "Hubtel"
+    }
 
 
 @router.get("/sms/templates")
@@ -197,6 +429,8 @@ async def delete_sms_template(
         raise HTTPException(status_code=404, detail="Template not found")
     return {"success": True, "message": "Template deleted"}
 
+
+# ============== SCHEDULED SMS ==============
 
 @router.post("/sms/schedule")
 async def schedule_sms(
@@ -247,9 +481,9 @@ async def cancel_scheduled_sms(
     return {"success": True, "message": "Scheduled SMS cancelled"}
 
 
-# ============== PUSH NOTIFICATIONS ==============
+# ============== PUSH NOTIFICATIONS (Keep existing) ==============
 
-@router.post("/push-notifications/send")
+@router.post("/push/send")
 async def send_push_notification(
     title: str,
     message: str,
@@ -294,7 +528,7 @@ async def send_push_notification(
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to send notification"))
 
 
-@router.get("/push-notifications/history")
+@router.get("/push/history")
 async def get_push_notification_history(
     limit: int = 50,
     current_admin: dict = Depends(get_current_admin)
@@ -307,7 +541,7 @@ async def get_push_notification_history(
     return {"notifications": history, "total": len(history)}
 
 
-@router.get("/push-notifications/stats")
+@router.get("/push/stats")
 async def get_push_notification_stats(
     current_admin: dict = Depends(get_current_admin)
 ):
@@ -317,4 +551,3 @@ async def get_push_notification_stats(
     
     stats = await push_service.get_app_stats()
     return stats
-
