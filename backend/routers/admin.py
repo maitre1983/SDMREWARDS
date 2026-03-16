@@ -4089,3 +4089,86 @@ async def export_gamification_data(
         }
     )
 
+
+
+# ============== MOBILE MONEY VERIFICATION (ADMIN) ==============
+
+class AdminMoMoVerificationRequest(BaseModel):
+    phone: str
+    merchant_id: Optional[str] = None
+
+@router.post("/momo/verify")
+async def admin_verify_momo_number(
+    request: AdminMoMoVerificationRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Admin endpoint to verify any Mobile Money number
+    
+    Used to verify merchant MoMo numbers before they can receive payments.
+    """
+    from services.momo_verification_service import get_momo_verification_service
+    
+    verification_service = get_momo_verification_service(db)
+    result = await verification_service.verify_momo_number(
+        phone=request.phone,
+        merchant_id=request.merchant_id
+    )
+    
+    # If merchant_id provided and verified, update merchant
+    if result.verified and request.merchant_id:
+        await db.merchants.update_one(
+            {"id": request.merchant_id},
+            {
+                "$set": {
+                    "momo_number": result.phone,
+                    "momo_verified": True,
+                    "momo_account_name": result.account_name,
+                    "momo_network": result.network,
+                    "momo_verified_at": datetime.now(timezone.utc).isoformat(),
+                    "momo_verified_by": current_admin["id"]
+                }
+            }
+        )
+    
+    # Log admin action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "momo_verification",
+        "details": {
+            "phone": request.phone,
+            "merchant_id": request.merchant_id,
+            "verified": result.verified,
+            "account_name": result.account_name
+        },
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": result.success,
+        "verified": result.verified,
+        "phone": result.phone,
+        "account_name": result.account_name,
+        "network": result.network,
+        "message": result.message,
+        "error": result.error
+    }
+
+
+@router.get("/momo/verifications")
+async def get_momo_verification_history(
+    limit: int = 50,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get recent MoMo verification history"""
+    verifications = await db.momo_verifications.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return {
+        "success": True,
+        "verifications": verifications,
+        "total": len(verifications)
+    }

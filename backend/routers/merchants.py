@@ -2930,3 +2930,98 @@ async def unregister_merchant_push(
         "message": "Push notifications disabled"
     }
 
+
+
+# ============== MOBILE MONEY VERIFICATION ==============
+
+class MoMoVerificationRequest(BaseModel):
+    phone: str
+
+@router.post("/momo/verify")
+async def verify_momo_number(
+    request: MoMoVerificationRequest,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Verify a Mobile Money number for receiving payments
+    
+    This ensures the merchant's MoMo number is valid before they can receive payments.
+    SDM REWARDS never holds merchant funds - payments go directly to verified accounts.
+    """
+    from services.momo_verification_service import get_momo_verification_service
+    
+    verification_service = get_momo_verification_service(db)
+    result = await verification_service.verify_momo_number(
+        phone=request.phone,
+        merchant_id=current_merchant["id"]
+    )
+    
+    if result.verified:
+        # Update merchant with verified MoMo details
+        await db.merchants.update_one(
+            {"id": current_merchant["id"]},
+            {
+                "$set": {
+                    "momo_number": result.phone,
+                    "momo_verified": True,
+                    "momo_account_name": result.account_name,
+                    "momo_network": result.network,
+                    "momo_verified_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
+        )
+        
+        return {
+            "success": True,
+            "verified": True,
+            "account_name": result.account_name,
+            "network": result.network,
+            "phone": result.phone,
+            "message": "Mobile Money number verified successfully!"
+        }
+    else:
+        return {
+            "success": False,
+            "verified": False,
+            "phone": result.phone,
+            "error": result.error or result.message or "Verification failed. Please check the number and try again."
+        }
+
+
+@router.get("/momo/status")
+async def get_momo_verification_status(
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get the MoMo verification status for the current merchant"""
+    return {
+        "verified": current_merchant.get("momo_verified", False),
+        "phone": current_merchant.get("momo_number"),
+        "account_name": current_merchant.get("momo_account_name"),
+        "network": current_merchant.get("momo_network"),
+        "verified_at": current_merchant.get("momo_verified_at")
+    }
+
+
+@router.delete("/momo/remove")
+async def remove_momo_number(
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Remove verified MoMo number (merchant will need to verify a new number)"""
+    await db.merchants.update_one(
+        {"id": current_merchant["id"]},
+        {
+            "$unset": {
+                "momo_number": "",
+                "momo_verified": "",
+                "momo_account_name": "",
+                "momo_network": "",
+                "momo_verified_at": ""
+            }
+        }
+    )
+    
+    return {
+        "success": True,
+        "message": "MoMo number removed. Please verify a new number to receive payments."
+    }
+
