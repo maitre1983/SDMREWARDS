@@ -171,7 +171,9 @@ async def purchase_card(
     request: PurchaseCardRequest,
     current_client: dict = Depends(get_current_client)
 ):
-    """Purchase membership card"""
+    """Purchase membership card via Hubtel Online Checkout"""
+    from services.hubtel_checkout_service import get_hubtel_checkout_service, HubtelCheckoutRequest
+    
     client_id = current_client["id"]
     
     # Check if already has active card
@@ -202,27 +204,10 @@ async def purchase_card(
         price = custom_card.get("price", price)
         duration_days = custom_card.get("duration_days", duration_days)
     
-    # Calculate dates
-    now = datetime.now(timezone.utc)
-    start_date = now
-    end_date = now + timedelta(days=duration_days)
+    # Generate unique reference
+    client_reference = f"SDM-CARD-{uuid.uuid4().hex[:12].upper()}"
     
-    # Create card
-    card = MembershipCard(
-        client_id=client_id,
-        card_type=request.card_type,
-        price=price,
-        payment_method=request.payment_method,
-        expires_at=end_date.isoformat()
-    )
-    
-    # For MoMo payment, initiate collection
-    if request.payment_method == PaymentMethod.MOMO:
-        # TODO: Integrate BulkClix MoMo collection
-        # For now, simulate success
-        card.payment_reference = f"MOMO_{uuid.uuid4().hex[:10].upper()}"
-    
-    # For cashback payment, verify and deduct balance
+    # For cashback payment - process immediately
     if request.payment_method == PaymentMethod.CASHBACK:
         cashback_balance = current_client.get("cashback_balance", 0)
         if cashback_balance < price:
@@ -235,7 +220,98 @@ async def purchase_card(
             {"id": client_id},
             {"$inc": {"cashback_balance": -price}}
         )
-        card.payment_reference = f"CASHBACK_{uuid.uuid4().hex[:10].upper()}"
+        
+        # Create and activate card immediately for cashback payment
+        return await _complete_card_purchase(
+            client_id=client_id,
+            card_type=request.card_type,
+            price=price,
+            duration_days=duration_days,
+            payment_method=request.payment_method,
+            payment_reference=f"CASHBACK_{client_reference}",
+            payment_phone=request.payment_phone,
+            config=config
+        )
+    
+    # For MoMo payment - use Hubtel Online Checkout
+    if request.payment_method == PaymentMethod.MOMO:
+        if not request.payment_phone:
+            raise HTTPException(status_code=400, detail="Phone number required for MoMo payment")
+        
+        # Initialize Hubtel service
+        hubtel_service = get_hubtel_checkout_service(db)
+        
+        # Store pending purchase info for callback processing
+        pending_purchase = {
+            "id": str(uuid.uuid4()),
+            "client_id": client_id,
+            "client_reference": client_reference,
+            "card_type": request.card_type.value,
+            "price": price,
+            "duration_days": duration_days,
+            "payment_phone": request.payment_phone,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.pending_card_purchases.insert_one(pending_purchase)
+        
+        # Initiate Hubtel checkout
+        checkout_request = HubtelCheckoutRequest(
+            amount=price,
+            description=f"SDM Rewards {request.card_type.value.title()} Card ({duration_days} days)",
+            customer_phone=request.payment_phone,
+            client_reference=client_reference
+        )
+        
+        result = await hubtel_service.initiate_checkout(checkout_request)
+        
+        if not result.success:
+            # Clean up pending purchase
+            await db.pending_card_purchases.delete_one({"client_reference": client_reference})
+            raise HTTPException(
+                status_code=400, 
+                detail=result.error or "Payment initiation failed. Please try again."
+            )
+        
+        return {
+            "success": True,
+            "status": "pending",
+            "message": "Payment initiated. Please check your phone to complete the payment.",
+            "client_reference": client_reference,
+            "request_id": result.request_id,
+            "checkout_url": result.checkout_url,
+            "amount": price,
+            "card_type": request.card_type.value
+        }
+    
+    # For other payment methods (card, etc.) - not yet implemented
+    raise HTTPException(status_code=400, detail="Payment method not supported")
+
+
+async def _complete_card_purchase(
+    client_id: str,
+    card_type,
+    price: float,
+    duration_days: int,
+    payment_method,
+    payment_reference: str,
+    payment_phone: Optional[str],
+    config: dict
+) -> dict:
+    """Complete card purchase after successful payment"""
+    now = datetime.now(timezone.utc)
+    start_date = now
+    end_date = now + timedelta(days=duration_days)
+    
+    # Create card
+    card = MembershipCard(
+        client_id=client_id,
+        card_type=card_type,
+        price=price,
+        payment_method=payment_method,
+        expires_at=end_date.isoformat(),
+        payment_reference=payment_reference
+    )
     
     # Create transaction
     transaction = Transaction(
@@ -243,10 +319,10 @@ async def purchase_card(
         status=TransactionStatus.COMPLETED,
         client_id=client_id,
         amount=price,
-        payment_method=request.payment_method,
-        payment_reference=card.payment_reference,
-        payment_phone=request.payment_phone,
-        description=f"Purchase {request.card_type.value.title()} Card ({duration_days} days)"
+        payment_method=payment_method,
+        payment_reference=payment_reference,
+        payment_phone=payment_phone,
+        description=f"Purchase {card_type.value.title()} Card ({duration_days} days)"
     )
     
     # Save card and transaction
@@ -258,7 +334,7 @@ async def purchase_card(
         {"id": client_id},
         {"$set": {
             "status": ClientStatus.ACTIVE.value,
-            "card_type": request.card_type.value,
+            "card_type": card_type.value,
             "card_number": card.card_number,
             "card_purchased_at": start_date.isoformat(),
             "card_expires_at": end_date.isoformat(),
@@ -267,7 +343,7 @@ async def purchase_card(
         }}
     )
     
-    # Process welcome bonus (1 GHS)
+    # Process welcome bonus
     welcome_bonus = config.get("welcome_bonus", 1) if config else 1
     await db.clients.update_one(
         {"id": client_id},
@@ -278,64 +354,38 @@ async def purchase_card(
     )
     
     # Record welcome bonus transaction
-    bonus_transaction = Transaction(
-        type=TransactionType.WELCOME_BONUS,
+    bonus_txn = Transaction(
+        type=TransactionType.CASHBACK,
         status=TransactionStatus.COMPLETED,
         client_id=client_id,
         amount=welcome_bonus,
         description="Welcome bonus for card purchase"
     )
-    await db.transactions.insert_one(bonus_transaction.model_dump())
+    await db.transactions.insert_one(bonus_txn.model_dump())
     
-    # Process referral bonus if referred
-    if current_client.get("referred_by"):
-        referral = await db.referrals.find_one({
-            "referred_id": client_id,
-            "bonuses_paid": False
-        })
-        
-        if referral:
-            referrer_bonus = config.get("referrer_bonus", 3) if config else 3
-            
-            # Credit referrer
-            await db.clients.update_one(
-                {"id": referral["referrer_id"]},
-                {"$inc": {
-                    "cashback_balance": referrer_bonus,
-                    "total_earned": referrer_bonus,
-                    "referral_count": 1
-                }}
-            )
-            
-            # Record referrer bonus transaction
-            referrer_txn = Transaction(
-                type=TransactionType.REFERRAL_BONUS,
-                status=TransactionStatus.COMPLETED,
-                client_id=referral["referrer_id"],
-                amount=referrer_bonus,
-                description=f"Referral bonus for inviting {current_client['full_name']}"
-            )
-            await db.transactions.insert_one(referrer_txn.model_dump())
-            
-            # Mark referral as paid
-            await db.referrals.update_one(
-                {"id": referral["id"]},
-                {"$set": {
-                    "bonuses_paid": True,
-                    "card_purchased": True,
-                    "bonus_paid_at": now
-                }}
-            )
+    # Update gamification
+    try:
+        from services.gamification_service import gamification_service
+        await gamification_service.process_event(
+            db, client_id, "card_purchased",
+            {"card_type": card_type.value, "amount": price}
+        )
+    except Exception as e:
+        logger.warning(f"Gamification update failed: {e}")
     
     return {
         "success": True,
-        "message": "Card purchased successfully! Your account is now active.",
+        "status": "completed",
+        "message": f"Congratulations! Your {card_type.value.title()} card is now active.",
         "card": {
             "card_number": card.card_number,
-            "card_type": card.card_type.value,
+            "card_type": card_type.value,
+            "expires_at": end_date.isoformat(),
+            "duration_days": duration_days,
             "qr_code": card.qr_code
         },
-        "welcome_bonus": welcome_bonus
+        "welcome_bonus": welcome_bonus,
+        "transaction_id": transaction.id
     }
 
 

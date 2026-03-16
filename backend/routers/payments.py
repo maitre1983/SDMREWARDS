@@ -1047,6 +1047,134 @@ async def check_payment_status(payment_id: str):
         raise HTTPException(status_code=500, detail="Failed to check payment status")
 
 
+# ============== HUBTEL ONLINE CHECKOUT ENDPOINTS ==============
+
+@router.post("/hubtel/callback")
+async def hubtel_payment_callback(request: Request):
+    """
+    Hubtel Online Checkout callback webhook
+    Called by Hubtel when a payment is completed/failed
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = dict(request.query_params)
+    
+    logger.info(f"Hubtel callback received: {data}")
+    
+    from services.hubtel_checkout_service import get_hubtel_checkout_service
+    hubtel_service = get_hubtel_checkout_service(db)
+    
+    # Process the callback
+    result = await hubtel_service.handle_callback(data)
+    
+    if result.get("success"):
+        client_reference = result.get("client_reference")
+        
+        # Find the pending card purchase
+        pending_purchase = await db.pending_card_purchases.find_one(
+            {"client_reference": client_reference},
+            {"_id": 0}
+        )
+        
+        if pending_purchase:
+            # Complete the card purchase
+            from routers.clients import _complete_card_purchase
+            from models import CardType, PaymentMethod
+            
+            config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+            
+            await _complete_card_purchase(
+                client_id=pending_purchase["client_id"],
+                card_type=CardType(pending_purchase["card_type"]),
+                price=pending_purchase["price"],
+                duration_days=pending_purchase["duration_days"],
+                payment_method=PaymentMethod.MOMO,
+                payment_reference=client_reference,
+                payment_phone=pending_purchase["payment_phone"],
+                config=config
+            )
+            
+            # Mark pending purchase as completed
+            await db.pending_card_purchases.update_one(
+                {"client_reference": client_reference},
+                {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            
+            logger.info(f"Card purchase completed via Hubtel: {client_reference}")
+        
+        return {"success": True, "message": "Callback processed successfully"}
+    else:
+        # Payment failed - update pending purchase
+        client_reference = result.get("client_reference")
+        if client_reference:
+            await db.pending_card_purchases.update_one(
+                {"client_reference": client_reference},
+                {"$set": {"status": "failed", "error": result.get("message")}}
+            )
+        
+        return {"success": False, "message": result.get("message", "Payment failed")}
+
+
+@router.get("/hubtel/status/{client_reference}")
+async def check_hubtel_payment_status(client_reference: str):
+    """Check status of a Hubtel payment by client reference"""
+    from services.hubtel_checkout_service import get_hubtel_checkout_service
+    hubtel_service = get_hubtel_checkout_service(db)
+    
+    result = await hubtel_service.verify_payment(client_reference)
+    return result
+
+
+@router.post("/cards/check-status/{client_reference}")
+async def check_card_purchase_status(client_reference: str):
+    """Check status of a card purchase by client reference"""
+    # Check pending purchase
+    pending = await db.pending_card_purchases.find_one(
+        {"client_reference": client_reference},
+        {"_id": 0}
+    )
+    
+    if not pending:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    
+    # If completed, return card info
+    if pending["status"] == "completed":
+        client = await db.clients.find_one(
+            {"id": pending["client_id"]},
+            {"_id": 0, "card_number": 1, "card_type": 1, "card_expires_at": 1, "status": 1}
+        )
+        return {
+            "success": True,
+            "status": "completed",
+            "message": "Card purchase completed!",
+            "card": {
+                "card_number": client.get("card_number"),
+                "card_type": client.get("card_type"),
+                "expires_at": client.get("card_expires_at")
+            }
+        }
+    elif pending["status"] == "failed":
+        return {
+            "success": False,
+            "status": "failed",
+            "message": pending.get("error", "Payment failed")
+        }
+    else:
+        # Check Hubtel for latest status
+        from services.hubtel_checkout_service import get_hubtel_checkout_service
+        hubtel_service = get_hubtel_checkout_service(db)
+        
+        hubtel_status = await hubtel_service.verify_payment(client_reference)
+        
+        return {
+            "success": True,
+            "status": "pending",
+            "message": "Payment is being processed. Please complete payment on your phone.",
+            "hubtel_status": hubtel_status.get("status")
+        }
+
+
 # ============== TEST MODE ENDPOINTS ==============
 
 @router.post("/test/confirm/{payment_id}")
