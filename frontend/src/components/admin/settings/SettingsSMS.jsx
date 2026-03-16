@@ -45,6 +45,83 @@ export default function SettingsSMS({ token }) {
   const [showPreview, setShowPreview] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingRecipients, setLoadingRecipients] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+  // Predefined SMS Templates
+  const SMS_TEMPLATES = [
+    {
+      id: 'cashback_reminder',
+      name: '💰 Rappel Cashback',
+      category: 'engagement',
+      message: 'Bonjour {nom}! Vous avez {cashback} GHS de cashback disponible. Utilisez-le chez nos marchands partenaires avant qu\'il n\'expire! SDM Rewards'
+    },
+    {
+      id: 'birthday',
+      name: '🎂 Anniversaire',
+      category: 'celebration',
+      message: 'Joyeux anniversaire {nom}! SDM Rewards vous souhaite une excellente journée. Profitez de 10% de cashback bonus sur vos achats aujourd\'hui!'
+    },
+    {
+      id: 'inactive_reactivation',
+      name: '👋 Relance Client Inactif',
+      category: 'retention',
+      message: 'Bonjour {nom}, vous nous manquez! Revenez profiter de vos avantages SDM Rewards. Votre cashback de {cashback} GHS vous attend!'
+    },
+    {
+      id: 'new_promotion',
+      name: '🎉 Nouvelle Promotion',
+      category: 'marketing',
+      message: 'Bonne nouvelle {nom}! Promotion exceptionnelle chez nos marchands: jusqu\'à 15% de cashback ce weekend! Ne ratez pas cette offre. SDM Rewards'
+    },
+    {
+      id: 'card_expiry',
+      name: '⚠️ Expiration Carte',
+      category: 'alert',
+      message: 'Attention {nom}! Votre carte {carte} expire bientôt. Renouvelez-la pour continuer à profiter de vos avantages cashback. SDM Rewards'
+    },
+    {
+      id: 'welcome_bonus',
+      name: '🌟 Bonus Bienvenue',
+      category: 'onboarding',
+      message: 'Bienvenue {nom}! Merci de rejoindre SDM Rewards. Votre bonus de bienvenue a été crédité. Découvrez nos marchands partenaires!'
+    },
+    {
+      id: 'referral_success',
+      name: '🤝 Parrainage Réussi',
+      category: 'referral',
+      message: 'Félicitations {nom}! Votre filleul a rejoint SDM Rewards. Votre bonus de parrainage de 3 GHS a été crédité. Continuez à parrainer!'
+    },
+    {
+      id: 'upgrade_invitation',
+      name: '⬆️ Invitation Upgrade',
+      category: 'upsell',
+      message: '{nom}, passez à la carte Gold ou Platinum et gagnez jusqu\'à 10% de cashback! Votre solde actuel: {cashback} GHS. Upgrader maintenant!'
+    },
+    {
+      id: 'merchant_promo',
+      name: '🏪 Promo Marchand',
+      category: 'marketing',
+      message: 'Bonjour {nom}! Offre spéciale chez [NOM MARCHAND]: double cashback aujourd\'hui seulement! Présentez votre carte SDM Rewards.'
+    },
+    {
+      id: 'thank_you',
+      name: '❤️ Remerciement',
+      category: 'engagement',
+      message: 'Merci {nom} pour votre fidélité! Grâce à vous, SDM Rewards grandit. Vous avez cumulé {cashback} GHS de cashback. Continuez!'
+    },
+    {
+      id: 'festive',
+      name: '🎄 Fêtes / Nouvel An',
+      category: 'celebration',
+      message: 'Bonne année {nom}! SDM Rewards vous souhaite santé et prospérité. Profitez de nos offres spéciales pour bien commencer l\'année!'
+    },
+    {
+      id: 'custom',
+      name: '✏️ Message Personnalisé',
+      category: 'custom',
+      message: ''
+    }
+  ];
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -144,6 +221,38 @@ export default function SettingsSMS({ token }) {
       .replace(/{phone}/gi, recipient.phone || '')
       .replace(/{carte}/gi, recipient.card_type || 'N/A')
       .replace(/{card}/gi, recipient.card_type || 'N/A');
+  };
+
+  // Handle template selection
+  const handleTemplateSelect = (templateId) => {
+    setSelectedTemplateId(templateId);
+    const template = SMS_TEMPLATES.find(t => t.id === templateId);
+    if (template && template.message) {
+      setPersonalizedTemplate(template.message);
+    }
+  };
+
+  // Get template categories for grouping
+  const getTemplatesByCategory = () => {
+    const categories = {
+      engagement: { name: 'Engagement', templates: [] },
+      marketing: { name: 'Marketing', templates: [] },
+      retention: { name: 'Rétention', templates: [] },
+      celebration: { name: 'Célébration', templates: [] },
+      alert: { name: 'Alertes', templates: [] },
+      onboarding: { name: 'Onboarding', templates: [] },
+      referral: { name: 'Parrainage', templates: [] },
+      upsell: { name: 'Upsell', templates: [] },
+      custom: { name: 'Personnalisé', templates: [] }
+    };
+    
+    SMS_TEMPLATES.forEach(template => {
+      if (categories[template.category]) {
+        categories[template.category].templates.push(template);
+      }
+    });
+    
+    return categories;
   };
 
   // Get preview messages
@@ -727,7 +836,7 @@ export default function SettingsSMS({ token }) {
       {/* Personalized SMS Modal */}
       {showPersonalizedModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-white font-semibold text-lg flex items-center gap-2">
                 <Sparkles className="text-indigo-400" />
@@ -741,9 +850,30 @@ export default function SettingsSMS({ token }) {
               </button>
             </div>
             
-            <div className="grid lg:grid-cols-2 gap-6 flex-1 overflow-hidden">
-              {/* Left Column: Template & Recipients */}
-              <div className="space-y-4 overflow-auto">
+            <div className="grid lg:grid-cols-5 gap-6 flex-1 overflow-hidden">
+              {/* Left Column: Templates */}
+              <div className="lg:col-span-1 overflow-auto border-r border-slate-700 pr-4">
+                <Label className="text-slate-400 text-sm mb-3 block">Templates Prédéfinis</Label>
+                <div className="space-y-1">
+                  {SMS_TEMPLATES.map(template => (
+                    <button
+                      key={template.id}
+                      onClick={() => handleTemplateSelect(template.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                        selectedTemplateId === template.id 
+                          ? 'bg-indigo-600 text-white' 
+                          : 'bg-slate-900/50 text-slate-300 hover:bg-slate-700'
+                      }`}
+                      data-testid={`template-${template.id}`}
+                    >
+                      {template.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Middle Column: Template & Recipients */}
+              <div className="lg:col-span-2 space-y-4 overflow-auto">
                 {/* Template Input */}
                 <div>
                   <Label className="text-slate-400 flex items-center gap-2">
@@ -754,7 +884,10 @@ export default function SettingsSMS({ token }) {
                   </Label>
                   <textarea
                     value={personalizedTemplate}
-                    onChange={(e) => setPersonalizedTemplate(e.target.value)}
+                    onChange={(e) => {
+                      setPersonalizedTemplate(e.target.value);
+                      setSelectedTemplateId('custom');
+                    }}
                     className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white min-h-[100px]"
                     placeholder="Bonjour {nom}, votre cashback est de {cashback} GHS! Profitez-en..."
                     maxLength={320}
@@ -881,7 +1014,7 @@ export default function SettingsSMS({ token }) {
               </div>
 
               {/* Right Column: Preview */}
-              <div className="flex flex-col overflow-hidden">
+              <div className="lg:col-span-2 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-slate-400 flex items-center gap-2">
                     <Eye size={16} /> Aperçu des messages

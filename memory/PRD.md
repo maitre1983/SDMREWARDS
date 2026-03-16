@@ -50,6 +50,11 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Sélecteur de destinataires avec recherche et filtres
   - Aperçu en temps réel des messages personnalisés
   - Support des clients et marchands
+- ✅ **Templates SMS Prédéfinis** - 12 templates prêts à l'emploi
+  - 💰 Rappel Cashback | 🎂 Anniversaire | 👋 Relance Client Inactif
+  - 🎉 Nouvelle Promotion | ⚠️ Expiration Carte | 🌟 Bonus Bienvenue
+  - 🤝 Parrainage Réussi | ⬆️ Invitation Upgrade | 🏪 Promo Marchand
+  - ❤️ Remerciement | 🎄 Fêtes/Nouvel An | ✏️ Message Personnalisé
 
 ### 2026-03-16 (Session 2)
 - ✅ **Règles de paiement corrigées** - Airtime/Data/ECG: cashback only | Upgrade carte: cashback/MoMo/hybride
