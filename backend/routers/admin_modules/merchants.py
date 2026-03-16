@@ -66,6 +66,157 @@ async def list_merchants(
     }
 
 
+@router.get("/merchants/debit-overview")
+async def get_merchants_debit_overview(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get overview of all merchant debit accounts with cash payment stats"""
+    
+    # Get all merchants with their debit_account info
+    merchants = await db.merchants.find(
+        {"status": "active"},
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "owner_name": 1,
+            "phone": 1,
+            "status": 1,
+            "debit_account": 1
+        }
+    ).to_list(10000)
+    
+    # Enrich and calculate stats
+    enriched = []
+    total_debt = 0
+    total_credit = 0
+    total_cash_volume = 0
+    total_cash_cashback = 0
+    blocked_count = 0
+    warning_count = 0
+    merchants_with_cash = 0
+    
+    for merchant in merchants:
+        merchant_id = merchant.get("id")
+        debit_account = merchant.get("debit_account", {})
+        balance = debit_account.get("balance", 0)
+        debit_limit = debit_account.get("limit", 0)
+        is_blocked = debit_account.get("is_blocked", False)
+        
+        # Get cash transactions for this merchant
+        cash_txs = await db.transactions.find(
+            {"merchant_id": merchant_id, "payment_method": "cash"},
+            {"_id": 0, "amount": 1, "cashback_amount": 1}
+        ).to_list(10000)
+        
+        merchant_cash_volume = sum(t.get("amount", 0) for t in cash_txs)
+        merchant_cash_cashback = sum(t.get("cashback_amount", 0) for t in cash_txs)
+        merchant_cash_count = len(cash_txs)
+        
+        total_cash_volume += merchant_cash_volume
+        total_cash_cashback += merchant_cash_cashback
+        
+        if merchant_cash_count > 0 or debit_limit > 0:
+            merchants_with_cash += 1
+        
+        # Calculate usage percentage
+        usage_percentage = 0
+        if debit_limit > 0:
+            usage_percentage = min(100, abs(balance) / debit_limit * 100)
+        
+        # Determine status
+        status = "not_configured"
+        if debit_limit > 0:
+            if is_blocked:
+                status = "blocked"
+                blocked_count += 1
+            elif usage_percentage >= 75:
+                status = "warning"
+                warning_count += 1
+            else:
+                status = "active"
+        
+        # Count debt and credit
+        if balance < 0:
+            total_debt += abs(balance)
+        else:
+            total_credit += balance
+        
+        enriched.append({
+            "merchant_id": merchant.get("id"),
+            "business_name": merchant.get("business_name"),
+            "owner_name": merchant.get("owner_name"),
+            "phone": merchant.get("phone"),
+            "merchant_status": merchant.get("status"),
+            "balance": round(balance, 2),
+            "debit_limit": round(debit_limit, 2),
+            "settlement_days": debit_account.get("settlement_period_days", 30),
+            "is_blocked": is_blocked,
+            "status": status,
+            "usage_percentage": round(usage_percentage, 1),
+            "cash_volume": round(merchant_cash_volume, 2),
+            "cash_cashback": round(merchant_cash_cashback, 2),
+            "cash_transactions": merchant_cash_count
+        })
+    
+    # Sort by cash volume (highest first), then by balance
+    enriched.sort(key=lambda x: (-x.get("cash_volume", 0), x.get("balance", 0)))
+    
+    return {
+        "accounts": enriched,
+        "summary": {
+            "total_merchants": len(merchants),
+            "merchants_with_cash": merchants_with_cash,
+            "total_debt": round(total_debt, 2),
+            "total_credit": round(total_credit, 2),
+            "total_cash_volume": round(total_cash_volume, 2),
+            "total_cash_cashback": round(total_cash_cashback, 2),
+            "blocked_count": blocked_count,
+            "warning_count": warning_count
+        }
+    }
+
+
+@router.post("/merchants/create-manual")
+async def create_merchant_manual(
+    request: CreateMerchantManualRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Create merchant manually (Super Admin only)"""
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    existing = await db.merchants.find_one({"phone": request.phone})
+    if existing:
+        raise HTTPException(status_code=400, detail="Phone already registered")
+    
+    merchant_id = str(uuid.uuid4())
+    password_hash = bcrypt.hashpw(request.password.encode(), bcrypt.gensalt()).decode()
+    
+    merchant_data = {
+        "id": merchant_id,
+        "business_name": request.business_name,
+        "owner_name": request.owner_name,
+        "phone": request.phone,
+        "email": request.email,
+        "password_hash": password_hash,
+        "status": "active",
+        "cashback_rate": request.cashback_rate or 5,
+        "balance": 0,
+        "total_transactions": 0,
+        "created_by": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.merchants.insert_one(merchant_data)
+    
+    return {
+        "success": True,
+        "merchant_id": merchant_id,
+        "message": "Merchant created successfully"
+    }
+
+
 @router.get("/merchants/{merchant_id}")
 async def get_merchant(merchant_id: str, current_admin: dict = Depends(get_current_admin)):
     """Get merchant details"""

@@ -4,11 +4,11 @@
 
 | Package | Original | Status | Structure |
 |---------|----------|--------|-----------|
-| `payments/` | 2,252 lines | ✅ **COMPLET** | 7 modules (15 routes) |
-| `merchants/` | 3,025 lines | ✅ **COMPLET** | 4 modules (56 routes) |
-| `admin/` | 4,337 lines | ✅ **COMPLET** | admin_modules + 1 (96 routes) |
+| `payments/` | 2,252 lines | ✅ **COMPLETE** | 7 modules (15 routes) |
+| `merchants/` | 3,025 lines | ✅ **COMPLETE** | 5 modules (56 routes) |
+| `admin/` | 4,337 lines | ✅ **COMPLETE** | admin_modules + 2 (96+ routes) |
 
-**Legacy files deleted:** ✅ `merchants_legacy.py`, `admin_legacy.py` supprimés
+**Legacy files:** Internal `legacy_routes.py` contain remaining specialized routes
 
 ---
 
@@ -27,7 +27,7 @@ routers/payments/
 └── test.py          # Test mode endpoints (2 routes)
 ```
 
-### merchants/ - MIGRATED ✅
+### merchants/ - FULLY REFACTORED ✅
 ```
 routers/merchants/
 ├── __init__.py       # Main router
@@ -37,16 +37,30 @@ routers/merchants/
 └── legacy_routes.py  # Remaining 49 routes (internal)
 ```
 
-### admin/ - MIGRATED ✅
+### admin/ - FULLY REFACTORED ✅
 ```
 routers/admin/
 ├── __init__.py       # Main router (imports admin_modules)
-└── legacy_routes.py  # Remaining ~29 routes (internal)
+├── dashboard.py      # NEW: Dashboard analytics (2 routes)
+├── clients.py        # NEW: Client management (9 routes)
+└── legacy_routes.py  # Remaining ~20 routes (gamification, email, etc.)
 
-routers/admin_modules/  # Pre-existing modules (64 routes)
-├── dashboard.py (3), clients.py (13), merchants.py (14)
-├── settings.py (9), admins.py (10), sms.py (15)
+routers/admin_modules/  # Core modules (70+ routes)
+├── __init__.py
+├── dashboard.py (3 routes)
+├── clients.py (13 routes)
+├── merchants.py (16 routes) - Updated with debit-overview
+├── settings.py (9 routes)
+├── admins.py (10 routes)
+├── sms.py (18 routes) - Updated with personalized SMS
+└── models.py, dependencies.py
 ```
+
+---
+
+## Routes Fixed - 2026-03-16
+- ✅ `/api/admin/merchants/debit-overview` - Fixed route ordering conflict
+- ✅ `/api/admin/merchants/create-manual` - Added to merchants.py
 
 ---
 
@@ -54,7 +68,7 @@ routers/admin_modules/  # Pre-existing modules (64 routes)
 - ✅ No more external legacy files
 - ✅ Modular code organization by domain
 - ✅ All packages self-contained
-- ✅ 14/14 tests passing
+- ✅ Route ordering fixed for FastAPI
 - ✅ All endpoints functional
 
 ---
