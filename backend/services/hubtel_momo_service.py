@@ -255,27 +255,37 @@ class HubtelMoMoService:
         
         url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/receive/mobilemoney"
         
-        # Use synchronous subprocess with curl to completely bypass Python HTTP libraries
-        # This is necessary because Hubtel's server closes connections prematurely
-        from starlette.concurrency import run_in_threadpool
+        # Import required modules
         import subprocess
         import json as json_module
+        import asyncio
         
         auth_header = self._get_auth_header()
         payload_json = json_module.dumps(payload)
         
-        # Create command list outside the function to avoid closure issues
-        curl_cmd = [
-            "curl", "-s", "-X", "POST", url,
-            "--http1.1",
-            "--ignore-content-length",
-            "-H", "Content-Type: application/json",
-            "-H", f"Authorization: {auth_header}",
-            "-H", "Connection: close",
-            "-d", payload_json,
-            "--max-time", "30",
-            "-w", "\n---HTTP_CODE:%{http_code}---"
-        ]
+        async def _make_request_via_httpx():
+            """Fallback method using httpx if curl fails."""
+            import httpx
+            
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                http2=False,
+                verify=True
+            ) as client:
+                response = await client.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": auth_header,
+                        "Connection": "close"
+                    },
+                    json=payload
+                )
+                return {
+                    "body": response.text,
+                    "http_code": response.status_code,
+                    "stderr": ""
+                }
         
         def _make_hubtel_request_via_curl(cmd):
             """
@@ -312,21 +322,55 @@ class HubtelMoMoService:
                 return {
                     "body": body,
                     "http_code": http_code,
-                    "stderr": result.stderr
+                    "stderr": result.stderr,
+                    "returncode": result.returncode
                 }
             except subprocess.TimeoutExpired:
                 logger.error("Curl subprocess timed out")
-                return {"body": "", "http_code": 0, "stderr": "Request timed out"}
+                return {"body": "", "http_code": 0, "stderr": "Request timed out", "returncode": -1}
+            except FileNotFoundError:
+                logger.error("Curl not found on system")
+                return {"body": "", "http_code": 0, "stderr": "curl not found", "returncode": -2}
             except Exception as e:
                 logger.error(f"Curl subprocess exception: {e}")
-                return {"body": "", "http_code": 0, "stderr": str(e)}
+                return {"body": "", "http_code": 0, "stderr": str(e), "returncode": -3}
+        
+        # Create command list for curl
+        curl_cmd = [
+            "curl", "-s", "-X", "POST", url,
+            "--http1.1",
+            "--ignore-content-length",
+            "-H", "Content-Type: application/json",
+            "-H", f"Authorization: {auth_header}",
+            "-H", "Connection: close",
+            "-d", payload_json,
+            "--max-time", "30",
+            "-w", "\n---HTTP_CODE:%{http_code}---"
+        ]
         
         try:
-            # Execute curl in a separate thread using asyncio.to_thread
-            import asyncio
+            # Try curl first in a separate thread
             response_data = await asyncio.to_thread(_make_hubtel_request_via_curl, curl_cmd)
             
             response_status_code = response_data["http_code"]
+            
+            # If curl failed (http_code=0), try httpx as fallback
+            if response_status_code == 0:
+                logger.warning(f"Curl failed (returncode={response_data.get('returncode')}, stderr={response_data.get('stderr')}), trying httpx fallback...")
+                try:
+                    response_data = await _make_request_via_httpx()
+                    response_status_code = response_data["http_code"]
+                    logger.info(f"Httpx fallback result: http_code={response_status_code}")
+                except Exception as httpx_error:
+                    logger.error(f"Httpx fallback also failed: {httpx_error}")
+                    # Return the original curl error with more details
+                    error_msg = f"Payment service unavailable. Please try again later. (curl: {response_data.get('stderr', 'unknown error')})"
+                    if self.db is not None:
+                        await self.db.hubtel_payments.update_one(
+                            {"client_reference": client_reference},
+                            {"$set": {"status": "error", "error": error_msg}}
+                        )
+                    return {"success": False, "error": error_msg}
             
             try:
                 result = json_module.loads(response_data["body"]) if response_data["body"] else {}
