@@ -1052,8 +1052,21 @@ async def check_payment_status(payment_id: str):
 @router.post("/hubtel/callback")
 async def hubtel_payment_callback(request: Request):
     """
-    Hubtel Direct Receive Money callback webhook
+    Hubtel Online Checkout callback webhook
     Called by Hubtel when a payment is completed/failed
+    
+    Expected callback data from Hubtel:
+    {
+        "ResponseCode": "0000",
+        "Status": "Success",
+        "Data": {
+            "CheckoutId": "...",
+            "ClientReference": "SDM-CARD-...",
+            "Amount": 25.0,
+            "CustomerPhoneNumber": "233...",
+            ...
+        }
+    }
     """
     try:
         data = await request.json()
@@ -1062,8 +1075,8 @@ async def hubtel_payment_callback(request: Request):
     
     logger.info(f"Hubtel callback received: {data}")
     
-    from services.hubtel_receive_service import get_hubtel_receive_service
-    hubtel_service = get_hubtel_receive_service(db)
+    from services.hubtel_checkout_service import get_hubtel_checkout_service
+    hubtel_service = get_hubtel_checkout_service(db)
     
     # Process the callback
     result = await hubtel_service.handle_callback(data)
@@ -1077,31 +1090,38 @@ async def hubtel_payment_callback(request: Request):
             {"_id": 0}
         )
         
-        if pending_purchase:
+        if pending_purchase and pending_purchase.get("status") != "completed":
             # Complete the card purchase
             from routers.clients import _complete_card_purchase
-            from models import CardType, PaymentMethod
+            from models.schemas import CardType, PaymentMethod
             
             config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
             
-            await _complete_card_purchase(
-                client_id=pending_purchase["client_id"],
-                card_type=CardType(pending_purchase["card_type"]),
-                price=pending_purchase["price"],
-                duration_days=pending_purchase["duration_days"],
-                payment_method=PaymentMethod.MOMO,
-                payment_reference=client_reference,
-                payment_phone=pending_purchase["payment_phone"],
-                config=config
-            )
-            
-            # Mark pending purchase as completed
-            await db.pending_card_purchases.update_one(
-                {"client_reference": client_reference},
-                {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
-            )
-            
-            logger.info(f"Card purchase completed via Hubtel: {client_reference}")
+            try:
+                await _complete_card_purchase(
+                    client_id=pending_purchase["client_id"],
+                    card_type=CardType(pending_purchase["card_type"]),
+                    price=pending_purchase["price"],
+                    duration_days=pending_purchase["duration_days"],
+                    payment_method=PaymentMethod.MOMO,
+                    payment_reference=client_reference,
+                    payment_phone=pending_purchase["payment_phone"],
+                    config=config
+                )
+                
+                # Mark pending purchase as completed
+                await db.pending_card_purchases.update_one(
+                    {"client_reference": client_reference},
+                    {"$set": {"status": "completed", "completed_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                
+                logger.info(f"Card purchase completed via Hubtel: {client_reference}")
+            except Exception as e:
+                logger.error(f"Error completing card purchase: {e}")
+                await db.pending_card_purchases.update_one(
+                    {"client_reference": client_reference},
+                    {"$set": {"status": "error", "error": str(e)}}
+                )
         
         return {"success": True, "message": "Callback processed successfully"}
     else:

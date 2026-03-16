@@ -3,6 +3,9 @@ SDM REWARDS - Hubtel Online Checkout Payment Service
 =====================================================
 Handles card purchases via Hubtel PayProxy API
 API: https://payproxyapi.hubtel.com/items/initiate
+
+Authentication: Basic Auth (base64 encoded API_ID:API_KEY)
+Merchant ID: POS Sales ID (2038129)
 """
 
 import os
@@ -20,7 +23,8 @@ logger = logging.getLogger(__name__)
 HUBTEL_BASE_URL = "https://payproxyapi.hubtel.com"
 HUBTEL_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
 HUBTEL_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
-HUBTEL_MERCHANT_ACCOUNT = os.environ.get("HUBTEL_MERCHANT_ACCOUNT", "")
+# Use POS Sales ID as the merchant account number for Online Checkout
+HUBTEL_MERCHANT_ACCOUNT = os.environ.get("HUBTEL_POS_SALES_ID", os.environ.get("HUBTEL_MERCHANT_ACCOUNT", ""))
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 
 
@@ -100,20 +104,24 @@ class HubtelOnlineCheckoutService:
         # Normalize phone number
         customer_phone = self._normalize_phone(request.customer_phone)
         
-        # Prepare callback URL
+        # Prepare URLs
         callback_url = request.callback_url or f"{CALLBACK_BASE_URL}/api/payments/hubtel/callback"
-        cancellation_url = request.cancellation_url or f"{CALLBACK_BASE_URL}/payment-cancelled"
+        return_url = f"{CALLBACK_BASE_URL}/payment/success?ref={request.client_reference}"
+        cancellation_url = request.cancellation_url or f"{CALLBACK_BASE_URL}/payment/cancelled"
         
-        # Prepare request payload
+        # Prepare request payload per Hubtel Online Checkout API spec
+        # Uses POS Sales ID as merchantAccountNumber
         payload = {
-            "merchantAccountNumber": self.merchant_account,
-            "customerMsisdn": customer_phone,
-            "amount": str(request.amount),
+            "totalAmount": request.amount,
             "description": request.description,
-            "clientReference": request.client_reference,
             "callbackUrl": callback_url,
-            "cancellationUrl": cancellation_url
+            "returnUrl": return_url,
+            "cancellationUrl": cancellation_url,
+            "merchantAccountNumber": self.merchant_account,
+            "clientReference": request.client_reference
         }
+        
+        logger.info(f"Hubtel checkout payload: merchantAccount={self.merchant_account}, amount={request.amount}, ref={request.client_reference}")
         
         # Log payment record before API call
         payment_record = {
@@ -243,25 +251,52 @@ class HubtelOnlineCheckoutService:
         """
         Handle callback from Hubtel after payment completion
         
+        Hubtel Online Checkout callback format:
+        {
+            "ResponseCode": "0000",
+            "Status": "Success", 
+            "Data": {
+                "CheckoutId": "...",
+                "ClientReference": "SDM-CARD-...",
+                "Amount": 25.0,
+                "Charges": 0.0,
+                "AmountAfterCharges": 25.0,
+                "CustomerPhoneNumber": "233...",
+                "PaymentDetails": {...}
+            }
+        }
+        
         Args:
             callback_data: Data received from Hubtel callback
             
         Returns:
             Dict with processing result
         """
-        logger.info(f"Hubtel callback received: {callback_data}")
+        logger.info(f"Hubtel Online Checkout callback received: {callback_data}")
         
-        # Extract relevant fields
-        client_reference = callback_data.get("clientReference", callback_data.get("ClientReference", ""))
-        response_code = callback_data.get("responseCode", callback_data.get("ResponseCode", ""))
-        status = callback_data.get("status", callback_data.get("Status", ""))
-        message = callback_data.get("message", callback_data.get("Message", ""))
+        # Extract fields from callback - handle both flat and nested Data structure
+        data = callback_data.get("Data", callback_data.get("data", {}))
+        
+        # Client reference can be in Data or at root level
+        client_reference = (
+            data.get("ClientReference") or 
+            data.get("clientReference") or
+            callback_data.get("ClientReference") or 
+            callback_data.get("clientReference") or
+            ""
+        )
+        
+        response_code = callback_data.get("ResponseCode", callback_data.get("responseCode", ""))
+        status = callback_data.get("Status", callback_data.get("status", ""))
+        message = callback_data.get("Message", callback_data.get("message", ""))
         
         # Determine if payment was successful
         is_approved = (
-            response_code in ["0000", "0001", "Success"] or 
-            status.lower() in ["approved", "success", "successful", "completed"]
+            response_code in ["0000", "0001"] or 
+            status.lower() in ["success", "successful", "completed", "approved", "paid"]
         )
+        
+        logger.info(f"Hubtel callback parsed: ref={client_reference}, code={response_code}, status={status}, approved={is_approved}")
         
         # Update payment record
         if self.db is not None and client_reference:
@@ -269,6 +304,7 @@ class HubtelOnlineCheckoutService:
                 "status": "completed" if is_approved else "failed",
                 "hubtel_callback_response": callback_data,
                 "hubtel_final_status": status,
+                "hubtel_response_code": response_code,
                 "completed_at": datetime.now(timezone.utc).isoformat() if is_approved else None
             }
             
@@ -281,7 +317,7 @@ class HubtelOnlineCheckoutService:
             "success": is_approved,
             "client_reference": client_reference,
             "status": "completed" if is_approved else "failed",
-            "message": message
+            "message": message or ("Payment successful" if is_approved else "Payment failed")
         }
 
 

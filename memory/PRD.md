@@ -2,6 +2,31 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-16 - Hubtel Online Checkout Integration (COMPLETED)
+
+**Hubtel Online Checkout Integration - TESTED ✅**
+- Migrated from Hubtel Direct Receive Money API to Online Checkout API
+- Fixed 401 Unauthorized error by using correct POS Sales ID (2038129) as merchantAccountNumber
+- Endpoint: `POST https://payproxyapi.hubtel.com/items/initiate`
+- Authentication: Basic Auth with API_ID:API_KEY
+- **Flow:**
+  1. User selects card (Silver 25 GHS, Gold 50 GHS, Platinum 100 GHS)
+  2. API returns `checkout_url` to Hubtel payment page
+  3. User redirected to `https://pay.hubtel.com/...` to complete payment
+  4. Hubtel sends callback to `/api/payments/hubtel/callback`
+  5. Card is automatically activated upon successful payment
+- **Files Updated:**
+  - `/app/backend/services/hubtel_checkout_service.py`: Updated to use POS Sales ID, fixed payload format
+  - `/app/backend/routers/clients.py`: `/api/clients/cards/purchase` now uses Online Checkout
+  - `/app/backend/routers/payments.py`: Updated callback handler for Online Checkout format
+- **Hubtel Credentials:**
+  - API ID: DMAN95
+  - API Key: dd52533e...
+  - POS Sales ID: 2038129
+  - Hubtel Account ID: 3738610
+- **Test Result:** ✅ Successfully returns checkout_url
+- **Status:** ✅ Completed
+
 ### 2026-03-14 - Remember Device Mobile & Admin Bug Fix (COMPLETED)
 
 **Remember Device Mobile Feature - TESTED ✅**

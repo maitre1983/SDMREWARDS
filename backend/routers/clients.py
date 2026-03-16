@@ -233,14 +233,10 @@ async def purchase_card(
             config=config
         )
     
-    # For MoMo payment - use Hubtel Direct Receive Money API
+    # For MoMo payment - use Hubtel Online Checkout API
     if request.payment_method == PaymentMethod.MOMO:
-        if not request.payment_phone:
-            raise HTTPException(status_code=400, detail="Phone number required for MoMo payment")
-        
-        # Initialize Hubtel service
-        from services.hubtel_receive_service import get_hubtel_receive_service, HubtelReceiveMoneyRequest
-        hubtel_service = get_hubtel_receive_service(db)
+        # Initialize Hubtel Online Checkout service
+        hubtel_service = get_hubtel_checkout_service(db)
         
         # Store pending purchase info for callback processing
         pending_purchase = {
@@ -250,21 +246,21 @@ async def purchase_card(
             "card_type": request.card_type.value,
             "price": price,
             "duration_days": duration_days,
-            "payment_phone": request.payment_phone,
+            "payment_phone": request.payment_phone or current_client.get("phone"),
             "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.pending_card_purchases.insert_one(pending_purchase)
         
-        # Initiate Hubtel Receive Money
-        receive_request = HubtelReceiveMoneyRequest(
+        # Initiate Hubtel Online Checkout
+        checkout_request = HubtelCheckoutRequest(
             amount=price,
             description=f"SDM Rewards {request.card_type.value.title()} Card ({duration_days} days)",
-            customer_phone=request.payment_phone,
+            customer_phone=request.payment_phone or current_client.get("phone", ""),
             client_reference=client_reference
         )
         
-        result = await hubtel_service.receive_money(receive_request)
+        result = await hubtel_service.initiate_checkout(checkout_request)
         
         if not result.success:
             # Clean up pending purchase
@@ -277,9 +273,10 @@ async def purchase_card(
         return {
             "success": True,
             "status": "pending",
-            "message": "Payment prompt sent to your phone. Please authorize the payment.",
+            "message": "Redirecting to Hubtel payment page...",
             "client_reference": client_reference,
-            "transaction_id": result.transaction_id,
+            "checkout_url": result.checkout_url,
+            "checkout_id": result.request_id,
             "amount": price,
             "card_type": request.card_type.value
         }
