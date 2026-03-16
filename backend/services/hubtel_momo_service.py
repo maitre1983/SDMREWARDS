@@ -253,67 +253,91 @@ class HubtelMoMoService:
         try:
             url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/receive/mobilemoney"
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
+            # Use aiohttp with auto_decompress disabled to handle Hubtel's response issues
+            import aiohttp
+            
+            connector = aiohttp.TCPConnector(force_close=True)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.post(
                     url,
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": self._get_auth_header()
+                        "Authorization": self._get_auth_header(),
+                        "Accept-Encoding": "identity"
                     },
                     json=payload,
-                    timeout=30.0
-                )
-                
-                try:
-                    result = response.json()
-                except:
-                    result = {"raw": response.text, "status_code": response.status_code}
-                
-                logger.info(f"Hubtel MoMo Collection response: {result}")
-                
-                # Check for success
-                response_code = result.get("ResponseCode", result.get("responseCode", ""))
-                is_success = response.status_code in [200, 201] and response_code in ["0000", "0001"]
-                
-                if is_success:
-                    data = result.get("Data", result.get("data", {}))
-                    transaction_id = data.get("TransactionId", data.get("transactionId", ""))
+                    timeout=aiohttp.ClientTimeout(total=30),
+                    read_bufsize=65536
+                ) as response:
+                    # Read raw bytes and decode
+                    try:
+                        raw_data = await response.read()
+                        response_text = raw_data.decode('utf-8')
+                    except:
+                        response_text = ""
                     
-                    if self.db is not None:
-                        await self.db.hubtel_payments.update_one(
-                            {"client_reference": client_reference},
-                            {"$set": {
-                                "status": "prompt_sent",
-                                "hubtel_transaction_id": transaction_id,
-                                "hubtel_response": result
-                            }}
-                        )
+                    try:
+                        import json
+                        result = json.loads(response_text) if response_text else {}
+                    except:
+                        result = {"raw": response_text, "status_code": response.status}
                     
-                    return {
-                        "success": True,
-                        "transaction_id": transaction_id,
-                        "client_reference": client_reference,
-                        "message": "Payment prompt sent to customer's phone"
-                    }
-                else:
-                    error_msg = result.get("Message", result.get("message", f"Collection failed: {response.status_code}"))
+                    logger.info(f"Hubtel MoMo Collection response: {result}")
                     
-                    if self.db is not None:
-                        await self.db.hubtel_payments.update_one(
-                            {"client_reference": client_reference},
-                            {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
-                        )
+                    # Check for success
+                    response_code = result.get("ResponseCode", result.get("responseCode", ""))
+                    is_success = response.status in [200, 201] and response_code in ["0000", "0001"]
                     
-                    return {"success": False, "error": error_msg}
+                    if is_success:
+                        data = result.get("Data", result.get("data", {}))
+                        transaction_id = data.get("TransactionId", data.get("transactionId", ""))
+                        
+                        if self.db is not None:
+                            await self.db.hubtel_payments.update_one(
+                                {"client_reference": client_reference},
+                                {"$set": {
+                                    "status": "prompt_sent",
+                                    "hubtel_transaction_id": transaction_id,
+                                    "hubtel_response": result
+                                }}
+                            )
+                        
+                        return {
+                            "success": True,
+                            "transaction_id": transaction_id,
+                            "client_reference": client_reference,
+                            "message": "Payment prompt sent to customer's phone"
+                        }
+                    else:
+                        error_msg = result.get("Message", result.get("message", f"Collection failed: {response.status}"))
+                        
+                        if self.db is not None:
+                            await self.db.hubtel_payments.update_one(
+                                {"client_reference": client_reference},
+                                {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
+                            )
+                        
+                        return {"success": False, "error": error_msg}
                     
         except Exception as e:
+            error_str = str(e)
             logger.error(f"Hubtel MoMo Collection error: {e}")
+            
+            # If it's a connection error, return without updating DB (retry was attempted)
+            if "peer closed" in error_str or "connection" in error_str.lower():
+                if self.db is not None:
+                    await self.db.hubtel_payments.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {"status": "error", "error": error_str}}
+                    )
+                return {"success": False, "error": "Connection to payment provider failed. Please try again."}
+            
             if self.db is not None:
                 await self.db.hubtel_payments.update_one(
                     {"client_reference": client_reference},
-                    {"$set": {"status": "error", "error": str(e)}}
+                    {"$set": {"status": "error", "error": error_str}}
                 )
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_str}
     
     # ============== SEND MONEY (MoMo Disbursement/Transfer) ==============
     

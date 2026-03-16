@@ -686,74 +686,43 @@ async def upgrade_card(
     
     # Initiate MoMo payment for remaining amount
     if not test_mode:
-        # Call BulkClix API for MoMo payment
-        import httpx
-        BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")
-        BULKCLIX_BASE_URL = os.environ.get("BULKCLIX_BASE_URL", "https://api.bulkclix.com/api/v1")
-        CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "")
+        # Call Hubtel MoMo Collection API
+        from services.hubtel_momo_service import get_hubtel_momo_service
+        
+        hubtel_service = get_hubtel_momo_service(db)
         
         try:
-            # Format phone for BulkClix
-            bulkclix_phone = request.payment_phone
-            if request.payment_phone.startswith("+233"):
-                bulkclix_phone = "0" + request.payment_phone[4:]
-            elif request.payment_phone.startswith("233"):
-                bulkclix_phone = "0" + request.payment_phone[3:]
-            
-            # Detect network
-            from routers.payments import detect_network
-            network = detect_network(request.payment_phone)
-            
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                payload = {
-                    "amount": momo_amount,
-                    "phone_number": bulkclix_phone,
-                    "network": network.upper() if network else "MTN",
-                    "transaction_id": payment_record["reference"],
-                    "reference": "SDM REWARDS UPGRADE",
-                    "callback_url": f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else "https://sdmrewards.com/api/payments/callback"
-                }
-                
-                response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/payment-api/momopay",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json=payload,
-                    timeout=30.0
-                )
-                
-                result = response.json() if response.text else {}
-                
-                if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
-                    payment_data = result.get("data", {})
-                    await db.momo_payments.update_one(
-                        {"id": payment_id},
-                        {"$set": {
-                            "status": "processing",
-                            "provider_reference": payment_data.get("ext_transaction_id"),
-                            "provider_message": result.get("message")
-                        }}
-                    )
-                else:
-                    # Refund cashback if MoMo initiation failed
-                    if cashback_to_use > 0:
-                        await db.clients.update_one(
-                            {"id": client_id},
-                            {"$inc": {"cashback_balance": cashback_to_use}}
-                        )
-                    raise HTTPException(status_code=400, detail=result.get("message", "Payment initiation failed"))
-                    
-        except httpx.RequestError:
-            # Refund cashback if network error
+            result = await hubtel_service.collect_momo(
+                phone=request.payment_phone,
+                amount=momo_amount,
+                description=f"SDM Rewards Card Upgrade ({current_card_type.upper()} → {request.new_card_type.upper()})",
+                client_reference=payment_record["reference"]
+            )
+        except Exception as e:
+            logger.error(f"Hubtel service error: {e}")
+            result = {"success": False, "error": str(e)}
+        
+        if result.get("success"):
+            await db.momo_payments.update_one(
+                {"id": payment_id},
+                {"$set": {
+                    "status": "processing",
+                    "provider": "hubtel",
+                    "provider_reference": result.get("transaction_id"),
+                    "provider_message": result.get("message")
+                }}
+            )
+        else:
+            # Refund cashback if MoMo initiation failed
             if cashback_to_use > 0:
                 await db.clients.update_one(
                     {"id": client_id},
                     {"$inc": {"cashback_balance": cashback_to_use}}
                 )
-            raise HTTPException(status_code=503, detail="Payment service temporarily unavailable")
+            error_msg = result.get("error", "Payment initiation failed")
+            if "peer closed" in error_msg or "connection" in error_msg.lower():
+                error_msg = "Connection to payment provider failed. Please try again."
+            raise HTTPException(status_code=400, detail=error_msg)
     
     return {
         "success": True,
