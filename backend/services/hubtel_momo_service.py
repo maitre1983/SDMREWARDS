@@ -199,6 +199,9 @@ class HubtelMoMoService:
         Sends payment request directly to customer's phone
         
         API: POST https://rmp.hubtel.com/merchantaccount/merchants/{POS_ID}/receive/mobilemoney
+        
+        Uses synchronous requests library via run_in_threadpool to avoid
+        FastAPI async context connection issues with Hubtel API.
         """
         normalized_phone = self._normalize_phone(phone)
         network = self._detect_network(phone)
@@ -250,87 +253,127 @@ class HubtelMoMoService:
             "ClientReference": client_reference
         }
         
+        url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/receive/mobilemoney"
+        
+        # Use synchronous subprocess with curl to completely bypass Python HTTP libraries
+        # This is necessary because Hubtel's server closes connections prematurely
+        from starlette.concurrency import run_in_threadpool
+        import subprocess
+        import json as json_module
+        
+        auth_header = self._get_auth_header()
+        payload_json = json_module.dumps(payload)
+        
+        # Create command list outside the function to avoid closure issues
+        curl_cmd = [
+            "curl", "-s", "-X", "POST", url,
+            "--http1.1",
+            "--ignore-content-length",
+            "-H", "Content-Type: application/json",
+            "-H", f"Authorization: {auth_header}",
+            "-H", "Connection: close",
+            "-d", payload_json,
+            "--max-time", "30",
+            "-w", "\n---HTTP_CODE:%{http_code}---"
+        ]
+        
+        def _make_hubtel_request_via_curl(cmd):
+            """
+            Use curl subprocess to call Hubtel API.
+            This bypasses all Python HTTP library issues with Hubtel's Content-Length.
+            """
+            import os as os_module
+            
+            # Use a fixed path for response
+            tmp_path = "/tmp/hubtel_response.json"
+            
+            try:
+                # Modify command to write output to file
+                file_cmd = cmd[:-2] + ["-o", tmp_path, "-w", "%{http_code}"]
+                
+                result = subprocess.run(
+                    file_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=35
+                )
+                
+                http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
+                
+                # Read response from file
+                body = ""
+                if os_module.path.exists(tmp_path):
+                    try:
+                        with open(tmp_path, 'r') as f:
+                            body = f.read()
+                    except Exception as read_err:
+                        logger.warning(f"Failed to read response file: {read_err}")
+                
+                return {
+                    "body": body,
+                    "http_code": http_code,
+                    "stderr": result.stderr
+                }
+            except subprocess.TimeoutExpired:
+                logger.error("Curl subprocess timed out")
+                return {"body": "", "http_code": 0, "stderr": "Request timed out"}
+            except Exception as e:
+                logger.error(f"Curl subprocess exception: {e}")
+                return {"body": "", "http_code": 0, "stderr": str(e)}
+        
         try:
-            url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/receive/mobilemoney"
+            # Execute curl in a separate thread using asyncio.to_thread
+            import asyncio
+            response_data = await asyncio.to_thread(_make_hubtel_request_via_curl, curl_cmd)
             
-            # Use aiohttp with auto_decompress disabled to handle Hubtel's response issues
-            import aiohttp
+            response_status_code = response_data["http_code"]
             
-            connector = aiohttp.TCPConnector(force_close=True)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.post(
-                    url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": self._get_auth_header(),
-                        "Accept-Encoding": "identity"
-                    },
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                    read_bufsize=65536
-                ) as response:
-                    # Read raw bytes and decode
-                    try:
-                        raw_data = await response.read()
-                        response_text = raw_data.decode('utf-8')
-                    except:
-                        response_text = ""
-                    
-                    try:
-                        import json
-                        result = json.loads(response_text) if response_text else {}
-                    except:
-                        result = {"raw": response_text, "status_code": response.status}
-                    
-                    logger.info(f"Hubtel MoMo Collection response: {result}")
-                    
-                    # Check for success
-                    response_code = result.get("ResponseCode", result.get("responseCode", ""))
-                    is_success = response.status in [200, 201] and response_code in ["0000", "0001"]
-                    
-                    if is_success:
-                        data = result.get("Data", result.get("data", {}))
-                        transaction_id = data.get("TransactionId", data.get("transactionId", ""))
-                        
-                        if self.db is not None:
-                            await self.db.hubtel_payments.update_one(
-                                {"client_reference": client_reference},
-                                {"$set": {
-                                    "status": "prompt_sent",
-                                    "hubtel_transaction_id": transaction_id,
-                                    "hubtel_response": result
-                                }}
-                            )
-                        
-                        return {
-                            "success": True,
-                            "transaction_id": transaction_id,
-                            "client_reference": client_reference,
-                            "message": "Payment prompt sent to customer's phone"
-                        }
-                    else:
-                        error_msg = result.get("Message", result.get("message", f"Collection failed: {response.status}"))
-                        
-                        if self.db is not None:
-                            await self.db.hubtel_payments.update_one(
-                                {"client_reference": client_reference},
-                                {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
-                            )
-                        
-                        return {"success": False, "error": error_msg}
+            try:
+                result = json_module.loads(response_data["body"]) if response_data["body"] else {}
+            except Exception as parse_error:
+                logger.warning(f"JSON parse error: {parse_error}")
+                result = {"raw": response_data["body"], "status_code": response_status_code}
+            
+            logger.info(f"Hubtel MoMo Collection: status={response_status_code}, response_code={result.get('ResponseCode', 'N/A')}")
+            
+            # Check for success
+            response_code = result.get("ResponseCode", result.get("responseCode", ""))
+            is_success = response_status_code in [200, 201] and response_code in ["0000", "0001"]
+            
+            if is_success:
+                data = result.get("Data", result.get("data", {}))
+                transaction_id = data.get("TransactionId", data.get("transactionId", ""))
+                
+                if self.db is not None:
+                    await self.db.hubtel_payments.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {
+                            "status": "prompt_sent",
+                            "hubtel_transaction_id": transaction_id,
+                            "hubtel_response": result
+                        }}
+                    )
+                
+                return {
+                    "success": True,
+                    "transaction_id": transaction_id,
+                    "client_reference": client_reference,
+                    "message": "Payment prompt sent to customer's phone"
+                }
+            else:
+                error_msg = result.get("Message", result.get("message", f"Collection failed: {response_status_code}"))
+                
+                if self.db is not None:
+                    await self.db.hubtel_payments.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
+                    )
+                
+                return {"success": False, "error": error_msg}
                     
         except Exception as e:
             error_str = str(e)
             logger.error(f"Hubtel MoMo Collection error: {e}")
-            
-            # If it's a connection error, return without updating DB (retry was attempted)
-            if "peer closed" in error_str or "connection" in error_str.lower():
-                if self.db is not None:
-                    await self.db.hubtel_payments.update_one(
-                        {"client_reference": client_reference},
-                        {"$set": {"status": "error", "error": error_str}}
-                    )
-                return {"success": False, "error": "Connection to payment provider failed. Please try again."}
             
             if self.db is not None:
                 await self.db.hubtel_payments.update_one(
@@ -425,7 +468,7 @@ class HubtelMoMoService:
                 
                 try:
                     result = response.json()
-                except:
+                except Exception:
                     result = {"raw": response.text, "status_code": response.status_code}
                 
                 logger.info(f"Hubtel MoMo Transfer response: {result}")

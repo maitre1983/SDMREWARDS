@@ -2,6 +2,23 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-16 - Card Upgrade Fix (COMPLETED)
+
+**Card Upgrade via Hubtel MoMo Collection - FIXED ✅**
+- **Issue:** Card upgrade (`/api/clients/cards/upgrade`) was failing with network connection errors
+- **Root Causes:**
+  1. Hubtel API closes connections prematurely with incorrect `Content-Length` headers
+  2. Python HTTP libraries (`httpx`, `aiohttp`, `requests`) failed to read partial responses
+  3. Unicode character `→` in descriptions caused empty responses from Hubtel
+- **Solution:**
+  1. Implemented `curl` subprocess with `--http1.1` and `--ignore-content-length` flags
+  2. Response written to temp file to bypass stdout capture issues in FastAPI context
+  3. Replaced `→` with `to` in descriptions sent to Hubtel
+- **Files Modified:**
+  - `/app/backend/services/hubtel_momo_service.py`: New curl-based implementation for `collect_momo()`
+  - `/app/backend/routers/clients.py`: Fixed description text
+- **Test Result:** ✅ Successfully returns `{success: true, status: "pending"}`
+
 ### 2026-03-16 - Hubtel Complete MoMo Integration (COMPLETED)
 
 **Hubtel MoMo Collection (Receive Money) - TESTED ✅**

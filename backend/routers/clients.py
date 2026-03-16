@@ -695,7 +695,7 @@ async def upgrade_card(
             result = await hubtel_service.collect_momo(
                 phone=request.payment_phone,
                 amount=momo_amount,
-                description=f"SDM Rewards Card Upgrade ({current_card_type.upper()} → {request.new_card_type.upper()})",
+                description=f"SDM Rewards Card Upgrade ({current_card_type.upper()} to {request.new_card_type.upper()})",
                 client_reference=payment_record["reference"]
             )
         except Exception as e:
