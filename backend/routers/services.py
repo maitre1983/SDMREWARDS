@@ -678,14 +678,23 @@ async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get
 
 @router.post("/withdrawal/initiate")
 async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict = Depends(get_current_client)):
-    """Withdraw cashback to MoMo"""
+    """Withdraw cashback to MoMo via Hubtel Send Money API"""
     
-    if request.amount < MIN_TRANSACTION_AMOUNT:
-        raise HTTPException(status_code=400, detail=f"Minimum withdrawal is GHS {MIN_TRANSACTION_AMOUNT}")
+    from services.hubtel_momo_service import get_hubtel_momo_service
+    
+    min_withdrawal = 5.0
+    max_withdrawal = 1000.0
+    
+    if request.amount < min_withdrawal:
+        raise HTTPException(status_code=400, detail=f"Minimum withdrawal is GHS {min_withdrawal}")
+    
+    if request.amount > max_withdrawal:
+        raise HTTPException(status_code=400, detail=f"Maximum withdrawal is GHS {max_withdrawal}")
     
     # Calculate fee
     fee_info = await get_service_fee("withdrawal", request.amount)
-    total_cost = fee_info["total"]
+    total_deducted = request.amount  # Deduct full amount from balance
+    net_amount = request.amount - fee_info["fee_amount"]  # Client receives this
     
     # Check balance
     client_record = await db.clients.find_one({"id": current_client["id"]}, {"_id": 0})
@@ -693,88 +702,109 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
         raise HTTPException(status_code=404, detail="Client not found")
     
     balance = client_record.get("cashback_balance", 0)
-    if balance < total_cost:
+    if balance < total_deducted:
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient balance. Required: GHS {total_cost:.2f} (GHS {request.amount:.2f} + GHS {fee_info['fee_amount']:.2f} fee)"
+            detail=f"Insufficient balance. Available: GHS {balance:.2f}"
         )
+    
+    # Generate unique transaction ID
+    transaction_id = f"SDM-WD-{uuid.uuid4().hex[:12].upper()}"
+    
+    # Detect network if not provided
+    network = request.network.upper() if request.network else None
+    if not network:
+        # Auto-detect from phone number
+        phone = request.phone
+        if phone.startswith("+233"):
+            phone = "0" + phone[4:]
+        elif phone.startswith("233"):
+            phone = "0" + phone[3:]
+        
+        prefix = phone[1:3] if len(phone) >= 3 else ""
+        if prefix in ["24", "25", "53", "54", "55", "59"]:
+            network = "MTN"
+        elif prefix in ["20", "50"]:
+            network = "VODAFONE"
+        elif prefix in ["27", "26", "56", "57"]:
+            network = "TELECEL"
+        else:
+            network = "MTN"  # Default
     
     # Create withdrawal record
     withdrawal_tx = {
         "id": str(uuid.uuid4()),
         "type": "withdrawal",
         "client_id": current_client["id"],
+        "client_name": client_record.get("full_name", ""),
         "phone": request.phone,
-        "network": request.network.upper(),
+        "network": network,
         "amount": request.amount,
         "service_fee": fee_info["fee_amount"],
-        "total_deducted": total_cost,
+        "net_amount": net_amount,
+        "total_deducted": total_deducted,
+        "transaction_id": transaction_id,
         "status": "pending",
+        "provider": "hubtel",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.service_transactions.insert_one(withdrawal_tx)
     
-    # Debit cashback first
-    debit_result = await debit_cashback(
-        current_client["id"],
-        total_cost,
-        f"MoMo withdrawal: GHS {request.amount} to {request.phone}",
-        "withdrawal"
+    # Call Hubtel Send Money API
+    hubtel_service = get_hubtel_momo_service(db)
+    result = await hubtel_service.send_momo(
+        phone=request.phone,
+        amount=net_amount,  # Send net amount after fee
+        description="SDM Rewards Cashback Withdrawal",
+        client_reference=transaction_id,
+        recipient_name=client_record.get("full_name", "SDM Client")
     )
     
-    # TODO: Call BulkClix disbursement API
-    # For now, mark as processing
-    
-    # If BulkClix API is available, send money
-    if BULKCLIX_API_KEY:
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                # Format phone
-                bulkclix_phone = request.phone
-                if request.phone.startswith("+233"):
-                    bulkclix_phone = "0" + request.phone[4:]
-                elif request.phone.startswith("233"):
-                    bulkclix_phone = "0" + request.phone[3:]
-                
-                response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json={
-                        "amount": request.amount,
-                        "phone_number": bulkclix_phone,
-                        "network": request.network.upper(),
-                        "reference": f"SDM-WD-{withdrawal_tx['id'][:8]}",
-                        "description": "SDM Rewards Cashback Withdrawal"
-                    },
-                    timeout=30.0
-                )
-                
-                logger.info(f"Withdrawal API response: {response.status_code} - {response.text[:300] if response.text else 'EMPTY'}")
-                
-                if response.status_code == 200:
-                    await db.service_transactions.update_one(
-                        {"id": withdrawal_tx["id"]},
-                        {"$set": {"status": "processing", "updated_at": datetime.now(timezone.utc).isoformat()}}
-                    )
-        except Exception as e:
-            logger.error(f"Withdrawal API error: {e}")
-            # Keep as pending, manual review needed
-    
-    return {
-        "success": True,
-        "message": f"Withdrawal of GHS {request.amount:.2f} to {request.phone} initiated",
-        "transaction_id": withdrawal_tx["id"],
-        "amount": request.amount,
-        "fee": fee_info["fee_amount"],
-        "total_deducted": total_cost,
-        "new_balance": debit_result["balance_after"],
-        "status": "processing"
-    }
+    if result.get("success"):
+        # Deduct balance
+        await db.clients.update_one(
+            {"id": current_client["id"]},
+            {"$inc": {"cashback_balance": -total_deducted}}
+        )
+        
+        # Update transaction as processing
+        await db.service_transactions.update_one(
+            {"id": withdrawal_tx["id"]},
+            {"$set": {
+                "status": "processing",
+                "provider_reference": result.get("transaction_id"),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": f"Withdrawal of GHS {net_amount:.2f} to {request.phone} initiated",
+            "transaction_id": transaction_id,
+            "provider_reference": result.get("transaction_id"),
+            "amount": request.amount,
+            "fee": fee_info["fee_amount"],
+            "net_amount": net_amount,
+            "total_deducted": total_deducted,
+            "new_balance": balance - total_deducted,
+            "status": "processing"
+        }
+    else:
+        # Update transaction as failed
+        await db.service_transactions.update_one(
+            {"id": withdrawal_tx["id"]},
+            {"$set": {
+                "status": "failed",
+                "error": result.get("error"),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Withdrawal failed. Please try again.")
+        )
 
 
 @router.get("/history")

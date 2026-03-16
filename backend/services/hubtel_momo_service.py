@@ -441,7 +441,9 @@ class HubtelMoMoService:
         Send/transfer money to a MoMo wallet (disbursement)
         Used for merchant payouts, cashback withdrawals, etc.
         
-        API: POST https://rmp.hubtel.com/merchantaccount/merchants/{POS_ID}/send/mobilemoney
+        API: POST https://smp.hubtel.com/merchantaccount/merchants/{PREPAID_ID}/send/mobilemoney
+        
+        Uses curl subprocess to avoid HTTP library issues with Hubtel API.
         """
         normalized_phone = self._normalize_phone(phone)
         network = self._detect_network(phone)
@@ -488,84 +490,118 @@ class HubtelMoMoService:
         payload = {
             "RecipientMsisdn": normalized_phone,
             "Amount": amount,
-            "Channel": network,  # mtn-gh, vodafone-gh, tigo-gh
+            "Channel": network,
             "PrimaryCallbackUrl": callback_url,
             "Description": description,
             "ClientReference": client_reference,
             "RecipientName": recipient_name or "SDM Client"
         }
         
-        try:
-            # Use SMP endpoint with Prepaid Deposit ID for Send Money
-            url = f"{HUBTEL_SEND_BASE_URL}/{self.prepaid_deposit_id}/send/mobilemoney"
+        # Use SMP endpoint with Prepaid Deposit ID for Send Money
+        url = f"{HUBTEL_SEND_BASE_URL}/{self.prepaid_deposit_id}/send/mobilemoney"
+        
+        # Use curl subprocess like collect_momo to avoid HTTP library issues
+        import subprocess
+        import json as json_module
+        import asyncio
+        
+        auth_header = self._get_auth_header()
+        payload_json = json_module.dumps(payload)
+        
+        curl_cmd = [
+            "curl", "-s", "-X", "POST", url,
+            "--http1.1",
+            "--ignore-content-length",
+            "-H", "Content-Type: application/json",
+            "-H", f"Authorization: {auth_header}",
+            "-H", "Connection: close",
+            "-d", payload_json,
+            "--max-time", "30",
+            "-w", "\n---HTTP_CODE:%{http_code}---"
+        ]
+        
+        def _make_request_via_curl(cmd):
+            import os as os_module
+            tmp_path = "/tmp/hubtel_send_response.json"
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": self._get_auth_header()
-                    },
-                    json=payload,
-                    timeout=30.0
-                )
+            try:
+                file_cmd = cmd[:-2] + ["-o", tmp_path, "-w", "%{http_code}"]
+                result = subprocess.run(file_cmd, capture_output=True, text=True, timeout=35)
+                http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
                 
-                try:
-                    result = response.json()
-                except Exception:
-                    result = {"raw": response.text, "status_code": response.status_code}
+                body = ""
+                if os_module.path.exists(tmp_path):
+                    with open(tmp_path, 'r') as f:
+                        body = f.read()
                 
-                logger.info(f"Hubtel MoMo Transfer response: {result}")
+                return {"body": body, "http_code": http_code, "stderr": result.stderr}
+            except Exception as e:
+                logger.error(f"Curl error: {e}")
+                return {"body": "", "http_code": 0, "stderr": str(e)}
+        
+        try:
+            response_data = await asyncio.to_thread(_make_request_via_curl, curl_cmd)
+            response_status_code = response_data["http_code"]
+            
+            try:
+                result = json_module.loads(response_data["body"]) if response_data["body"] else {}
+            except Exception:
+                result = {"raw": response_data["body"], "status_code": response_status_code}
+            
+            logger.info(f"Hubtel MoMo Transfer: status={response_status_code}, response={result}")
+            
+            response_code = result.get("ResponseCode", result.get("responseCode", ""))
+            is_success = response_status_code in [200, 201] and response_code in ["0000", "0001"]
+            
+            if is_success:
+                data = result.get("Data", result.get("data", {}))
+                transaction_id = data.get("TransactionId", data.get("transactionId", ""))
                 
-                # Check for success
-                response_code = result.get("ResponseCode", result.get("responseCode", ""))
-                is_success = response.status_code in [200, 201] and response_code in ["0000", "0001"]
+                if self.db is not None:
+                    await self.db.hubtel_payments.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {
+                            "status": "processing",
+                            "hubtel_transaction_id": transaction_id,
+                            "hubtel_response": result
+                        }}
+                    )
                 
-                if is_success:
-                    data = result.get("Data", result.get("data", {}))
-                    transaction_id = data.get("TransactionId", data.get("transactionId", ""))
-                    
-                    if self.db is not None:
-                        await self.db.hubtel_payments.update_one(
-                            {"client_reference": client_reference},
-                            {"$set": {
-                                "status": "processing",
-                                "hubtel_transaction_id": transaction_id,
-                                "hubtel_response": result
-                            }}
-                        )
-                    
-                    return {
-                        "success": True,
-                        "transaction_id": transaction_id,
-                        "client_reference": client_reference,
-                        "message": "Transfer initiated successfully"
-                    }
-                else:
-                    error_msg = result.get("Message", result.get("message", f"Transfer failed: {response.status_code}"))
-                    
-                    # Check for specific error codes
-                    if response_code == "4075":
-                        error_msg = "Insufficient balance in Hubtel account"
-                    elif response_code == "4105":
-                        error_msg = "Account number mismatch"
-                    
-                    if self.db is not None:
-                        await self.db.hubtel_payments.update_one(
-                            {"client_reference": client_reference},
-                            {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
-                        )
-                    
-                    return {"success": False, "error": error_msg}
-                    
+                return {
+                    "success": True,
+                    "transaction_id": transaction_id,
+                    "client_reference": client_reference,
+                    "message": "Transfer initiated successfully"
+                }
+            else:
+                error_msg = result.get("Message", result.get("message", f"Transfer failed: {response_status_code}"))
+                
+                # Check for specific error codes
+                if response_code == "4075":
+                    error_msg = "Insufficient balance in Hubtel account"
+                elif response_code == "4105":
+                    error_msg = "Invalid recipient phone number"
+                elif response_status_code == 403:
+                    error_msg = "Access denied. IP may not be whitelisted for Send Money API."
+                
+                if self.db is not None:
+                    await self.db.hubtel_payments.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
+                    )
+                
+                return {"success": False, "error": error_msg}
+                
         except Exception as e:
+            error_str = str(e)
             logger.error(f"Hubtel MoMo Transfer error: {e}")
+            
             if self.db is not None:
                 await self.db.hubtel_payments.update_one(
                     {"client_reference": client_reference},
-                    {"$set": {"status": "error", "error": str(e)}}
+                    {"$set": {"status": "error", "error": error_str}}
                 )
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_str}
     
     # ============== CALLBACK HANDLERS ==============
     

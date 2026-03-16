@@ -1583,24 +1583,23 @@ async def topup_debit_account(
     
     await db.payments.insert_one(payment)
     
-    # Initiate MoMo collection via BulkClix
+    # Initiate MoMo collection via Hubtel
     try:
-        from services.bulkclix_service import get_bulkclix_service
-        bulkclix = get_bulkclix_service()
+        from services.hubtel_momo_service import get_hubtel_momo_service
+        hubtel_service = get_hubtel_momo_service(db)
         
-        momo_result = await bulkclix.collect_momo(
+        momo_result = await hubtel_service.collect_momo(
             phone=request.momo_phone,
             amount=request.amount,
-            network=request.momo_network,
-            reference=f"TOPUP-{payment_id}",
-            description="SDM Debit Account Top-up"
+            description="SDM Debit Account Top-up",
+            client_reference=f"TOPUP-{payment_id}"
         )
         
         if momo_result.get("success"):
             await db.payments.update_one(
                 {"id": payment_id},
                 {"$set": {
-                    "provider_reference": momo_result.get("reference"),
+                    "provider_reference": momo_result.get("transaction_id"),
                     "status": "processing"
                 }}
             )
@@ -2821,7 +2820,7 @@ async def download_monthly_statement(
     
     # Header
     writer.writerow([
-        f"SDM REWARDS - Monthly Statement",
+        "SDM REWARDS - Monthly Statement",
         f"{merchant.get('business_name', 'Merchant')}",
         f"{start_date.strftime('%B %Y')}"
     ])

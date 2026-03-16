@@ -1,40 +1,29 @@
 """
 SDM Services Module
 ===================
-Provides Airtime, Data, Bill Payment, MoMo Withdrawal, and Payment services
+Provides Airtime, Data, Bill Payment, MoMo services via Hubtel
 """
 
-from .bulkclix_service import (
-    BulkClixService,
-    ServiceTransaction,
-    ServiceType,
-    TransactionStatus,
-    NetworkProvider,
-    BillProvider,
-    DataBundle,
-    DATA_BUNDLES,
-    detect_network
+from .hubtel_momo_service import (
+    HubtelMoMoService,
+    get_hubtel_momo_service
 )
 
-from .bulkclix_payment import (
-    BulkClixPaymentService,
-    bulkclix_payment_service,
-    MoMoNetwork,
-    PaymentStatus
+from .hubtel_vas_service import (
+    HubtelVASService,
+    get_hubtel_vas_service
+)
+
+from .hubtel_checkout_service import (
+    HubtelOnlineCheckoutService,
+    get_hubtel_checkout_service
 )
 
 __all__ = [
-    "BulkClixService",
-    "ServiceTransaction",
-    "ServiceType",
-    "TransactionStatus",
-    "NetworkProvider",
-    "BillProvider",
-    "DataBundle",
-    "DATA_BUNDLES",
-    "detect_network",
-    "BulkClixPaymentService",
-    "bulkclix_payment_service",
-    "MoMoNetwork",
-    "PaymentStatus"
+    "HubtelMoMoService",
+    "get_hubtel_momo_service",
+    "HubtelVASService", 
+    "get_hubtel_vas_service",
+    "HubtelOnlineCheckoutService",
+    "get_hubtel_checkout_service"
 ]
