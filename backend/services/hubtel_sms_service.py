@@ -2,8 +2,12 @@
 SDM REWARDS - Hubtel SMS Service
 ================================
 Sends SMS notifications via Hubtel SMS API
-API: https://smsc.hubtel.com/v1/messages/send
-Documentation: https://developers.hubtel.com/docs/business/api_documentation/lending_apis/sms
+API Documentation: https://developers.hubtel.com
+
+Endpoints:
+- Single SMS: POST https://sms.hubtel.com/v1/messages/send
+- Batch SMS: POST https://sms.hubtel.com/v1/messages/batch/simple/send
+- Status Check: GET https://sms.hubtel.com/v1/messages/{messageId}
 """
 
 import os
@@ -20,7 +24,7 @@ logger = logging.getLogger(__name__)
 HUBTEL_SMS_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
 HUBTEL_SMS_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 HUBTEL_SMS_SENDER_ID = os.environ.get("HUBTEL_SMS_SENDER_ID", "SDMRewards")
-HUBTEL_SMS_BASE_URL = "https://smsc.hubtel.com/v1/messages"
+HUBTEL_SMS_BASE_URL = "https://sms.hubtel.com/v1/messages"
 SMS_TEST_MODE = os.environ.get("SMS_TEST_MODE", "false").lower() == "true"
 
 
@@ -47,7 +51,6 @@ class HubtelSMSService:
     def _format_phone_international(self, phone: str) -> str:
         """
         Format phone number to international format (+233XXXXXXXXX)
-        Hubtel expects international format
         """
         phone = phone.replace(" ", "").replace("-", "")
         
@@ -66,22 +69,38 @@ class HubtelSMSService:
         # Just the number without country code
         return f"+233{phone}"
     
+    def _format_phone_local(self, phone: str) -> str:
+        """
+        Format phone number to local Ghana format (0XXXXXXXXX)
+        Hubtel SMS API expects local format
+        """
+        phone = phone.replace(" ", "").replace("-", "").replace("+", "")
+        
+        # Remove country code if present
+        if phone.startswith("233"):
+            phone = "0" + phone[3:]
+        elif not phone.startswith("0"):
+            phone = "0" + phone
+        
+        return phone
+    
     async def send_sms(self, phone: str, message: str, sms_type: str = "notification") -> Dict:
         """
         Send SMS via Hubtel API
         
-        API Endpoint: POST https://smsc.hubtel.com/v1/messages/send
+        API Endpoint: POST https://sms.hubtel.com/v1/messages/send
         Headers:
             - Content-Type: application/json
             - Authorization: Basic base64(ClientId:ClientSecret)
         Body:
             - From: Sender ID (e.g., "SDMRewards")
-            - To: Phone number (+233XXXXXXXXX)
+            - To: Phone number (0XXXXXXXXX local format)
             - Content: Message text
         
         Returns: {"success": bool, "message_id": str, "error": str}
         """
-        formatted_phone = self._format_phone_international(phone)
+        # Hubtel SMS accepts local format (0XXXXXXXXX)
+        formatted_phone = self._format_phone_local(phone)
         
         # Create SMS record for logging
         sms_record = {
@@ -143,18 +162,17 @@ class HubtelSMSService:
                 except:
                     result = {"raw_response": response.text}
                 
-                logger.info(f"Hubtel SMS response for {formatted_phone}: {result}")
+                logger.info(f"Hubtel SMS response for {formatted_phone}: status={response.status_code}, result={result}")
                 
-                # Check for success
-                # Hubtel returns status 0 for success
+                # Check for success - Hubtel returns status 0 for success
+                status_code = result.get("status", result.get("Status", -1))
                 is_success = (
                     response.status_code in [200, 201] and
-                    (result.get("Status") == 0 or result.get("status") == 0 or
-                     str(result.get("MessageId", "")) != "")
+                    status_code == 0
                 )
                 
                 if is_success:
-                    message_id = result.get("MessageId", result.get("messageId", sms_record["id"]))
+                    message_id = result.get("messageId", result.get("MessageId", sms_record["id"]))
                     if self.db is not None:
                         await self.db.sms_logs.update_one(
                             {"id": sms_record["id"]},
@@ -172,7 +190,7 @@ class HubtelSMSService:
                         "message_id": message_id
                     }
                 else:
-                    error = result.get("Message", result.get("message", f"HTTP {response.status_code}"))
+                    error = result.get("statusDescription", result.get("Message", f"HTTP {response.status_code} - Status {status_code}"))
                     logger.error(f"Hubtel SMS failed: {error} | Full response: {result}")
                     if self.db is not None:
                         await self.db.sms_logs.update_one(
@@ -193,15 +211,15 @@ class HubtelSMSService:
     
     async def send_bulk_sms(self, phones: List[str], message: str, sms_type: str = "bulk") -> Dict:
         """
-        Send SMS to multiple recipients
-        Hubtel doesn't have a native bulk endpoint, so we send individually
-        but batch the requests for efficiency
+        Send SMS to multiple recipients using Hubtel Batch API
         
-        Returns: {"success": bool, "sent": int, "failed": int, "message_ids": list}
+        API Endpoint: POST https://sms.hubtel.com/v1/messages/batch/simple/send
+        
+        Returns: {"success": bool, "sent": int, "failed": int, "batch_id": str}
         """
-        # Format and deduplicate phone numbers
+        # Format and deduplicate phone numbers (local format)
         formatted_phones = list(set([
-            self._format_phone_international(p) for p in phones if p
+            self._format_phone_local(p) for p in phones if p
         ]))
         
         if not formatted_phones:
@@ -243,14 +261,77 @@ class HubtelSMSService:
                 )
             return {"success": False, "error": error, "sent": 0, "failed": len(formatted_phones)}
         
-        # Send SMS to each recipient
+        # Use Hubtel Batch API for bulk sending
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/batch/simple/send",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": self._get_auth_header()
+                    },
+                    json={
+                        "From": self.sender_id,
+                        "To": formatted_phones,
+                        "Content": message
+                    },
+                    timeout=60.0
+                )
+                
+                try:
+                    result = response.json()
+                except:
+                    result = {"raw_response": response.text}
+                
+                logger.info(f"Hubtel Batch SMS response: status={response.status_code}, result={result}")
+                
+                # Check for success
+                status_code = result.get("status", result.get("Status", -1))
+                is_success = response.status_code in [200, 201] and status_code == 0
+                
+                if is_success:
+                    batch_id = result.get("batchId", result.get("BatchId", bulk_record["id"]))
+                    if self.db is not None:
+                        await self.db.bulk_sms_logs.update_one(
+                            {"id": bulk_record["id"]},
+                            {
+                                "$set": {
+                                    "status": "sent",
+                                    "batch_id": batch_id,
+                                    "provider_response": result,
+                                    "sent_at": datetime.now(timezone.utc).isoformat()
+                                }
+                            }
+                        )
+                    return {
+                        "success": True,
+                        "sent": len(formatted_phones),
+                        "failed": 0,
+                        "batch_id": batch_id,
+                        "bulk_id": bulk_record["id"]
+                    }
+                else:
+                    error = result.get("statusDescription", result.get("Message", f"HTTP {response.status_code}"))
+                    
+                    # If batch fails, try individual sends as fallback
+                    logger.warning(f"Batch SMS failed ({error}), falling back to individual sends...")
+                    return await self._send_bulk_individual(formatted_phones, message, bulk_record)
+                    
+        except Exception as e:
+            error = str(e)
+            logger.error(f"Hubtel Batch SMS exception: {error}")
+            # Fallback to individual sends
+            return await self._send_bulk_individual(formatted_phones, message, bulk_record)
+    
+    async def _send_bulk_individual(self, phones: List[str], message: str, bulk_record: dict) -> Dict:
+        """Fallback: Send SMS individually when batch API fails"""
         sent_count = 0
         failed_count = 0
         message_ids = []
         errors = []
         
         async with httpx.AsyncClient() as client:
-            for phone in formatted_phones:
+            for phone in phones:
                 try:
                     response = await client.post(
                         f"{self.base_url}/send",
@@ -271,17 +352,15 @@ class HubtelSMSService:
                     except:
                         result = {}
                     
-                    is_success = (
-                        response.status_code in [200, 201] and
-                        (result.get("Status") == 0 or str(result.get("MessageId", "")) != "")
-                    )
+                    status_code = result.get("status", -1)
+                    is_success = response.status_code in [200, 201] and status_code == 0
                     
                     if is_success:
                         sent_count += 1
-                        message_ids.append(result.get("MessageId", ""))
+                        message_ids.append(result.get("messageId", ""))
                     else:
                         failed_count += 1
-                        errors.append(f"{phone}: {result.get('Message', 'Failed')}")
+                        errors.append(f"{phone}: {result.get('statusDescription', 'Failed')}")
                         
                 except Exception as e:
                     failed_count += 1
@@ -298,7 +377,7 @@ class HubtelSMSService:
                         "sent_count": sent_count,
                         "failed_count": failed_count,
                         "message_ids": message_ids,
-                        "errors": errors[:10],  # Keep only first 10 errors
+                        "errors": errors[:10],
                         "sent_at": datetime.now(timezone.utc).isoformat()
                     }
                 }
