@@ -45,6 +45,8 @@ db = client[DB_NAME]
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
+    import asyncio
+    
     # Startup
     logger.info("🚀 SDM REWARDS Server Starting...")
     logger.info(f"📦 Database: {DB_NAME}")
@@ -61,10 +63,20 @@ async def lifespan(app: FastAPI):
     # Initialize Settings PIN
     await init_settings_pin()
     
+    # Start scheduled SMS worker
+    from services.scheduled_sms_processor import start_scheduled_sms_worker
+    sms_worker_task = asyncio.create_task(start_scheduled_sms_worker())
+    logger.info("📬 Scheduled SMS worker started")
+    
     yield
     
     # Shutdown
     logger.info("🛑 SDM REWARDS Server Shutting Down...")
+    sms_worker_task.cancel()
+    try:
+        await sms_worker_task
+    except asyncio.CancelledError:
+        pass
     client.close()
 
 # ============== CREATE APP ==============

@@ -7,7 +7,8 @@ import { Label } from '../../ui/label';
 import { 
   MessageSquare, Bell, Send, Loader2, Users, Store,
   RefreshCw, History, Clock, Mail, User, AtSign, 
-  Sparkles, Eye, ChevronDown, ChevronUp, Trash2, Plus, Search
+  Sparkles, Eye, ChevronDown, ChevronUp, Trash2, Plus, Search,
+  Calendar, Timer, X
 } from 'lucide-react';
 
 // API URL imported from config
@@ -46,6 +47,13 @@ export default function SettingsSMS({ token }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  
+  // Scheduling states
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [scheduledSMSList, setScheduledSMSList] = useState([]);
+  const [showScheduledList, setShowScheduledList] = useState(false);
 
   // Predefined SMS Templates
   const SMS_TEMPLATES = [
@@ -129,6 +137,7 @@ export default function SettingsSMS({ token }) {
     fetchSMSHistory();
     fetchPushStats();
     fetchEmailHistory();
+    fetchScheduledSMS();
   }, []);
 
   useEffect(() => {
@@ -162,6 +171,46 @@ export default function SettingsSMS({ token }) {
     } catch (error) {
       console.error('Error fetching email history:', error);
     }
+  };
+
+  // Fetch scheduled personalized SMS
+  const fetchScheduledSMS = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/admin/sms/scheduled/personalized`, { headers });
+      setScheduledSMSList(res.data.scheduled || []);
+    } catch (error) {
+      console.error('Error fetching scheduled SMS:', error);
+    }
+  };
+
+  // Cancel a scheduled SMS
+  const cancelScheduledSMS = async (scheduleId) => {
+    try {
+      await axios.delete(`${API_URL}/api/admin/sms/scheduled/personalized/${scheduleId}`, { headers });
+      toast.success('SMS programmé annulé');
+      fetchScheduledSMS();
+    } catch (error) {
+      toast.error('Erreur lors de l\'annulation');
+    }
+  };
+
+  // Get minimum datetime for scheduling (now + 5 minutes)
+  const getMinDateTime = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 5);
+    return now.toISOString().slice(0, 16);
+  };
+
+  // Format scheduled datetime for display
+  const formatScheduledDateTime = (isoString) => {
+    const date = new Date(isoString);
+    return date.toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const fetchRecipientCount = async () => {
@@ -275,32 +324,79 @@ export default function SettingsSMS({ token }) {
       return;
     }
 
+    // Validate scheduling if enabled
+    if (isScheduled) {
+      if (!scheduledDate || !scheduledTime) {
+        toast.error('Veuillez sélectionner une date et heure pour la programmation');
+        return;
+      }
+      
+      const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      const now = new Date();
+      if (scheduledDateTime <= now) {
+        toast.error('La date programmée doit être dans le futur');
+        return;
+      }
+    }
+
     // Build recipients array with personalized messages
     const recipients = selectedRecipients.map(r => ({
       phone: r.phone,
-      message: applyTemplate(personalizedTemplate, r)
+      message: applyTemplate(personalizedTemplate, r),
+      recipient_name: r.name,
+      recipient_id: r.id
     }));
 
     try {
       setIsLoading(true);
-      const res = await axios.post(`${API_URL}/api/admin/sms/bulk/personalized`, {
-        recipients
-      }, { headers });
       
-      if (res.data.success) {
-        toast.success(`${res.data.sent} SMS personnalisés envoyés avec succès!`);
-        setShowPersonalizedModal(false);
-        setPersonalizedTemplate('');
-        setSelectedRecipients([]);
-        fetchSMSHistory();
+      if (isScheduled) {
+        // Schedule the SMS for later
+        const scheduledAt = `${scheduledDate}T${scheduledTime}:00`;
+        const res = await axios.post(`${API_URL}/api/admin/sms/schedule/personalized`, {
+          recipients,
+          scheduled_at: scheduledAt,
+          template_name: SMS_TEMPLATES.find(t => t.id === selectedTemplateId)?.name || 'Custom'
+        }, { headers });
+        
+        if (res.data.success) {
+          toast.success(`SMS programmé pour ${formatScheduledDateTime(scheduledAt)}`);
+          setShowPersonalizedModal(false);
+          resetPersonalizedForm();
+          fetchScheduledSMS();
+        } else {
+          toast.error(res.data.error || 'Échec de la programmation');
+        }
       } else {
-        toast.error(res.data.error || 'Échec de l\'envoi');
+        // Send immediately
+        const res = await axios.post(`${API_URL}/api/admin/sms/bulk/personalized`, {
+          recipients
+        }, { headers });
+        
+        if (res.data.success) {
+          toast.success(`${res.data.sent} SMS personnalisés envoyés avec succès!`);
+          setShowPersonalizedModal(false);
+          resetPersonalizedForm();
+          fetchSMSHistory();
+        } else {
+          toast.error(res.data.error || 'Échec de l\'envoi');
+        }
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'opération');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Reset personalized SMS form
+  const resetPersonalizedForm = () => {
+    setPersonalizedTemplate('');
+    setSelectedRecipients([]);
+    setSelectedTemplateId('');
+    setIsScheduled(false);
+    setScheduledDate('');
+    setScheduledTime('');
   };
 
   // Toggle recipient selection
@@ -530,6 +626,64 @@ export default function SettingsSMS({ token }) {
           >
             <AtSign size={16} className="mr-2" /> Send Individual
           </Button>
+        </div>
+      </div>
+
+      {/* Scheduled SMS Section */}
+      <div className="bg-gradient-to-r from-slate-800 to-amber-900/20 border border-amber-500/30 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Timer size={20} className="text-amber-400" /> SMS Programmés
+            {scheduledSMSList.length > 0 && (
+              <span className="bg-amber-500 text-black text-xs px-2 py-0.5 rounded-full font-bold">
+                {scheduledSMSList.length}
+              </span>
+            )}
+          </h3>
+          <Button onClick={fetchScheduledSMS} variant="outline" size="sm" className="border-amber-600/50 text-amber-400 hover:bg-amber-900/30">
+            <RefreshCw size={14} className="mr-1" /> Actualiser
+          </Button>
+        </div>
+        
+        <div className="space-y-3">
+          {scheduledSMSList.length > 0 ? (
+            scheduledSMSList.map((scheduled) => (
+              <div key={scheduled.id} className="bg-slate-900/80 rounded-lg p-4 border border-slate-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-amber-400 font-medium">{scheduled.template_name || 'Custom'}</span>
+                    <span className="text-slate-500 text-xs">
+                      {scheduled.recipient_count} destinataire{scheduled.recipient_count > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-1 rounded flex items-center gap-1">
+                      <Calendar size={12} />
+                      {formatScheduledDateTime(scheduled.scheduled_at)}
+                    </span>
+                    <Button 
+                      onClick={() => cancelScheduledSMS(scheduled.id)}
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-1"
+                      title="Annuler"
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-slate-400 text-sm truncate">
+                  {scheduled.preview_message || 'Message personnalisé...'}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <Timer size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Aucun SMS programmé</p>
+              <p className="text-xs mt-1">Utilisez "SMS Personnalisés" avec l'option "Programmer l'envoi"</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1073,13 +1227,56 @@ export default function SettingsSMS({ token }) {
               </div>
             </div>
 
+            {/* Scheduling Section */}
+            <div className="mt-4 pt-4 border-t border-slate-700">
+              <div className="flex items-center gap-4 mb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isScheduled}
+                    onChange={(e) => setIsScheduled(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-slate-300 flex items-center gap-2">
+                    <Timer size={16} className="text-amber-400" />
+                    Programmer l'envoi
+                  </span>
+                </label>
+                
+                {isScheduled && (
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={16} className="text-slate-500" />
+                      <input
+                        type="date"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-md text-white text-sm"
+                        data-testid="schedule-date-input"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock size={16} className="text-slate-500" />
+                      <input
+                        type="time"
+                        value={scheduledTime}
+                        onChange={(e) => setScheduledTime(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-md text-white text-sm"
+                        data-testid="schedule-time-input"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Action Buttons */}
-            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700">
+            <div className="flex gap-3 mt-4 pt-4 border-t border-slate-700">
               <Button
                 onClick={() => {
                   setShowPersonalizedModal(false);
-                  setSelectedRecipients([]);
-                  setPersonalizedTemplate('');
+                  resetPersonalizedForm();
                 }}
                 variant="outline"
                 className="flex-1 border-slate-700 text-slate-300"
@@ -1088,16 +1285,18 @@ export default function SettingsSMS({ token }) {
               </Button>
               <Button
                 onClick={handleSendPersonalizedSMS}
-                disabled={isLoading || selectedRecipients.length === 0 || !personalizedTemplate.trim()}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                disabled={isLoading || selectedRecipients.length === 0 || !personalizedTemplate.trim() || (isScheduled && (!scheduledDate || !scheduledTime))}
+                className={`flex-1 ${isScheduled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'} disabled:opacity-50`}
                 data-testid="send-personalized-sms-btn"
               >
                 {isLoading ? (
                   <Loader2 className="animate-spin mr-2" size={16} />
+                ) : isScheduled ? (
+                  <Timer className="mr-2" size={16} />
                 ) : (
                   <Send className="mr-2" size={16} />
                 )}
-                Envoyer {selectedRecipients.length} SMS
+                {isScheduled ? `Programmer ${selectedRecipients.length} SMS` : `Envoyer ${selectedRecipients.length} SMS`}
               </Button>
             </div>
           </div>

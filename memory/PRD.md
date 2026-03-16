@@ -55,6 +55,11 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - 🎉 Nouvelle Promotion | ⚠️ Expiration Carte | 🌟 Bonus Bienvenue
   - 🤝 Parrainage Réussi | ⬆️ Invitation Upgrade | 🏪 Promo Marchand
   - ❤️ Remerciement | 🎄 Fêtes/Nouvel An | ✏️ Message Personnalisé
+- ✅ **Programmation d'envoi SMS** - Fonctionnalité de scheduling complète
+  - Option "Programmer l'envoi" avec sélection date/heure
+  - Worker de fond qui traite les SMS programmés toutes les 60 secondes
+  - Section "SMS Programmés" avec liste, détails et bouton d'annulation
+  - Endpoints: `POST /api/admin/sms/schedule/personalized`, `GET /scheduled/personalized`, `DELETE /{id}`
 
 ### 2026-03-16 (Session 2)
 - ✅ **Règles de paiement corrigées** - Airtime/Data/ECG: cashback only | Upgrade carte: cashback/MoMo/hybride

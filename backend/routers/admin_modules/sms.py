@@ -49,11 +49,20 @@ class PersonalizedRecipient(BaseModel):
     """A single personalized SMS recipient"""
     phone: str
     message: str
+    recipient_name: Optional[str] = None
+    recipient_id: Optional[str] = None
 
 
 class PersonalizedBulkSMSRequest(BaseModel):
     """Request model for personalized bulk SMS"""
     recipients: List[PersonalizedRecipient]
+
+
+class ScheduledPersonalizedSMSRequest(BaseModel):
+    """Request model for scheduling personalized bulk SMS"""
+    recipients: List[PersonalizedRecipient]
+    scheduled_at: str  # ISO datetime string
+    template_name: Optional[str] = "Custom"
 
 
 # ============== INDIVIDUAL SMS ==============
@@ -368,6 +377,142 @@ async def send_personalized_bulk_sms(
         "error": result.get("error"),
         "errors": result.get("errors")
     }
+
+
+# ============== SCHEDULED SMS ==============
+
+@router.post("/sms/schedule/personalized")
+async def schedule_personalized_sms(
+    request: ScheduledPersonalizedSMSRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Schedule personalized SMS for later delivery.
+    
+    The SMS will be sent at the specified scheduled_at datetime.
+    A background job will process scheduled SMS every minute.
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    if not request.recipients:
+        raise HTTPException(status_code=400, detail="At least one recipient is required")
+    
+    if len(request.recipients) > 10000:
+        raise HTTPException(status_code=400, detail="Maximum 10,000 recipients per request")
+    
+    # Parse scheduled datetime
+    try:
+        scheduled_datetime = datetime.fromisoformat(request.scheduled_at.replace('Z', '+00:00'))
+        if scheduled_datetime.tzinfo is None:
+            scheduled_datetime = scheduled_datetime.replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid datetime format. Use ISO format.")
+    
+    # Ensure scheduled time is in the future
+    now = datetime.now(timezone.utc)
+    if scheduled_datetime <= now:
+        raise HTTPException(status_code=400, detail="Scheduled time must be in the future")
+    
+    # Build recipients data
+    recipients_data = [
+        {
+            "phone": r.phone,
+            "message": r.message,
+            "recipient_name": r.recipient_name,
+            "recipient_id": r.recipient_id
+        }
+        for r in request.recipients
+        if r.phone and r.message
+    ]
+    
+    if not recipients_data:
+        raise HTTPException(status_code=400, detail="No valid recipients after validation")
+    
+    # Create scheduled SMS record
+    schedule_id = str(uuid.uuid4())
+    scheduled_sms = {
+        "id": schedule_id,
+        "type": "personalized",
+        "recipients": recipients_data,
+        "recipient_count": len(recipients_data),
+        "template_name": request.template_name or "Custom",
+        "preview_message": recipients_data[0]["message"][:100] if recipients_data else "",
+        "scheduled_at": scheduled_datetime.isoformat(),
+        "status": "pending",
+        "created_by": current_admin["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.scheduled_sms.insert_one(scheduled_sms)
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "schedule_personalized_sms",
+        "schedule_id": schedule_id,
+        "recipient_count": len(recipients_data),
+        "scheduled_at": scheduled_datetime.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {
+        "success": True,
+        "schedule_id": schedule_id,
+        "recipient_count": len(recipients_data),
+        "scheduled_at": scheduled_datetime.isoformat(),
+        "message": f"SMS scheduled for {scheduled_datetime.strftime('%Y-%m-%d %H:%M')}"
+    }
+
+
+@router.get("/sms/scheduled/personalized")
+async def get_scheduled_personalized_sms(
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get all pending scheduled personalized SMS.
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    scheduled = await db.scheduled_sms.find(
+        {"type": "personalized", "status": "pending"},
+        {"_id": 0}
+    ).sort("scheduled_at", 1).to_list(100)
+    
+    return {"scheduled": scheduled}
+
+
+@router.delete("/sms/scheduled/personalized/{schedule_id}")
+async def cancel_scheduled_sms(
+    schedule_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Cancel a scheduled SMS.
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    result = await db.scheduled_sms.delete_one({
+        "id": schedule_id,
+        "status": "pending"
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Scheduled SMS not found or already processed")
+    
+    # Log the action
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "cancel_scheduled_sms",
+        "schedule_id": schedule_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    return {"success": True, "message": "Scheduled SMS cancelled"}
 
 
 # ============== SMS BY CATEGORY ==============
