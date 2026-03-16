@@ -20,10 +20,10 @@ from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
 
-# Hubtel SMS Configuration
-HUBTEL_SMS_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
-HUBTEL_SMS_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
-HUBTEL_SMS_SENDER_ID = os.environ.get("HUBTEL_SMS_SENDER_ID", "SDMRewards")
+# Hubtel SMS Configuration (separate credentials from payment API)
+HUBTEL_SMS_CLIENT_ID = os.environ.get("HUBTEL_SMS_CLIENT_ID", "")
+HUBTEL_SMS_CLIENT_SECRET = os.environ.get("HUBTEL_SMS_CLIENT_SECRET", "")
+HUBTEL_SMS_SENDER_ID = os.environ.get("HUBTEL_SMS_SENDER_ID", "SDMREWARDS")
 HUBTEL_SMS_BASE_URL = "https://sms.hubtel.com/v1/messages"
 SMS_TEST_MODE = os.environ.get("SMS_TEST_MODE", "false").lower() == "true"
 

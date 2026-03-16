@@ -2,6 +2,34 @@
 
 ## Changelog (Latest First)
 
+### 2026-03-16 - Hubtel SMS Integration (COMPLETED)
+
+**Hubtel SMS API Integration - TESTED ✅**
+- Replaced BulkClix SMS service with Hubtel SMS API
+- API Endpoint: `https://sms.hubtel.com/v1/messages/send`
+- Batch Endpoint: `https://sms.hubtel.com/v1/messages/batch/simple/send`
+- Authentication: Basic Auth with separate SMS credentials
+- **SMS Credentials (separate from payment):**
+  - SMS Client ID: azcxpsni
+  - SMS Client Secret: xslvwakk
+  - Sender ID: SDMREWARDS
+- **Admin SMS Endpoints:**
+  - `GET /api/admin/sms/stats`: SMS statistics
+  - `POST /api/admin/sms/send`: Send to individual user
+  - `POST /api/admin/sms/category/{category}`: Send to card category (silver/gold/platinum)
+  - `POST /api/admin/bulk-sms/clients`: Bulk SMS to clients with filters
+  - `POST /api/admin/bulk-sms/merchants`: Bulk SMS to merchants
+- **Files Created/Modified:**
+  - `/app/backend/services/hubtel_sms_service.py`: New Hubtel SMS service
+  - `/app/backend/services/sms_service.py`: Re-exports Hubtel service
+  - `/app/backend/routers/admin.py`: Added new SMS endpoints
+- **Status:** ✅ API integrated (requires Hubtel SMS credit to send)
+
+**Payment Logos Updated - COMPLETED ✅**
+- Updated homepage payment logos section
+- New logos: Visa/Mastercard combo, MTN MoMo, Hubtel
+- Removed: old Visa, Mastercard, Telecel, BulkClix text
+
 ### 2026-03-16 - Hubtel Online Checkout Integration (COMPLETED)
 
 **Hubtel Online Checkout Integration - TESTED ✅**
