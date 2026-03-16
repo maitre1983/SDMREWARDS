@@ -28,7 +28,12 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-16
+### 2026-03-16 (Session 2)
+- ✅ **Règles de paiement corrigées** - Airtime/Data/ECG: cashback only | Upgrade carte: cashback/MoMo/hybride
+- ✅ **Tests automatisés créés** - 14 tests pytest pour endpoints critiques (OTP, services, upgrade, auth)
+- ✅ **Documentation tests** - `test_critical_endpoints.py`, `conftest.py`, `pytest.ini`
+
+### 2026-03-16 (Session 1)
 - ✅ **Migration OTP Hubtel SMS** - Système OTP complet (envoi, vérification, inscription, reset password) testé et validé
 - ✅ **Migration VAS Hubtel** - Airtime, Data, ECG fonctionnels
 - ✅ **Correction mise à niveau carte** - Bug unicode résolu avec solution curl

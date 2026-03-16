@@ -2,7 +2,13 @@
 SDM REWARDS - Services Router
 ==============================
 Handles cashback-funded services: Airtime, Data, ECG, Withdrawal
-All services now use Hubtel VAS API
+
+PAYMENT RULES:
+- Airtime, Data Bundle, ECG: CASHBACK ONLY
+- Withdrawal: Converts cashback to MoMo (Hubtel Send Money)
+- Card Upgrade: Cashback, MoMo, or Hybrid (see clients.py)
+
+All services use Hubtel VAS API
 """
 
 import os
@@ -34,36 +40,31 @@ MIN_TRANSACTION_AMOUNT = 2.0
 
 # ============== REQUEST MODELS ==============
 
-# Payment method enum
-class PaymentMethod:
-    CASHBACK = "cashback"      # 100% cashback
-    MOMO = "momo"              # 100% mobile money
-    HYBRID = "hybrid"          # cashback + momo combined
+# ============== PAYMENT RULES ==============
+# Airtime, Data Bundle, ECG: CASHBACK ONLY (no MoMo option)
+# Card Upgrade: Cashback, MoMo, or Hybrid (see clients.py)
 
 class AirtimeRequest(BaseModel):
+    """Airtime purchase request - CASHBACK ONLY"""
     phone: str
     amount: float
     network: str  # MTN, TELECEL, AIRTELTIGO
-    payment_method: str = "cashback"  # cashback, momo, hybrid
-    momo_phone: Optional[str] = None  # Required for momo/hybrid
 
 
 class DataBundleRequest(BaseModel):
+    """Data bundle purchase request - CASHBACK ONLY"""
     phone: str
     package_id: str  # Bundle package ID
     service_id: str  # Network service ID
     network: str  # MTN, TELECEL, AIRTELTIGO
     amount: float  # Price of the bundle
     display_name: str  # e.g. "1.37GB"
-    payment_method: str = "cashback"  # cashback, momo, hybrid
-    momo_phone: Optional[str] = None  # Required for momo/hybrid
 
 
 class ECGPaymentRequest(BaseModel):
+    """ECG bill payment request - CASHBACK ONLY"""
     meter_number: str
     amount: float
-    payment_method: str = "cashback"  # cashback, momo, hybrid
-    momo_phone: Optional[str] = None  # Required for momo/hybrid
 
 
 class WithdrawalRequest(BaseModel):
@@ -354,7 +355,10 @@ async def get_data_bundles(service_id: str, phone: str):
 
 @router.post("/airtime/purchase")
 async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depends(get_current_client)):
-    """Purchase airtime using cashback balance via Hubtel VAS API"""
+    """
+    Purchase airtime using CASHBACK BALANCE ONLY.
+    MoMo payment is not available for this service.
+    """
     
     from services.hubtel_vas_service import get_hubtel_vas_service
     
@@ -458,7 +462,10 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
 
 @router.post("/data/purchase")
 async def purchase_data(request: DataBundleRequest, current_client: dict = Depends(get_current_client)):
-    """Purchase data bundle using cashback balance via Hubtel VAS API"""
+    """
+    Purchase data bundle using CASHBACK BALANCE ONLY.
+    MoMo payment is not available for this service.
+    """
     
     from services.hubtel_vas_service import get_hubtel_vas_service
     
@@ -557,7 +564,10 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
 
 @router.post("/ecg/pay")
 async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get_current_client)):
-    """Pay ECG bill using cashback balance via Hubtel VAS API"""
+    """
+    Pay ECG bill using CASHBACK BALANCE ONLY.
+    MoMo payment is not available for this service.
+    """
     
     from services.hubtel_vas_service import get_hubtel_vas_service
     
