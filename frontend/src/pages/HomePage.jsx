@@ -46,10 +46,9 @@ const IMAGES = {
 
 // Payment Logos
 const PAYMENT_LOGOS = {
-  visa: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/200px-Visa_Inc._logo.svg.png",
-  mastercard: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/200px-Mastercard-logo.svg.png",
-  mtn: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/New-mtn-logo.svg/200px-New-mtn-logo.svg.png",
-  telecel: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Vodafone_icon.svg/200px-Vodafone_icon.svg.png", // Using existing icon until Telecel logo available
+  visaMastercard: "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/xg8ltdqh_lviv-ukraine-march-mastercard-visa-logo-credit-money-card-plastic-debit-icon-vector-illustration-editorial-273430308.webp",
+  mtn: "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/vsfx9be2_cropped-MTN-Favicon-1.png",
+  hubtel: "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/04kz6bx9_GBGTr3NWoAAQ5Xc.jpg",
 };
 
 export default function HomePage() {
@@ -679,12 +678,10 @@ export default function HomePage() {
           {/* Payment Partners */}
           <div className="text-center">
             <p className="text-slate-500 text-sm mb-4">{t('trust_powered_by')}</p>
-            <div className="flex flex-wrap justify-center items-center gap-8">
-              <img src={PAYMENT_LOGOS.visa} alt="Visa" className="h-8 opacity-60 hover:opacity-100 transition-opacity" />
-              <img src={PAYMENT_LOGOS.mastercard} alt="Mastercard" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
-              <img src={PAYMENT_LOGOS.mtn} alt="MTN MoMo" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
-              <img src={PAYMENT_LOGOS.telecel} alt="Telecel" className="h-10 opacity-60 hover:opacity-100 transition-opacity" />
-              <span className="text-slate-400 font-semibold">BulkClix</span>
+            <div className="flex flex-wrap justify-center items-center gap-6">
+              <img src={PAYMENT_LOGOS.visaMastercard} alt="Visa & Mastercard" className="h-12 rounded-lg bg-white p-1" />
+              <img src={PAYMENT_LOGOS.mtn} alt="MTN MoMo" className="h-12 rounded-lg" />
+              <img src={PAYMENT_LOGOS.hubtel} alt="Hubtel" className="h-12 rounded-lg bg-white p-1" />
             </div>
           </div>
         </div>
