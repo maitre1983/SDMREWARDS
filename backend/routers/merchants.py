@@ -9,14 +9,13 @@ import uuid
 import random
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 
-from models.schemas import Merchant, MerchantStatus
 from routers.auth import get_current_merchant
 
 # Password/PIN hashing

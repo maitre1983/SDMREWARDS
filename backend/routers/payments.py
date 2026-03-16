@@ -497,7 +497,7 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
     if abs(new_balance) > debit_limit:
         raise HTTPException(
             status_code=400, 
-            detail=f"Cash payment would exceed merchant's debit limit. Please pay with MoMo or use a smaller amount."
+            detail="Cash payment would exceed merchant's debit limit. Please pay with MoMo or use a smaller amount."
         )
     
     now = datetime.now(timezone.utc)
@@ -566,7 +566,7 @@ async def initiate_cash_payment(request: ClientCashPaymentRequest):
         "status": "pending_confirmation",
         "payment_method": "cash",
         "expires_at": expires_at.isoformat(),
-        "message": f"Payment recorded! Awaiting merchant confirmation. Cashback will be credited once confirmed."
+        "message": "Payment recorded! Awaiting merchant confirmation. Cashback will be credited once confirmed."
     }
 
 
@@ -1984,7 +1984,7 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
     result = await hubtel_service.send_momo(
         phone=request.phone,
         amount=net_amount,  # Send net amount (after fee deduction)
-        description=f"SDM Rewards Cashback Withdrawal",
+        description="SDM Rewards Cashback Withdrawal",
         client_reference=withdrawal_ref,
         recipient_name=client.get("full_name", "SDM Client")
     )

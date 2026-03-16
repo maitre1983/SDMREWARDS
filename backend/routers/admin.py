@@ -859,8 +859,7 @@ async def activate_client(client_id: str, current_admin: dict = Depends(get_curr
     return {"success": True, "message": "Client activated"}
 
 
-class StatusActionRequest(BaseModel):
-    action: str  # "activate", "suspend", "delete"
+# StatusActionRequest already defined above
 
 
 @router.put("/clients/{client_id}/status")
@@ -2779,11 +2778,7 @@ async def get_revenue_report(
 
 # ============== PAYMENT LOGOS MANAGEMENT ==============
 
-class PaymentLogoRequest(BaseModel):
-    name: str  # e.g., "Visa", "MTN MoMo"
-    logo_url: str
-    display_order: int = 0
-    is_active: bool = True
+# PaymentLogoRequest is imported from admin_modules
 
 
 @router.get("/payment-logos")
