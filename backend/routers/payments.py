@@ -1052,7 +1052,7 @@ async def check_payment_status(payment_id: str):
 @router.post("/hubtel/callback")
 async def hubtel_payment_callback(request: Request):
     """
-    Hubtel Online Checkout callback webhook
+    Hubtel Direct Receive Money callback webhook
     Called by Hubtel when a payment is completed/failed
     """
     try:
@@ -1062,8 +1062,8 @@ async def hubtel_payment_callback(request: Request):
     
     logger.info(f"Hubtel callback received: {data}")
     
-    from services.hubtel_checkout_service import get_hubtel_checkout_service
-    hubtel_service = get_hubtel_checkout_service(db)
+    from services.hubtel_receive_service import get_hubtel_receive_service
+    hubtel_service = get_hubtel_receive_service(db)
     
     # Process the callback
     result = await hubtel_service.handle_callback(data)
@@ -1119,11 +1119,24 @@ async def hubtel_payment_callback(request: Request):
 @router.get("/hubtel/status/{client_reference}")
 async def check_hubtel_payment_status(client_reference: str):
     """Check status of a Hubtel payment by client reference"""
-    from services.hubtel_checkout_service import get_hubtel_checkout_service
-    hubtel_service = get_hubtel_checkout_service(db)
+    from services.hubtel_receive_service import get_hubtel_receive_service
+    hubtel_service = get_hubtel_receive_service(db)
     
-    result = await hubtel_service.verify_payment(client_reference)
-    return result
+    # First check local DB
+    local_result = await hubtel_service.verify_payment(client_reference)
+    
+    # If still pending, check with Hubtel API
+    if local_result.get("status") == "pending" or local_result.get("status") == "initiated":
+        api_result = await hubtel_service.check_transaction_status(client_reference)
+        if api_result.success:
+            return {
+                "success": True,
+                "status": api_result.status,
+                "message": api_result.message,
+                "data": api_result.data
+            }
+    
+    return local_result
 
 
 @router.post("/cards/check-status/{client_reference}")

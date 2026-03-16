@@ -233,13 +233,14 @@ async def purchase_card(
             config=config
         )
     
-    # For MoMo payment - use Hubtel Online Checkout
+    # For MoMo payment - use Hubtel Direct Receive Money API
     if request.payment_method == PaymentMethod.MOMO:
         if not request.payment_phone:
             raise HTTPException(status_code=400, detail="Phone number required for MoMo payment")
         
         # Initialize Hubtel service
-        hubtel_service = get_hubtel_checkout_service(db)
+        from services.hubtel_receive_service import get_hubtel_receive_service, HubtelReceiveMoneyRequest
+        hubtel_service = get_hubtel_receive_service(db)
         
         # Store pending purchase info for callback processing
         pending_purchase = {
@@ -255,15 +256,15 @@ async def purchase_card(
         }
         await db.pending_card_purchases.insert_one(pending_purchase)
         
-        # Initiate Hubtel checkout
-        checkout_request = HubtelCheckoutRequest(
+        # Initiate Hubtel Receive Money
+        receive_request = HubtelReceiveMoneyRequest(
             amount=price,
             description=f"SDM Rewards {request.card_type.value.title()} Card ({duration_days} days)",
             customer_phone=request.payment_phone,
             client_reference=client_reference
         )
         
-        result = await hubtel_service.initiate_checkout(checkout_request)
+        result = await hubtel_service.receive_money(receive_request)
         
         if not result.success:
             # Clean up pending purchase
@@ -276,10 +277,9 @@ async def purchase_card(
         return {
             "success": True,
             "status": "pending",
-            "message": "Payment initiated. Please check your phone to complete the payment.",
+            "message": "Payment prompt sent to your phone. Please authorize the payment.",
             "client_reference": client_reference,
-            "request_id": result.request_id,
-            "checkout_url": result.checkout_url,
+            "transaction_id": result.transaction_id,
             "amount": price,
             "card_type": request.card_type.value
         }
