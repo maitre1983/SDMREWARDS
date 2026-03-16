@@ -241,102 +241,61 @@ async def initiate_card_payment(request: CardPaymentRequest):
             "message": f"Payment of GHS {amount} initiated for {card_name}. Use /api/payments/test/confirm/{payment_record['id']} to complete."
         }
     
-    # Production: Call BulkClix API
-    try:
-        # Build callback URL
-        callback_url = f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else None
-        
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            # Format phone for BulkClix (0XXXXXXXXX format)
-            bulkclix_phone = request.phone
-            if request.phone.startswith("+233"):
-                bulkclix_phone = "0" + request.phone[4:]
-            elif request.phone.startswith("233"):
-                bulkclix_phone = "0" + request.phone[3:]
-            
-            payload = {
-                "amount": amount,
-                "phone_number": bulkclix_phone,
-                "network": network.upper(),  # MTN, TELECEL, AIRTELTIGO
-                "transaction_id": payment_ref,
-                "reference": "SDM REWARDS",
-                "callback_url": callback_url or "https://sdmrewards.com/api/payments/callback"
-            }
-                
-            response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/payment-api/momopay",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "x-api-key": BULKCLIX_API_KEY
-                },
-                json=payload,
-                timeout=30.0
-            )
-            
-            # Log raw response for debugging
-            logger.info(f"BulkClix raw response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
-            
-            result = response.json() if response.text else {}
-            logger.info(f"BulkClix card payment response: {result}")
-            
-            # BulkClix returns "Payment Initiated Successful" message on success
-            if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
-                payment_data = result.get("data", {})
-                # Store ext_transaction_id as provider_reference for callback matching
-                await db.momo_payments.update_one(
-                    {"id": payment_record["id"]},
-                    {
-                        "$set": {
-                            "status": "processing",
-                            "provider_reference": payment_data.get("ext_transaction_id"),
-                            "provider_message": result.get("message"),
-                            "updated_at": datetime.now(timezone.utc).isoformat()
-                        }
-                    }
-                )
-                
-                # Send SMS notification
-                try:
-                    sms = get_sms()
-                    await sms.notify_payment_pending(request.phone, amount, card_name)
-                except Exception as e:
-                    logger.error(f"SMS notification error: {e}")
-                
-                return {
-                    "success": True,
-                    "payment_id": payment_record["id"],
-                    "reference": payment_ref,
-                    "amount": amount,
+    # Production: Call Hubtel MoMo Collection API
+    from services.hubtel_momo_service import get_hubtel_momo_service
+    
+    hubtel_service = get_hubtel_momo_service(db)
+    
+    result = await hubtel_service.collect_momo(
+        phone=request.phone,
+        amount=amount,
+        description=f"SDM Rewards {card_name} Card",
+        client_reference=payment_ref
+    )
+    
+    if result.get("success"):
+        await db.momo_payments.update_one(
+            {"id": payment_record["id"]},
+            {
+                "$set": {
                     "status": "processing",
-                    "message": "MoMo prompt sent to your phone. Please approve the payment."
+                    "provider": "hubtel",
+                    "provider_reference": result.get("transaction_id"),
+                    "provider_message": result.get("message"),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }
-            else:
-                error_msg = result.get("message", "Payment initiation failed")
-                await db.momo_payments.update_one(
-                    {"id": payment_record["id"]},
-                    {
-                        "$set": {
-                            "status": "failed",
-                            "provider_message": error_msg,
-                            "updated_at": datetime.now(timezone.utc).isoformat()
-                        }
-                    }
-                )
-                raise HTTPException(status_code=400, detail=error_msg)
-                
-    except httpx.RequestError as e:
+            }
+        )
+        
+        # Send SMS notification
+        try:
+            sms = get_sms()
+            await sms.notify_payment_pending(request.phone, amount, card_name)
+        except Exception as e:
+            logger.error(f"SMS notification error: {e}")
+        
+        return {
+            "success": True,
+            "payment_id": payment_record["id"],
+            "reference": payment_ref,
+            "amount": amount,
+            "status": "processing",
+            "test_mode": result.get("test_mode", False),
+            "message": "MoMo prompt sent to your phone. Please approve the payment."
+        }
+    else:
+        error_msg = result.get("error", "Payment initiation failed")
         await db.momo_payments.update_one(
             {"id": payment_record["id"]},
             {
                 "$set": {
                     "status": "failed",
-                    "provider_message": f"Network error: {str(e)}",
+                    "provider_message": error_msg,
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
             }
         )
-        raise HTTPException(status_code=503, detail="Payment service temporarily unavailable")
+        raise HTTPException(status_code=400, detail=error_msg)
 
 
 @router.post("/merchant/initiate")
@@ -417,83 +376,50 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
             "message": f"Payment initiated. Use /api/payments/test/confirm/{payment_record['id']} to complete."
         }
     
-    # Production: Call BulkClix MoMo API
-    callback_url = f"{CALLBACK_BASE_URL}/api/payments/callback" if CALLBACK_BASE_URL else None
+    # Production: Call Hubtel MoMo Collection API
+    from services.hubtel_momo_service import get_hubtel_momo_service
     
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            # Format phone for BulkClix (0XXXXXXXXX format)
-            bulkclix_phone = request.client_phone
-            if request.client_phone.startswith("+233"):
-                bulkclix_phone = "0" + request.client_phone[4:]
-            elif request.client_phone.startswith("233"):
-                bulkclix_phone = "0" + request.client_phone[3:]
-            
-            payload = {
-                "amount": request.amount,
-                "phone_number": bulkclix_phone,
-                "network": network.upper(),
-                "transaction_id": payment_ref,
-                "reference": "SDM REWARDS",
-                "callback_url": callback_url or "https://sdmrewards.com/api/payments/callback"
-            }
-            
-            response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/payment-api/momopay",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "x-api-key": BULKCLIX_API_KEY
-                },
-                json=payload,
-                timeout=30.0
-            )
-            
-            logger.info(f"BulkClix merchant payment response: status={response.status_code}, body={response.text[:500] if response.text else 'EMPTY'}")
-            
-            result = response.json() if response.text else {}
-            
-            # BulkClix returns "Payment Initiated Successful" on success
-            if response.status_code == 200 and ("successful" in result.get("message", "").lower() or result.get("status") in ["success", "pending"]):
-                payment_data = result.get("data", {})
-                await db.momo_payments.update_one(
-                    {"id": payment_record["id"]},
-                    {
-                        "$set": {
-                            "status": "processing",
-                            "provider_reference": payment_data.get("ext_transaction_id"),
-                            "provider_message": result.get("message"),
-                            "updated_at": datetime.now(timezone.utc).isoformat()
-                        }
-                    }
-                )
-                
-                return {
-                    "success": True,
-                    "payment_id": payment_record["id"],
-                    "reference": payment_ref,
-                    "amount": request.amount,
-                    "merchant": merchant["business_name"],
-                    "expected_cashback": expected_cashback,
-                    "status": "processing",
-                    "test_mode": False,
-                    "message": "Please approve the MoMo prompt on your phone"
-                }
-            else:
-                # Payment initiation failed
-                await db.momo_payments.update_one(
-                    {"id": payment_record["id"]},
-                    {"$set": {"status": "failed", "provider_message": result.get("message", "Payment initiation failed")}}
-                )
-                raise HTTPException(status_code=400, detail=result.get("message", "Payment initiation failed"))
-                
-    except httpx.RequestError as e:
-        logger.error(f"BulkClix API error: {e}")
+    hubtel_service = get_hubtel_momo_service(db)
+    
+    result = await hubtel_service.collect_momo(
+        phone=request.client_phone,
+        amount=request.amount,
+        description=f"Payment to {merchant['business_name']}",
+        client_reference=payment_ref
+    )
+    
+    if result.get("success"):
         await db.momo_payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {"status": "failed", "provider_message": str(e)}}
+            {
+                "$set": {
+                    "status": "processing",
+                    "provider": "hubtel",
+                    "provider_reference": result.get("transaction_id"),
+                    "provider_message": result.get("message"),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+            }
         )
-        raise HTTPException(status_code=500, detail="Payment service unavailable")
+        
+        return {
+            "success": True,
+            "payment_id": payment_record["id"],
+            "reference": payment_ref,
+            "amount": request.amount,
+            "merchant": merchant["business_name"],
+            "expected_cashback": expected_cashback,
+            "status": "processing",
+            "test_mode": result.get("test_mode", False),
+            "message": "Please approve the MoMo prompt on your phone"
+        }
+    else:
+        # Payment initiation failed
+        await db.momo_payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {"status": "failed", "provider_message": result.get("error", "Payment initiation failed")}}
+        )
+        raise HTTPException(status_code=400, detail=result.get("error", "Payment initiation failed"))
 
 
 @router.post("/merchant/cash")
@@ -1134,6 +1060,79 @@ async def hubtel_payment_callback(request: Request):
             )
         
         return {"success": False, "message": result.get("message", "Payment failed")}
+
+
+@router.post("/hubtel/transfer-callback")
+async def hubtel_transfer_callback(request: Request):
+    """
+    Hubtel Send Money (Transfer/Disbursement) callback webhook
+    Called by Hubtel when a transfer is completed/failed
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        data = dict(request.query_params)
+    
+    logger.info(f"Hubtel Transfer callback received: {data}")
+    
+    from services.hubtel_momo_service import get_hubtel_momo_service
+    hubtel_service = get_hubtel_momo_service(db)
+    
+    result = await hubtel_service.handle_transfer_callback(data)
+    
+    if result.get("success"):
+        client_reference = result.get("client_reference")
+        
+        # Find and update withdrawal record
+        withdrawal = await db.withdrawals.find_one(
+            {"reference": client_reference},
+            {"_id": 0}
+        )
+        
+        if withdrawal:
+            # Mark withdrawal as successful
+            await db.withdrawals.update_one(
+                {"reference": client_reference},
+                {"$set": {
+                    "status": "success",
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Deduct from client balance
+            client = await db.clients.find_one({"id": withdrawal["client_id"]}, {"_id": 0})
+            if client:
+                new_balance = max(0, client.get("cashback_balance", 0) - withdrawal["amount"])
+                await db.clients.update_one(
+                    {"id": withdrawal["client_id"]},
+                    {"$set": {"cashback_balance": new_balance}}
+                )
+                
+                # Record transaction
+                await db.transactions.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "type": "withdrawal",
+                    "client_id": withdrawal["client_id"],
+                    "amount": -withdrawal["amount"],
+                    "description": f"Cashback withdrawal to {withdrawal['destination_phone']}",
+                    "payment_reference": client_reference,
+                    "status": "completed",
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+            
+            logger.info(f"Withdrawal completed via Hubtel: {client_reference}")
+        
+        return {"success": True, "message": "Transfer callback processed"}
+    else:
+        # Transfer failed
+        client_reference = result.get("client_reference")
+        if client_reference:
+            await db.withdrawals.update_one(
+                {"reference": client_reference},
+                {"$set": {"status": "failed", "error": result.get("message")}}
+            )
+        
+        return {"success": False, "message": result.get("message", "Transfer failed")}
 
 
 @router.get("/hubtel/status/{client_reference}")
@@ -1977,80 +1976,62 @@ async def initiate_withdrawal(request: WithdrawalRequest, req: Request):
             "message": "Test mode: Use /api/payments/withdrawal/test/confirm/{id} to simulate payout"
         }
     
-    # Production mode: Call BulkClix Disbursement API
-    try:
-        # Format phone for BulkClix (0XXXXXXXXX format)
-        bulkclix_phone = request.phone
-        if request.phone.startswith("+233"):
-            bulkclix_phone = "0" + request.phone[4:]
-        elif request.phone.startswith("233"):
-            bulkclix_phone = "0" + request.phone[3:]
+    # Production mode: Call Hubtel Send Money API
+    from services.hubtel_momo_service import get_hubtel_momo_service
+    
+    hubtel_service = get_hubtel_momo_service(db)
+    
+    result = await hubtel_service.send_momo(
+        phone=request.phone,
+        amount=net_amount,  # Send net amount (after fee deduction)
+        description=f"SDM Rewards Cashback Withdrawal",
+        client_reference=withdrawal_ref,
+        recipient_name=client.get("full_name", "SDM Client")
+    )
+    
+    if result.get("success"):
+        # Update record with provider reference
+        await db.withdrawals.update_one(
+            {"id": withdrawal_record["id"]},
+            {"$set": {
+                "status": "processing",
+                "provider": "hubtel",
+                "provider_reference": result.get("transaction_id"),
+                "provider_message": result.get("message"),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
         
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/payment-api/send/mobilemoney",
-                headers={
-                    "x-api-key": BULKCLIX_API_KEY,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                json={
-                    "amount": str(net_amount),  # Send net amount (after fee deduction)
-                    "account_number": bulkclix_phone,
-                    "channel": network.upper(),  # MTN, TELECEL, AIRTELTIGO
-                    "account_name": "",  # Will be filled by BulkClix
-                    "client_reference": withdrawal_ref
-                },
-                timeout=30.0
+        # Send SMS notification with net amount
+        try:
+            sms = get_sms()
+            await sms.send_sms(
+                client["phone"],
+                f"SDM Rewards: Your withdrawal of GHS {net_amount:.2f} to {request.phone} is being processed. You will receive funds shortly."
             )
-            
-            if response.status_code == 200:
-                data = response.json()
-                # Update record with provider reference
-                await db.withdrawals.update_one(
-                    {"id": withdrawal_record["id"]},
-                    {"$set": {
-                        "provider_reference": data.get("transactionId"),
-                        "provider_message": data.get("message"),
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-                
-                # Send SMS notification with net amount
-                try:
-                    sms = get_sms()
-                    await sms.send_sms(
-                        client["phone"],
-                        f"SDM Rewards: Your withdrawal of GHS {net_amount:.2f} to {request.phone} is being processed. You will receive funds shortly."
-                    )
-                except Exception as e:
-                    logger.error(f"Withdrawal SMS error: {e}")
-                
-                return {
-                    "success": True,
-                    "withdrawal_id": withdrawal_record["id"],
-                    "reference": withdrawal_ref,
-                    "amount": request.amount,
-                    "fee": withdrawal_fee,
-                    "net_amount": net_amount,
-                    "destination": request.phone,
-                    "network": network,
-                    "status": "processing",
-                    "message": "Withdrawal is being processed. You will receive funds shortly."
-                }
-            else:
-                logger.error(f"BulkClix disbursement error: {response.status_code} - {response.text}")
-                await db.withdrawals.update_one(
-                    {"id": withdrawal_record["id"]},
-                    {"$set": {"status": "failed", "provider_message": response.text}}
-                )
-                raise HTTPException(status_code=500, detail="Withdrawal request failed. Please try again.")
-                
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Payment provider timeout. Please try again.")
-    except Exception as e:
-        logger.error(f"Withdrawal error: {e}")
-        raise HTTPException(status_code=500, detail="Withdrawal service unavailable")
+        except Exception as e:
+            logger.error(f"Withdrawal SMS error: {e}")
+        
+        return {
+            "success": True,
+            "withdrawal_id": withdrawal_record["id"],
+            "reference": withdrawal_ref,
+            "amount": request.amount,
+            "fee": withdrawal_fee,
+            "net_amount": net_amount,
+            "destination": request.phone,
+            "network": network,
+            "status": "processing",
+            "test_mode": result.get("test_mode", False),
+            "message": "Withdrawal is being processed. You will receive funds shortly."
+        }
+    else:
+        logger.error(f"Hubtel Send Money error: {result.get('error')}")
+        await db.withdrawals.update_one(
+            {"id": withdrawal_record["id"]},
+            {"$set": {"status": "failed", "provider_message": result.get("error")}}
+        )
+        raise HTTPException(status_code=500, detail=result.get("error", "Withdrawal request failed. Please try again."))
 
 
 @router.post("/withdrawal/test/confirm/{withdrawal_id}")
