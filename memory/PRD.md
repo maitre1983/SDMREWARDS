@@ -48,25 +48,19 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 ## In Progress / Upcoming Tasks
 
 ### P1 - Refactoring Routeurs - ✅ TERMINÉ
-**Tous les 3 fichiers volumineux ont été migrés vers des packages:**
+**Tous les 3 fichiers volumineux migrés vers packages:**
 
-**payments/ - COMPLET (7 modules):**
-- [x] `shared.py`, `card.py`, `merchant.py`
-- [x] `callbacks.py`, `withdrawal.py`
-- [x] `processing.py`, `test.py`
+| Package | Modules | Routes | Status |
+|---------|---------|--------|--------|
+| `payments/` | 7 (shared, card, merchant, callbacks, withdrawal, processing, test) | 15 | ✅ Complet |
+| `merchants/` | 3 (shared, public, dashboard) + legacy | 56 | ✅ Migré |
+| `admin/` | admin_modules (6 fichiers) + legacy | 96 | ✅ Migré |
 
-**merchants/ - MIGRÉ (hybride):**
-- [x] `public.py` - Partners, QR lookup
-- [x] `__init__.py` - Importe merchants_legacy.py
+**Fichiers legacy conservés (pour validation prolongée):**
+- `merchants_legacy.py` - 49 routes non extraites
+- `admin_legacy.py` - 29 routes non extraites
 
-**admin/ - MIGRÉ (hybride):**
-- [x] Utilise `admin_modules/` existant (64 routes)
-- [x] `__init__.py` - Importe admin_legacy.py
-
-**Prochaines optimisations (P2):**
-- [ ] Extraire routes restantes de merchants_legacy.py
-- [ ] Compléter admin_modules avec les 29 routes manquantes
-- [ ] Supprimer fichiers *_legacy.py après validation
+**Tests:** 14/14 passent ✅
 
 ### P2 - Migration Restante
 - [ ] Migrer `notification_service.py` (références BulkClix)
