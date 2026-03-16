@@ -36,7 +36,7 @@ import { API_URL } from '@/config/api';
 
 const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   // Build version for debugging
-  const BUILD_VERSION = "2026.03.16.v3";
+  const BUILD_VERSION = "2026.03.16.v4";
   const [activeService, setActiveService] = useState(null);
   const [fees, setFees] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -899,8 +899,23 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
         
         {/* Form Fields */}
         <div className="space-y-4">
-          {/* Network Selection (for airtime, data, withdrawal) */}
-          {['airtime', 'data', 'withdrawal'].includes(activeService) && (
+          {/* Payment Method Banner - CASHBACK ONLY for services */}
+          {['airtime', 'data', 'ecg'].includes(activeService) && (
+            <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 border border-amber-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 rounded-lg">
+                  <Wallet className="text-amber-400" size={20} />
+                </div>
+                <div>
+                  <p className="text-amber-400 font-semibold">Paid from Cashback Balance</p>
+                  <p className="text-amber-200/70 text-sm">Available: GHS {balance?.toFixed(2) || '0.00'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Network Selection (ONLY for withdrawal - uses MoMo) */}
+          {activeService === 'withdrawal' && (
             <div>
               <Label className="text-slate-300 text-sm">Network</Label>
               <Select value={network} onValueChange={setNetwork}>
