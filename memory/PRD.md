@@ -47,21 +47,26 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## In Progress / Upcoming Tasks
 
-### P1 - Refactoring Routeurs
-**payments.py - ✅ TERMINÉ**
-- [x] `payments/shared.py` - Config, helpers, schemas
-- [x] `payments/card.py` - Card purchase (1 route)
-- [x] `payments/merchant.py` - Merchant payments (3 routes)
-- [x] `payments/callbacks.py` - Hubtel callbacks + status (4 routes)
-- [x] `payments/withdrawal.py` - Cashback withdrawals (5 routes)
-- [x] `payments/processing.py` - Payment completion logic
-- [x] `payments/test.py` - Test mode endpoints (2 routes)
-- [x] `server.py` mis à jour
-- [x] `_payments_legacy.py.bak` créé (backup)
+### P1 - Refactoring Routeurs - ✅ TERMINÉ
+**Tous les 3 fichiers volumineux ont été migrés vers des packages:**
 
-**Prochains fichiers:**
-- [ ] Diviser `merchants.py` (3025 lignes) en sous-modules
-- [ ] Utiliser `admin_modules/` existant pour `admin.py` (4337 lignes)
+**payments/ - COMPLET (7 modules):**
+- [x] `shared.py`, `card.py`, `merchant.py`
+- [x] `callbacks.py`, `withdrawal.py`
+- [x] `processing.py`, `test.py`
+
+**merchants/ - MIGRÉ (hybride):**
+- [x] `public.py` - Partners, QR lookup
+- [x] `__init__.py` - Importe merchants_legacy.py
+
+**admin/ - MIGRÉ (hybride):**
+- [x] Utilise `admin_modules/` existant (64 routes)
+- [x] `__init__.py` - Importe admin_legacy.py
+
+**Prochaines optimisations (P2):**
+- [ ] Extraire routes restantes de merchants_legacy.py
+- [ ] Compléter admin_modules avec les 29 routes manquantes
+- [ ] Supprimer fichiers *_legacy.py après validation
 
 ### P2 - Migration Restante
 - [ ] Migrer `notification_service.py` (références BulkClix)

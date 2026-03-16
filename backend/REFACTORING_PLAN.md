@@ -2,38 +2,37 @@
 
 ## Current State (March 2026)
 
-### Large Router Files
-| File | Lines | Endpoints | Status |
-|------|-------|-----------|--------|
-| `admin.py` | 4,337 | 93 | Needs refactoring |
-| `merchants.py` | 3,025 | 60+ | Needs refactoring |
-| `payments.py` | 2,252 | 35+ | **✅ COMPLETE - Migrated to package** |
+### Refactoring Status
+| File | Lines | Status | Package |
+|------|-------|--------|---------|
+| `payments.py` | 2,252 | **✅ COMPLETE** | `routers/payments/` (7 modules, 15 routes) |
+| `merchants.py` | 3,025 | **✅ MIGRATED** | `routers/merchants/` (uses legacy + public.py) |
+| `admin.py` | 4,337 | **✅ MIGRATED** | `routers/admin/` (uses admin_modules + legacy) |
 
-### Payments Package - MIGRATION COMPLETE ✅
-The `routers/payments/` package has been fully migrated:
-- ✅ `__init__.py` - Package entry point with combined router (15 routes)
-- ✅ `shared.py` - Config, helpers, schemas
-- ✅ `card.py` - Card purchase endpoint (1 route)
-- ✅ `merchant.py` - Merchant payments (3 routes)
-- ✅ `callbacks.py` - Status checks and Hubtel callbacks (4 routes)
-- ✅ `withdrawal.py` - Cashback withdrawal (5 routes)
-- ✅ `processing.py` - Payment completion logic (internal)
-- ✅ `test.py` - Test mode endpoints (2 routes)
+### Payments Package - COMPLETE ✅
+Fully refactored into 7 modules:
+- `shared.py` - Config, helpers, schemas
+- `card.py` - Card purchase (1 route)
+- `merchant.py` - Merchant payments (3 routes)
+- `callbacks.py` - Status + Hubtel callbacks (4 routes)
+- `withdrawal.py` - Cashback withdrawal (5 routes)
+- `processing.py` - Payment completion logic
+- `test.py` - Test mode endpoints (2 routes)
 
-**Old file:** Renamed to `_payments_legacy.py.bak` (safe to delete after verification)
+### Merchants Package - MIGRATED ✅
+Uses hybrid approach:
+- `public.py` - Partners, QR lookup (2 routes) - NEW
+- `merchants_legacy.py` - Remaining routes (54 routes) - TO BE EXTRACTED
 
-### Existing Partial Refactoring (admin_modules/)
-The `admin_modules/` folder contains partial extraction of models and some routes:
-- `models.py` - Pydantic request/response models (COMPLETE)
-- `dependencies.py` - Shared utilities (COMPLETE)
-- `dashboard.py` - Dashboard routes (3 endpoints)
-- `clients.py` - Client routes (13 endpoints)
-- `merchants.py` - Merchant routes (14 endpoints)
-- `settings.py` - Settings routes (9 endpoints)
-- `admins.py` - Admin user routes (10 endpoints)
-- `sms.py` - SMS routes (15 endpoints)
-
-**Note:** These modules duplicate some routes from `admin.py`. They are not currently mounted in `server.py`.
+### Admin Package - MIGRATED ✅
+Uses existing `admin_modules/`:
+- `admin_modules/dashboard.py` - 3 routes
+- `admin_modules/clients.py` - 13 routes
+- `admin_modules/merchants.py` - 14 routes
+- `admin_modules/settings.py` - 9 routes
+- `admin_modules/admins.py` - 10 routes
+- `admin_modules/sms.py` - 15 routes
+- `admin_legacy.py` - Remaining routes (~29 routes) - TO BE EXTRACTED
 
 ---
 
