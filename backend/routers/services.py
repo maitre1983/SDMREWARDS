@@ -376,15 +376,18 @@ async def get_data_bundles(service_id: str, phone: str):
 
 @router.post("/airtime/purchase")
 async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depends(get_current_client)):
-    """Purchase airtime using cashback balance via BulkClix API"""
+    """Purchase airtime using cashback balance via Hubtel VAS API"""
+    
+    from services.hubtel_vas_service import get_hubtel_vas_service
     
     if request.amount < MIN_TRANSACTION_AMOUNT:
         raise HTTPException(status_code=400, detail=f"Minimum amount is GHS {MIN_TRANSACTION_AMOUNT}")
     
     # Validate network
     network_upper = request.network.upper()
-    if network_upper not in BULKCLIX_NETWORK_IDS:
-        raise HTTPException(status_code=400, detail="Invalid network. Supported: MTN, TELECEL, AIRTELTIGO")
+    valid_networks = ["MTN", "VODAFONE", "TELECEL", "AIRTELTIGO", "GLO"]
+    if network_upper not in valid_networks:
+        raise HTTPException(status_code=400, detail="Invalid network. Supported: MTN, TELECEL, VODAFONE, GLO")
     
     # Calculate fee
     fee_info = await get_service_fee("airtime", request.amount)
@@ -401,13 +404,6 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
             status_code=400,
             detail=f"Insufficient balance. Required: GHS {total_cost:.2f} (GHS {request.amount:.2f} + GHS {fee_info['fee_amount']:.2f} fee)"
         )
-    
-    # Format phone number for BulkClix (must start with 0)
-    bulkclix_phone = request.phone
-    if request.phone.startswith("+233"):
-        bulkclix_phone = "0" + request.phone[4:]
-    elif request.phone.startswith("233"):
-        bulkclix_phone = "0" + request.phone[3:]
     
     # Generate unique transaction ID
     transaction_id = f"SDM-AIR-{uuid.uuid4().hex[:12].upper()}"
@@ -429,115 +425,64 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
     
     await db.service_transactions.insert_one(service_tx)
     
-    # Call BulkClix airtime API
-    api_success = False
-    api_message = "Transaction simulated"
-    provider_reference = None
+    # Call Hubtel VAS API for airtime
+    hubtel_vas = get_hubtel_vas_service(db)
+    result = await hubtel_vas.buy_airtime(
+        phone=request.phone,
+        amount=request.amount,
+        network=network_upper,
+        client_reference=transaction_id
+    )
     
-    if BULKCLIX_API_KEY:
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                # Get network ID for BulkClix
-                network_id = BULKCLIX_NETWORK_IDS.get(network_upper)
-                
-                payload = {
-                    "amount": request.amount,
-                    "network_id": network_id,
-                    "phone_number": bulkclix_phone,
-                    "transaction_id": transaction_id
-                }
-                
-                logger.info(f"BulkClix Airtime Request: {payload}")
-                
-                response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/airtime-api/sendAirtime",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json=payload,
-                    timeout=30.0
-                )
-                
-                logger.info(f"BulkClix Airtime Response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
-                
-                result = response.json() if response.text else {}
-                
-                # Check for success - BulkClix returns success messages
-                if response.status_code == 200:
-                    message_lower = result.get("message", "").lower()
-                    if result.get("status") == "success" or "success" in message_lower or "sent" in message_lower:
-                        api_success = True
-                        api_message = result.get("message", "Airtime sent successfully")
-                        # Get reference from data object if available
-                        data = result.get("data", {})
-                        provider_reference = data.get("reference") or data.get("transaction_id") or result.get("reference") or transaction_id
-                    else:
-                        api_message = result.get("message", "Unknown response from provider")
-                        logger.warning(f"BulkClix airtime returned non-success: {result}")
-                else:
-                    api_message = result.get("message", f"Provider returned status {response.status_code}")
-                    logger.error(f"BulkClix airtime failed: {response.status_code} - {result}")
-                    
-        except httpx.RequestError as e:
-            logger.error(f"BulkClix airtime network error: {e}")
-            api_message = "Network error - please try again"
-        except Exception as e:
-            logger.error(f"BulkClix airtime error: {e}")
-            api_message = str(e)
+    if result.get("success"):
+        # Deduct balance
+        await db.clients.update_one(
+            {"id": current_client["id"]},
+            {"$inc": {"cashback_balance": -total_cost}}
+        )
+        
+        # Update transaction as success
+        await db.service_transactions.update_one(
+            {"id": service_tx["id"]},
+            {"$set": {
+                "status": "success",
+                "provider_reference": result.get("transaction_id"),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "transaction_id": transaction_id,
+            "provider_reference": result.get("transaction_id"),
+            "amount": request.amount,
+            "fee": fee_info["fee_amount"],
+            "total_deducted": total_cost,
+            "new_balance": balance - total_cost,
+            "message": result.get("message", "Airtime sent successfully")
+        }
     else:
-        logger.warning("BULKCLIX_API_KEY not configured - simulating airtime purchase")
-        api_success = True  # Simulate success in test mode
-        api_message = "Airtime sent (simulated - API not configured)"
-        provider_reference = f"SIM-{transaction_id}"
-    
-    if not api_success:
         # Update transaction as failed
         await db.service_transactions.update_one(
             {"id": service_tx["id"]},
             {"$set": {
                 "status": "failed",
-                "error_message": api_message,
+                "error": result.get("error"),
                 "completed_at": datetime.now(timezone.utc).isoformat()
             }}
         )
-        raise HTTPException(status_code=400, detail=f"Airtime purchase failed: {api_message}")
-    
-    # Debit cashback
-    debit_result = await debit_cashback(
-        current_client["id"],
-        total_cost,
-        f"Airtime purchase: GHS {request.amount} to {request.phone}",
-        "airtime"
-    )
-    
-    # Update service transaction as completed
-    await db.service_transactions.update_one(
-        {"id": service_tx["id"]},
-        {"$set": {
-            "status": "completed",
-            "provider_reference": provider_reference,
-            "provider_message": api_message,
-            "completed_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
-    return {
-        "success": True,
-        "message": f"Airtime of GHS {request.amount:.2f} sent to {request.phone}",
-        "transaction_id": service_tx["id"],
-        "provider_reference": provider_reference,
-        "amount": request.amount,
-        "fee": fee_info["fee_amount"],
-        "total_deducted": total_cost,
-        "new_balance": debit_result["balance_after"]
-    }
+        
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Airtime purchase failed")
+        )
 
 
 @router.post("/data/purchase")
 async def purchase_data(request: DataBundleRequest, current_client: dict = Depends(get_current_client)):
-    """Purchase data bundle using cashback balance via BulkClix API"""
+    """Purchase data bundle using cashback balance via Hubtel VAS API"""
+    
+    from services.hubtel_vas_service import get_hubtel_vas_service
     
     # Calculate fee based on the bundle price
     fee_info = await get_service_fee("data_bundle", request.amount)
@@ -554,13 +499,6 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
             status_code=400,
             detail=f"Insufficient balance. Required: GHS {total_cost:.2f} (GHS {request.amount:.2f} + GHS {fee_info['fee_amount']:.2f} fee)"
         )
-    
-    # Format phone number for BulkClix (must start with 0)
-    bulkclix_phone = request.phone
-    if request.phone.startswith("+233"):
-        bulkclix_phone = "0" + request.phone[4:]
-    elif request.phone.startswith("233"):
-        bulkclix_phone = "0" + request.phone[3:]
     
     # Generate unique transaction ID
     transaction_id = f"SDM-DATA-{uuid.uuid4().hex[:12].upper()}"
@@ -585,114 +523,65 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
     
     await db.service_transactions.insert_one(service_tx)
     
-    # Call BulkClix data API
-    api_success = False
-    api_message = "Transaction simulated"
-    provider_reference = None
+    # Call Hubtel VAS API for data bundle
+    hubtel_vas = get_hubtel_vas_service(db)
+    result = await hubtel_vas.buy_data_bundle(
+        phone=request.phone,
+        bundle_id=request.package_id,
+        amount=request.amount,
+        network=request.network.upper(),
+        client_reference=transaction_id
+    )
     
-    if BULKCLIX_API_KEY:
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                payload = {
-                    "phone_number": bulkclix_phone,
-                    "network": request.network.upper(),
-                    "amount": request.amount,
-                    "service_id": request.service_id,
-                    "type": "momo",
-                    "package_id": request.package_id,
-                    "name": client_record.get("full_name", "Customer")
-                }
-                
-                logger.info(f"BulkClix Data Request: {payload}")
-                
-                response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/databundle-api-v2/buy",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json=payload,
-                    timeout=30.0
-                )
-                
-                logger.info(f"BulkClix Data Response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
-                
-                result = response.json() if response.text else {}
-                
-                # Check for success
-                if response.status_code == 200:
-                    message_lower = result.get("message", "").lower()
-                    if result.get("status") == "success" or "success" in message_lower:
-                        api_success = True
-                        api_message = result.get("message", "Data bundle sent successfully")
-                        data = result.get("data", {})
-                        provider_reference = data.get("reference") or data.get("transaction_id") or result.get("reference") or transaction_id
-                    else:
-                        api_message = result.get("message", "Unknown response from provider")
-                        logger.warning(f"BulkClix data returned non-success: {result}")
-                else:
-                    api_message = result.get("message", f"Provider returned status {response.status_code}")
-                    logger.error(f"BulkClix data failed: {response.status_code} - {result}")
-                    
-        except httpx.RequestError as e:
-            logger.error(f"BulkClix data network error: {e}")
-            api_message = "Network error - please try again"
-        except Exception as e:
-            logger.error(f"BulkClix data error: {e}")
-            api_message = str(e)
+    if result.get("success"):
+        # Deduct balance
+        await db.clients.update_one(
+            {"id": current_client["id"]},
+            {"$inc": {"cashback_balance": -total_cost}}
+        )
+        
+        # Update transaction as success
+        await db.service_transactions.update_one(
+            {"id": service_tx["id"]},
+            {"$set": {
+                "status": "success",
+                "provider_reference": result.get("transaction_id"),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": f"Data bundle {request.display_name} sent to {request.phone}",
+            "transaction_id": transaction_id,
+            "provider_reference": result.get("transaction_id"),
+            "amount": request.amount,
+            "fee": fee_info["fee_amount"],
+            "total_deducted": total_cost,
+            "new_balance": balance - total_cost
+        }
     else:
-        logger.warning("BULKCLIX_API_KEY not configured - simulating data purchase")
-        api_success = True  # Simulate success in test mode
-        api_message = "Data bundle sent (simulated - API not configured)"
-        provider_reference = f"SIM-{transaction_id}"
-    
-    if not api_success:
         # Update transaction as failed
         await db.service_transactions.update_one(
             {"id": service_tx["id"]},
             {"$set": {
                 "status": "failed",
-                "error_message": api_message,
+                "error": result.get("error"),
                 "completed_at": datetime.now(timezone.utc).isoformat()
             }}
         )
-        raise HTTPException(status_code=400, detail=f"Data bundle purchase failed: {api_message}")
-    
-    # Debit cashback
-    debit_result = await debit_cashback(
-        current_client["id"],
-        total_cost,
-        f"Data bundle: {request.display_name} to {request.phone}",
-        "data_bundle"
-    )
-    
-    # Update service transaction as completed
-    await db.service_transactions.update_one(
-        {"id": service_tx["id"]},
-        {"$set": {
-            "status": "completed",
-            "provider_reference": provider_reference,
-            "provider_message": api_message,
-            "completed_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
-    return {
-        "success": True,
-        "message": f"Data bundle {request.display_name} sent to {request.phone}",
-        "transaction_id": service_tx["id"],
-        "provider_reference": provider_reference,
-        "amount": request.amount,
-        "fee": fee_info["fee_amount"],
-        "total_deducted": total_cost,
-        "new_balance": debit_result["balance_after"]
-    }
+        
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Data bundle purchase failed")
+        )
 
 
 @router.post("/ecg/pay")
 async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get_current_client)):
-    """Pay ECG bill using cashback balance via BulkClix API"""
+    """Pay ECG bill using cashback balance via Hubtel VAS API"""
+    
+    from services.hubtel_vas_service import get_hubtel_vas_service
     
     if request.amount < MIN_TRANSACTION_AMOUNT:
         raise HTTPException(status_code=400, detail=f"Minimum amount is GHS {MIN_TRANSACTION_AMOUNT}")
@@ -713,6 +602,9 @@ async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get
             detail=f"Insufficient balance. Required: GHS {total_cost:.2f}"
         )
     
+    # Generate unique transaction ID
+    transaction_id = f"SDM-ECG-{uuid.uuid4().hex[:12].upper()}"
+    
     # Create service transaction record
     service_tx = {
         "id": str(uuid.uuid4()),
@@ -722,115 +614,66 @@ async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get
         "amount": request.amount,
         "service_fee": fee_info["fee_amount"],
         "total_deducted": total_cost,
+        "transaction_id": transaction_id,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     await db.service_transactions.insert_one(service_tx)
     
-    # Call BulkClix bill payment API
-    api_success = False
-    api_message = "Transaction simulated"
-    provider_reference = None
-    ecg_token = None
+    # Call Hubtel VAS API for ECG payment
+    hubtel_vas = get_hubtel_vas_service(db)
+    result = await hubtel_vas.pay_ecg_bill(
+        meter_number=request.meter_number,
+        amount=request.amount,
+        bill_type="prepaid",
+        client_reference=transaction_id
+    )
     
-    if BULKCLIX_API_KEY:
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                payload = {
-                    "provider": "ECG",
-                    "account_number": request.meter_number,
-                    "amount": request.amount,
-                    "reference": f"SDM-ECG-{service_tx['id'][:8].upper()}"
-                }
-                
-                logger.info(f"BulkClix ECG Request: {payload}")
-                
-                response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/bill-api/pay",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json=payload,
-                    timeout=60.0  # Longer timeout for bill payments
-                )
-                
-                logger.info(f"BulkClix ECG Response: {response.status_code} - {response.text[:500] if response.text else 'EMPTY'}")
-                
-                result = response.json() if response.text else {}
-                
-                # Check for success
-                if response.status_code == 200:
-                    if result.get("status") == "success" or "success" in result.get("message", "").lower():
-                        api_success = True
-                        api_message = result.get("message", "ECG payment successful")
-                        provider_reference = result.get("reference") or result.get("transaction_id")
-                        ecg_token = result.get("token") or result.get("receipt_number") or result.get("data", {}).get("token")
-                    else:
-                        api_message = result.get("message", "Unknown response from provider")
-                        logger.warning(f"BulkClix ECG returned non-success: {result}")
-                else:
-                    api_message = result.get("message", f"Provider returned status {response.status_code}")
-                    logger.error(f"BulkClix ECG failed: {response.status_code} - {result}")
-                    
-        except httpx.RequestError as e:
-            logger.error(f"BulkClix ECG network error: {e}")
-            api_message = "Network error - please try again"
-        except Exception as e:
-            logger.error(f"BulkClix ECG error: {e}")
-            api_message = str(e)
+    if result.get("success"):
+        # Deduct balance
+        await db.clients.update_one(
+            {"id": current_client["id"]},
+            {"$inc": {"cashback_balance": -total_cost}}
+        )
+        
+        # Update transaction as success
+        await db.service_transactions.update_one(
+            {"id": service_tx["id"]},
+            {"$set": {
+                "status": "success",
+                "provider_reference": result.get("transaction_id"),
+                "ecg_token": result.get("token"),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": f"ECG payment of GHS {request.amount:.2f} to meter {request.meter_number}",
+            "transaction_id": transaction_id,
+            "provider_reference": result.get("transaction_id"),
+            "ecg_token": result.get("token"),
+            "amount": request.amount,
+            "fee": fee_info["fee_amount"],
+            "total_deducted": total_cost,
+            "new_balance": balance - total_cost
+        }
     else:
-        logger.warning("BULKCLIX_API_KEY not configured - simulating ECG payment")
-        api_success = True  # Simulate success in test mode
-        api_message = "ECG payment processed (simulated - API not configured)"
-        provider_reference = f"SIM-{service_tx['id'][:8].upper()}"
-        ecg_token = f"TOKEN-{uuid.uuid4().hex[:12].upper()}"
-    
-    if not api_success:
         # Update transaction as failed
         await db.service_transactions.update_one(
             {"id": service_tx["id"]},
             {"$set": {
                 "status": "failed",
-                "error_message": api_message,
+                "error": result.get("error"),
                 "completed_at": datetime.now(timezone.utc).isoformat()
             }}
         )
-        raise HTTPException(status_code=400, detail=f"ECG payment failed: {api_message}")
-    
-    # Debit cashback
-    debit_result = await debit_cashback(
-        current_client["id"],
-        total_cost,
-        f"ECG payment: GHS {request.amount} to meter {request.meter_number}",
-        "ecg_payment"
-    )
-    
-    # Update service transaction as completed
-    await db.service_transactions.update_one(
-        {"id": service_tx["id"]},
-        {"$set": {
-            "status": "completed",
-            "provider_reference": provider_reference,
-            "ecg_token": ecg_token,
-            "provider_message": api_message,
-            "completed_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
-    return {
-        "success": True,
-        "message": f"ECG payment of GHS {request.amount:.2f} to meter {request.meter_number}",
-        "transaction_id": service_tx["id"],
-        "provider_reference": provider_reference,
-        "ecg_token": ecg_token,
-        "amount": request.amount,
-        "fee": fee_info["fee_amount"],
-        "total_deducted": total_cost,
-        "new_balance": debit_result["balance_after"]
-    }
+        
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "ECG payment failed")
+        )
 
 
 @router.post("/withdrawal/initiate")
