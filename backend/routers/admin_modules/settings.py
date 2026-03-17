@@ -7,9 +7,9 @@ Platform settings and configuration endpoints
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Any, Dict
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 
 from routers.auth import get_current_admin
 from routers.admin_modules.dependencies import get_db, check_is_super_admin
@@ -32,6 +32,78 @@ async def get_platform_settings(current_admin: dict = Depends(get_current_admin)
     """Get platform configuration"""
     config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
     return {"config": config}
+
+
+@router.put("/platform-config")
+async def update_platform_config(
+    updates: Dict[str, Any] = Body(...),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Generic platform config update endpoint.
+    Accepts any key-value pairs and maps them to the correct database structure.
+    This is the CENTRAL endpoint for all admin dashboard updates.
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    db_updates = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    # Map frontend keys to database structure
+    key_mapping = {
+        # Card prices
+        "silver_card_price": "card_prices.silver",
+        "gold_card_price": "card_prices.gold",
+        "platinum_card_price": "card_prices.platinum",
+        # Card benefits
+        "silver_card_benefits": "card_benefits.silver",
+        "gold_card_benefits": "card_benefits.gold",
+        "platinum_card_benefits": "card_benefits.platinum",
+        # Card durations
+        "silver_card_duration": "card_durations.silver",
+        "gold_card_duration": "card_durations.gold",
+        "platinum_card_duration": "card_durations.platinum",
+        # Welcome bonuses
+        "silver_welcome_bonus": "welcome_bonuses.silver",
+        "gold_welcome_bonus": "welcome_bonuses.gold",
+        "platinum_welcome_bonus": "welcome_bonuses.platinum",
+        # Referral bonuses
+        "referral_welcome_bonus": "referral_bonuses.welcome_bonus",
+        "referral_referrer_bonus": "referral_bonuses.referrer_bonus",
+        # Service fees (direct mapping)
+        "service_fees": "service_fees",
+        # Cashback rates
+        "silver_cashback_rate": "card_cashback_rates.silver",
+        "gold_cashback_rate": "card_cashback_rates.gold",
+        "platinum_cashback_rate": "card_cashback_rates.platinum",
+    }
+    
+    for key, value in updates.items():
+        if key in key_mapping:
+            db_updates[key_mapping[key]] = value
+        else:
+            # For unmapped keys, store directly
+            db_updates[key] = value
+    
+    # Update the database
+    await db.platform_config.update_one(
+        {"key": "main"}, 
+        {"$set": db_updates},
+        upsert=True
+    )
+    
+    # Log the update
+    await db.admin_logs.insert_one({
+        "id": str(uuid.uuid4()),
+        "admin_id": current_admin["id"],
+        "action": "update_platform_config",
+        "changes": list(updates.keys()),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    logger.info(f"Platform config updated by admin {current_admin['id']}: {list(updates.keys())}")
+    
+    return {"success": True, "message": "Configuration updated successfully"}
 
 
 @router.put("/settings/commissions")

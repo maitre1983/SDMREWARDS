@@ -20,9 +20,11 @@ export default function SettingsReferrals({ token, platformConfig, onConfigUpdat
 
   useEffect(() => {
     if (platformConfig) {
+      // Read from the correct nested structure stored in database
+      const referralBonuses = platformConfig.referral_bonuses || {};
       setReferralForm({
-        welcome_bonus: platformConfig.referral_welcome_bonus || 1,
-        referrer_bonus: platformConfig.referral_referrer_bonus || 3
+        welcome_bonus: referralBonuses.welcome_bonus || platformConfig.referral_welcome_bonus || 1,
+        referrer_bonus: referralBonuses.referrer_bonus || platformConfig.referral_referrer_bonus || 3
       });
     }
   }, [platformConfig]);

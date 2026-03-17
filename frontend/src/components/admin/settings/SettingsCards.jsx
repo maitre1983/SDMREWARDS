@@ -24,19 +24,25 @@ export default function SettingsCards({ token, platformConfig, onConfigUpdate })
 
   useEffect(() => {
     if (platformConfig) {
+      // Read from the correct nested structure stored in database
+      const cardPrices = platformConfig.card_prices || {};
+      const cardBenefits = platformConfig.card_benefits || {};
+      const cardDurations = platformConfig.card_durations || {};
+      const welcomeBonuses = platformConfig.welcome_bonuses || {};
+      
       setCardPricesForm({
-        silver_price: platformConfig.silver_card_price || 25,
-        gold_price: platformConfig.gold_card_price || 50,
-        platinum_price: platformConfig.platinum_card_price || 100,
-        silver_benefits: platformConfig.silver_card_benefits || '3% cashback on all purchases',
-        gold_benefits: platformConfig.gold_card_benefits || '5% cashback + Priority support',
-        platinum_benefits: platformConfig.platinum_card_benefits || '7% cashback + VIP benefits + Exclusive offers',
-        silver_duration: platformConfig.silver_card_duration || 365,
-        gold_duration: platformConfig.gold_card_duration || 365,
-        platinum_duration: platformConfig.platinum_card_duration || 730,
-        silver_welcome_bonus: platformConfig.silver_welcome_bonus || 1,
-        gold_welcome_bonus: platformConfig.gold_welcome_bonus || 2,
-        platinum_welcome_bonus: platformConfig.platinum_welcome_bonus || 3
+        silver_price: cardPrices.silver || platformConfig.silver_card_price || 25,
+        gold_price: cardPrices.gold || platformConfig.gold_card_price || 50,
+        platinum_price: cardPrices.platinum || platformConfig.platinum_card_price || 100,
+        silver_benefits: cardBenefits.silver || platformConfig.silver_card_benefits || '3% cashback on all purchases',
+        gold_benefits: cardBenefits.gold || platformConfig.gold_card_benefits || '5% cashback + Priority support',
+        platinum_benefits: cardBenefits.platinum || platformConfig.platinum_card_benefits || '7% cashback + VIP benefits + Exclusive offers',
+        silver_duration: cardDurations.silver || platformConfig.silver_card_duration || 365,
+        gold_duration: cardDurations.gold || platformConfig.gold_card_duration || 365,
+        platinum_duration: cardDurations.platinum || platformConfig.platinum_card_duration || 730,
+        silver_welcome_bonus: welcomeBonuses.silver || platformConfig.silver_welcome_bonus || 1,
+        gold_welcome_bonus: welcomeBonuses.gold || platformConfig.gold_welcome_bonus || 2,
+        platinum_welcome_bonus: welcomeBonuses.platinum || platformConfig.platinum_welcome_bonus || 3
       });
     }
   }, [platformConfig]);
