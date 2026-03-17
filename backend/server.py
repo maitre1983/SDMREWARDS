@@ -63,6 +63,9 @@ async def lifespan(app: FastAPI):
     # Initialize Settings PIN
     await init_settings_pin()
     
+    # Make database accessible via app.state
+    app.state.db = db
+    
     # Start scheduled SMS worker
     from services.scheduled_sms_processor import start_scheduled_sms_worker
     sms_worker_task = asyncio.create_task(start_scheduled_sms_worker())

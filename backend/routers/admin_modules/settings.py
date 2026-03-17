@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, Request
 
 from routers.auth import get_current_admin
 from routers.admin_modules.dependencies import get_db, check_is_super_admin
@@ -352,6 +352,91 @@ async def delete_card_type(
     })
     
     return {"success": True, "message": "Card type deleted"}
+
+
+@router.post("/service-fees")
+async def save_service_fees(
+    request: Request,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    POST endpoint for saving service fees.
+    Accepts direct service_fees object and saves to database.
+    This is the PRIMARY endpoint for Admin Dashboard Service Fees updates.
+    """
+    if not check_is_super_admin(current_admin):
+        raise HTTPException(status_code=403, detail="Super admin required")
+    
+    try:
+        data = await request.json()
+        
+        # Validate and sanitize numeric values (prevent NaN)
+        def sanitize_number(value, default=0):
+            try:
+                num = float(value) if value is not None else default
+                if num != num:  # Check for NaN
+                    return default
+                return num
+            except (ValueError, TypeError):
+                return default
+        
+        # Build service_fees structure
+        service_fees = {}
+        if "airtime" in data or "airtime_rate" in data:
+            service_fees["airtime"] = {
+                "type": data.get("airtime_type", data.get("airtime", {}).get("type", "percentage")),
+                "rate": sanitize_number(data.get("airtime_rate", data.get("airtime", {}).get("rate")), 2)
+            }
+        if "data" in data or "data_rate" in data:
+            service_fees["data"] = {
+                "type": data.get("data_type", data.get("data", {}).get("type", "percentage")),
+                "rate": sanitize_number(data.get("data_rate", data.get("data", {}).get("rate")), 2)
+            }
+        if "ecg" in data or "ecg_rate" in data:
+            service_fees["ecg"] = {
+                "type": data.get("ecg_type", data.get("ecg", {}).get("type", "fixed")),
+                "rate": sanitize_number(data.get("ecg_rate", data.get("ecg", {}).get("rate")), 1)
+            }
+        if "merchant_payment" in data or "merchant_rate" in data:
+            service_fees["merchant_payment"] = {
+                "type": data.get("merchant_type", data.get("merchant_payment", {}).get("type", "percentage")),
+                "rate": sanitize_number(data.get("merchant_rate", data.get("merchant_payment", {}).get("rate")), 1)
+            }
+        if "withdrawal" in data or "withdrawal_rate" in data:
+            service_fees["withdrawal"] = {
+                "type": data.get("withdrawal_type", data.get("withdrawal", {}).get("type", "percentage")),
+                "rate": sanitize_number(data.get("withdrawal_rate", data.get("withdrawal", {}).get("rate")), 1)
+            }
+        
+        # If data contains direct service_fees object
+        if "service_fees" in data and isinstance(data["service_fees"], dict):
+            for key, value in data["service_fees"].items():
+                if isinstance(value, dict):
+                    service_fees[key] = {
+                        "type": value.get("type", "percentage"),
+                        "rate": sanitize_number(value.get("rate"), 1)
+                    }
+        
+        # Update database with service_commissions (the canonical name)
+        updates = {
+            "service_commissions": service_fees,
+            "service_fees": service_fees,  # Also store under service_fees for compatibility
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.platform_config.update_one(
+            {"key": "main"},
+            {"$set": updates},
+            upsert=True
+        )
+        
+        logger.info(f"Service fees updated by admin {current_admin['id']}: {service_fees}")
+        
+        return {"success": True, "message": "Service fees saved successfully", "data": service_fees}
+        
+    except Exception as e:
+        logger.error(f"Error saving service fees: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to save service fees: {str(e)}")
 
 
 @router.put("/settings/service-commissions")

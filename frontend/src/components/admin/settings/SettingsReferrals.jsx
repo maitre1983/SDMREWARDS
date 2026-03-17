@@ -32,14 +32,25 @@ export default function SettingsReferrals({ token, platformConfig, onConfigUpdat
   const handleSaveReferrals = async () => {
     try {
       setIsLoading(true);
-      await axios.put(`${API_URL}/api/admin/platform-config`, {
-        referral_welcome_bonus: referralForm.welcome_bonus,
-        referral_referrer_bonus: referralForm.referrer_bonus
-      }, { headers });
+      
+      // Validate and sanitize numeric values
+      const sanitizeNumber = (value, defaultValue = 0) => {
+        const num = parseFloat(value);
+        if (isNaN(num)) return defaultValue;
+        return num;
+      };
+      
+      const payload = {
+        referral_welcome_bonus: sanitizeNumber(referralForm.welcome_bonus, 1),
+        referral_referrer_bonus: sanitizeNumber(referralForm.referrer_bonus, 3)
+      };
+      
+      await axios.put(`${API_URL}/api/admin/platform-config`, payload, { headers });
       toast.success('Referral bonuses updated');
       onConfigUpdate?.();
     } catch (error) {
-      toast.error('Failed to update referral settings');
+      console.error('Referral update error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update referral settings');
     } finally {
       setIsLoading(false);
     }

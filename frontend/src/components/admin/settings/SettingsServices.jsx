@@ -44,19 +44,30 @@ export default function SettingsServices({ token, platformConfig, onConfigUpdate
   const handleSaveServiceFees = async () => {
     try {
       setIsLoading(true);
-      // Map frontend field names to backend expected field names
-      await axios.put(`${API_URL}/api/admin/settings/service-commissions`, {
-        airtime_commission_type: serviceCommissionsForm.airtime_type,
-        airtime_commission_rate: parseFloat(serviceCommissionsForm.airtime_rate),
-        data_commission_type: serviceCommissionsForm.data_type,
-        data_commission_rate: parseFloat(serviceCommissionsForm.data_rate),
-        ecg_commission_type: serviceCommissionsForm.ecg_type,
-        ecg_commission_rate: parseFloat(serviceCommissionsForm.ecg_rate),
-        merchant_payment_commission_type: serviceCommissionsForm.merchant_type,
-        merchant_payment_commission_rate: parseFloat(serviceCommissionsForm.merchant_rate),
-        withdrawal_commission_type: serviceCommissionsForm.withdrawal_type,
-        withdrawal_commission_rate: parseFloat(serviceCommissionsForm.withdrawal_rate)
-      }, { headers });
+      
+      // Validate and sanitize numeric values (prevent NaN)
+      const sanitizeNumber = (value, defaultValue = 0) => {
+        const num = parseFloat(value);
+        if (isNaN(num)) return defaultValue;
+        return num;
+      };
+      
+      // Build the payload with validated data
+      const payload = {
+        airtime_type: serviceCommissionsForm.airtime_type || 'percentage',
+        airtime_rate: sanitizeNumber(serviceCommissionsForm.airtime_rate, 2),
+        data_type: serviceCommissionsForm.data_type || 'percentage',
+        data_rate: sanitizeNumber(serviceCommissionsForm.data_rate, 2),
+        ecg_type: serviceCommissionsForm.ecg_type || 'fixed',
+        ecg_rate: sanitizeNumber(serviceCommissionsForm.ecg_rate, 1),
+        merchant_type: serviceCommissionsForm.merchant_type || 'percentage',
+        merchant_rate: sanitizeNumber(serviceCommissionsForm.merchant_rate, 1),
+        withdrawal_type: serviceCommissionsForm.withdrawal_type || 'percentage',
+        withdrawal_rate: sanitizeNumber(serviceCommissionsForm.withdrawal_rate, 1)
+      };
+      
+      // Use POST endpoint for service fees
+      await axios.post(`${API_URL}/api/admin/service-fees`, payload, { headers });
       toast.success('Service fees updated');
       onConfigUpdate?.();
     } catch (error) {

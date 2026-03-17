@@ -50,24 +50,35 @@ export default function SettingsCards({ token, platformConfig, onConfigUpdate })
   const handleSaveCardPrices = async () => {
     try {
       setIsLoading(true);
-      await axios.put(`${API_URL}/api/admin/platform-config`, {
-        silver_card_price: cardPricesForm.silver_price,
-        gold_card_price: cardPricesForm.gold_price,
-        platinum_card_price: cardPricesForm.platinum_price,
-        silver_card_benefits: cardPricesForm.silver_benefits,
-        gold_card_benefits: cardPricesForm.gold_benefits,
-        platinum_card_benefits: cardPricesForm.platinum_benefits,
-        silver_card_duration: cardPricesForm.silver_duration,
-        gold_card_duration: cardPricesForm.gold_duration,
-        platinum_card_duration: cardPricesForm.platinum_duration,
-        silver_welcome_bonus: cardPricesForm.silver_welcome_bonus,
-        gold_welcome_bonus: cardPricesForm.gold_welcome_bonus,
-        platinum_welcome_bonus: cardPricesForm.platinum_welcome_bonus
-      }, { headers });
+      
+      // Validate and sanitize numeric values
+      const sanitizeNumber = (value, defaultValue = 0) => {
+        const num = parseFloat(value);
+        if (isNaN(num)) return defaultValue;
+        return num;
+      };
+      
+      const payload = {
+        silver_card_price: sanitizeNumber(cardPricesForm.silver_price, 25),
+        gold_card_price: sanitizeNumber(cardPricesForm.gold_price, 50),
+        platinum_card_price: sanitizeNumber(cardPricesForm.platinum_price, 100),
+        silver_card_benefits: cardPricesForm.silver_benefits || '3% cashback on all purchases',
+        gold_card_benefits: cardPricesForm.gold_benefits || '5% cashback + Priority support',
+        platinum_card_benefits: cardPricesForm.platinum_benefits || '7% cashback + VIP benefits',
+        silver_card_duration: sanitizeNumber(cardPricesForm.silver_duration, 365),
+        gold_card_duration: sanitizeNumber(cardPricesForm.gold_duration, 365),
+        platinum_card_duration: sanitizeNumber(cardPricesForm.platinum_duration, 730),
+        silver_welcome_bonus: sanitizeNumber(cardPricesForm.silver_welcome_bonus, 1),
+        gold_welcome_bonus: sanitizeNumber(cardPricesForm.gold_welcome_bonus, 2),
+        platinum_welcome_bonus: sanitizeNumber(cardPricesForm.platinum_welcome_bonus, 3)
+      };
+      
+      await axios.put(`${API_URL}/api/admin/platform-config`, payload, { headers });
       toast.success('Card prices updated');
       onConfigUpdate?.();
     } catch (error) {
-      toast.error('Failed to update card prices');
+      console.error('Card prices update error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update card prices');
     } finally {
       setIsLoading(false);
     }
