@@ -340,8 +340,9 @@ async def _complete_card_purchase(
         }}
     )
     
-    # Process welcome bonus
-    welcome_bonus = config.get("welcome_bonus", 1) if config else 1
+    # Process welcome bonus - read from welcome_bonuses config based on card type
+    welcome_bonuses = config.get("welcome_bonuses", {"silver": 1, "gold": 2, "platinum": 3}) if config else {"silver": 1, "gold": 2, "platinum": 3}
+    welcome_bonus = welcome_bonuses.get(card_type.value, 1)
     await db.clients.update_one(
         {"id": client_id},
         {"$inc": {
