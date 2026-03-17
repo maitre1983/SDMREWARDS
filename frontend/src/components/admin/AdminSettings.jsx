@@ -40,9 +40,12 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
     try {
       setIsLoading(true);
       const res = await axios.get(`${API_URL}/api/admin/platform-config`, { headers });
-      setPlatformConfig(res.data);
+      console.log('Platform config response:', res.data);
+      // Extract the config object from the response
+      setPlatformConfig(res.data.config || res.data);
     } catch (error) {
       console.error('Error fetching platform config:', error);
+      toast.error('Failed to load platform configuration');
     } finally {
       setIsLoading(false);
     }

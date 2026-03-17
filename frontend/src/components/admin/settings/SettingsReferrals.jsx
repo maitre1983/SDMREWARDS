@@ -30,6 +30,10 @@ export default function SettingsReferrals({ token, platformConfig, onConfigUpdat
   }, [platformConfig]);
 
   const handleSaveReferrals = async () => {
+    console.log('handleSaveReferrals called');
+    console.log('API_URL:', API_URL);
+    console.log('Token:', token ? 'present' : 'missing');
+    
     try {
       setIsLoading(true);
       
@@ -45,11 +49,17 @@ export default function SettingsReferrals({ token, platformConfig, onConfigUpdat
         referral_referrer_bonus: sanitizeNumber(referralForm.referrer_bonus, 3)
       };
       
-      await axios.put(`${API_URL}/api/admin/platform-config`, payload, { headers });
+      console.log('Sending payload:', payload);
+      console.log('Full URL:', `${API_URL}/api/admin/platform-config`);
+      
+      const response = await axios.put(`${API_URL}/api/admin/platform-config`, payload, { headers });
+      console.log('Response:', response.data);
+      
       toast.success('Referral bonuses updated');
       onConfigUpdate?.();
     } catch (error) {
       console.error('Referral update error:', error);
+      console.error('Error response:', error.response?.data);
       toast.error(error.response?.data?.detail || 'Failed to update referral settings');
     } finally {
       setIsLoading(false);

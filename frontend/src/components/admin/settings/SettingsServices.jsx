@@ -42,6 +42,10 @@ export default function SettingsServices({ token, platformConfig, onConfigUpdate
   }, [platformConfig]);
 
   const handleSaveServiceFees = async () => {
+    console.log('handleSaveServiceFees called');
+    console.log('API_URL:', API_URL);
+    console.log('Token:', token ? 'present' : 'missing');
+    
     try {
       setIsLoading(true);
       
@@ -66,12 +70,18 @@ export default function SettingsServices({ token, platformConfig, onConfigUpdate
         withdrawal_rate: sanitizeNumber(serviceCommissionsForm.withdrawal_rate, 1)
       };
       
+      console.log('Sending payload:', payload);
+      console.log('Full URL:', `${API_URL}/api/admin/service-fees`);
+      
       // Use POST endpoint for service fees
-      await axios.post(`${API_URL}/api/admin/service-fees`, payload, { headers });
+      const response = await axios.post(`${API_URL}/api/admin/service-fees`, payload, { headers });
+      console.log('Response:', response.data);
+      
       toast.success('Service fees updated');
       onConfigUpdate?.();
     } catch (error) {
       console.error('Service fees update error:', error);
+      console.error('Error response:', error.response?.data);
       toast.error(error.response?.data?.detail || 'Failed to update service fees');
     } finally {
       setIsLoading(false);

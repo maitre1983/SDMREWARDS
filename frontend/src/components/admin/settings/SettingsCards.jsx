@@ -48,6 +48,10 @@ export default function SettingsCards({ token, platformConfig, onConfigUpdate })
   }, [platformConfig]);
 
   const handleSaveCardPrices = async () => {
+    console.log('handleSaveCardPrices called');
+    console.log('API_URL:', API_URL);
+    console.log('Token:', token ? 'present' : 'missing');
+    
     try {
       setIsLoading(true);
       
@@ -73,11 +77,17 @@ export default function SettingsCards({ token, platformConfig, onConfigUpdate })
         platinum_welcome_bonus: sanitizeNumber(cardPricesForm.platinum_welcome_bonus, 3)
       };
       
-      await axios.put(`${API_URL}/api/admin/platform-config`, payload, { headers });
+      console.log('Sending payload:', payload);
+      console.log('Full URL:', `${API_URL}/api/admin/platform-config`);
+      
+      const response = await axios.put(`${API_URL}/api/admin/platform-config`, payload, { headers });
+      console.log('Response:', response.data);
+      
       toast.success('Card prices updated');
       onConfigUpdate?.();
     } catch (error) {
       console.error('Card prices update error:', error);
+      console.error('Error response:', error.response?.data);
       toast.error(error.response?.data?.detail || 'Failed to update card prices');
     } finally {
       setIsLoading(false);
