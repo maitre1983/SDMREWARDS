@@ -333,6 +333,53 @@ async def health_check():
     }
 
 
+@app.get("/api/debug/server-ip")
+async def get_server_outbound_ip():
+    """
+    Debug endpoint to discover the server's outbound IP address.
+    This helps identify which IP needs to be whitelisted with payment providers.
+    """
+    import httpx
+    
+    ip_info = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "outbound_ips": []
+    }
+    
+    # Try multiple IP detection services
+    ip_services = [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://icanhazip.com"
+    ]
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for service in ip_services:
+            try:
+                response = await client.get(service)
+                if response.status_code == 200:
+                    ip = response.text.strip()
+                    if ip and ip not in ip_info["outbound_ips"]:
+                        ip_info["outbound_ips"].append(ip)
+            except Exception as e:
+                pass
+    
+    # Also try hitting the webhook to show actual IP
+    webhook_url = "https://webhook.site/dfe1a8b7-4e95-44d6-9649-58f02f0935b5"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(
+                f"{webhook_url}/server-ip-check",
+                json={"source": "sdm-rewards-debug", "timestamp": ip_info["timestamp"]},
+                headers={"X-Debug": "server-ip-check"}
+            )
+            ip_info["webhook_pinged"] = True
+    except Exception:
+        ip_info["webhook_pinged"] = False
+    
+    return ip_info
+
+
 # ============== PUBLIC BANKS ENDPOINT ==============
 @app.get("/api/public/banks")
 async def get_public_banks():
