@@ -34,6 +34,16 @@ async def get_platform_settings(current_admin: dict = Depends(get_current_admin)
     return {"config": config}
 
 
+@router.get("/platform-config")
+async def get_platform_config(current_admin: dict = Depends(get_current_admin)):
+    """
+    Get the full platform configuration.
+    Used by Admin Dashboard to load current settings.
+    """
+    config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+    return {"success": True, "config": config or {}}
+
+
 @router.put("/platform-config")
 async def update_platform_config(
     updates: Dict[str, Any] = Body(...),
