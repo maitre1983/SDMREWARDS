@@ -179,11 +179,12 @@ async def request_withdrawal(
     
     hubtel_service = get_hubtel_momo_service(db)
     
-    result = await hubtel_service.send_money(
+    result = await hubtel_service.send_momo(
         phone=request.phone,
         amount=net_amount,
         description=f"SDM Rewards Withdrawal - {withdrawal_ref}",
-        client_reference=withdrawal_ref
+        client_reference=withdrawal_ref,
+        recipient_name=client.get("name", "SDM Client")
     )
     
     if result.get("success"):
