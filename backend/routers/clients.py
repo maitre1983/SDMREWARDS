@@ -686,44 +686,70 @@ async def upgrade_card(
     
     # Initiate MoMo payment for remaining amount
     if not test_mode:
-        # Call Hubtel MoMo Collection API
-        from services.hubtel_momo_service import get_hubtel_momo_service
+        # Use Hubtel Online Checkout API (no IP whitelisting required)
+        from services.hubtel_checkout_service import get_hubtel_checkout_service, HubtelCheckoutRequest
         
-        hubtel_service = get_hubtel_momo_service(db)
+        hubtel_service = get_hubtel_checkout_service(db)
         
         try:
-            result = await hubtel_service.collect_momo(
-                phone=request.payment_phone,
+            checkout_request = HubtelCheckoutRequest(
                 amount=momo_amount,
                 description=f"SDM Rewards Card Upgrade ({current_card_type.upper()} to {request.new_card_type.upper()})",
+                customer_phone=request.payment_phone or current_client.get("phone", ""),
                 client_reference=payment_record["reference"]
             )
+            
+            result = await hubtel_service.initiate_checkout(checkout_request)
+            
+            if result.success:
+                await db.momo_payments.update_one(
+                    {"id": payment_id},
+                    {"$set": {
+                        "status": "checkout_initiated",
+                        "provider": "hubtel_checkout",
+                        "checkout_url": result.checkout_url,
+                        "checkout_id": result.request_id,
+                        "provider_message": result.message
+                    }}
+                )
+                
+                return {
+                    "success": True,
+                    "status": "pending",
+                    "payment_id": payment_id,
+                    "amount": new_price,
+                    "cashback_used": cashback_to_use,
+                    "momo_amount": momo_amount,
+                    "from_card": current_card_type,
+                    "to_card": request.new_card_type,
+                    "welcome_bonus": welcome_bonus,
+                    "checkout_url": result.checkout_url,
+                    "checkout_id": result.request_id,
+                    "message": f"Redirecting to payment page for GHS {momo_amount:.2f}" + (f" (GHS {cashback_to_use:.2f} paid with cashback)" if cashback_to_use > 0 else "")
+                }
+            else:
+                # Refund cashback if checkout initiation failed
+                if cashback_to_use > 0:
+                    await db.clients.update_one(
+                        {"id": client_id},
+                        {"$inc": {"cashback_balance": cashback_to_use}}
+                    )
+                error_msg = result.error or "Payment initiation failed"
+                raise HTTPException(status_code=400, detail=error_msg)
+                
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.error(f"Hubtel service error: {e}")
-            result = {"success": False, "error": str(e)}
-        
-        if result.get("success"):
-            await db.momo_payments.update_one(
-                {"id": payment_id},
-                {"$set": {
-                    "status": "processing",
-                    "provider": "hubtel",
-                    "provider_reference": result.get("transaction_id"),
-                    "provider_message": result.get("message")
-                }}
-            )
-        else:
-            # Refund cashback if MoMo initiation failed
+            logger.error(f"Hubtel checkout error: {e}")
+            # Refund cashback on error
             if cashback_to_use > 0:
                 await db.clients.update_one(
                     {"id": client_id},
                     {"$inc": {"cashback_balance": cashback_to_use}}
                 )
-            error_msg = result.get("error", "Payment initiation failed")
-            if "peer closed" in error_msg or "connection" in error_msg.lower():
-                error_msg = "Connection to payment provider failed. Please try again."
-            raise HTTPException(status_code=400, detail=error_msg)
+            raise HTTPException(status_code=400, detail=f"Payment service error: {str(e)}")
     
+    # Test mode response
     return {
         "success": True,
         "status": "pending",
@@ -735,7 +761,7 @@ async def upgrade_card(
         "to_card": request.new_card_type,
         "welcome_bonus": welcome_bonus,
         "test_mode": test_mode,
-        "message": f"MoMo payment of GHS {momo_amount:.2f} required for upgrade" + (f" (GHS {cashback_to_use:.2f} paid with cashback)" if cashback_to_use > 0 else "")
+        "message": f"Test mode: MoMo payment of GHS {momo_amount:.2f} required for upgrade"
     }
 
 
