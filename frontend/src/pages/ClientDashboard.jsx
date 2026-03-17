@@ -1012,8 +1012,12 @@ export default function ClientDashboard() {
             setShowUpgradeModal(false);
             fetchDashboardData();
           }, 2000);
+        } else if (res.data.checkout_url) {
+          // Online Checkout - redirect to Hubtel payment page
+          toast.success('Redirecting to payment page...');
+          window.location.href = res.data.checkout_url;
         } else {
-          // MoMo payment needed
+          // MoMo payment needed (legacy flow)
           setIsUpgradeTestMode(res.data.test_mode || false);
           setUpgradeStatus('pending');
           
