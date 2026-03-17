@@ -24,17 +24,19 @@ export default function SettingsServices({ token, platformConfig, onConfigUpdate
 
   useEffect(() => {
     if (platformConfig) {
+      // Read from service_commissions structure (how backend stores it)
+      const sc = platformConfig.service_commissions || {};
       setServiceCommissionsForm({
-        airtime_type: platformConfig.service_fees?.airtime_type || 'percentage',
-        airtime_rate: platformConfig.service_fees?.airtime_rate || 2,
-        data_type: platformConfig.service_fees?.data_type || 'percentage',
-        data_rate: platformConfig.service_fees?.data_rate || 2,
-        ecg_type: platformConfig.service_fees?.ecg_type || 'fixed',
-        ecg_rate: platformConfig.service_fees?.ecg_rate || 1,
-        merchant_type: platformConfig.service_fees?.merchant_type || 'percentage',
-        merchant_rate: platformConfig.service_fees?.merchant_rate || 1,
-        withdrawal_type: platformConfig.service_fees?.withdrawal_type || 'percentage',
-        withdrawal_rate: platformConfig.service_fees?.withdrawal_rate || 1
+        airtime_type: sc.airtime?.type || platformConfig.service_fees?.airtime_type || 'percentage',
+        airtime_rate: sc.airtime?.rate || platformConfig.service_fees?.airtime_rate || 2,
+        data_type: sc.data?.type || platformConfig.service_fees?.data_type || 'percentage',
+        data_rate: sc.data?.rate || platformConfig.service_fees?.data_rate || 2,
+        ecg_type: sc.ecg?.type || platformConfig.service_fees?.ecg_type || 'fixed',
+        ecg_rate: sc.ecg?.rate || platformConfig.service_fees?.ecg_rate || 1,
+        merchant_type: sc.merchant_payment?.type || platformConfig.service_fees?.merchant_type || 'percentage',
+        merchant_rate: sc.merchant_payment?.rate || platformConfig.service_fees?.merchant_rate || 1,
+        withdrawal_type: sc.withdrawal?.type || platformConfig.service_fees?.withdrawal_type || 'percentage',
+        withdrawal_rate: sc.withdrawal?.rate || platformConfig.service_fees?.withdrawal_rate || 1
       });
     }
   }, [platformConfig]);
@@ -42,13 +44,24 @@ export default function SettingsServices({ token, platformConfig, onConfigUpdate
   const handleSaveServiceFees = async () => {
     try {
       setIsLoading(true);
-      await axios.put(`${API_URL}/api/admin/platform-config`, {
-        service_fees: serviceCommissionsForm
+      // Map frontend field names to backend expected field names
+      await axios.put(`${API_URL}/api/admin/settings/service-commissions`, {
+        airtime_commission_type: serviceCommissionsForm.airtime_type,
+        airtime_commission_rate: parseFloat(serviceCommissionsForm.airtime_rate),
+        data_commission_type: serviceCommissionsForm.data_type,
+        data_commission_rate: parseFloat(serviceCommissionsForm.data_rate),
+        ecg_commission_type: serviceCommissionsForm.ecg_type,
+        ecg_commission_rate: parseFloat(serviceCommissionsForm.ecg_rate),
+        merchant_payment_commission_type: serviceCommissionsForm.merchant_type,
+        merchant_payment_commission_rate: parseFloat(serviceCommissionsForm.merchant_rate),
+        withdrawal_commission_type: serviceCommissionsForm.withdrawal_type,
+        withdrawal_commission_rate: parseFloat(serviceCommissionsForm.withdrawal_rate)
       }, { headers });
       toast.success('Service fees updated');
       onConfigUpdate?.();
     } catch (error) {
-      toast.error('Failed to update service fees');
+      console.error('Service fees update error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update service fees');
     } finally {
       setIsLoading(false);
     }
