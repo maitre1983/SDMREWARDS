@@ -43,6 +43,26 @@ async def get_withdrawal_fee():
     }
 
 
+
+@router.post("/withdrawal/initiate")
+async def initiate_withdrawal(
+    request: WithdrawalRequest,
+    current_client: dict = Depends(get_current_client)
+):
+    """
+    Initiate cashback withdrawal to MoMo.
+    Alias for /withdrawal/request for frontend compatibility.
+    Uses Hubtel Send Money API: https://smp.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/send/mobilemoney
+    
+    Business Rules:
+    - ONLY cashback balance can be withdrawn (not wallet/deposit)
+    - Minimum withdrawal: 5 GHS
+    - Service fee: 3% (configurable via Admin Dashboard)
+    - Balance deducted BEFORE processing
+    """
+    return await request_withdrawal(request, current_client)
+
+
 @router.post("/withdrawal/request")
 async def request_withdrawal(
     request: WithdrawalRequest,
@@ -51,12 +71,15 @@ async def request_withdrawal(
     """
     Request cashback withdrawal to MoMo.
     Uses Hubtel Send Money API.
+    
+    IMPORTANT: Only CASHBACK BALANCE can be withdrawn.
+    This is NOT a wallet or deposit system.
     """
     db = get_db()
     
-    # Validate amount
-    if request.amount < 1:
-        raise HTTPException(status_code=400, detail="Minimum withdrawal is GHS 1")
+    # Minimum withdrawal: 5 GHS
+    if request.amount < 5:
+        raise HTTPException(status_code=400, detail="Minimum withdrawal is GHS 5")
     
     if request.amount > 5000:
         raise HTTPException(status_code=400, detail="Maximum withdrawal is GHS 5,000")
@@ -66,12 +89,14 @@ async def request_withdrawal(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     
-    # Check balance
+    # Check CASHBACK balance (not wallet, not deposit - ONLY cashback)
     current_balance = client.get("cashback_balance", 0)
     
-    # Get withdrawal fee config
+    # Get withdrawal fee config from Admin Dashboard settings
     config = await db.platform_config.find_one({}, {"_id": 0, "service_commissions": 1})
-    withdrawal_config = {"type": "fixed", "rate": 0}
+    
+    # Default: 3% fee as per business rules
+    withdrawal_config = {"type": "percentage", "rate": 3}
     
     if config and config.get("service_commissions"):
         commissions = config["service_commissions"]
@@ -79,8 +104,8 @@ async def request_withdrawal(
             withdrawal_config = commissions["withdrawal"]
     
     # Calculate fee
-    fee_type = withdrawal_config.get("type", "fixed")
-    fee_rate = withdrawal_config.get("rate", 0)
+    fee_type = withdrawal_config.get("type", "percentage")
+    fee_rate = withdrawal_config.get("rate", 3)
     
     if fee_type == "percentage":
         withdrawal_fee = round(request.amount * (fee_rate / 100), 2)

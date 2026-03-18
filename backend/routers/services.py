@@ -795,6 +795,25 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
         )
 
 
+@router.post("/withdraw-momo")
+async def withdraw_momo(request: WithdrawalRequest, current_client: dict = Depends(get_current_client)):
+    """
+    Withdraw CASHBACK to MoMo.
+    Alias for /withdrawal/initiate.
+    
+    IMPORTANT: This withdraws from CASHBACK BALANCE ONLY.
+    This is NOT a wallet or deposit system.
+    
+    Business Rules:
+    - Minimum: 5 GHS
+    - Fee: 3% (configurable from Admin Dashboard)
+    - Balance deducted BEFORE Hubtel API call
+    
+    Hubtel Send Money API: https://smp.hubtel.com/api/merchants/2021772/send/mobilemoney
+    """
+    return await initiate_withdrawal(request, current_client)
+
+
 @router.get("/history")
 async def get_service_history(
     limit: int = 20,
