@@ -728,6 +728,7 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     """Withdraw cashback to MoMo via Hubtel Send Money API"""
     
     from services.hubtel_momo_service import get_hubtel_momo_service
+    from services.withdrawal_limits_service import get_withdrawal_limits_service
     
     # DETAILED LOGGING - Log everything for debugging
     logger.info("=" * 50)
@@ -753,14 +754,21 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
         logger.error(f"VALIDATION ERROR: {error_msg}")
         raise HTTPException(status_code=400, detail=error_msg)
     
-    min_withdrawal = 5.0
-    max_withdrawal = 1000.0
+    # ========== WITHDRAWAL LIMITS VALIDATION ==========
+    limits_service = get_withdrawal_limits_service(db)
+    client_id = current_client["id"]
     
-    # Validate amount
-    if amount < min_withdrawal:
-        error_msg = f"Minimum withdrawal is GHS {min_withdrawal}. You requested GHS {amount}"
-        logger.warning(f"VALIDATION ERROR: {error_msg}")
-        raise HTTPException(status_code=400, detail=error_msg)
+    # Validate against limits
+    limit_check = await limits_service.validate_withdrawal(client_id, amount, "momo")
+    
+    if not limit_check["allowed"]:
+        logger.warning(f"Withdrawal rejected - Limit exceeded: {limit_check['reason']}")
+        raise HTTPException(status_code=400, detail=limit_check["reason"])
+    
+    logger.info(f"Withdrawal limit check passed. Max allowed: GHS {limit_check['max_allowed']:.2f}")
+    # ===================================================
+    
+    min_withdrawal = 5.0
     
     if amount > max_withdrawal:
         error_msg = f"Maximum withdrawal is GHS {max_withdrawal}. You requested GHS {amount}"
@@ -1020,10 +1028,13 @@ async def initiate_bank_withdrawal(
     
     Flow:
     1. Validate client has sufficient balance
-    2. Deduct cashback
-    3. Send to bank via Hubtel
-    4. Return transaction reference for status tracking
+    2. Validate withdrawal limits
+    3. Deduct cashback
+    4. Send to bank via Hubtel
+    5. Return transaction reference for status tracking
     """
+    from services.withdrawal_limits_service import get_withdrawal_limits_service
+    
     client_id = current_client["id"]
     
     # Get current balance
@@ -1032,6 +1043,19 @@ async def initiate_bank_withdrawal(
         raise HTTPException(status_code=404, detail="Client not found")
     
     current_balance = client_record.get("cashback_balance", 0)
+    
+    # ========== WITHDRAWAL LIMITS VALIDATION ==========
+    limits_service = get_withdrawal_limits_service(db)
+    
+    # Validate against bank limits
+    limit_check = await limits_service.validate_withdrawal(client_id, request.amount, "bank")
+    
+    if not limit_check["allowed"]:
+        logger.warning(f"Bank withdrawal rejected - Limit exceeded: {limit_check['reason']}")
+        raise HTTPException(status_code=400, detail=limit_check["reason"])
+    
+    logger.info(f"Bank withdrawal limit check passed. Max allowed: GHS {limit_check['max_allowed']:.2f}")
+    # ===================================================
     
     # Get withdrawal fee from config
     config = await db.platform_config.find_one({"key": "main"})

@@ -495,3 +495,137 @@ async def update_referral_bonuses(
     await db.platform_config.update_one({"key": "main"}, {"$set": updates})
     
     return {"success": True, "message": "Referral bonuses updated"}
+
+
+
+# ===========================================
+# WITHDRAWAL LIMITS (GLOBAL)
+# ===========================================
+
+from services.withdrawal_limits_service import get_withdrawal_limits_service
+from pydantic import BaseModel
+
+class WithdrawalLimitsRequest(BaseModel):
+    """Global withdrawal limits configuration"""
+    momo_max_per_tx: float = 500
+    momo_daily: float = 1000
+    momo_weekly: float = 5000
+    momo_monthly: float = 20000
+    bank_max_per_tx: float = 2000
+    bank_daily: float = 5000
+    bank_weekly: float = 20000
+    bank_monthly: float = 100000
+
+
+@router.get("/withdrawal-limits")
+async def get_withdrawal_limits(current_admin: dict = Depends(get_current_admin)):
+    """
+    Get global withdrawal limits for clients.
+    
+    These limits apply to all clients and work with individual limits
+    using the formula: effective_limit = MIN(global_limit, user_limit)
+    """
+    limits_service = get_withdrawal_limits_service(db)
+    limits = await limits_service.get_global_limits()
+    
+    # Also get the raw config for admin display
+    config = await db.withdrawal_limits_global.find_one({"key": "main"}, {"_id": 0})
+    
+    return {
+        "success": True,
+        "limits": limits,
+        "config": config
+    }
+
+
+@router.put("/withdrawal-limits")
+async def update_withdrawal_limits(
+    request: WithdrawalLimitsRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Update global withdrawal limits for clients.
+    
+    These limits are the maximum allowed for ANY client.
+    Individual user limits can be set lower, but never higher.
+    """
+    limits_service = get_withdrawal_limits_service(db)
+    
+    limits = {
+        "momo": {
+            "max_per_tx": request.momo_max_per_tx,
+            "daily": request.momo_daily,
+            "weekly": request.momo_weekly,
+            "monthly": request.momo_monthly
+        },
+        "bank": {
+            "max_per_tx": request.bank_max_per_tx,
+            "daily": request.bank_daily,
+            "weekly": request.bank_weekly,
+            "monthly": request.bank_monthly
+        }
+    }
+    
+    success = await limits_service.set_global_limits(limits)
+    
+    if success:
+        logger.info(f"Admin {current_admin.get('email')} updated global withdrawal limits")
+        return {
+            "success": True,
+            "message": "Withdrawal limits updated successfully",
+            "limits": limits
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update limits")
+
+
+@router.get("/withdrawal-limits/user/{user_id}")
+async def get_user_withdrawal_limits(
+    user_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get a specific user's withdrawal limits and usage"""
+    limits_service = get_withdrawal_limits_service(db)
+    
+    # Get effective limits for both methods
+    momo_limits = await limits_service.get_effective_limits(user_id, "momo")
+    bank_limits = await limits_service.get_effective_limits(user_id, "bank")
+    
+    # Get user's individual limits (if any)
+    user_limits = await limits_service.get_user_limits(user_id)
+    
+    return {
+        "success": True,
+        "user_id": user_id,
+        "individual_limits": user_limits,
+        "effective_limits": {
+            "momo": momo_limits,
+            "bank": bank_limits
+        }
+    }
+
+
+@router.put("/withdrawal-limits/user/{user_id}")
+async def set_user_withdrawal_limits(
+    user_id: str,
+    limits: Dict[str, Any] = Body(...),
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Set individual withdrawal limits for a user.
+    
+    Note: Effective limit will always be MIN(global, user)
+    """
+    limits_service = get_withdrawal_limits_service(db)
+    
+    success = await limits_service.set_user_limits(user_id, limits)
+    
+    if success:
+        logger.info(f"Admin {current_admin.get('email')} updated limits for user {user_id}")
+        return {
+            "success": True,
+            "message": f"Limits updated for user {user_id}",
+            "limits": limits
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update user limits")
