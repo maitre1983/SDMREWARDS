@@ -15,6 +15,7 @@ import os
 import httpx
 import base64
 import uuid
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, List
@@ -522,61 +523,34 @@ class HubtelMoMoService:
         # Use SMP endpoint with Prepaid Deposit ID for Send Money
         url = f"{HUBTEL_SEND_BASE_URL}/{self.prepaid_deposit_id}/send/mobilemoney"
         
-        # Use curl subprocess like collect_momo to avoid HTTP library issues
-        import subprocess
-        import json as json_module
-        import asyncio
-        
         auth_header = self._get_auth_header()
-        payload_json = json_module.dumps(payload)
         
-        # Build curl command WITH PROXY
-        curl_cmd = ["curl", "-s"]
-        
-        # Add Fixie proxy for static IP (CRITICAL for production)
-        if FIXIE_PROXY_URL:
-            curl_cmd.extend(["--proxy", FIXIE_PROXY_URL])
-            logger.info("🔒 [SEND MONEY] Using Fixie static IP proxy")
-        
-        curl_cmd.extend([
-            "-X", "POST", url,
-            "--http1.1",
-            "--ignore-content-length",
-            "-H", "Content-Type: application/json",
-            "-H", f"Authorization: {auth_header}",
-            "-H", "Connection: close",
-            "-d", payload_json,
-            "--max-time", "30",
-            "-w", "\n---HTTP_CODE:%{http_code}---"
-        ])
-        
-        def _make_request_via_curl(cmd):
-            import os as os_module
-            tmp_path = "/tmp/hubtel_send_response.json"
-            
-            try:
-                file_cmd = cmd[:-2] + ["-o", tmp_path, "-w", "%{http_code}"]
-                result = subprocess.run(file_cmd, capture_output=True, text=True, timeout=35)
-                http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
-                
-                body = ""
-                if os_module.path.exists(tmp_path):
-                    with open(tmp_path, 'r') as f:
-                        body = f.read()
-                
-                return {"body": body, "http_code": http_code, "stderr": result.stderr}
-            except Exception as e:
-                logger.error(f"Curl error: {e}")
-                return {"body": "", "http_code": 0, "stderr": str(e)}
-        
+        # Use httpx with Fixie proxy (same as VAS service)
         try:
-            response_data = await asyncio.to_thread(_make_request_via_curl, curl_cmd)
-            response_status_code = response_data["http_code"]
+            print("=" * 70)
+            print("🔵 [MOMO SEND] WITHDRAWAL REQUEST")
+            print("=" * 70)
+            print(f"📍 URL: {url}")
+            print(f"📦 PAYLOAD: {json.dumps(payload, indent=2)}")
+            print(f"🔒 Using Proxy: {'Yes' if FIXIE_PROXY_URL else 'No'}")
             
-            try:
-                result = json_module.loads(response_data["body"]) if response_data["body"] else {}
-            except Exception:
-                result = {"raw": response_data["body"], "status_code": response_status_code}
+            headers = {
+                "Authorization": auth_header,
+                "Content-Type": "application/json"
+            }
+            
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None, timeout=30.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response_status_code = response.status_code
+                
+                print(f"🟢 [MOMO SEND] HTTP Code: {response_status_code}")
+                
+                try:
+                    result = response.json()
+                    print(f"🟢 [MOMO SEND] Response: {json.dumps(result, indent=2)}")
+                except:
+                    result = {"raw": response.text}
+                    print(f"🟢 [MOMO SEND] Raw response: {response.text}")
             
             logger.info(f"Hubtel MoMo Transfer: status={response_status_code}, response={result}")
             
