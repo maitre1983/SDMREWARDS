@@ -668,6 +668,7 @@ from routers.language import router as language_router
 from routers.growth import router as growth_router
 from routers.two_factor import router as two_factor_router
 from routers import integration as integration_router_module
+from routers.hubtel_diagnostic import router as hubtel_diagnostic_router
 
 # Set database for payments router (new package)
 set_payments_db(db)
@@ -690,6 +691,7 @@ app.include_router(language_router, prefix="/api/language", tags=["Language"])
 app.include_router(growth_router, prefix="/api/growth", tags=["Growth & Gamification"])
 app.include_router(two_factor_router, prefix="/api/2fa", tags=["Two-Factor Authentication"])
 app.include_router(integration_router_module.router, prefix="/api", tags=["Integration API"])
+app.include_router(hubtel_diagnostic_router, prefix="/api/admin", tags=["Hubtel Diagnostics"])
 
 # ============== MOBILE APP STATIC FILES ==============
 import os

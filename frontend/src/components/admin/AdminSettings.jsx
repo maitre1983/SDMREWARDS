@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import {
   Shield, CreditCard, Gift, Banknote, UserPlus,
-  MessageSquare, Users, Sliders, Loader2, Settings, Trophy, Gauge
+  MessageSquare, Users, Sliders, Loader2, Settings, Trophy, Gauge, Wrench
 } from 'lucide-react';
 
 // Import settings sub-components
@@ -20,6 +20,7 @@ import SettingsSecurity from './settings/SettingsSecurity';
 import SettingsAdmins from './settings/SettingsAdmins';
 import SettingsGamification from './settings/SettingsGamification';
 import SettingsLimits from './settings/SettingsLimits';
+import HubtelDiagnostics from './settings/HubtelDiagnostics';
 
 // API URL imported from config
 import { API_URL } from '@/config/api';
@@ -62,7 +63,8 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
     { id: 'users', label: 'Add Users', icon: UserPlus },
     { id: 'sms', label: 'SMS Center', icon: MessageSquare },
     { id: 'security', label: 'Security', icon: Shield },
-    { id: 'admins', label: 'Admin Users', icon: Users }
+    { id: 'admins', label: 'Admin Users', icon: Users },
+    { id: 'hubtel', label: 'Hubtel Diagnostics', icon: Wrench }
   ];
 
   // Show PIN prompt if not verified
@@ -172,6 +174,11 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
       {/* Admin Users Management */}
       {settingsTab === 'admins' && (
         <SettingsAdmins token={token} currentAdmin={admin} />
+      )}
+
+      {/* Hubtel Diagnostics */}
+      {settingsTab === 'hubtel' && (
+        <HubtelDiagnostics token={token} />
       )}
     </div>
   );
