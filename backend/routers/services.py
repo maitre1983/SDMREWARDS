@@ -941,19 +941,39 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
             "status": "processing"
         }
     else:
-        # Update transaction as failed
+        # Get detailed error from result
+        error_msg = result.get("error", "Withdrawal failed")
+        
+        # Check for Hubtel server errors (500s)
+        if "5000" in error_msg or "server error" in error_msg.lower() or "something went wrong" in error_msg.lower():
+            error_msg = "MoMo service is temporarily unavailable. Please try again in a few minutes. If the issue persists, contact support."
+            logger.error(f"HUBTEL SERVER ERROR for {transaction_id}: {result}")
+        
+        # Check for specific error types to give better messages
+        elif "insufficient" in error_msg.lower():
+            error_msg = "Withdrawal service temporarily unavailable. Please try again later."
+        elif "invalid" in error_msg.lower() and "phone" in error_msg.lower():
+            error_msg = "Invalid phone number. Please verify and try again."
+        elif "limit" in error_msg.lower():
+            error_msg = "Transaction limit exceeded. Please try a smaller amount."
+        
+        # Update transaction as failed with detailed error
         await db.service_transactions.update_one(
             {"id": withdrawal_tx["id"]},
             {"$set": {
                 "status": "failed",
-                "error": result.get("error"),
+                "error": result.get("error"),  # Store original error for debugging
+                "error_display": error_msg,     # User-friendly message
+                "hubtel_response": result,      # Full response for debugging
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
         
+        logger.error(f"Withdrawal failed for {transaction_id}: {result.get('error')}")
+        
         raise HTTPException(
             status_code=400,
-            detail=result.get("error", "Withdrawal failed. Please try again.")
+            detail=error_msg
         )
 
 

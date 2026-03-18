@@ -585,8 +585,17 @@ class HubtelMoMoService:
                     error_msg = "Insufficient balance in Hubtel account"
                 elif response_code == "4105":
                     error_msg = "Invalid recipient phone number"
+                elif response_code == "5000":
+                    error_msg = f"Hubtel server error (5000): {result.get('Errors', 'Service temporarily unavailable')}"
+                elif response_status_code == 500:
+                    error_msg = f"Hubtel server error (HTTP 500): {result.get('Message', 'Service temporarily unavailable')}"
                 elif response_status_code == 403:
                     error_msg = "Access denied. IP may not be whitelisted for Send Money API."
+                
+                # Log the full response for debugging
+                print(f"🔴 [MOMO SEND] FAILED - ResponseCode: {response_code}, HTTP: {response_status_code}")
+                print(f"🔴 [MOMO SEND] Error: {error_msg}")
+                print(f"🔴 [MOMO SEND] Full response: {result}")
                 
                 if self.db is not None:
                     await self.db.hubtel_payments.update_one(
@@ -594,7 +603,7 @@ class HubtelMoMoService:
                         {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
                     )
                 
-                return {"success": False, "error": error_msg}
+                return {"success": False, "error": error_msg, "response_code": response_code, "http_status": response_status_code}
                 
         except Exception as e:
             error_str = str(e)
