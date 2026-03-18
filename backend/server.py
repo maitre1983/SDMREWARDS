@@ -99,6 +99,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://web-boost-seo.preview.emergentagent.com",
+    "https://web-boost-seo.emergent.host",  # Production deployment
     # Add any other domains here
 ]
 

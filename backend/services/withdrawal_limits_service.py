@@ -261,13 +261,23 @@ class WithdrawalLimitsService:
                 "max_allowed": float
             }
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"[LIMIT CHECK] Validating withdrawal: user={user_id}, amount={amount}, method={method}")
+        
         effective = await self.get_effective_limits(user_id, method)
         limits = effective["limits"]
         usage = effective["usage"]
         remaining = effective["remaining"]
         
+        logger.info(f"[LIMIT CHECK] Effective limits: {limits}")
+        logger.info(f"[LIMIT CHECK] Current usage: {usage}")
+        logger.info(f"[LIMIT CHECK] Remaining: {remaining}")
+        
         # Check max per transaction
         if amount > limits["max_per_tx"]:
+            logger.warning(f"[LIMIT CHECK] REJECTED - Amount {amount} > max_per_tx {limits['max_per_tx']}")
             return {
                 "allowed": False,
                 "reason": f"Maximum amount per transaction is GHS {limits['max_per_tx']:.2f}",
@@ -276,6 +286,7 @@ class WithdrawalLimitsService:
         
         # Check daily limit
         if usage["daily"] + amount > limits["daily"]:
+            logger.warning(f"[LIMIT CHECK] REJECTED - Daily limit exceeded: {usage['daily']} + {amount} > {limits['daily']}")
             return {
                 "allowed": False,
                 "reason": f"Daily limit exceeded. Remaining: GHS {remaining['daily']:.2f}",
@@ -284,6 +295,7 @@ class WithdrawalLimitsService:
         
         # Check weekly limit
         if usage["weekly"] + amount > limits["weekly"]:
+            logger.warning(f"[LIMIT CHECK] REJECTED - Weekly limit exceeded")
             return {
                 "allowed": False,
                 "reason": f"Weekly limit exceeded. Remaining: GHS {remaining['weekly']:.2f}",
@@ -292,16 +304,20 @@ class WithdrawalLimitsService:
         
         # Check monthly limit
         if usage["monthly"] + amount > limits["monthly"]:
+            logger.warning(f"[LIMIT CHECK] REJECTED - Monthly limit exceeded")
             return {
                 "allowed": False,
                 "reason": f"Monthly limit exceeded. Remaining: GHS {remaining['monthly']:.2f}",
                 "max_allowed": remaining["monthly"]
             }
         
+        max_allowed = min(limits["max_per_tx"], remaining["daily"], remaining["weekly"], remaining["monthly"])
+        logger.info(f"[LIMIT CHECK] APPROVED - Max allowed: {max_allowed}")
+        
         return {
             "allowed": True,
             "reason": None,
-            "max_allowed": min(limits["max_per_tx"], remaining["daily"], remaining["weekly"], remaining["monthly"])
+            "max_allowed": max_allowed
         }
 
     async def get_all_clients_usage(self, limit: int = 50, sort_by: str = "daily_usage", 
