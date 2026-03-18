@@ -24,27 +24,29 @@ HUBTEL_API_KEY = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 VAS_TEST_MODE = os.environ.get("VAS_TEST_MODE", "false").lower() == "true"
 
-# Hubtel Service IDs for different networks
+# Hubtel Commission Services - CORRECT Service IDs (from Hubtel documentation)
+# Airtime Service IDs
 HUBTEL_AIRTIME_SERVICE_IDS = {
     "MTN": "fdd76c884e614b1c8f669a3207b09a98",
-    "VODAFONE": "dae2142eb5a14c298eace60240c09e4b",
-    "TELECEL": "dae2142eb5a14c298eace60240c09e4b",  # Same as Vodafone/AirtelTigo
-    "AIRTELTIGO": "dae2142eb5a14c298eace60240c09e4b",
-    "GLO": "47d88e88f50f47468a34a14ac73e8ab5"
+    "TELECEL": "f4be83ad74c742e185224fdae1304800",
+    "VODAFONE": "f4be83ad74c742e185224fdae1304800",  # Telecel/Vodafone same
+    "AT": "dae2142eb5a14c298eace60240c09e4b",
+    "AIRTELTIGO": "dae2142eb5a14c298eace60240c09e4b"
 }
 
+# Data Bundle Service IDs
 HUBTEL_DATA_SERVICE_IDS = {
-    "MTN": "a98818d5c6b14d90988fd0c5d9a86d83",
-    "VODAFONE": "b5d7c8e9f0a14b2c8d9e0f1a2b3c4d5e",
-    "TELECEL": "b5d7c8e9f0a14b2c8d9e0f1a2b3c4d5e",
-    "AIRTELTIGO": "b5d7c8e9f0a14b2c8d9e0f1a2b3c4d5e"
+    "MTN": "b230733cd56b4a0fad820e39f66bc27c",
+    "TELECEL": "fa27127ba039455da04a2ac8a1613e00",
+    "VODAFONE": "fa27127ba039455da04a2ac8a1613e00",  # Telecel/Vodafone same
+    "AT": "06abd92da459428496967612463575ca",
+    "AIRTELTIGO": "06abd92da459428496967612463575ca"
 }
 
-# ECG Service IDs
+# ECG/Bill Payment Service IDs
 HUBTEL_BILL_SERVICE_IDS = {
-    "ECG_PREPAID": "ecg_prepaid_service_id",
-    "ECG_POSTPAID": "ecg_postpaid_service_id",
-    "GWCL": "gwcl_service_id"
+    "ECG_PREPAID": "e6d6bac062b5499cb1ece1ac3d742a84",
+    "ECG_POSTPAID": "e6d6bac062b5499cb1ece1ac3d742a84"
 }
 
 
@@ -230,14 +232,21 @@ class HubtelVASService:
         payload = {
             "Destination": normalized_phone,
             "Amount": amount,
+            "ClientReference": client_reference,
             "CallbackURL": f"{self.callback_base_url}/api/vas/callback"
         }
         
         try:
+            # DEBUG LOGGING - as requested
+            print(f"🔵 [AIRTIME] Calling Hubtel VAS endpoint: {url}")
+            print(f"🔵 [AIRTIME] Payload: {payload}")
+            logger.info(f"[AIRTIME] Calling Hubtel: {url} with payload: {payload}")
+            
             response = await self._make_hubtel_request("POST", url, payload)
             result = response.get("data", {})
             http_code = response.get("http_code", 0)
             
+            print(f"🟢 [AIRTIME] Response (HTTP {http_code}): {result}")
             logger.info(f"Hubtel Airtime response: {result}")
             
             response_code = result.get("ResponseCode", result.get("responseCode", ""))
@@ -391,14 +400,21 @@ class HubtelVASService:
             "Destination": normalized_phone,
             "Amount": amount,
             "PackageId": bundle_id,
+            "ClientReference": client_reference,
             "CallbackURL": f"{self.callback_base_url}/api/vas/callback"
         }
         
         try:
+            # DEBUG LOGGING - as requested
+            print(f"🔵 [DATA] Calling Hubtel VAS endpoint: {url}")
+            print(f"🔵 [DATA] Payload: {payload}")
+            logger.info(f"[DATA] Calling Hubtel: {url} with payload: {payload}")
+            
             response = await self._make_hubtel_request("POST", url, payload)
             result = response.get("data", {})
             http_code = response.get("http_code", 0)
             
+            print(f"🟢 [DATA] Response (HTTP {http_code}): {result}")
             logger.info(f"Hubtel Data Bundle response: {result}")
             
             response_code = result.get("ResponseCode", "")
@@ -490,14 +506,21 @@ class HubtelVASService:
         payload = {
             "MeterNumber": meter_number,
             "Amount": amount,
+            "ClientReference": client_reference,
             "CallbackURL": f"{self.callback_base_url}/api/vas/callback"
         }
         
         try:
+            # DEBUG LOGGING - as requested
+            print(f"🔵 [ECG] Calling Hubtel VAS endpoint: {url}")
+            print(f"🔵 [ECG] Payload: {payload}")
+            logger.info(f"[ECG] Calling Hubtel: {url} with payload: {payload}")
+            
             response = await self._make_hubtel_request("POST", url, payload)
             result = response.get("data", {})
             http_code = response.get("http_code", 0)
             
+            print(f"🟢 [ECG] Response (HTTP {http_code}): {result}")
             logger.info(f"Hubtel ECG response: {result}")
             
             response_code = result.get("ResponseCode", "")
