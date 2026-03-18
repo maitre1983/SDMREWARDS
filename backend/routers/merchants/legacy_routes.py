@@ -43,7 +43,7 @@ class UpdatePaymentInfoRequest(BaseModel):
     momo_network: Optional[str] = None
     bank_name: Optional[str] = None
     bank_account: Optional[str] = None
-    bank_id: Optional[str] = None  # BulkClix bank ID
+    bank_id: Optional[str] = None  # Bank code for Hubtel
     bank_account_name: Optional[str] = None  # Verified account holder name
     preferred_payout_method: Optional[str] = None  # 'momo' or 'bank'
 
@@ -2214,7 +2214,7 @@ async def forgot_pin(
             "otp": otp  # Only in test mode
         }
     
-    # TODO: Send OTP via BulkClix SMS or email
+    # TODO: Send OTP via Hubtel SMS or email service
     destination = current_merchant.get("phone") if request.method == "sms" else current_merchant.get("email")
     
     return {
@@ -2526,16 +2526,14 @@ async def update_business_info_extended(
 @router.get("/banks/list")
 async def get_bank_list():
     """Get list of supported banks for transfers"""
-    from services.bulkclix_service import bank_transfer_service
+    from services.hubtel_bank_service import HubtelBankService
     
-    result = await bank_transfer_service.get_bank_list()
-    
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch banks"))
+    bank_service = HubtelBankService(db)
+    banks = await bank_service.get_bank_list()
     
     return {
         "success": True,
-        "banks": result["banks"]
+        "banks": banks
     }
 
 
@@ -2546,16 +2544,17 @@ async def verify_bank_account(
     current_merchant: dict = Depends(get_current_merchant)
 ):
     """Verify bank account and get account holder name"""
-    from services.bulkclix_service import bank_transfer_service
+    from services.hubtel_bank_service import HubtelBankService
     
-    result = await bank_transfer_service.verify_bank_account(account_number, bank_id)
+    bank_service = HubtelBankService(db)
+    result = await bank_service.verify_bank_account(account_number, bank_id)
     
-    if not result["success"]:
+    if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "Failed to verify account"))
     
     return {
         "success": True,
-        "account_name": result["account_name"],
+        "account_name": result.get("account_name"),
         "account_number": account_number,
         "bank_id": bank_id
     }

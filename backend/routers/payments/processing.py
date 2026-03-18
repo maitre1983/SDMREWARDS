@@ -2,6 +2,7 @@
 SDM REWARDS - Payment Processing Logic
 ======================================
 Core payment completion and processing functions
+Uses Hubtel for all payment operations
 """
 
 from datetime import datetime, timezone, timedelta
@@ -13,7 +14,7 @@ import logging
 
 from .shared import (
     get_db, get_sms, get_gamification, is_test_mode,
-    BULKCLIX_API_KEY, BULKCLIX_BASE_URL, logger
+    HUBTEL_CLIENT_ID, HUBTEL_CLIENT_SECRET, logger
 )
 
 # ============== MAIN COMPLETION ==============

@@ -374,7 +374,7 @@ async def get_server_outbound_ip():
                     ip = response.text.strip()
                     if ip and ip not in ip_info["outbound_ips"]:
                         ip_info["outbound_ips"].append(ip)
-            except Exception as e:
+            except Exception:
                 pass
     
     # Also try hitting the webhook to show actual IP
@@ -419,19 +419,17 @@ async def debug_withdrawal_request(request: Request):
 @app.get("/api/public/banks")
 async def get_public_banks():
     """
-    Get list of supported banks from BulkClix.
+    Get list of supported banks for bank transfers.
     Used by merchants to configure bank payouts.
     """
-    from services.bulkclix_service import bank_transfer_service
+    from services.hubtel_bank_service import HubtelBankService
     
-    result = await bank_transfer_service.get_bank_list()
-    
-    if not result["success"]:
-        raise HTTPException(status_code=500, detail=result.get("error", "Failed to fetch banks"))
+    bank_service = HubtelBankService(db)
+    banks = await bank_service.get_bank_list()
     
     return {
         "success": True,
-        "banks": result["banks"]
+        "banks": banks
     }
 
 

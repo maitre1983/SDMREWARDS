@@ -27,10 +27,15 @@ def get_db():
 
 
 # ============== CONFIG ==============
-BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")
-BULKCLIX_BASE_URL = os.environ.get("BULKCLIX_BASE_URL", "https://api.bulkclix.com/api/v1")
+# Legacy BulkClix variables (DEPRECATED - kept for backward compatibility)
+BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")  # DEPRECATED
+BULKCLIX_BASE_URL = os.environ.get("BULKCLIX_BASE_URL", "https://api.bulkclix.com/api/v1")  # DEPRECATED
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "")
 PAYMENT_TEST_MODE = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
+
+# Hubtel is now the primary payment provider
+HUBTEL_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
+HUBTEL_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 
 
 # ============== LAZY SERVICE IMPORTS ==============
@@ -102,8 +107,8 @@ def normalize_network(network: str) -> str:
 
 
 def is_test_mode() -> bool:
-    """Check if running in test mode"""
-    return PAYMENT_TEST_MODE or not BULKCLIX_API_KEY
+    """Check if running in test mode - now checks Hubtel config"""
+    return PAYMENT_TEST_MODE or not HUBTEL_CLIENT_ID
 
 
 # ============== SCHEMAS ==============

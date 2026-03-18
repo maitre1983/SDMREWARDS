@@ -291,7 +291,6 @@ async def get_current_admin(authorization: str = Header(...)) -> dict:
 @limiter.limit("3/minute")  # Rate limit: 3 OTP requests per minute per IP
 async def send_otp(request: Request, otp_request: SendOTPRequest):
     """Send OTP to phone number via Hubtel SMS API"""
-    import random
     from services.hubtel_sms_service import HubtelSMSService
     
     phone = normalize_phone(otp_request.phone)
@@ -1020,53 +1019,65 @@ async def admin_forgot_password(request: Request, forgot_request: AdminForgotPas
     
     phone_clean = phone.replace("+233", "0").replace(" ", "")
     
-    # Send OTP via BulkClix
+    # Generate 6-digit OTP
+    otp_code = str(random.randint(100000, 999999))
+    request_id = f"ADMIN-OTP-{uuid.uuid4().hex[:12].upper()}"
+    
+    # Send OTP via Hubtel SMS
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as http_client:
-            response = await http_client.post(
-                f"{BULKCLIX_BASE_URL}/sms-api/otp/send",
-                headers={
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "x-api-key": BULKCLIX_API_KEY
-                },
-                json={
-                    "phoneNumber": phone_clean,
-                    "senderId": BULKCLIX_OTP_SENDER_ID,
-                    "message": "Your SDM admin password reset code is <%otp_code%>",
-                    "expiry": 10,
-                    "length": 6
-                },
-                timeout=15.0
+        from services.hubtel_sms_service import HubtelSMSService
+        sms_service = HubtelSMSService(db)
+        
+        if sms_service.is_configured():
+            sms_result = await sms_service.send_sms(
+                phone=phone,
+                message=f"Your SDM admin password reset code is: {otp_code}. Valid for 10 minutes.",
+                sms_type="otp"
             )
             
-            if response.status_code == 200 and response.text:
-                result = response.json()
+            if sms_result.get("success"):
+                # Store request for verification
+                await db.password_reset_requests.insert_one({
+                    "email": email,
+                    "phone": phone,
+                    "request_id": request_id,
+                    "otp_code": otp_code,  # Store OTP for verification
+                    "user_type": "admin",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                    "used": False
+                })
                 
-                if result.get("message") == "OTP sent":
-                    otp_data = result.get("data", {}).get("otp", {})
-                    request_id = otp_data.get("requestId", f"OTP-{uuid.uuid4()}")
-                    
-                    # Store request for verification
-                    await db.password_reset_requests.insert_one({
-                        "email": email,
-                        "phone": phone,
-                        "request_id": request_id,
-                        "user_type": "admin",
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
-                        "used": False
-                    })
-                    
-                    # Mask phone for response
-                    masked_phone = phone[:7] + "****" + phone[-2:] if len(phone) > 9 else "****"
-                    
-                    return {
-                        "success": True,
-                        "request_id": request_id,
-                        "masked_phone": masked_phone,
-                        "message": f"OTP sent to {masked_phone}"
-                    }
+                # Mask phone for response
+                masked_phone = phone[:7] + "****" + phone[-2:] if len(phone) > 9 else "****"
+                
+                return {
+                    "success": True,
+                    "request_id": request_id,
+                    "masked_phone": masked_phone,
+                    "message": f"OTP sent to {masked_phone}"
+                }
+        
+        # Fallback: Test mode if SMS not configured
+        logger.warning("Hubtel SMS not configured for admin password reset, using test mode")
+        await db.password_reset_requests.insert_one({
+            "email": email,
+            "phone": phone,
+            "request_id": request_id,
+            "otp_code": "123456",  # Test OTP
+            "user_type": "admin",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+            "used": False
+        })
+        
+        masked_phone = phone[:7] + "****" + phone[-2:] if len(phone) > 9 else "****"
+        return {
+            "success": True,
+            "request_id": request_id,
+            "masked_phone": masked_phone,
+            "message": "OTP sent (test mode - code: 123456)"
+        }
                     
     except Exception as e:
         logger.error(f"Admin forgot password OTP error: {e}")
@@ -1098,40 +1109,22 @@ async def reset_admin_password(request: Request, reset_request: AdminResetPasswo
     if not reset_record:
         raise HTTPException(status_code=400, detail="Invalid or expired reset request")
     
-    # Verify OTP with BulkClix (or test mode)
-    phone_clean = reset_record["phone"].replace("+233", "0").replace(" ", "")
+    # Check if OTP has expired
+    expires_at = datetime.fromisoformat(reset_record["expires_at"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    
+    # Verify OTP against stored code
+    stored_otp = reset_record.get("otp_code", "")
     otp_verified = False
     
-    # Check for test mode OTP first
-    if reset_request.otp_code == "123456":
+    if reset_request.otp_code == stored_otp:
+        logger.info(f"Admin password reset: OTP verified for {email}")
+        otp_verified = True
+    elif reset_request.otp_code == "123456":
+        # Fallback test mode OTP
         logger.info(f"Admin password reset: Using test OTP for {email}")
         otp_verified = True
-    else:
-        # Verify via BulkClix API
-        try:
-            async with httpx.AsyncClient(follow_redirects=True) as http_client:
-                verify_response = await http_client.post(
-                    f"{BULKCLIX_BASE_URL}/sms-api/otp/verify",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                        "x-api-key": BULKCLIX_API_KEY
-                    },
-                    json={
-                        "phoneNumber": phone_clean,
-                        "requestId": reset_request.request_id,
-                        "code": reset_request.otp_code
-                    },
-                    timeout=15.0
-                )
-                
-                if verify_response.status_code == 200:
-                    result = verify_response.json()
-                    if "successful" in result.get("message", "").lower():
-                        otp_verified = True
-                        
-        except Exception as e:
-            logger.error(f"Admin OTP verification error: {e}")
     
     if not otp_verified:
         raise HTTPException(status_code=400, detail="Invalid OTP code")

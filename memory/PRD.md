@@ -105,6 +105,12 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 - ✅ `hubtel_momo_service.py` - Comments updated
 - ✅ `hubtel_vas_service.py` - Comments updated
 - ✅ `sms_provider` default changed from "bulkclix" to "hubtel"
+- ✅ `routers/auth.py` - Admin password reset OTP migrated to Hubtel SMS
+- ✅ `routers/payments/shared.py` - is_test_mode() now checks Hubtel config
+- ✅ `routers/payments/callbacks.py` - Updated comments
+- ✅ `routers/payments/processing.py` - Updated imports
+- ✅ `routers/merchants/legacy_routes.py` - Bank services now use HubtelBankService
+- ✅ `server.py` - Public banks endpoint now uses HubtelBankService
 
 ## Blocked Issues (User Action Required)
 

@@ -1,7 +1,7 @@
 """
 SDM REWARDS - Payment Callbacks & Status Routes
 ===============================================
-Handles payment status checks and Hubtel/BulkClix callbacks
+Handles payment status checks and Hubtel callbacks
 """
 
 from fastapi import APIRouter, HTTPException, Request
@@ -106,7 +106,7 @@ async def check_cash_payment_status(client_phone: str, merchant_id: str):
 
 @router.post("/callback")
 async def payment_callback(request: Request):
-    """BulkClix/Hubtel payment callback webhook"""
+    """Hubtel payment callback webhook"""
     db = get_db()
     
     try:
