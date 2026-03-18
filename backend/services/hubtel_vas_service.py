@@ -23,6 +23,9 @@ HUBTEL_API_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
 HUBTEL_API_KEY = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 
+# Fixie Static IP Proxy - Routes Hubtel calls through a static IP
+FIXIE_PROXY_URL = os.environ.get("FIXIE_URL", "")
+
 def is_vas_test_mode() -> bool:
     """
     PRODUCTION OVERRIDE: Always returns False to ensure real API calls.
@@ -124,42 +127,54 @@ class HubtelVASService:
     
     async def _make_hubtel_request(self, method: str, url: str, payload: dict = None) -> Dict:
         """
-        Make HTTP request to Hubtel API using curl subprocess
-        This bypasses Python HTTP library issues with Hubtel's Content-Length
+        Make HTTP request to Hubtel API using curl subprocess with Fixie proxy.
+        This routes all requests through a static IP for Hubtel whitelist compliance.
         """
         auth_header = self._get_auth_header()
+        proxy_url = FIXIE_PROXY_URL
         
         def _execute_curl():
             tmp_path = f"/tmp/hubtel_vas_{uuid.uuid4().hex[:8]}.json"
             
             try:
-                if method.upper() == "GET":
-                    cmd = [
-                        "curl", "-s", "-X", "GET", url,
-                        "--http1.1",
-                        "--ignore-content-length",
-                        "-H", f"Authorization: {auth_header}",
-                        "-H", "Content-Type: application/json",
-                        "--max-time", "30",
-                        "-o", tmp_path,
-                        "-w", "%{http_code}"
-                    ]
-                else:
-                    payload_json = json.dumps(payload) if payload else "{}"
-                    cmd = [
-                        "curl", "-s", "-X", "POST", url,
-                        "--http1.1",
-                        "--ignore-content-length",
-                        "-H", f"Authorization: {auth_header}",
-                        "-H", "Content-Type: application/json",
-                        "-d", payload_json,
-                        "--max-time", "30",
-                        "-o", tmp_path,
-                        "-w", "%{http_code}"
-                    ]
+                # Base curl command
+                cmd = ["curl", "-s"]
                 
-                # Log the curl command (without auth for security)
-                safe_cmd = [c if 'Basic' not in c else 'Authorization: Basic ***' for c in cmd]
+                # Add proxy if configured (CRITICAL for production)
+                if proxy_url:
+                    cmd.extend(["--proxy", proxy_url])
+                    print(f"🔒 [PROXY] Using Fixie static IP proxy")
+                else:
+                    print(f"⚠️ [PROXY] No proxy configured - using direct connection")
+                
+                # Add method and URL
+                cmd.extend(["-X", method.upper(), url])
+                
+                # Add common options
+                cmd.extend([
+                    "--http1.1",
+                    "--ignore-content-length",
+                    "-H", f"Authorization: {auth_header}",
+                    "-H", "Content-Type: application/json",
+                    "--max-time", "30",
+                    "-o", tmp_path,
+                    "-w", "%{http_code}"
+                ])
+                
+                # Add payload for POST
+                if method.upper() == "POST" and payload:
+                    payload_json = json.dumps(payload)
+                    cmd.extend(["-d", payload_json])
+                
+                # Log the curl command (sanitized)
+                safe_cmd = []
+                for c in cmd:
+                    if 'Basic' in c:
+                        safe_cmd.append('Authorization: Basic ***')
+                    elif '@' in c and 'fixie' in c.lower():
+                        safe_cmd.append('--proxy ***FIXIE***')
+                    else:
+                        safe_cmd.append(c)
                 print(f"🔧 [CURL] Command: {' '.join(safe_cmd)}")
                 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
@@ -170,6 +185,7 @@ class HubtelVASService:
                     logger.warning(f"Curl stderr: {result.stderr}")
                 
                 http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
+                print(f"🔧 [CURL] HTTP Code: {http_code}")
                 print(f"🔧 [CURL] HTTP Code from stdout: {http_code}")
                 
                 body = ""

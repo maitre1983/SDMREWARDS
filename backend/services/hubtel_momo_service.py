@@ -30,6 +30,9 @@ HUBTEL_POS_SALES_ID = os.environ.get("HUBTEL_POS_SALES_ID", "")
 HUBTEL_MERCHANT_ACCOUNT = os.environ.get("HUBTEL_MERCHANT_ACCOUNT", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 
+# Fixie Static IP Proxy - Routes Hubtel calls through a static IP
+FIXIE_PROXY_URL = os.environ.get("FIXIE_URL", "")
+
 # API Endpoints
 HUBTEL_RMP_BASE_URL = "https://rmp.hubtel.com/merchantaccount/merchants"  # For Receive Money
 HUBTEL_SEND_BASE_URL = "https://smp.hubtel.com/api/merchants"  # For Send Money
@@ -335,9 +338,16 @@ class HubtelMoMoService:
                 logger.error(f"Curl subprocess exception: {e}")
                 return {"body": "", "http_code": 0, "stderr": str(e), "returncode": -3}
         
-        # Create command list for curl
-        curl_cmd = [
-            "curl", "-s", "-X", "POST", url,
+        # Create command list for curl WITH PROXY
+        curl_cmd = ["curl", "-s"]
+        
+        # Add Fixie proxy for static IP (CRITICAL for production)
+        if FIXIE_PROXY_URL:
+            curl_cmd.extend(["--proxy", FIXIE_PROXY_URL])
+            logger.info("🔒 [MOMO] Using Fixie static IP proxy")
+        
+        curl_cmd.extend([
+            "-X", "POST", url,
             "--http1.1",
             "--ignore-content-length",
             "-H", "Content-Type: application/json",
@@ -346,7 +356,7 @@ class HubtelMoMoService:
             "-d", payload_json,
             "--max-time", "30",
             "-w", "\n---HTTP_CODE:%{http_code}---"
-        ]
+        ])
         
         try:
             # Try curl first in a separate thread
@@ -520,8 +530,16 @@ class HubtelMoMoService:
         auth_header = self._get_auth_header()
         payload_json = json_module.dumps(payload)
         
-        curl_cmd = [
-            "curl", "-s", "-X", "POST", url,
+        # Build curl command WITH PROXY
+        curl_cmd = ["curl", "-s"]
+        
+        # Add Fixie proxy for static IP (CRITICAL for production)
+        if FIXIE_PROXY_URL:
+            curl_cmd.extend(["--proxy", FIXIE_PROXY_URL])
+            logger.info("🔒 [SEND MONEY] Using Fixie static IP proxy")
+        
+        curl_cmd.extend([
+            "-X", "POST", url,
             "--http1.1",
             "--ignore-content-length",
             "-H", "Content-Type: application/json",
@@ -530,7 +548,7 @@ class HubtelMoMoService:
             "-d", payload_json,
             "--max-time", "30",
             "-w", "\n---HTTP_CODE:%{http_code}---"
-        ]
+        ])
         
         def _make_request_via_curl(cmd):
             import os as os_module
