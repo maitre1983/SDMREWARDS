@@ -23,6 +23,7 @@ export default function WithdrawalModal({
   isTestMode,
   paymentSettings,
   withdrawalFee = { type: 'fixed', rate: 0 },
+  transactionId,
   onClose,
   onInitiate,
   onCheckStatus,
@@ -81,14 +82,28 @@ export default function WithdrawalModal({
               Try Again
             </Button>
           </div>
-        ) : status === 'pending' ? (
+        ) : (status === 'pending' || status === 'processing') ? (
           <div className="text-center py-6">
             <div className="relative inline-block">
-              <Phone className="text-amber-400 mx-auto mb-4" size={48} />
+              {method === 'bank' ? (
+                <Building2 className="text-blue-400 mx-auto mb-4" size={48} />
+              ) : (
+                <Phone className="text-amber-400 mx-auto mb-4" size={48} />
+              )}
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
             </div>
-            <p className="text-white text-lg font-semibold">Processing Withdrawal</p>
-            <p className="text-slate-400 mt-2 text-sm">Please wait...</p>
+            <p className="text-white text-lg font-semibold">
+              {status === 'processing' ? 'Processing...' : 'Withdrawal Initiated'}
+            </p>
+            <p className="text-slate-400 mt-2 text-sm">
+              {method === 'bank' 
+                ? 'Bank transfers may take 1-24 hours' 
+                : 'Check your phone for the prompt'}
+            </p>
+            
+            {transactionId && (
+              <p className="text-slate-500 text-xs mt-2">Ref: {transactionId}</p>
+            )}
             
             <div className="mt-6 pt-4 border-t border-slate-700">
               <Button

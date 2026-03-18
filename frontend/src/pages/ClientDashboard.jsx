@@ -132,7 +132,10 @@ export default function ClientDashboard() {
   const [paymentSettings, setPaymentSettings] = useState({
     momo_number: '',
     momo_network: 'MTN',
+    bank_id: '',
+    bank_code: '',
     bank_name: '',
+    bank_account_name: '',
     bank_account: '',
     bank_branch: '',
     preferred_withdrawal_method: 'momo'
@@ -278,7 +281,10 @@ export default function ClientDashboard() {
       setPaymentSettings({
         momo_number: res.data.momo_number || '',
         momo_network: res.data.momo_network || 'MTN',
+        bank_id: res.data.bank_id || '',
+        bank_code: res.data.bank_code || '',
         bank_name: res.data.bank_name || '',
+        bank_account_name: res.data.bank_account_name || '',
         bank_account: res.data.bank_account || '',
         bank_branch: res.data.bank_branch || '',
         preferred_withdrawal_method: res.data.preferred_withdrawal_method || 'momo'
@@ -851,7 +857,7 @@ export default function ClientDashboard() {
         return;
       }
     } else if (withdrawalMethod === 'bank') {
-      if (!paymentSettings.bank_name || !paymentSettings.bank_account) {
+      if (!paymentSettings.bank_id || !paymentSettings.bank_account || !paymentSettings.bank_account_name) {
         toast.error('Please configure your bank account in Payment Settings first');
         return;
       }
@@ -861,33 +867,43 @@ export default function ClientDashboard() {
     setWithdrawalStatus('processing');
     
     try {
-      const payload = {
-        amount: amount,
-        method: withdrawalMethod
-      };
+      let res;
       
       if (withdrawalMethod === 'momo') {
-        payload.phone = withdrawalPhone;
-        payload.network = withdrawalNetwork;
+        // MoMo withdrawal
+        const payload = {
+          amount: amount,
+          phone: withdrawalPhone,
+          network: withdrawalNetwork
+        };
+        res = await axios.post(`${API_URL}/api/services/withdrawal/initiate`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       } else {
-        payload.bank_name = paymentSettings.bank_name;
-        payload.bank_account = paymentSettings.bank_account;
-        payload.bank_branch = paymentSettings.bank_branch;
+        // Bank withdrawal
+        const payload = {
+          account_number: paymentSettings.bank_account,
+          bank_id: paymentSettings.bank_id,
+          account_name: paymentSettings.bank_account_name,
+          amount: amount
+        };
+        res = await axios.post(`${API_URL}/api/services/withdrawal/bank`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }
       
-      const res = await axios.post(`${API_URL}/api/payments/withdrawal/initiate`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
       if (res.data.success) {
-        setWithdrawalId(res.data.withdrawal_id);
+        setWithdrawalId(res.data.transaction_id || res.data.withdrawal_id);
         setWithdrawalStatus('pending');
         setIsWithdrawalTestMode(res.data.test_mode || false);
+        
+        // Refresh balance
+        fetchDashboardData();
         
         if (res.data.test_mode) {
           toast.info('Test mode: Click "Confirm Withdrawal" to simulate payout');
         } else {
-          toast.success('Withdrawal is being processed!');
+          toast.success(`Withdrawal initiated! Amount: GHS ${amount.toFixed(2)}`);
         }
       }
     } catch (error) {
@@ -917,6 +933,36 @@ export default function ClientDashboard() {
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Confirmation failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Check transaction status
+  const checkTransactionStatus = async () => {
+    if (!withdrawalId) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/services/transaction/status/${withdrawalId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data.success) {
+        const status = res.data.status;
+        setWithdrawalStatus(status);
+        
+        if (status === 'success') {
+          toast.success('Withdrawal completed successfully!');
+          fetchDashboardData();
+        } else if (status === 'failed') {
+          toast.error('Withdrawal failed. Please contact support.');
+        } else {
+          toast.info(`Status: ${status}. Please check again later.`);
+        }
+      }
+    } catch (error) {
+      toast.error('Could not check status. Please try again.');
     } finally {
       setIsProcessingPayment(false);
     }
@@ -2092,9 +2138,10 @@ export default function ClientDashboard() {
           isTestMode={isWithdrawalTestMode}
           paymentSettings={paymentSettings}
           withdrawalFee={withdrawalFee}
+          transactionId={withdrawalId}
           onClose={closeWithdrawalModal}
           onInitiate={initiateWithdrawal}
-          onCheckStatus={() => {}} 
+          onCheckStatus={checkTransactionStatus} 
           onConfirmTest={confirmTestWithdrawal}
           onOpenPaymentSettings={() => setShowPaymentSettings(true)}
         />

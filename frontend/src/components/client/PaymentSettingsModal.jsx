@@ -1,7 +1,10 @@
-import React from 'react';
-import { X, Settings, Phone, Building2, CheckCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Settings, Phone, Building2, CheckCircle, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 export default function PaymentSettingsModal({
   isOpen,
@@ -13,6 +16,42 @@ export default function PaymentSettingsModal({
   onClose,
   onSave
 }) {
+  const [banks, setBanks] = useState([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+
+  // Load banks when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadBanks();
+    }
+  }, [isOpen]);
+
+  const loadBanks = async () => {
+    setLoadingBanks(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/services/banks`);
+      if (res.data.success && res.data.banks) {
+        setBanks(res.data.banks);
+      }
+    } catch (error) {
+      console.error('Failed to load banks:', error);
+    } finally {
+      setLoadingBanks(false);
+    }
+  };
+
+  const handleBankChange = (e) => {
+    const selectedBankId = e.target.value;
+    const selectedBank = banks.find(b => b.id === selectedBankId);
+    
+    setSettings({
+      ...settings,
+      bank_id: selectedBankId,
+      bank_code: selectedBank?.code || '',
+      bank_name: selectedBank?.name || ''
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -78,17 +117,55 @@ export default function PaymentSettingsModal({
             Bank Account
           </h4>
           <div className="space-y-3">
+            {/* Bank Dropdown */}
             <div>
               <label className="text-slate-400 text-xs block mb-1">Bank Name</label>
+              <div className="relative">
+                <select
+                  value={settings.bank_id || ''}
+                  onChange={handleBankChange}
+                  disabled={loadingBanks}
+                  className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 pr-10 appearance-none cursor-pointer"
+                  data-testid="settings-bank-name"
+                >
+                  <option value="">
+                    {loadingBanks ? 'Loading banks...' : 'Select your bank'}
+                  </option>
+                  {banks.map((bank) => (
+                    <option key={bank.id} value={bank.id}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  {loadingBanks ? (
+                    <Loader2 className="animate-spin text-slate-400" size={16} />
+                  ) : (
+                    <ChevronDown className="text-slate-400" size={16} />
+                  )}
+                </div>
+              </div>
+              {settings.bank_name && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Selected: {settings.bank_name} ({settings.bank_code})
+                </p>
+              )}
+            </div>
+            
+            {/* Account Name */}
+            <div>
+              <label className="text-slate-400 text-xs block mb-1">Account Holder Name</label>
               <Input
                 type="text"
-                placeholder="E.g. GCB Bank, Ecobank..."
-                value={settings.bank_name || ''}
-                onChange={(e) => setSettings({...settings, bank_name: e.target.value})}
+                placeholder="Name as shown on account"
+                value={settings.bank_account_name || ''}
+                onChange={(e) => setSettings({...settings, bank_account_name: e.target.value})}
                 className="bg-slate-900 border-slate-700 text-white"
-                data-testid="settings-bank-name"
+                data-testid="settings-bank-account-name"
               />
             </div>
+            
+            {/* Account Number */}
             <div>
               <label className="text-slate-400 text-xs block mb-1">Account Number</label>
               <Input
@@ -100,6 +177,8 @@ export default function PaymentSettingsModal({
                 data-testid="settings-bank-account"
               />
             </div>
+            
+            {/* Branch (Optional) */}
             <div>
               <label className="text-slate-400 text-xs block mb-1">Branch (Optional)</label>
               <Input
