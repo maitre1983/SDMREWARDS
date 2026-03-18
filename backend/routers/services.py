@@ -985,3 +985,245 @@ async def get_service_history(
         "transactions": transactions,
         "count": len(transactions)
     }
+
+
+
+# ===========================================
+# BANK WITHDRAWAL ENDPOINTS
+# ===========================================
+
+from services.hubtel_bank_service import get_hubtel_bank_service, GHANA_BANK_CODES
+
+class BankWithdrawalRequest(BaseModel):
+    """Bank withdrawal request"""
+    account_number: str
+    bank_id: str  # e.g., "GCB", "ECOBANK"
+    account_name: str
+    amount: float
+
+
+@router.get("/banks")
+async def get_supported_banks():
+    """Get list of supported banks for withdrawal"""
+    bank_service = get_hubtel_bank_service()
+    banks = bank_service.get_bank_list()
+    return {"success": True, "banks": banks}
+
+
+@router.post("/withdrawal/bank")
+async def initiate_bank_withdrawal(
+    request: BankWithdrawalRequest,
+    current_client: dict = Depends(get_current_client)
+):
+    """
+    Initiate bank withdrawal (cashback to bank account)
+    
+    Flow:
+    1. Validate client has sufficient balance
+    2. Deduct cashback
+    3. Send to bank via Hubtel
+    4. Return transaction reference for status tracking
+    """
+    client_id = current_client["id"]
+    
+    # Get current balance
+    client_record = await db.clients.find_one({"id": client_id})
+    if not client_record:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    current_balance = client_record.get("cashback_balance", 0)
+    
+    # Get withdrawal fee from config
+    config = await db.platform_config.find_one({"key": "main"})
+    withdrawal_config = config.get("withdrawal_config", {}) if config else {}
+    fee_rate = withdrawal_config.get("fee_rate", 3.0)  # Default 3%
+    min_amount = withdrawal_config.get("min_amount", 10.0)
+    
+    # Calculate fee
+    fee = request.amount * (fee_rate / 100)
+    total_deduction = request.amount + fee
+    
+    # Validations
+    if request.amount < min_amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum withdrawal amount is GHS {min_amount}"
+        )
+    
+    if total_deduction > current_balance:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient balance. Required: GHS {total_deduction:.2f}, Available: GHS {current_balance:.2f}"
+        )
+    
+    # Generate transaction ID
+    transaction_id = f"BWITHDRAW-{uuid.uuid4().hex[:12].upper()}"
+    
+    # Create service transaction record
+    service_tx = {
+        "id": transaction_id,
+        "type": "bank_withdrawal",
+        "client_id": client_id,
+        "account_number": request.account_number[-4:].rjust(len(request.account_number), '*'),
+        "account_name": request.account_name,
+        "bank_id": request.bank_id,
+        "amount": request.amount,
+        "fee": fee,
+        "total_deducted": total_deduction,
+        "balance_before": current_balance,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.service_transactions.insert_one(service_tx)
+    
+    # Call Hubtel Bank Transfer API
+    bank_service = get_hubtel_bank_service(db)
+    result = await bank_service.send_to_bank(
+        account_number=request.account_number,
+        bank_id=request.bank_id,
+        amount=request.amount,
+        account_name=request.account_name,
+        description=f"SDM Cashback Withdrawal - {client_record.get('name', 'User')}",
+        client_reference=transaction_id,
+        user_id=client_id
+    )
+    
+    if result.get("success"):
+        # Deduct balance
+        new_balance = current_balance - total_deduction
+        await db.clients.update_one(
+            {"id": client_id},
+            {
+                "$set": {"cashback_balance": new_balance},
+                "$inc": {"total_withdrawn": request.amount}
+            }
+        )
+        
+        # Update service transaction
+        await db.service_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {
+                "status": result.get("status", "processing"),
+                "balance_after": new_balance,
+                "provider_reference": result.get("transaction_id"),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "message": "Bank withdrawal initiated successfully",
+            "transaction_id": transaction_id,
+            "hubtel_reference": result.get("transaction_id"),
+            "amount": request.amount,
+            "fee": fee,
+            "total_deducted": total_deduction,
+            "new_balance": new_balance,
+            "status": result.get("status", "processing")
+        }
+    else:
+        # Update service transaction as failed
+        await db.service_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {
+                "status": "failed",
+                "error": result.get("error"),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("error", "Bank withdrawal failed")
+        )
+
+
+@router.get("/transaction/status/{reference}")
+async def check_transaction_status(
+    reference: str,
+    current_client: dict = Depends(get_current_client)
+):
+    """
+    Check transaction status via Hubtel API
+    
+    Returns current status: pending, processing, success, failed
+    """
+    client_id = current_client["id"]
+    
+    # Find the transaction
+    transaction = await db.service_transactions.find_one({
+        "id": reference,
+        "client_id": client_id
+    })
+    
+    if not transaction:
+        # Also check bank_transfers collection
+        transaction = await db.bank_transfers.find_one({
+            "client_reference": reference,
+            "user_id": client_id
+        })
+    
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # If already completed, return cached status
+    if transaction.get("status") in ["success", "failed", "cancelled"]:
+        return {
+            "success": True,
+            "status": transaction.get("status"),
+            "transaction_id": reference,
+            "message": f"Transaction {transaction.get('status')}"
+        }
+    
+    # Check status via Hubtel API
+    bank_service = get_hubtel_bank_service(db)
+    status_result = await bank_service.check_transaction_status(reference)
+    
+    if status_result.get("success"):
+        new_status = status_result.get("status", "unknown")
+        
+        # Update our records
+        await db.service_transactions.update_one(
+            {"id": reference},
+            {"$set": {
+                "status": new_status,
+                "status_checked_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        return {
+            "success": True,
+            "status": new_status,
+            "transaction_id": reference,
+            "hubtel_status": status_result.get("hubtel_status"),
+            "message": f"Transaction {new_status}"
+        }
+    else:
+        return {
+            "success": False,
+            "status": transaction.get("status", "unknown"),
+            "transaction_id": reference,
+            "error": status_result.get("error", "Could not check status")
+        }
+
+
+@router.get("/withdrawal/bank/history")
+async def get_bank_withdrawal_history(
+    limit: int = 20,
+    current_client: dict = Depends(get_current_client)
+):
+    """Get user's bank withdrawal history"""
+    client_id = current_client["id"]
+    
+    # Get from service_transactions
+    transactions = await db.service_transactions.find(
+        {"client_id": client_id, "type": "bank_withdrawal"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(length=limit)
+    
+    return {
+        "success": True,
+        "transactions": transactions,
+        "count": len(transactions)
+    }

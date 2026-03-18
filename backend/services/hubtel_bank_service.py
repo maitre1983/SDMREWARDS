@@ -3,19 +3,18 @@ SDM REWARDS - Hubtel Bank Transfer Service
 ===========================================
 Handles bank transfers via Hubtel Send Money API
 
-API Endpoint: https://smp.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/send/bank/gh/{BankCode}
-Request Type: POST
-Content Type: JSON
+Bank Withdrawal: POST https://smp.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/send/bank/gh/{BankCode}
+Status Check: GET https://smrsc.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/transactions/status?clientReference={ref}
 """
 
 import os
-import subprocess
+import httpx
 import json
 import uuid
-import asyncio
+import base64
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -28,42 +27,44 @@ CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com"
 # Fixie Static IP Proxy
 FIXIE_PROXY_URL = os.environ.get("FIXIE_URL", "")
 
-# Hubtel Bank Transfer Base URL
+# Hubtel API URLs
 HUBTEL_BANK_BASE_URL = "https://smp.hubtel.com/api/merchants"
+HUBTEL_STATUS_BASE_URL = "https://smrsc.hubtel.com/api/merchants"
 
 # Ghana Bank Codes for Hubtel
 GHANA_BANK_CODES = {
-    "GCB": "300335",
-    "ECOBANK": "130100",
-    "STANBIC": "190100",
-    "STANDARD_CHARTERED": "020100",
-    "FIDELITY": "240100",
-    "ACCESS": "280100",
-    "UBA": "060100",
-    "ZENITH": "120100",
-    "GT_BANK": "230100",
-    "CAL_BANK": "140100",
-    "ABSA": "030100",
-    "FIRST_ATLANTIC": "170100",
-    "SOCIETE_GENERALE": "090100",
-    "PRUDENTIAL": "180100",
-    "REPUBLIC": "500335",
-    "NATIONAL_INVESTMENT": "360100",
-    "AGRICULTURAL_DEV": "080100",
-    "FIRST_NATIONAL": "330100",
-    "BANK_OF_AFRICA": "210100",
-    "CONSOLIDATED": "400100",
-    "HERITAGE": "370100",
-    "PREMIUM": "380100",
-    "UNIVERSAL_MERCHANT": "100100",
-    "OMNI_BSIC": "460100"
+    "GCB": {"code": "300335", "name": "GCB Bank"},
+    "ECOBANK": {"code": "130100", "name": "Ecobank Ghana"},
+    "STANBIC": {"code": "190100", "name": "Stanbic Bank"},
+    "STANDARD_CHARTERED": {"code": "020100", "name": "Standard Chartered"},
+    "FIDELITY": {"code": "240100", "name": "Fidelity Bank"},
+    "ACCESS": {"code": "280100", "name": "Access Bank"},
+    "UBA": {"code": "060100", "name": "United Bank for Africa"},
+    "ZENITH": {"code": "120100", "name": "Zenith Bank"},
+    "GT_BANK": {"code": "230100", "name": "GT Bank"},
+    "CAL_BANK": {"code": "140100", "name": "CAL Bank"},
+    "ABSA": {"code": "030100", "name": "Absa Bank Ghana"},
+    "FIRST_ATLANTIC": {"code": "170100", "name": "First Atlantic Bank"},
+    "SOCIETE_GENERALE": {"code": "090100", "name": "Societe Generale"},
+    "PRUDENTIAL": {"code": "180100", "name": "Prudential Bank"},
+    "REPUBLIC": {"code": "500335", "name": "Republic Bank"},
+    "NATIONAL_INVESTMENT": {"code": "360100", "name": "National Investment Bank"},
+    "AGRICULTURAL_DEV": {"code": "080100", "name": "Agricultural Development Bank"},
+    "FIRST_NATIONAL": {"code": "330100", "name": "First National Bank"},
+    "BANK_OF_AFRICA": {"code": "210100", "name": "Bank of Africa"},
+    "CONSOLIDATED": {"code": "400100", "name": "Consolidated Bank"},
+    "ARB_APEX": {"code": "070100", "name": "ARB Apex Bank"},
+    "HERITAGE": {"code": "370100", "name": "Heritage Bank"},
+    "PREMIUM": {"code": "380100", "name": "Premium Bank"},
+    "UNIVERSAL_MERCHANT": {"code": "100100", "name": "Universal Merchant Bank"},
+    "OMNI_BSIC": {"code": "460100", "name": "OmniBank (BSIC)"}
 }
 
 
-class HubtelBankTransferService:
+class HubtelBankService:
     """
-    Hubtel Bank Transfer Service
-    Routes requests through Fixie proxy for static IP compliance
+    Hubtel Bank Transfer Service with status tracking.
+    Uses httpx with Fixie proxy for static IP compliance.
     """
     
     def __init__(self, db=None):
@@ -75,7 +76,6 @@ class HubtelBankTransferService:
     
     def _get_auth_header(self) -> str:
         """Generate Basic Auth header"""
-        import base64
         credentials = f"{self.client_id}:{self.client_secret}"
         encoded = base64.b64encode(credentials.encode()).decode()
         return f"Basic {encoded}"
@@ -84,25 +84,23 @@ class HubtelBankTransferService:
         """Check if service is properly configured"""
         return bool(self.client_id and self.client_secret and self.prepaid_deposit_id)
     
-    def get_bank_list(self) -> Dict:
+    def get_bank_list(self) -> List[Dict]:
         """Get list of supported banks"""
         banks = [
-            {"code": code, "name": name.replace("_", " ").title()}
-            for name, code in GHANA_BANK_CODES.items()
+            {"id": key, "code": value["code"], "name": value["name"]}
+            for key, value in GHANA_BANK_CODES.items()
         ]
-        return {
-            "success": True,
-            "banks": sorted(banks, key=lambda x: x["name"])
-        }
+        return sorted(banks, key=lambda x: x["name"])
     
     async def send_to_bank(
         self,
         account_number: str,
-        bank_code: str,
+        bank_id: str,
         amount: float,
         account_name: str,
-        description: str = "SDM Transfer",
-        client_reference: str = None
+        description: str = "SDM Cashback Withdrawal",
+        client_reference: str = None,
+        user_id: str = None
     ) -> Dict:
         """
         Send money to a bank account via Hubtel
@@ -111,16 +109,25 @@ class HubtelBankTransferService:
         
         Args:
             account_number: Recipient bank account number
-            bank_code: Hubtel bank code (e.g., "300335" for GCB)
+            bank_id: Bank identifier (e.g., "GCB", "ECOBANK")
             amount: Amount in GHS
             account_name: Name on the bank account
             description: Transfer description
             client_reference: Unique reference for tracking
+            user_id: ID of the user making the withdrawal
         """
         client_reference = client_reference or f"BANK-{uuid.uuid4().hex[:12].upper()}"
         
         if not self.is_configured():
             return {"success": False, "error": "Bank transfer service not configured"}
+        
+        # Get bank code
+        bank_info = GHANA_BANK_CODES.get(bank_id.upper())
+        if not bank_info:
+            return {"success": False, "error": f"Unknown bank: {bank_id}"}
+        
+        bank_code = bank_info["code"]
+        bank_name = bank_info["name"]
         
         # Build URL
         url = f"{HUBTEL_BANK_BASE_URL}/{self.prepaid_deposit_id}/send/bank/gh/{bank_code}"
@@ -135,122 +142,229 @@ class HubtelBankTransferService:
             "PrimaryCallbackUrl": f"{self.callback_base_url}/api/payments/hubtel/bank-callback"
         }
         
-        # Log transaction
+        # Log transaction to database
+        transaction_record = {
+            "id": str(uuid.uuid4()),
+            "type": "bank_withdrawal",
+            "user_id": user_id,
+            "client_reference": client_reference,
+            "account_number": account_number[-4:].rjust(len(account_number), '*'),  # Masked
+            "account_number_full": account_number,  # Full for processing
+            "account_name": account_name,
+            "bank_id": bank_id,
+            "bank_code": bank_code,
+            "bank_name": bank_name,
+            "amount": amount,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
         if self.db is not None:
-            await self.db.bank_transfers.insert_one({
-                "id": str(uuid.uuid4()),
-                "type": "bank_transfer",
-                "account_number": account_number,
-                "bank_code": bank_code,
-                "account_name": account_name,
-                "amount": amount,
-                "client_reference": client_reference,
-                "status": "pending",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
+            await self.db.bank_transfers.insert_one(transaction_record)
         
-        # Make request via curl with proxy
-        def _execute_curl():
-            tmp_path = f"/tmp/hubtel_bank_{uuid.uuid4().hex[:8]}.json"
-            
-            try:
-                auth_header = self._get_auth_header()
-                payload_json = json.dumps(payload)
-                
-                # Build curl command with proxy
-                cmd = ["curl", "-s"]
-                
-                # Add Fixie proxy for static IP
-                if FIXIE_PROXY_URL:
-                    cmd.extend(["--proxy", FIXIE_PROXY_URL])
-                    logger.info("🔒 [BANK TRANSFER] Using Fixie static IP proxy")
-                
-                cmd.extend([
-                    "-X", "POST", url,
-                    "--http1.1",
-                    "-H", "Content-Type: application/json",
-                    "-H", f"Authorization: {auth_header}",
-                    "-d", payload_json,
-                    "--max-time", "30",
-                    "-o", tmp_path,
-                    "-w", "%{http_code}"
-                ])
-                
-                # Log request
-                logger.info(f"🔵 [BANK TRANSFER] URL: {url}")
-                logger.info(f"🔵 [BANK TRANSFER] Payload: {payload}")
-                
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
-                http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
-                
-                body = ""
-                if os.path.exists(tmp_path):
-                    with open(tmp_path, 'r') as f:
-                        body = f.read()
-                    os.unlink(tmp_path)
-                
-                logger.info(f"🟢 [BANK TRANSFER] HTTP {http_code}: {body}")
-                
-                return {"body": body, "http_code": http_code}
-            
-            except Exception as e:
-                logger.error(f"Bank transfer curl error: {e}")
-                return {"body": "", "http_code": 0, "error": str(e)}
-        
+        # Make request via httpx with proxy
         try:
-            response = await asyncio.to_thread(_execute_curl)
-            http_code = response.get("http_code", 0)
+            headers = {
+                "Authorization": self._get_auth_header(),
+                "Content-Type": "application/json"
+            }
             
-            try:
-                result = json.loads(response["body"]) if response["body"] else {}
-            except:
-                result = {"raw": response["body"]}
+            print("=" * 70)
+            print("🏦 [BANK TRANSFER] REQUEST")
+            print("=" * 70)
+            print(f"📍 URL: {url}")
+            print(f"📦 PAYLOAD: {json.dumps(payload, indent=2)}")
+            print(f"🔒 Using Proxy: {'Yes' if FIXIE_PROXY_URL else 'No'}")
+            
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None, timeout=30.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                http_code = response.status_code
+                
+                print(f"🟢 [BANK TRANSFER] HTTP Code: {http_code}")
+                
+                try:
+                    result = response.json()
+                    print(f"🟢 [BANK TRANSFER] Response: {json.dumps(result, indent=2)}")
+                except:
+                    result = {"raw": response.text}
+                    print(f"🟢 [BANK TRANSFER] Raw: {response.text}")
+            
+            logger.info(f"Bank transfer response: {result}")
             
             response_code = result.get("ResponseCode", result.get("responseCode", ""))
             message = result.get("Message", result.get("message", ""))
             data = result.get("Data", result.get("data", {}))
             
-            # Success check
+            # Success check: 0000 = immediate success, 0001 = pending
             is_success = http_code in [200, 201] and response_code in ["0000", "0001"]
             
-            # Update database
+            # Get transaction ID from response
+            hubtel_transaction_id = data.get("TransactionId", data.get("transactionId", ""))
+            
+            # Update database record
+            update_data = {
+                "status": "processing" if response_code == "0001" else ("success" if response_code == "0000" else "failed"),
+                "hubtel_transaction_id": hubtel_transaction_id,
+                "hubtel_response_code": response_code,
+                "hubtel_message": message,
+                "hubtel_response": result,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
             if self.db is not None:
-                status = "success" if response_code == "0000" else "pending" if response_code == "0001" else "failed"
                 await self.db.bank_transfers.update_one(
                     {"client_reference": client_reference},
-                    {"$set": {
-                        "status": status,
-                        "hubtel_response": result,
-                        "http_code": http_code,
-                        "updated_at": datetime.now(timezone.utc).isoformat()
-                    }}
+                    {"$set": update_data}
                 )
             
             if is_success:
                 return {
                     "success": True,
                     "pending": response_code == "0001",
-                    "transaction_id": data.get("TransactionId", client_reference),
+                    "transaction_id": hubtel_transaction_id,
                     "client_reference": client_reference,
-                    "message": message or "Bank transfer initiated"
+                    "message": message or "Bank transfer initiated",
+                    "status": "processing" if response_code == "0001" else "success"
                 }
             else:
                 error_msg = message or f"Bank transfer failed (HTTP {http_code})"
-                return {"success": False, "error": error_msg}
+                
+                # Specific error handling
+                if response_code == "4075":
+                    error_msg = "Insufficient balance in merchant account"
+                elif response_code == "4105":
+                    error_msg = "Invalid account number"
+                elif http_code == 403:
+                    error_msg = "Access denied - IP not whitelisted"
+                
+                return {"success": False, "error": error_msg, "client_reference": client_reference}
+        
+        except httpx.TimeoutException:
+            logger.error("Bank transfer timeout")
+            if self.db is not None:
+                await self.db.bank_transfers.update_one(
+                    {"client_reference": client_reference},
+                    {"$set": {"status": "timeout", "error": "Request timeout"}}
+                )
+            return {"success": False, "error": "Request timeout. Please try again.", "client_reference": client_reference}
         
         except Exception as e:
             logger.error(f"Bank transfer error: {e}")
-            return {"success": False, "error": str(e)}
+            if self.db is not None:
+                await self.db.bank_transfers.update_one(
+                    {"client_reference": client_reference},
+                    {"$set": {"status": "error", "error": str(e)}}
+                )
+            return {"success": False, "error": str(e), "client_reference": client_reference}
+    
+    async def check_transaction_status(self, client_reference: str) -> Dict:
+        """
+        Check transaction status via Hubtel Status API
+        
+        API: GET https://smrsc.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/transactions/status?clientReference={ref}
+        """
+        if not self.is_configured():
+            return {"success": False, "error": "Service not configured"}
+        
+        url = f"{HUBTEL_STATUS_BASE_URL}/{self.prepaid_deposit_id}/transactions/status"
+        params = {"clientReference": client_reference}
+        
+        try:
+            headers = {
+                "Authorization": self._get_auth_header(),
+                "Content-Type": "application/json"
+            }
+            
+            print("=" * 70)
+            print("🔍 [STATUS CHECK] REQUEST")
+            print("=" * 70)
+            print(f"📍 URL: {url}")
+            print(f"📦 Params: {params}")
+            
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None, timeout=30.0) as client:
+                response = await client.get(url, headers=headers, params=params)
+                http_code = response.status_code
+                
+                print(f"🟢 [STATUS CHECK] HTTP Code: {http_code}")
+                
+                try:
+                    result = response.json()
+                    print(f"🟢 [STATUS CHECK] Response: {json.dumps(result, indent=2)}")
+                except:
+                    result = {"raw": response.text}
+            
+            logger.info(f"Status check response: {result}")
+            
+            if http_code == 200:
+                data = result.get("Data", result.get("data", {}))
+                status = data.get("Status", data.get("status", "unknown"))
+                
+                # Map Hubtel status to our status
+                status_map = {
+                    "Success": "success",
+                    "Successful": "success",
+                    "Completed": "success",
+                    "Pending": "processing",
+                    "Processing": "processing",
+                    "Failed": "failed",
+                    "Rejected": "failed",
+                    "Cancelled": "cancelled"
+                }
+                
+                normalized_status = status_map.get(status, "unknown")
+                
+                # Update database
+                if self.db is not None:
+                    await self.db.bank_transfers.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {
+                            "status": normalized_status,
+                            "hubtel_status": status,
+                            "status_checked_at": datetime.now(timezone.utc).isoformat(),
+                            "updated_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+                
+                return {
+                    "success": True,
+                    "status": normalized_status,
+                    "hubtel_status": status,
+                    "client_reference": client_reference,
+                    "data": data
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Status check failed (HTTP {http_code})",
+                    "client_reference": client_reference
+                }
+        
+        except Exception as e:
+            logger.error(f"Status check error: {e}")
+            return {"success": False, "error": str(e), "client_reference": client_reference}
+    
+    async def get_user_bank_transfers(self, user_id: str, limit: int = 20) -> List[Dict]:
+        """Get user's bank transfer history"""
+        if self.db is None:
+            return []
+        
+        transfers = await self.db.bank_transfers.find(
+            {"user_id": user_id},
+            {"_id": 0, "account_number_full": 0}  # Exclude sensitive data
+        ).sort("created_at", -1).limit(limit).to_list(length=limit)
+        
+        return transfers
 
 
 # Singleton instance
 _bank_service = None
 
-def get_hubtel_bank_service(db=None) -> HubtelBankTransferService:
+def get_hubtel_bank_service(db=None) -> HubtelBankService:
     """Get singleton instance"""
     global _bank_service
     if _bank_service is None:
-        _bank_service = HubtelBankTransferService(db)
+        _bank_service = HubtelBankService(db)
     elif db is not None and _bank_service.db is None:
         _bank_service.db = db
     return _bank_service
