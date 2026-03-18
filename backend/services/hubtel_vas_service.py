@@ -408,10 +408,23 @@ class HubtelVASService:
             http_code = response.get("http_code", 0)
             
             if http_code == 200:
-                bundles = result.get("Data", result.get("data", []))
+                raw_bundles = result.get("Data", result.get("data", []))
+                
+                # Normalize bundle structure for frontend
+                # Hubtel returns: {Display, Value, Amount}
+                # Frontend expects: {id, display, amount}
+                normalized_bundles = []
+                for bundle in raw_bundles:
+                    normalized_bundles.append({
+                        "id": bundle.get("Value", bundle.get("value", "")),
+                        "display": bundle.get("Display", bundle.get("display", "")),
+                        "amount": bundle.get("Amount", bundle.get("amount", 0)),
+                        "service_id": service_id
+                    })
+                
                 return {
                     "success": True,
-                    "bundles": bundles,
+                    "bundles": normalized_bundles,
                     "network": detected_network,
                     "phone": normalized_phone
                 }
