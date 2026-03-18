@@ -70,7 +70,11 @@ class ECGPaymentRequest(BaseModel):
 class WithdrawalRequest(BaseModel):
     phone: str
     amount: float
-    network: str
+    network: Optional[str] = None  # Made optional - will auto-detect if not provided
+    
+    class Config:
+        # Accept extra fields without error
+        extra = "ignore"
 
 
 # ============== HELPER FUNCTIONS ==============
@@ -670,20 +674,43 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     
     from services.hubtel_momo_service import get_hubtel_momo_service
     
-    # Log incoming request for debugging
-    logger.info(f"Withdrawal request received: phone={request.phone}, amount={request.amount}, network={request.network}")
+    # DETAILED LOGGING - Log everything for debugging
+    logger.info("=" * 50)
+    logger.info("WITHDRAWAL REQUEST RECEIVED")
+    logger.info(f"Raw request data:")
+    logger.info(f"  - phone: {repr(request.phone)}")
+    logger.info(f"  - amount: {repr(request.amount)}")
+    logger.info(f"  - network: {repr(request.network)}")
+    logger.info(f"  - client_id: {current_client.get('id', 'unknown')}")
+    logger.info("=" * 50)
+    
+    # Validate phone is not empty
+    if not request.phone or not request.phone.strip():
+        error_msg = "Phone number is required"
+        logger.error(f"VALIDATION ERROR: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    # Validate amount is a valid number
+    try:
+        amount = float(request.amount)
+    except (TypeError, ValueError):
+        error_msg = f"Invalid amount: {request.amount}"
+        logger.error(f"VALIDATION ERROR: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     
     min_withdrawal = 5.0
     max_withdrawal = 1000.0
     
     # Validate amount
-    if request.amount < min_withdrawal:
-        logger.warning(f"Withdrawal rejected: amount {request.amount} < minimum {min_withdrawal}")
-        raise HTTPException(status_code=400, detail=f"Minimum withdrawal is GHS {min_withdrawal}")
+    if amount < min_withdrawal:
+        error_msg = f"Minimum withdrawal is GHS {min_withdrawal}. You requested GHS {amount}"
+        logger.warning(f"VALIDATION ERROR: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     
-    if request.amount > max_withdrawal:
-        logger.warning(f"Withdrawal rejected: amount {request.amount} > maximum {max_withdrawal}")
-        raise HTTPException(status_code=400, detail=f"Maximum withdrawal is GHS {max_withdrawal}")
+    if amount > max_withdrawal:
+        error_msg = f"Maximum withdrawal is GHS {max_withdrawal}. You requested GHS {amount}"
+        logger.warning(f"VALIDATION ERROR: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     
     # NORMALIZE PHONE NUMBER - Accept all formats
     phone = request.phone.strip() if request.phone else ""

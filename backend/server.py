@@ -383,6 +383,28 @@ async def get_server_outbound_ip():
     return ip_info
 
 
+# ============== DEBUG ENDPOINT FOR WITHDRAWAL ==============
+@app.post("/api/debug/withdrawal-request")
+async def debug_withdrawal_request(request: Request):
+    """
+    Debug endpoint to see exactly what the frontend sends for withdrawal.
+    Returns the raw request body without validation.
+    """
+    try:
+        body = await request.json()
+    except Exception as e:
+        body = {"error": f"Could not parse JSON: {str(e)}"}
+    
+    headers = dict(request.headers)
+    
+    return {
+        "received_body": body,
+        "content_type": headers.get("content-type"),
+        "authorization_present": "authorization" in headers,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 # ============== PUBLIC BANKS ENDPOINT ==============
 @app.get("/api/public/banks")
 async def get_public_banks():
