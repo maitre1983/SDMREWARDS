@@ -1012,7 +1012,10 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
                   <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
                     {dataBundlesApi.map(bundle => {
                       const isSelected = selectedBundle?.id === bundle.id;
-                      const canAfford = bundle.amount * (1 + (fees.data_bundle || 3) / 100) <= balance;
+                      // Fix: fees.data_bundle is an object {type, rate}, not a number
+                      const feeRate = fees.data_bundle?.rate || 3;
+                      const totalCost = bundle.amount * (1 + feeRate / 100);
+                      const canAfford = totalCost <= (balance || 0);
                       
                       return (
                         <button

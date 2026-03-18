@@ -22,7 +22,10 @@ HUBTEL_PREPAID_ID = os.environ.get("HUBTEL_PREPAID_DEPOSIT_ID", "")
 HUBTEL_API_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
 HUBTEL_API_KEY = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
-VAS_TEST_MODE = os.environ.get("VAS_TEST_MODE", "false").lower() == "true"
+
+def is_vas_test_mode() -> bool:
+    """Check VAS test mode at RUNTIME, not import time"""
+    return os.environ.get("VAS_TEST_MODE", "false").lower() == "true"
 
 # Hubtel Commission Services - CORRECT Service IDs (from Hubtel documentation)
 # Airtime Service IDs
@@ -188,6 +191,11 @@ class HubtelVASService:
         detected_network = network.upper() if network else self._detect_network(phone)
         client_reference = client_reference or f"AIRTIME-{uuid.uuid4().hex[:12].upper()}"
         
+        # DEBUG: Print test mode status at RUNTIME
+        current_test_mode = is_vas_test_mode()
+        print(f"🔍 [DEBUG] VAS_TEST_MODE at runtime: {current_test_mode}")
+        print(f"🔍 [DEBUG] ENV VAS_TEST_MODE value: {os.environ.get('VAS_TEST_MODE', 'NOT SET')}")
+        
         # Log the transaction
         transaction_log = {
             "id": str(uuid.uuid4()),
@@ -198,14 +206,14 @@ class HubtelVASService:
             "client_reference": client_reference,
             "status": "pending",
             "provider": "hubtel_vas",
-            "test_mode": VAS_TEST_MODE,
+            "test_mode": is_vas_test_mode(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         if self.db is not None:
             await self.db.vas_transactions.insert_one(transaction_log)
         
-        if VAS_TEST_MODE:
+        if is_vas_test_mode():
             logger.info(f"[TEST] Hubtel Airtime: {normalized_phone} - GHS {amount}")
             if self.db is not None:
                 await self.db.vas_transactions.update_one(
@@ -250,9 +258,10 @@ class HubtelVASService:
             logger.info(f"Hubtel Airtime response: {result}")
             
             response_code = result.get("ResponseCode", result.get("responseCode", ""))
-            is_success = http_code in [200, 201] and response_code in ["0000", "0001"]
             
-            if is_success:
+            # 0000 = immediate success, 0001 = pending (awaiting callback)
+            if http_code in [200, 201] and response_code == "0000":
+                # Immediate success
                 if self.db is not None:
                     await self.db.vas_transactions.update_one(
                         {"client_reference": client_reference},
@@ -265,6 +274,24 @@ class HubtelVASService:
                     "success": True,
                     "transaction_id": result.get("Data", {}).get("TransactionId", client_reference),
                     "message": "Airtime sent successfully"
+                }
+            elif http_code in [200, 201] and response_code == "0001":
+                # Pending - transaction submitted, awaiting callback
+                transaction_id = result.get("Data", {}).get("TransactionId", client_reference)
+                if self.db is not None:
+                    await self.db.vas_transactions.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {
+                            "status": "pending",
+                            "transaction_id": transaction_id,
+                            "hubtel_response": result
+                        }}
+                    )
+                return {
+                    "success": True,
+                    "pending": True,
+                    "transaction_id": transaction_id,
+                    "message": "Airtime request submitted. Processing..."
                 }
             else:
                 error_msg = result.get("Message", result.get("message", f"Airtime failed: {http_code}"))
@@ -292,7 +319,7 @@ class HubtelVASService:
         normalized_phone = self._normalize_phone(phone)
         detected_network = network.upper() if network else self._detect_network(phone)
         
-        if VAS_TEST_MODE or not self.is_configured():
+        if is_vas_test_mode() or not self.is_configured():
             # Return mock bundles for test mode
             return {
                 "success": True,
@@ -366,14 +393,14 @@ class HubtelVASService:
             "client_reference": client_reference,
             "status": "pending",
             "provider": "hubtel_vas",
-            "test_mode": VAS_TEST_MODE,
+            "test_mode": is_vas_test_mode(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         if self.db is not None:
             await self.db.vas_transactions.insert_one(transaction_log)
         
-        if VAS_TEST_MODE:
+        if is_vas_test_mode():
             logger.info(f"[TEST] Hubtel Data: {normalized_phone} - Bundle {bundle_id}")
             if self.db is not None:
                 await self.db.vas_transactions.update_one(
@@ -418,9 +445,9 @@ class HubtelVASService:
             logger.info(f"Hubtel Data Bundle response: {result}")
             
             response_code = result.get("ResponseCode", "")
-            is_success = http_code in [200, 201] and response_code in ["0000", "0001"]
             
-            if is_success:
+            # 0000 = immediate success, 0001 = pending (awaiting callback)
+            if http_code in [200, 201] and response_code == "0000":
                 if self.db is not None:
                     await self.db.vas_transactions.update_one(
                         {"client_reference": client_reference},
@@ -430,6 +457,24 @@ class HubtelVASService:
                     "success": True,
                     "transaction_id": result.get("Data", {}).get("TransactionId", client_reference),
                     "message": "Data bundle purchased successfully"
+                }
+            elif http_code in [200, 201] and response_code == "0001":
+                # Pending - transaction submitted, awaiting callback
+                transaction_id = result.get("Data", {}).get("TransactionId", client_reference)
+                if self.db is not None:
+                    await self.db.vas_transactions.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {
+                            "status": "pending",
+                            "transaction_id": transaction_id,
+                            "hubtel_response": result
+                        }}
+                    )
+                return {
+                    "success": True,
+                    "pending": True,
+                    "transaction_id": transaction_id,
+                    "message": "Data bundle request submitted. Processing..."
                 }
             else:
                 error_msg = result.get("Message", f"Data bundle failed: {http_code}")
@@ -473,14 +518,14 @@ class HubtelVASService:
             "client_reference": client_reference,
             "status": "pending",
             "provider": "hubtel_vas",
-            "test_mode": VAS_TEST_MODE,
+            "test_mode": is_vas_test_mode(),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         if self.db is not None:
             await self.db.vas_transactions.insert_one(transaction_log)
         
-        if VAS_TEST_MODE:
+        if is_vas_test_mode():
             logger.info(f"[TEST] Hubtel ECG: {meter_number} - GHS {amount}")
             if self.db is not None:
                 await self.db.vas_transactions.update_one(
@@ -524,9 +569,10 @@ class HubtelVASService:
             logger.info(f"Hubtel ECG response: {result}")
             
             response_code = result.get("ResponseCode", "")
-            is_success = http_code in [200, 201] and response_code in ["0000", "0001"]
             
-            if is_success:
+            # CRITICAL: Only 0000 is SUCCESS for ECG (token received)
+            # 0001 = PENDING (no token yet, awaiting callback)
+            if http_code in [200, 201] and response_code == "0000":
                 token = result.get("Data", {}).get("Token", "")
                 if self.db is not None:
                     await self.db.vas_transactions.update_one(
@@ -537,7 +583,26 @@ class HubtelVASService:
                     "success": True,
                     "transaction_id": result.get("Data", {}).get("TransactionId", client_reference),
                     "token": token,
-                    "message": "ECG payment successful"
+                    "message": "ECG payment successful - token generated"
+                }
+            elif http_code in [200, 201] and response_code == "0001":
+                # PENDING - Transaction submitted but NO token yet
+                # User balance was deducted, awaiting callback for token
+                transaction_id = result.get("Data", {}).get("TransactionId", client_reference)
+                if self.db is not None:
+                    await self.db.vas_transactions.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {
+                            "status": "pending",
+                            "transaction_id": transaction_id,
+                            "hubtel_response": result
+                        }}
+                    )
+                return {
+                    "success": True,
+                    "pending": True,
+                    "transaction_id": transaction_id,
+                    "message": "ECG payment submitted. Token will be delivered shortly via callback."
                 }
             else:
                 error_msg = result.get("Message", f"ECG payment failed: {http_code}")
