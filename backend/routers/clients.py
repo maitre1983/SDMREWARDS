@@ -53,11 +53,37 @@ async def get_client_dashboard(current_client: dict = Depends(get_current_client
     """Get client dashboard data"""
     client_id = current_client["id"]
     
-    # Get recent transactions
-    recent_transactions = await db.transactions.find(
+    # Get recent transactions from both collections
+    regular_transactions = await db.transactions.find(
         {"client_id": client_id},
         {"_id": 0}
-    ).sort("created_at", -1).limit(10).to_list(10)
+    ).sort("created_at", -1).limit(20).to_list(20)
+    
+    service_transactions = await db.service_transactions.find(
+        {"client_id": client_id},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    
+    # Normalize service transactions
+    normalized_service_txns = []
+    for txn in service_transactions:
+        normalized_service_txns.append({
+            "id": txn.get("id"),
+            "client_id": txn.get("client_id"),
+            "type": txn.get("type", "service"),
+            "amount": txn.get("amount", 0),
+            "fee": txn.get("fee", 0),
+            "total": txn.get("total_cost", txn.get("amount", 0)),
+            "status": txn.get("status", "pending"),
+            "description": txn.get("description") or f"{txn.get('type', 'Service').replace('_', ' ').title()} - {txn.get('phone', '')}",
+            "reference": txn.get("id"),
+            "created_at": txn.get("created_at")
+        })
+    
+    # Combine and sort
+    all_transactions = regular_transactions + normalized_service_txns
+    all_transactions.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    recent_transactions = all_transactions[:10]
     
     # Get referral stats
     referral_count = await db.referrals.count_documents({
@@ -775,22 +801,62 @@ async def get_transactions(
     type: Optional[str] = None,
     current_client: dict = Depends(get_current_client)
 ):
-    """Get client's transaction history"""
-    query = {"client_id": current_client["id"]}
+    """Get client's transaction history - combines all transaction sources"""
+    client_id = current_client["id"]
     
+    # Query for regular transactions (cashback earnings, bonuses, etc.)
+    query1 = {"client_id": client_id}
     if type:
-        query["type"] = type
+        query1["type"] = type
     
-    transactions = await db.transactions.find(
-        query,
+    regular_transactions = await db.transactions.find(
+        query1,
         {"_id": 0}
-    ).sort("created_at", -1).skip(offset).limit(limit).to_list(limit)
+    ).sort("created_at", -1).to_list(length=500)
     
-    total = await db.transactions.count_documents(query)
+    # Query for service transactions (airtime, data, ecg, withdrawal)
+    query2 = {"client_id": client_id}
+    if type:
+        query2["type"] = type
+    
+    service_transactions = await db.service_transactions.find(
+        query2,
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(length=500)
+    
+    # Normalize service transactions to match regular transaction format
+    normalized_service_txns = []
+    for txn in service_transactions:
+        normalized_service_txns.append({
+            "id": txn.get("id"),
+            "client_id": txn.get("client_id"),
+            "type": txn.get("type", "service"),
+            "amount": txn.get("amount", 0),
+            "fee": txn.get("fee", 0),
+            "total": txn.get("total_cost", txn.get("amount", 0)),
+            "status": txn.get("status", "pending"),
+            "description": txn.get("description") or f"{txn.get('type', 'Service').replace('_', ' ').title()} - {txn.get('phone', '')}",
+            "reference": txn.get("id"),
+            "provider_reference": txn.get("provider_reference"),
+            "created_at": txn.get("created_at"),
+            "metadata": {
+                "phone": txn.get("phone"),
+                "network": txn.get("network"),
+                "meter_number": txn.get("meter_number"),
+                "package_id": txn.get("package_id")
+            }
+        })
+    
+    # Combine and sort all transactions
+    all_transactions = regular_transactions + normalized_service_txns
+    all_transactions.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    # Apply pagination
+    paginated = all_transactions[offset:offset + limit]
     
     return {
-        "transactions": transactions,
-        "total": total,
+        "transactions": paginated,
+        "total": len(all_transactions),
         "limit": limit,
         "offset": offset
     }

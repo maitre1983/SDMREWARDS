@@ -22,6 +22,11 @@ from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from routers.auth import get_current_client
+from services.transaction_service import (
+    get_transaction_service, 
+    TransactionType, 
+    TransactionStatus
+)
 
 # Setup
 router = APIRouter()

@@ -286,3 +286,84 @@ async def get_monthly_analytics(
     except Exception as e:
         logger.error(f"Monthly analytics error: {e}")
         return {"month": month, "transactions": 0, "volume": 0, "new_clients": 0, "new_merchants": 0, "cashback_distributed": 0, "card_sales": 0}
+
+
+
+@router.get("/transactions")
+async def get_all_transactions(
+    limit: int = 100,
+    offset: int = 0,
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    user_id: Optional[str] = None,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """Get all transactions (admin view) - combines all transaction sources"""
+    
+    # Query for regular transactions
+    query1 = {}
+    if type:
+        query1["type"] = type
+    if status:
+        query1["status"] = status
+    if user_id:
+        query1["client_id"] = user_id
+    
+    regular_transactions = await db.transactions.find(
+        query1,
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(length=1000)
+    
+    # Query for service transactions
+    query2 = {}
+    if type:
+        query2["type"] = type
+    if status:
+        query2["status"] = status
+    if user_id:
+        query2["client_id"] = user_id
+    
+    service_transactions = await db.service_transactions.find(
+        query2,
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(length=1000)
+    
+    # Normalize service transactions
+    normalized_service_txns = []
+    for txn in service_transactions:
+        normalized_service_txns.append({
+            "id": txn.get("id"),
+            "client_id": txn.get("client_id"),
+            "type": txn.get("type", "service"),
+            "amount": txn.get("amount", 0),
+            "fee": txn.get("fee", 0),
+            "total": txn.get("total_cost", txn.get("amount", 0)),
+            "status": txn.get("status", "pending"),
+            "description": txn.get("description") or f"{txn.get('type', 'Service').replace('_', ' ').title()}",
+            "reference": txn.get("id"),
+            "provider_reference": txn.get("provider_reference"),
+            "phone": txn.get("phone"),
+            "network": txn.get("network"),
+            "created_at": txn.get("created_at")
+        })
+    
+    # Combine and sort
+    all_transactions = regular_transactions + normalized_service_txns
+    all_transactions.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    # Apply pagination
+    paginated = all_transactions[offset:offset + limit]
+    
+    # Calculate stats
+    total_count = len(all_transactions)
+    total_volume = sum(t.get("amount", 0) for t in all_transactions)
+    success_count = len([t for t in all_transactions if t.get("status") == "success"])
+    
+    return {
+        "transactions": paginated,
+        "total": total_count,
+        "total_volume": round(total_volume, 2),
+        "success_count": success_count,
+        "limit": limit,
+        "offset": offset
+    }
