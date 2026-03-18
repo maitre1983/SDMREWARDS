@@ -435,18 +435,30 @@ class HubtelMoMoService:
         description: str,
         client_reference: str,
         recipient_name: str = "",
-        callback_url: str = None
+        callback_url: str = None,
+        channel: str = None  # Optional: pre-determined channel (mtn-gh, vodafone-gh, tigo-gh)
     ) -> Dict:
         """
         Send/transfer money to a MoMo wallet (disbursement)
         Used for merchant payouts, cashback withdrawals, etc.
         
-        API: POST https://smp.hubtel.com/merchantaccount/merchants/{PREPAID_ID}/send/mobilemoney
+        API: POST https://smp.hubtel.com/api/merchants/{PREPAID_ID}/send/mobilemoney
         
         Uses curl subprocess to avoid HTTP library issues with Hubtel API.
+        
+        Args:
+            phone: Phone number (any format, will be normalized to 233XXXXXXXXX)
+            amount: Amount to send in GHS
+            description: Transaction description
+            client_reference: Unique reference ID
+            recipient_name: Name of recipient
+            callback_url: Optional callback URL for status updates
+            channel: Optional Hubtel channel (mtn-gh, vodafone-gh, tigo-gh). Auto-detected if not provided.
         """
         normalized_phone = self._normalize_phone(phone)
-        network = self._detect_network(phone)
+        
+        # Use provided channel or auto-detect
+        network = channel if channel else self._detect_network(phone)
         
         # Log the transfer attempt
         transfer_log = {

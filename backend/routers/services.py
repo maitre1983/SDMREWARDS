@@ -670,14 +670,79 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     
     from services.hubtel_momo_service import get_hubtel_momo_service
     
+    # Log incoming request for debugging
+    logger.info(f"Withdrawal request received: phone={request.phone}, amount={request.amount}, network={request.network}")
+    
     min_withdrawal = 5.0
     max_withdrawal = 1000.0
     
+    # Validate amount
     if request.amount < min_withdrawal:
+        logger.warning(f"Withdrawal rejected: amount {request.amount} < minimum {min_withdrawal}")
         raise HTTPException(status_code=400, detail=f"Minimum withdrawal is GHS {min_withdrawal}")
     
     if request.amount > max_withdrawal:
+        logger.warning(f"Withdrawal rejected: amount {request.amount} > maximum {max_withdrawal}")
         raise HTTPException(status_code=400, detail=f"Maximum withdrawal is GHS {max_withdrawal}")
+    
+    # NORMALIZE PHONE NUMBER - Accept all formats
+    phone = request.phone.strip() if request.phone else ""
+    phone = phone.replace(" ", "").replace("-", "")  # Remove spaces and dashes
+    
+    # Normalize to 233XXXXXXXXX format
+    if phone.startswith("+"):
+        phone = phone[1:]  # Remove +
+    if phone.startswith("00"):
+        phone = phone[2:]  # Remove 00
+    if phone.startswith("0"):
+        phone = "233" + phone[1:]  # 0XX -> 233XX
+    if not phone.startswith("233"):
+        phone = "233" + phone  # Add 233 prefix
+    
+    # Validate phone length
+    if len(phone) != 12:
+        logger.warning(f"Withdrawal rejected: invalid phone format {request.phone} -> normalized {phone}")
+        raise HTTPException(status_code=400, detail=f"Invalid phone number format. Please enter a valid Ghana phone number.")
+    
+    logger.info(f"Phone normalized: {request.phone} -> {phone}")
+    
+    # NORMALIZE NETWORK - Map frontend values to Hubtel channel codes
+    network_input = (request.network or "").strip().upper()
+    
+    # Network mapping: Frontend value -> Hubtel channel code
+    network_map = {
+        "MTN": "mtn-gh",
+        "MTN MOMO": "mtn-gh",
+        "MTN-MOMO": "mtn-gh",
+        "MTNMOMO": "mtn-gh",
+        "MTN MOBILE MONEY": "mtn-gh",
+        "MTN-GH": "mtn-gh",
+        "VODAFONE": "vodafone-gh",
+        "VODAFONE CASH": "vodafone-gh",
+        "VODAFONE-GH": "vodafone-gh",
+        "TELECEL": "tigo-gh",
+        "TELECEL CASH": "tigo-gh",
+        "TIGO": "tigo-gh",
+        "AIRTEL": "tigo-gh",
+        "AIRTELTIGO": "tigo-gh",
+        "AIRTEL-TIGO": "tigo-gh",
+    }
+    
+    hubtel_channel = network_map.get(network_input, None)
+    
+    # Auto-detect network from phone if not mapped
+    if not hubtel_channel:
+        prefix = phone[3:5] if len(phone) >= 5 else ""  # Get prefix after 233
+        if prefix in ["24", "25", "53", "54", "55", "59"]:
+            hubtel_channel = "mtn-gh"
+        elif prefix in ["20", "50"]:
+            hubtel_channel = "vodafone-gh"
+        elif prefix in ["27", "26", "56", "57"]:
+            hubtel_channel = "tigo-gh"
+        else:
+            hubtel_channel = "mtn-gh"  # Default to MTN
+    
+    logger.info(f"Network normalized: {request.network} -> {hubtel_channel}")
     
     # Calculate fee
     fee_info = await get_service_fee("withdrawal", request.amount)
@@ -687,46 +752,30 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     # Check balance
     client_record = await db.clients.find_one({"id": current_client["id"]}, {"_id": 0})
     if not client_record:
+        logger.warning(f"Withdrawal rejected: client {current_client['id']} not found")
         raise HTTPException(status_code=404, detail="Client not found")
     
     balance = client_record.get("cashback_balance", 0)
     if balance < total_deducted:
+        logger.warning(f"Withdrawal rejected: balance {balance} < required {total_deducted}")
         raise HTTPException(
             status_code=400,
-            detail=f"Insufficient balance. Available: GHS {balance:.2f}"
+            detail=f"Insufficient cashback balance. Available: GHS {balance:.2f}, Required: GHS {total_deducted:.2f}"
         )
     
     # Generate unique transaction ID
     transaction_id = f"SDM-WD-{uuid.uuid4().hex[:12].upper()}"
     
-    # Detect network if not provided
-    network = request.network.upper() if request.network else None
-    if not network:
-        # Auto-detect from phone number
-        phone = request.phone
-        if phone.startswith("+233"):
-            phone = "0" + phone[4:]
-        elif phone.startswith("233"):
-            phone = "0" + phone[3:]
-        
-        prefix = phone[1:3] if len(phone) >= 3 else ""
-        if prefix in ["24", "25", "53", "54", "55", "59"]:
-            network = "MTN"
-        elif prefix in ["20", "50"]:
-            network = "VODAFONE"
-        elif prefix in ["27", "26", "56", "57"]:
-            network = "TELECEL"
-        else:
-            network = "MTN"  # Default
+    logger.info(f"Processing withdrawal: {transaction_id}, amount={request.amount}, net={net_amount}, fee={fee_info['fee_amount']}")
     
-    # Create withdrawal record
+    # Create withdrawal record (PENDING status BEFORE API call)
     withdrawal_tx = {
         "id": str(uuid.uuid4()),
         "type": "withdrawal",
         "client_id": current_client["id"],
-        "client_name": client_record.get("full_name", ""),
-        "phone": request.phone,
-        "network": network,
+        "client_name": client_record.get("full_name", client_record.get("name", "")),
+        "phone": phone,  # Use normalized phone
+        "network": hubtel_channel,  # Use Hubtel channel code
         "amount": request.amount,
         "service_fee": fee_info["fee_amount"],
         "net_amount": net_amount,
@@ -739,15 +788,38 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     
     await db.service_transactions.insert_one(withdrawal_tx)
     
-    # Call Hubtel Send Money API
+    logger.info(f"Calling Hubtel Send Money API for {transaction_id}")
+    
+    # Call Hubtel Send Money API with NORMALIZED phone and channel
     hubtel_service = get_hubtel_momo_service(db)
-    result = await hubtel_service.send_momo(
-        phone=request.phone,
-        amount=net_amount,  # Send net amount after fee
-        description="SDM Rewards Cashback Withdrawal",
-        client_reference=transaction_id,
-        recipient_name=client_record.get("full_name", "SDM Client")
-    )
+    
+    try:
+        result = await hubtel_service.send_momo(
+            phone=phone,  # Use normalized phone (233XXXXXXXXX)
+            amount=net_amount,  # Send net amount after fee
+            description=f"SDM Rewards Cashback Withdrawal - {transaction_id}",
+            client_reference=transaction_id,
+            recipient_name=client_record.get("full_name", client_record.get("name", "SDM Client")),
+            channel=hubtel_channel  # Use normalized channel (mtn-gh, vodafone-gh, tigo-gh)
+        )
+        
+        logger.info(f"Hubtel response for {transaction_id}: {result}")
+        
+    except Exception as e:
+        logger.error(f"Hubtel API error for {transaction_id}: {str(e)}")
+        # Update transaction as failed
+        await db.service_transactions.update_one(
+            {"id": withdrawal_tx["id"]},
+            {"$set": {
+                "status": "failed",
+                "error": f"API Error: {str(e)}",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Payment service error: {str(e)}"
+        )
     
     if result.get("success"):
         # Deduct balance
