@@ -26,8 +26,16 @@ async def initiate_card_payment(request: CardPaymentRequest):
     """
     db = get_db()
     
-    # Validate card type
-    card_prices = {"silver": 25, "gold": 50, "platinum": 100}
+    # Get card prices from platform config (single source of truth)
+    config = await db.platform_config.find_one({"key": "main"}, {"_id": 0})
+    card_prices_config = config.get("card_prices", {}) if config else {}
+    
+    # Use config values or defaults
+    card_prices = {
+        "silver": card_prices_config.get("silver", 25),
+        "gold": card_prices_config.get("gold", 50),
+        "platinum": card_prices_config.get("platinum", 100)
+    }
     card_names = {"silver": "Silver Card", "gold": "Gold Card", "platinum": "Platinum Card"}
     
     if request.card_type.lower() not in card_prices:

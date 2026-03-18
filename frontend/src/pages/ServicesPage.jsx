@@ -36,7 +36,7 @@ import { API_URL } from '@/config/api';
 
 const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   // Build version for debugging
-  const BUILD_VERSION = "2026.03.17.v9";
+  const BUILD_VERSION = "2026.03.17.v10";
   const [activeService, setActiveService] = useState(null);
   const [fees, setFees] = useState({});
   const [isLoading, setIsLoading] = useState(false);
