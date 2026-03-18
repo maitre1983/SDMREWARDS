@@ -6,7 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import {
   Shield, CreditCard, Gift, Banknote, UserPlus,
-  MessageSquare, Users, Sliders, Loader2, Settings, Trophy
+  MessageSquare, Users, Sliders, Loader2, Settings, Trophy, Gauge
 } from 'lucide-react';
 
 // Import settings sub-components
@@ -19,6 +19,7 @@ import SettingsSMS from './settings/SettingsSMS';
 import SettingsSecurity from './settings/SettingsSecurity';
 import SettingsAdmins from './settings/SettingsAdmins';
 import SettingsGamification from './settings/SettingsGamification';
+import SettingsLimits from './settings/SettingsLimits';
 
 // API URL imported from config
 import { API_URL } from '@/config/api';
@@ -54,6 +55,7 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
   const settingsTabs = [
     { id: 'cards', label: 'Card Prices', icon: CreditCard },
     { id: 'services', label: 'Service Fees', icon: Sliders },
+    { id: 'limits', label: 'Withdrawal Limits', icon: Gauge },
     { id: 'referrals', label: 'Referrals', icon: Gift },
     { id: 'gamification', label: 'Gamification', icon: Trophy },
     { id: 'debit', label: 'Merchant Debit', icon: Banknote },
@@ -126,6 +128,11 @@ export default function AdminSettings({ token, admin, pinVerified, setPinVerifie
           platformConfig={platformConfig}
           onConfigUpdate={fetchPlatformConfig}
         />
+      )}
+
+      {/* Withdrawal Limits Settings */}
+      {settingsTab === 'limits' && (
+        <SettingsLimits token={token} />
       )}
 
       {/* Referrals Settings */}
