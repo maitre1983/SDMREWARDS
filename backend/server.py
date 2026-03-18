@@ -91,14 +91,24 @@ app = FastAPI(
 )
 
 # ============== CORS ==============
-# IMPORTANT: Allow all origins to fix CORS issues with sdmrewards.com
-# This is necessary because the deployed frontend may call from various domains
+# IMPORTANT: Explicitly allow sdmrewards.com and other origins
+# Cannot use credentials=True with origins=["*"], so we list explicitly
+ALLOWED_ORIGINS = [
+    "https://sdmrewards.com",
+    "https://www.sdmrewards.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://web-boost-seo.preview.emergentagent.com",
+    # Add any other domains here
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Expose all headers to frontend
 )
 
 # ============== GZIP COMPRESSION ==============
