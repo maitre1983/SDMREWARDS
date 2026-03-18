@@ -629,3 +629,39 @@ async def set_user_withdrawal_limits(
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to update user limits")
+
+
+
+@router.get("/withdrawal-limits/usage")
+async def get_withdrawal_usage_dashboard(
+    limit: int = 50,
+    sort_by: str = "daily_usage",
+    filter_approaching: bool = False,
+    threshold: float = 0.8,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get withdrawal usage dashboard data.
+    
+    Shows all clients with withdrawal activity, their usage vs limits,
+    and summary statistics for fraud detection and monitoring.
+    
+    Query params:
+    - limit: Max clients to return (default 50)
+    - sort_by: Sort field (daily_usage, weekly_usage, monthly_usage, daily_percent, etc.)
+    - filter_approaching: Only show clients at or above threshold
+    - threshold: Percentage threshold (0.8 = 80% of limit)
+    """
+    limits_service = get_withdrawal_limits_service(db)
+    
+    data = await limits_service.get_all_clients_usage(
+        limit=limit,
+        sort_by=sort_by,
+        filter_approaching=filter_approaching,
+        threshold=threshold
+    )
+    
+    return {
+        "success": True,
+        **data
+    }

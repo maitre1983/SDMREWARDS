@@ -4,11 +4,13 @@ import { toast } from 'sonner';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
-import { Gauge, Save, Loader2, Smartphone, Building2, AlertCircle, Info } from 'lucide-react';
+import { Gauge, Save, Loader2, Smartphone, Building2, AlertCircle, Info, Settings, Activity } from 'lucide-react';
 
 import { API_URL } from '@/config/api';
+import UsageTrackingDashboard from './UsageTrackingDashboard';
 
 export default function SettingsLimits({ token }) {
+  const [activeTab, setActiveTab] = useState('configure');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [limitsForm, setLimitsForm] = useState({
@@ -107,7 +109,7 @@ export default function SettingsLimits({ token }) {
     </div>
   );
 
-  if (isLoading) {
+  if (isLoading && activeTab === 'configure') {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="animate-spin text-purple-400" size={32} />
@@ -117,98 +119,136 @@ export default function SettingsLimits({ token }) {
 
   return (
     <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 flex items-start gap-3">
-        <Info className="text-blue-400 mt-0.5 flex-shrink-0" size={20} />
-        <div>
-          <h4 className="text-blue-300 font-medium">How Global Limits Work</h4>
-          <p className="text-blue-200/70 text-sm mt-1">
-            These limits apply to all clients. The effective limit for any withdrawal is calculated as:<br/>
-            <code className="bg-blue-900/50 px-2 py-0.5 rounded text-blue-100 text-xs">
-              Effective Limit = MIN(Global Limit, Individual User Limit)
-            </code>
-          </p>
-        </div>
-      </div>
-
-      {/* MoMo Limits Section */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-          <Smartphone size={20} className="text-yellow-400" />
-          Mobile Money (MoMo) Limits
-        </h3>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <LimitInput 
-            label="Max Per Transaction" 
-            field="momo_max_per_tx"
-            icon={<AlertCircle size={12} className="text-yellow-400" />}
-          />
-          <LimitInput 
-            label="Daily Limit" 
-            field="momo_daily"
-            icon={<span className="text-xs">24h</span>}
-          />
-          <LimitInput 
-            label="Weekly Limit" 
-            field="momo_weekly"
-            icon={<span className="text-xs">7d</span>}
-          />
-          <LimitInput 
-            label="Monthly Limit" 
-            field="momo_monthly"
-            icon={<span className="text-xs">30d</span>}
-          />
-        </div>
-      </div>
-
-      {/* Bank Limits Section */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-        <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
-          <Building2 size={20} className="text-green-400" />
-          Bank Transfer Limits
-        </h3>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <LimitInput 
-            label="Max Per Transaction" 
-            field="bank_max_per_tx"
-            icon={<AlertCircle size={12} className="text-green-400" />}
-          />
-          <LimitInput 
-            label="Daily Limit" 
-            field="bank_daily"
-            icon={<span className="text-xs">24h</span>}
-          />
-          <LimitInput 
-            label="Weekly Limit" 
-            field="bank_weekly"
-            icon={<span className="text-xs">7d</span>}
-          />
-          <LimitInput 
-            label="Monthly Limit" 
-            field="bank_monthly"
-            icon={<span className="text-xs">30d</span>}
-          />
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button 
-          onClick={handleSaveLimits}
-          disabled={isSaving}
-          className="bg-purple-600 hover:bg-purple-700"
-          data-testid="save-withdrawal-limits-btn"
+      {/* Sub-tabs for Configure vs Usage Tracking */}
+      <div className="flex gap-2 bg-slate-900 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setActiveTab('configure')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all ${
+            activeTab === 'configure'
+              ? 'bg-purple-600 text-white'
+              : 'text-slate-400 hover:bg-slate-800'
+          }`}
+          data-testid="limits-tab-configure"
         >
-          {isSaving ? (
-            <Loader2 className="animate-spin mr-2" size={16} />
-          ) : (
-            <Save className="mr-2" size={16} />
-          )}
-          {isSaving ? 'Saving...' : 'Save Withdrawal Limits'}
-        </Button>
+          <Settings size={16} />
+          Configure Limits
+        </button>
+        <button
+          onClick={() => setActiveTab('usage')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all ${
+            activeTab === 'usage'
+              ? 'bg-purple-600 text-white'
+              : 'text-slate-400 hover:bg-slate-800'
+          }`}
+          data-testid="limits-tab-usage"
+        >
+          <Activity size={16} />
+          Usage Tracking
+        </button>
       </div>
+
+      {/* Usage Tracking Dashboard */}
+      {activeTab === 'usage' && (
+        <UsageTrackingDashboard token={token} />
+      )}
+
+      {/* Configure Limits */}
+      {activeTab === 'configure' && (
+        <>
+          {/* Info Banner */}
+          <div className="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4 flex items-start gap-3">
+            <Info className="text-blue-400 mt-0.5 flex-shrink-0" size={20} />
+            <div>
+              <h4 className="text-blue-300 font-medium">How Global Limits Work</h4>
+              <p className="text-blue-200/70 text-sm mt-1">
+                These limits apply to all clients. The effective limit for any withdrawal is calculated as:<br/>
+                <code className="bg-blue-900/50 px-2 py-0.5 rounded text-blue-100 text-xs">
+                  Effective Limit = MIN(Global Limit, Individual User Limit)
+                </code>
+              </p>
+            </div>
+          </div>
+
+          {/* MoMo Limits Section */}
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+              <Smartphone size={20} className="text-yellow-400" />
+              Mobile Money (MoMo) Limits
+            </h3>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <LimitInput 
+                label="Max Per Transaction" 
+                field="momo_max_per_tx"
+                icon={<AlertCircle size={12} className="text-yellow-400" />}
+              />
+              <LimitInput 
+                label="Daily Limit" 
+                field="momo_daily"
+                icon={<span className="text-xs">24h</span>}
+              />
+              <LimitInput 
+                label="Weekly Limit" 
+                field="momo_weekly"
+                icon={<span className="text-xs">7d</span>}
+              />
+              <LimitInput 
+                label="Monthly Limit" 
+                field="momo_monthly"
+                icon={<span className="text-xs">30d</span>}
+              />
+            </div>
+          </div>
+
+          {/* Bank Limits Section */}
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+              <Building2 size={20} className="text-green-400" />
+              Bank Transfer Limits
+            </h3>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <LimitInput 
+                label="Max Per Transaction" 
+                field="bank_max_per_tx"
+                icon={<AlertCircle size={12} className="text-green-400" />}
+              />
+              <LimitInput 
+                label="Daily Limit" 
+                field="bank_daily"
+                icon={<span className="text-xs">24h</span>}
+              />
+              <LimitInput 
+                label="Weekly Limit" 
+                field="bank_weekly"
+                icon={<span className="text-xs">7d</span>}
+              />
+              <LimitInput 
+                label="Monthly Limit" 
+                field="bank_monthly"
+                icon={<span className="text-xs">30d</span>}
+              />
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleSaveLimits}
+              disabled={isSaving}
+              className="bg-purple-600 hover:bg-purple-700"
+              data-testid="save-withdrawal-limits-btn"
+            >
+              {isSaving ? (
+                <Loader2 className="animate-spin mr-2" size={16} />
+              ) : (
+                <Save className="mr-2" size={16} />
+              )}
+              {isSaving ? 'Saving...' : 'Save Withdrawal Limits'}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
