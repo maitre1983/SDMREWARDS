@@ -46,6 +46,16 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Frontend: `SettingsLimits.jsx` component with MoMo and Bank limit configuration
   - New "Withdrawal Limits" tab in Admin Settings dashboard
   - Full test coverage (6 backend tests, frontend E2E verified)
+- ✅ **Usage Tracking Dashboard** - Real-time monitoring of client withdrawal activity
+  - Backend: `get_all_clients_usage()` method for aggregated usage statistics
+  - API: `GET /api/admin/withdrawal-limits/usage` with sort/filter/threshold params
+  - Frontend: `UsageTrackingDashboard.jsx` with:
+    - Summary cards (Active Clients, At Limit, Approaching Limit, Daily Volume)
+    - Client table with color-coded progress bars (green/blue/yellow/red)
+    - Search by name/phone/email
+    - Sort by usage volume or percentage
+    - Filter "At-Risk Only" (clients at >=80% of limits)
+  - Sub-tabs in SettingsLimits: "Configure Limits" and "Usage Tracking"
 
 ### 2026-03-16 (Session 3)
 - ✅ **Intégration Hubtel SMS Batch Personalized** - `POST /api/admin/sms/bulk/personalized` créé et testé
@@ -117,6 +127,7 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 | `PUT /api/admin/withdrawal-limits` | ✅ **NEW** | Update global withdrawal limits |
 | `GET /api/admin/withdrawal-limits/user/{id}` | ✅ **NEW** | Get user's effective limits |
 | `PUT /api/admin/withdrawal-limits/user/{id}` | ✅ **NEW** | Set individual user limits |
+| `GET /api/admin/withdrawal-limits/usage` | ✅ **NEW** | Usage tracking dashboard data |
 | `POST /api/auth/otp/send` | ✅ | Envoi OTP via Hubtel SMS |
 | `POST /api/auth/otp/verify` | ✅ | Vérification OTP |
 | `POST /api/auth/client/register` | ✅ | Inscription client avec OTP |
