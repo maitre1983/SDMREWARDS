@@ -25,19 +25,21 @@ CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com"
 
 def is_vas_test_mode() -> bool:
     """
-    Check VAS test mode at RUNTIME.
-    PRODUCTION SAFEGUARD: Always returns False to ensure real API calls.
-    To enable test mode, you must explicitly set VAS_TEST_MODE=true in env.
-    """
-    env_value = os.environ.get("VAS_TEST_MODE", "false").lower()
-    # Log for debugging
-    print(f"🚨 ACTIVE FILE: {__file__}")
-    print(f"🚨 VAS_TEST_MODE env value: '{env_value}'")
+    PRODUCTION OVERRIDE: Always returns False to ensure real API calls.
+    Test mode is DISABLED permanently.
     
-    # ONLY return True if explicitly set to "true"
-    is_test = env_value == "true"
-    print(f"🚨 is_vas_test_mode() returning: {is_test}")
-    return is_test
+    If you need to enable test mode for development:
+    1. Comment out the 'return False' line below
+    2. Uncomment the environment check
+    """
+    # FORCED PRODUCTION MODE - ALWAYS REAL API
+    return False
+    
+    # Original code (disabled for production safety):
+    # env_value = os.environ.get("VAS_TEST_MODE", "false").lower()
+    # print(f"🚨 ACTIVE FILE: {__file__}")
+    # print(f"🚨 VAS_TEST_MODE env value: '{env_value}'")
+    # return env_value == "true"
 
 # Hubtel Commission Services - CORRECT Service IDs (from Hubtel documentation)
 # Airtime Service IDs
