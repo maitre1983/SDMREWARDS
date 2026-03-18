@@ -557,6 +557,7 @@ class HubtelVASService:
         self,
         meter_number: str,
         amount: float,
+        phone: str = None,
         bill_type: str = "prepaid",
         client_reference: str = None
     ) -> Dict:
@@ -566,15 +567,20 @@ class HubtelVASService:
         Args:
             meter_number: ECG meter number
             amount: Payment amount in GHS
+            phone: Customer phone number (required by Hubtel for SMS notification)
             bill_type: "prepaid" or "postpaid"
             client_reference: Unique reference
         """
         client_reference = client_reference or f"ECG-{uuid.uuid4().hex[:12].upper()}"
         
+        # Normalize phone if provided
+        normalized_phone = self._normalize_phone(phone) if phone else ""
+        
         transaction_log = {
             "id": str(uuid.uuid4()),
             "type": "ecg_payment",
             "meter_number": meter_number,
+            "phone": normalized_phone,
             "amount": amount,
             "bill_type": bill_type,
             "client_reference": client_reference,
@@ -610,7 +616,9 @@ class HubtelVASService:
         
         url = f"{self.base_url}/{self.prepaid_id}/{service_id}"
         
+        # ECG requires both Destination (phone) and MeterNumber
         payload = {
+            "Destination": normalized_phone,
             "MeterNumber": meter_number,
             "Amount": amount,
             "ClientReference": client_reference,

@@ -65,6 +65,7 @@ class ECGPaymentRequest(BaseModel):
     """ECG bill payment request - CASHBACK ONLY"""
     meter_number: str
     amount: float
+    phone: str  # Customer phone number for Hubtel SMS notification
 
 
 class WithdrawalRequest(BaseModel):
@@ -650,6 +651,7 @@ async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get
     result = await hubtel_vas.pay_ecg_bill(
         meter_number=request.meter_number,
         amount=request.amount,
+        phone=request.phone,
         bill_type="prepaid",
         client_reference=transaction_id
     )
