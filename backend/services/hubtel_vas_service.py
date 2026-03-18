@@ -10,6 +10,7 @@ import logging
 import uuid
 import subprocess
 import json
+import httpx
 from datetime import datetime, timezone
 from typing import Dict, Optional
 import asyncio
@@ -127,96 +128,66 @@ class HubtelVASService:
     
     async def _make_hubtel_request(self, method: str, url: str, payload: dict = None) -> Dict:
         """
-        Make HTTP request to Hubtel API using curl subprocess with Fixie proxy.
+        Make HTTP request to Hubtel API using httpx with Fixie proxy.
         This routes all requests through a static IP for Hubtel whitelist compliance.
+        
+        Uses httpx instead of curl for better compatibility with Render/cloud environments.
         """
         auth_header = self._get_auth_header()
         proxy_url = FIXIE_PROXY_URL
         
-        def _execute_curl():
-            tmp_path = f"/tmp/hubtel_vas_{uuid.uuid4().hex[:8]}.json"
-            
-            try:
-                # Base curl command
-                cmd = ["curl", "-s"]
-                
-                # Add proxy if configured (CRITICAL for production)
-                if proxy_url:
-                    cmd.extend(["--proxy", proxy_url])
-                    print(f"🔒 [PROXY] Using Fixie static IP proxy")
-                else:
-                    print(f"⚠️ [PROXY] No proxy configured - using direct connection")
-                
-                # Add method and URL
-                cmd.extend(["-X", method.upper(), url])
-                
-                # Add common options
-                cmd.extend([
-                    "--http1.1",
-                    "--ignore-content-length",
-                    "-H", f"Authorization: {auth_header}",
-                    "-H", "Content-Type: application/json",
-                    "--max-time", "30",
-                    "-o", tmp_path,
-                    "-w", "%{http_code}"
-                ])
-                
-                # Add payload for POST
-                if method.upper() == "POST" and payload:
-                    payload_json = json.dumps(payload)
-                    cmd.extend(["-d", payload_json])
-                
-                # Log the curl command (sanitized)
-                safe_cmd = []
-                for c in cmd:
-                    if 'Basic' in c:
-                        safe_cmd.append('Authorization: Basic ***')
-                    elif '@' in c and 'fixie' in c.lower():
-                        safe_cmd.append('--proxy ***FIXIE***')
-                    else:
-                        safe_cmd.append(c)
-                print(f"🔧 [CURL] Command: {' '.join(safe_cmd)}")
-                
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
-                
-                # Log stderr if any
-                if result.stderr:
-                    print(f"⚠️ [CURL] stderr: {result.stderr}")
-                    logger.warning(f"Curl stderr: {result.stderr}")
-                
-                http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
-                print(f"🔧 [CURL] HTTP Code: {http_code}")
-                print(f"🔧 [CURL] HTTP Code from stdout: {http_code}")
-                
-                body = ""
-                import os as os_module
-                if os_module.path.exists(tmp_path):
-                    with open(tmp_path, 'r') as f:
-                        body = f.read()
-                    os_module.unlink(tmp_path)
-                    print(f"🔧 [CURL] Response body: {body[:500]}")
-                else:
-                    print(f"⚠️ [CURL] No response file at {tmp_path}")
-                
-                return {"body": body, "http_code": http_code}
-                
-            except subprocess.TimeoutExpired as e:
-                print(f"🚨 [CURL] Timeout after 35 seconds")
-                logger.error(f"Curl timeout: {e}")
-                return {"body": "", "http_code": 0, "error": "Request timeout"}
-            except Exception as e:
-                print(f"🚨 [CURL] Exception: {str(e)}")
-                logger.error(f"Curl error: {e}")
-                return {"body": "", "http_code": 0, "error": str(e)}
-        
-        response = await asyncio.to_thread(_execute_curl)
-        
         try:
-            result = json.loads(response["body"]) if response["body"] else {}
-        except Exception:
-            result = {"raw": response["body"], "status_code": response["http_code"]}
-        
-        return {"data": result, "http_code": response["http_code"]}
+            # Configure proxy for httpx
+            proxies = None
+            if proxy_url:
+                proxies = proxy_url
+                print(f"🔒 [HTTPX] Using Fixie static IP proxy")
+                logger.info(f"Using Fixie proxy for Hubtel request")
+            else:
+                print(f"⚠️ [HTTPX] No proxy configured - using direct connection")
+            
+            # Log request details
+            print(f"🔵 [HTTPX] {method} {url}")
+            if payload:
+                print(f"🔵 [HTTPX] Payload: {json.dumps(payload)}")
+            
+            headers = {
+                "Authorization": auth_header,
+                "Content-Type": "application/json"
+            }
+            
+            # Make the request with httpx
+            async with httpx.AsyncClient(proxy=proxies, timeout=30.0) as client:
+                if method.upper() == "GET":
+                    response = await client.get(url, headers=headers)
+                else:
+                    response = await client.post(url, headers=headers, json=payload)
+                
+                http_code = response.status_code
+                print(f"🟢 [HTTPX] HTTP Code: {http_code}")
+                
+                try:
+                    body = response.text
+                    result = response.json()
+                    print(f"🟢 [HTTPX] Response: {body[:500]}")
+                except:
+                    result = {"raw": response.text}
+                    print(f"🟢 [HTTPX] Raw response: {response.text[:500]}")
+                
+                return {"data": result, "http_code": http_code}
+                
+        except httpx.TimeoutException as e:
+            print(f"🚨 [HTTPX] Timeout: {str(e)}")
+            logger.error(f"HTTPX timeout: {e}")
+            return {"data": {"error": "Request timeout"}, "http_code": 0}
+        except httpx.ProxyError as e:
+            print(f"🚨 [HTTPX] Proxy error: {str(e)}")
+            logger.error(f"HTTPX proxy error: {e}")
+            return {"data": {"error": f"Proxy error: {str(e)}"}, "http_code": 0}
+        except Exception as e:
+            print(f"🚨 [HTTPX] Exception: {str(e)}")
+            logger.error(f"HTTPX error: {e}")
+            return {"data": {"error": str(e)}, "http_code": 0}
     
     # ============== AIRTIME SERVICES ==============
     
