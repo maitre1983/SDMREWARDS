@@ -23,6 +23,9 @@ HUBTEL_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 HUBTEL_POS_SALES_ID = os.environ.get("HUBTEL_POS_SALES_ID", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 
+# Fixie Static IP Proxy
+FIXIE_PROXY_URL = os.environ.get("FIXIE_URL", "")
+
 # API Endpoints
 RECEIVE_MONEY_URL = "https://rmp.hubtel.com/merchantaccount/merchants"
 TRANSACTION_STATUS_URL = "https://api-txnstatus.hubtel.com/transactions"
@@ -134,85 +137,111 @@ class HubtelDirectReceiveService:
             # Build the API URL
             api_url = f"{RECEIVE_MONEY_URL}/{self.pos_sales_id}/receive/mobilemoney"
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    api_url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": self._get_auth_header()
-                    },
-                    json=payload,
-                    timeout=60.0
-                )
-                
-                logger.info(f"Hubtel Receive Money response: status={response.status_code}")
+            # Use curl with Fixie proxy for static IP
+            import subprocess
+            import json as json_module
+            import asyncio
+            
+            payload_json = json_module.dumps(payload)
+            auth_header = self._get_auth_header()
+            
+            def _make_request_via_curl():
+                tmp_path = f"/tmp/hubtel_receive_{uuid.uuid4().hex[:8]}.json"
                 
                 try:
-                    result = response.json()
-                    logger.info(f"Hubtel Receive Money result: {result}")
-                except:
-                    result = {"raw": response.text}
-                
-                # Parse response - Hubtel returns ResponseCode "0000" for success
-                response_code = result.get("ResponseCode", result.get("responseCode", ""))
-                message = result.get("Message", result.get("message", ""))
-                data = result.get("Data", result.get("data", {}))
-                
-                # Success codes: "0000" = success, "0001" = pending
-                is_success = response.status_code == 200 and response_code in ["0000", "0001"]
-                
-                # Get transaction ID from response
-                transaction_id = (
-                    data.get("TransactionId") or 
-                    data.get("transactionId") or
-                    data.get("HubtelTransactionId")
-                )
-                
-                # Update payment record
-                update_data = {
-                    "status": "initiated" if is_success else "failed",
-                    "hubtel_response_code": response_code,
-                    "hubtel_message": message,
-                    "hubtel_transaction_id": transaction_id,
-                    "hubtel_response": result,
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }
-                
-                if self.db is not None:
-                    await self.db.hubtel_payments.update_one(
-                        {"client_reference": request.client_reference},
-                        {"$set": update_data}
-                    )
-                
-                if is_success:
-                    return HubtelPaymentResponse(
-                        success=True,
-                        response_code=response_code,
-                        message=message or "Payment prompt sent to customer",
-                        transaction_id=transaction_id,
-                        client_reference=request.client_reference,
-                        status="pending",
-                        data=data
-                    )
-                else:
-                    return HubtelPaymentResponse(
-                        success=False,
-                        response_code=response_code,
-                        message=message,
-                        error=message or f"Payment failed (code: {response_code})"
-                    )
+                    # Build curl command with proxy
+                    cmd = ["curl", "-s"]
                     
-        except httpx.TimeoutException:
-            logger.error("Hubtel API timeout")
+                    # Add Fixie proxy for static IP
+                    if FIXIE_PROXY_URL:
+                        cmd.extend(["--proxy", FIXIE_PROXY_URL])
+                        logger.info("🔒 [RECEIVE MONEY] Using Fixie static IP proxy")
+                    
+                    cmd.extend([
+                        "-X", "POST", api_url,
+                        "--http1.1",
+                        "-H", "Content-Type: application/json",
+                        "-H", f"Authorization: {auth_header}",
+                        "-d", payload_json,
+                        "--max-time", "60",
+                        "-o", tmp_path,
+                        "-w", "%{http_code}"
+                    ])
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=65)
+                    http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
+                    
+                    body = ""
+                    if os.path.exists(tmp_path):
+                        with open(tmp_path, 'r') as f:
+                            body = f.read()
+                        os.unlink(tmp_path)
+                    
+                    return {"body": body, "http_code": http_code, "stderr": result.stderr}
+                except Exception as e:
+                    logger.error(f"Curl error: {e}")
+                    return {"body": "", "http_code": 0, "stderr": str(e)}
+            
+            response_data = await asyncio.to_thread(_make_request_via_curl)
+            http_code = response_data["http_code"]
+            
+            logger.info(f"Hubtel Receive Money response: status={http_code}")
+            
+            try:
+                result = json_module.loads(response_data["body"]) if response_data["body"] else {}
+                logger.info(f"Hubtel Receive Money result: {result}")
+            except:
+                result = {"raw": response_data["body"]}
+            
+            # Parse response - Hubtel returns ResponseCode "0000" for success
+            response_code = result.get("ResponseCode", result.get("responseCode", ""))
+            message = result.get("Message", result.get("message", ""))
+            data = result.get("Data", result.get("data", {}))
+            
+            # Success codes: "0000" = success, "0001" = pending
+            is_success = http_code == 200 and response_code in ["0000", "0001"]
+            
+            # Get transaction ID from response
+            transaction_id = (
+                data.get("TransactionId") or 
+                data.get("transactionId") or
+                data.get("HubtelTransactionId")
+            )
+            
+            # Update payment record
+            update_data = {
+                "status": "initiated" if is_success else "failed",
+                "hubtel_response_code": response_code,
+                "hubtel_message": message,
+                "hubtel_transaction_id": transaction_id,
+                "hubtel_response": result,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
             if self.db is not None:
                 await self.db.hubtel_payments.update_one(
                     {"client_reference": request.client_reference},
-                    {"$set": {"status": "timeout", "error": "API timeout"}}
+                    {"$set": update_data}
                 )
-            return HubtelPaymentResponse(
-                success=False,
-                error="Payment service timeout. Please try again."
-            )
+            
+            if is_success:
+                return HubtelPaymentResponse(
+                    success=True,
+                    response_code=response_code,
+                    message=message or "Payment prompt sent to customer",
+                    transaction_id=transaction_id,
+                    client_reference=request.client_reference,
+                    status="pending",
+                    data=data
+                )
+            else:
+                return HubtelPaymentResponse(
+                    success=False,
+                    response_code=response_code,
+                    message=message,
+                    error=message or f"Payment failed (code: {response_code})"
+                )
+                    
         except Exception as e:
             logger.error(f"Hubtel receive money error: {e}")
             if self.db is not None:
