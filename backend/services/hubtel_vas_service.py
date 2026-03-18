@@ -158,8 +158,19 @@ class HubtelVASService:
                         "-w", "%{http_code}"
                     ]
                 
+                # Log the curl command (without auth for security)
+                safe_cmd = [c if 'Basic' not in c else 'Authorization: Basic ***' for c in cmd]
+                print(f"🔧 [CURL] Command: {' '.join(safe_cmd)}")
+                
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
+                
+                # Log stderr if any
+                if result.stderr:
+                    print(f"⚠️ [CURL] stderr: {result.stderr}")
+                    logger.warning(f"Curl stderr: {result.stderr}")
+                
                 http_code = int(result.stdout.strip()) if result.stdout.strip().isdigit() else 0
+                print(f"🔧 [CURL] HTTP Code from stdout: {http_code}")
                 
                 body = ""
                 import os as os_module
@@ -167,12 +178,20 @@ class HubtelVASService:
                     with open(tmp_path, 'r') as f:
                         body = f.read()
                     os_module.unlink(tmp_path)
+                    print(f"🔧 [CURL] Response body: {body[:500]}")
+                else:
+                    print(f"⚠️ [CURL] No response file at {tmp_path}")
                 
                 return {"body": body, "http_code": http_code}
                 
+            except subprocess.TimeoutExpired as e:
+                print(f"🚨 [CURL] Timeout after 35 seconds")
+                logger.error(f"Curl timeout: {e}")
+                return {"body": "", "http_code": 0, "error": "Request timeout"}
             except Exception as e:
+                print(f"🚨 [CURL] Exception: {str(e)}")
                 logger.error(f"Curl error: {e}")
-                return {"body": "", "http_code": 0}
+                return {"body": "", "http_code": 0, "error": str(e)}
         
         response = await asyncio.to_thread(_execute_curl)
         
@@ -261,17 +280,37 @@ class HubtelVASService:
         }
         
         try:
-            # DEBUG LOGGING - as requested
-            print(f"🔵 [AIRTIME] Calling Hubtel VAS endpoint: {url}")
-            print(f"🔵 [AIRTIME] Payload: {payload}")
+            # DEBUG LOGGING - FULL REQUEST DETAILS
+            print("=" * 70)
+            print("🔵 [VAS REQUEST] AIRTIME PURCHASE")
+            print("=" * 70)
+            print(f"📍 URL: {url}")
+            print(f"📦 PAYLOAD: {json.dumps(payload, indent=2)}")
+            print(f"🔑 PrepaidID: {self.prepaid_id}")
+            print(f"🔑 API ID: {self.api_id[:4]}***")
             logger.info(f"[AIRTIME] Calling Hubtel: {url} with payload: {payload}")
             
             response = await self._make_hubtel_request("POST", url, payload)
             result = response.get("data", {})
             http_code = response.get("http_code", 0)
             
-            print(f"🟢 [AIRTIME] Response (HTTP {http_code}): {result}")
-            logger.info(f"Hubtel Airtime response: {result}")
+            print("=" * 70)
+            print("🟢 [VAS RESPONSE] AIRTIME")
+            print("=" * 70)
+            print(f"📊 HTTP STATUS: {http_code}")
+            print(f"📋 RESPONSE BODY: {json.dumps(result, indent=2) if isinstance(result, dict) else result}")
+            logger.info(f"Hubtel Airtime response (HTTP {http_code}): {result}")
+            
+            # Handle HTTP 0 (connection failed)
+            if http_code == 0:
+                error_detail = result.get("raw", "") or result.get("error", "Connection failed - no response from Hubtel")
+                print(f"🚨 [ERROR] HTTP 0 - Connection failed: {error_detail}")
+                if self.db is not None:
+                    await self.db.vas_transactions.update_one(
+                        {"client_reference": client_reference},
+                        {"$set": {"status": "failed", "error": f"Connection failed: {error_detail}"}}
+                    )
+                return {"success": False, "error": f"Connection to Hubtel failed. Please try again. Details: {error_detail}"}
             
             response_code = result.get("ResponseCode", result.get("responseCode", ""))
             
@@ -310,17 +349,36 @@ class HubtelVASService:
                     "message": "Airtime request submitted. Processing..."
                 }
             else:
-                error_msg = result.get("Message", result.get("message", f"Airtime failed: {http_code}"))
+                # Build detailed error message
+                hubtel_message = result.get("Message", result.get("message", ""))
+                hubtel_errors = result.get("Errors", [])
+                response_code = result.get("ResponseCode", "")
+                
+                if hubtel_message:
+                    error_msg = f"Hubtel: {hubtel_message}"
+                elif hubtel_errors:
+                    error_msg = f"Hubtel errors: {hubtel_errors}"
+                elif http_code == 401:
+                    error_msg = "Authentication failed - invalid API credentials"
+                elif http_code == 403:
+                    error_msg = "Access denied - IP not whitelisted or insufficient permissions"
+                elif http_code >= 500:
+                    error_msg = f"Hubtel server error (HTTP {http_code})"
+                else:
+                    error_msg = f"Airtime failed (HTTP {http_code}, ResponseCode: {response_code})"
+                
+                print(f"🚨 [ERROR] {error_msg}")
                 if self.db is not None:
                     await self.db.vas_transactions.update_one(
                         {"client_reference": client_reference},
-                        {"$set": {"status": "failed", "error": error_msg}}
+                        {"$set": {"status": "failed", "error": error_msg, "http_code": http_code, "hubtel_response": result}}
                     )
                 return {"success": False, "error": error_msg}
                 
         except Exception as e:
-            logger.error(f"Hubtel Airtime error: {e}")
-            return {"success": False, "error": str(e)}
+            print(f"🚨 [EXCEPTION] {str(e)}")
+            logger.error(f"Hubtel Airtime error: {e}", exc_info=True)
+            return {"success": False, "error": f"System error: {str(e)}"}
     
     # ============== DATA BUNDLE SERVICES ==============
     
