@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SDM REWARDS API",
     description="Smart Development Membership - Loyalty & Cashback Platform",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan
 )
 
@@ -341,7 +341,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "SDM REWARDS API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
