@@ -36,7 +36,7 @@ import { API_URL } from '@/config/api';
 
 const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   // Build version for debugging
-  const BUILD_VERSION = "2025.12.19.v17";
+  const BUILD_VERSION = "2025.12.19.v18";
   const [activeService, setActiveService] = useState(null);
   const [fees, setFees] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -468,8 +468,18 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
           };
           break;
         case 'ecg':
+          if (!phone || phone.length < 10) {
+            toast.error('Please enter a valid phone number');
+            setIsLoading(false);
+            return;
+          }
+          if (!meterNumber || meterNumber.length < 5) {
+            toast.error('Please enter a valid meter number');
+            setIsLoading(false);
+            return;
+          }
           endpoint = '/api/services/ecg/pay';
-          payload = { meter_number: meterNumber, amount: parseFloat(amount) };
+          payload = { meter_number: meterNumber, amount: parseFloat(amount), phone };
           break;
         case 'withdrawal':
           endpoint = '/api/services/withdrawal/initiate';
@@ -952,17 +962,30 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
           
           {/* Meter Number (for ECG) */}
           {activeService === 'ecg' && (
-            <div>
-              <Label className="text-slate-300 text-sm">Meter Number</Label>
-              <Input
-                type="text"
-                placeholder="Enter meter number"
-                value={meterNumber}
-                onChange={(e) => setMeterNumber(e.target.value)}
-                className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
-                data-testid="meter-number"
-              />
-            </div>
+            <>
+              <div>
+                <Label className="text-slate-300 text-sm">Phone Number (for token SMS)</Label>
+                <Input
+                  type="tel"
+                  placeholder="055XXXXXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
+                  data-testid="ecg-phone"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300 text-sm">Meter Number</Label>
+                <Input
+                  type="text"
+                  placeholder="Enter meter number"
+                  value={meterNumber}
+                  onChange={(e) => setMeterNumber(e.target.value)}
+                  className="mt-1.5 h-12 bg-slate-900/50 border-slate-700/50 text-white rounded-xl"
+                  data-testid="meter-number"
+                />
+              </div>
+            </>
           )}
           
           {/* Data Bundle Selection */}
