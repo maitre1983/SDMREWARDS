@@ -30,10 +30,12 @@ HUBTEL_CLIENT_ID = os.environ.get('HUBTEL_CLIENT_ID', '')
 HUBTEL_CLIENT_SECRET = os.environ.get('HUBTEL_CLIENT_SECRET', '')
 HUBTEL_SENDER_ID = os.environ.get('HUBTEL_SENDER_ID', 'SDM')
 
-# ============== BulkClix Configuration ==============
-BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')
-BULKCLIX_OTP_SENDER_ID = os.environ.get('BULKCLIX_OTP_SENDER_ID', '')
-BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')
+# ============== Legacy BulkClix Configuration (DEPRECATED - Use Hubtel) ==============
+# These variables are kept for backward compatibility but are no longer used
+# All SMS/OTP functionality has been migrated to Hubtel
+BULKCLIX_API_KEY = os.environ.get('BULKCLIX_API_KEY', '')  # DEPRECATED
+BULKCLIX_OTP_SENDER_ID = os.environ.get('BULKCLIX_OTP_SENDER_ID', '')  # DEPRECATED
+BULKCLIX_BASE_URL = os.environ.get('BULKCLIX_BASE_URL', 'https://api.bulkclix.com/api/v1')  # DEPRECATED
 
 # ============== SDM Business Configuration ==============
 SDM_COMMISSION_RATE = float(os.environ.get('SDM_COMMISSION_RATE', '0.02'))  # 2%
@@ -185,7 +187,7 @@ DEFAULT_SDM_CONFIG = {
     "withdrawal_fee": 1.0,
     "referral_bonus": REFERRAL_BONUS,
     "welcome_bonus": REFERRAL_WELCOME_BONUS,
-    "sms_provider": "bulkclix",
+    "sms_provider": "hubtel",  # Migrated from bulkclix to hubtel
     "lottery_enabled": True,
     "birthday_bonus_enabled": True,
     "birthday_bonus_amount": 5.0,

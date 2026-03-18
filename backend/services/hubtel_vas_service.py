@@ -2,7 +2,7 @@
 Hubtel Value Added Services (VAS) - Airtime, Data Bundles, Bill Payments
 
 API Documentation: https://cs.hubtel.com/commissionservices
-Replaces BulkClix for VAS services
+Provides VAS services via Hubtel API.
 """
 
 import os

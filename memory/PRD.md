@@ -99,8 +99,12 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 **Tests:** 14/14 passent ✅
 
-### P2 - Migration Restante
-- [ ] Migrer `notification_service.py` (références BulkClix)
+### P2 - Migration BulkClix - ✅ TERMINÉ
+- ✅ `notification_service.py` - SMS now uses Hubtel SMS API
+- ✅ `config.py` - BulkClix variables marked as DEPRECATED
+- ✅ `hubtel_momo_service.py` - Comments updated
+- ✅ `hubtel_vas_service.py` - Comments updated
+- ✅ `sms_provider` default changed from "bulkclix" to "hubtel"
 
 ## Blocked Issues (User Action Required)
 

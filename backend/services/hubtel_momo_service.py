@@ -62,8 +62,8 @@ class PaymentStatus(str, Enum):
 
 class HubtelMoMoService:
     """
-    Unified service for all Hubtel MoMo operations
-    Replaces BulkClix for payment collection and disbursement
+    Unified service for all Hubtel MoMo operations.
+    Handles payment collection and disbursement via Hubtel API.
     """
     
     def __init__(self, db=None):

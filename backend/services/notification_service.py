@@ -2,6 +2,10 @@
 SDM REWARDS - Smart Notification Service
 =========================================
 AI-powered intelligent notifications via Push, SMS, and Email
+
+SMS: Uses Hubtel SMS API
+Push: Uses OneSignal
+Email: Uses Resend
 """
 
 import os
@@ -17,9 +21,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 ONESIGNAL_APP_ID = os.environ.get("ONESIGNAL_APP_ID")
 ONESIGNAL_API_KEY = os.environ.get("ONESIGNAL_API_KEY")
-BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY")
-BULKCLIX_SENDER_ID = os.environ.get("BULKCLIX_SENDER_ID", "SDM")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+
+# Import Hubtel SMS service for SMS notifications
+from services.hubtel_sms_service import HubtelSMSService
 
 
 class SmartNotificationService:
@@ -84,35 +89,26 @@ class SmartNotificationService:
         phone: str,
         message: str
     ) -> Dict:
-        """Send SMS via BulkClix"""
-        if not BULKCLIX_API_KEY:
-            logger.warning("BulkClix not configured")
-            return {"success": False, "error": "SMS not configured"}
-        
+        """Send SMS via Hubtel SMS API"""
         try:
-            # Format phone number
-            formatted_phone = phone.replace("+", "").replace(" ", "")
+            # Use Hubtel SMS service
+            sms_service = HubtelSMSService(self.db)
             
-            async with httpx.AsyncClient() as http_client:
-                response = await http_client.post(
-                    "https://api.bulkclix.com/sms/send",
-                    headers={
-                        "Authorization": f"Bearer {BULKCLIX_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "to": formatted_phone,
-                        "message": message,
-                        "sender_id": BULKCLIX_SENDER_ID
-                    },
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    return {"success": True, "channel": "sms"}
-                else:
-                    logger.error(f"BulkClix error: {response.text}")
-                    return {"success": False, "error": response.text}
+            if not sms_service.is_configured():
+                logger.warning("Hubtel SMS not configured")
+                return {"success": False, "error": "SMS not configured"}
+            
+            # Send SMS via Hubtel
+            result = await sms_service.send_sms(
+                to=phone,
+                message=message
+            )
+            
+            if result.get("success"):
+                return {"success": True, "channel": "sms"}
+            else:
+                logger.error(f"Hubtel SMS error: {result.get('error')}")
+                return {"success": False, "error": result.get("error", "SMS send failed")}
                     
         except Exception as e:
             logger.error(f"SMS notification error: {e}")
