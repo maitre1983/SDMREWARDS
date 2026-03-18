@@ -36,7 +36,7 @@ import { API_URL } from '@/config/api';
 
 const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
   // Build version for debugging
-  const BUILD_VERSION = "2026.03.17.v10";
+  const BUILD_VERSION = "2026.03.17.v11";
   const [activeService, setActiveService] = useState(null);
   const [fees, setFees] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -398,14 +398,18 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             setUpgradePaymentId(null);
             if (onRefresh) onRefresh();
           }, 2000);
+        } else if (res.data.checkout_url) {
+          // Online Checkout - redirect to Hubtel payment page
+          toast.success('Redirecting to secure payment page...');
+          window.location.href = res.data.checkout_url;
         } else {
-          // MoMo payment needed - start polling
+          // Legacy/Test mode - show pending status
           setUpgradeStatus('pending');
           
           if (res.data.test_mode) {
             toast.info('Test mode: Waiting for confirmation');
           } else {
-            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount || payment.momo}! Approve on your phone.`);
+            toast.success('Payment processing...');
           }
           
           // Start polling for payment status

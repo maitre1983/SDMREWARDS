@@ -181,11 +181,10 @@ export default function MerchantPayModal({
         ) : status === 'pending' ? (
           <div className="text-center py-6">
             <div className="relative inline-block">
-              <Phone className="text-amber-400 mx-auto mb-4" size={48} />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
+              <Loader2 className="text-amber-400 mx-auto mb-4 animate-spin" size={48} />
             </div>
-            <p className="text-white text-lg font-semibold">Waiting for Payment</p>
-            <p className="text-slate-400 mt-2 text-sm">Approve the MoMo prompt on your phone</p>
+            <p className="text-white text-lg font-semibold">Processing Payment</p>
+            <p className="text-slate-400 mt-2 text-sm">Complete your payment on the secure checkout page</p>
             
             {/* Cashback Preview */}
             <div className="mt-4 bg-slate-900 rounded-lg p-3">

@@ -335,15 +335,24 @@ export default function ClientDashboard() {
       
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
+        
+        // Check if we have a checkout URL (Online Checkout API)
+        if (res.data.checkout_url) {
+          // Redirect to Hubtel checkout page
+          toast.success('Redirecting to secure payment page...');
+          window.location.href = res.data.checkout_url;
+          return;
+        }
+        
         setPaymentStatus('pending');
         setIsPaymentTestMode(res.data.test_mode || false);
         
         // In test mode, show confirm button
         if (res.data.test_mode) {
-          toast.info('Test mode: Click "Confirm Payment" to simulate MoMo approval');
+          toast.info('Test mode: Click "Confirm Payment" to simulate payment');
         } else {
-          toast.success('MoMo prompt sent! Please approve on your phone.');
-          // Start polling for status
+          toast.success('Redirecting to payment...');
+          // Start polling for status (fallback for non-redirect payments)
           startPolling(res.data.payment_id);
         }
       }
@@ -1921,12 +1930,11 @@ export default function ClientDashboard() {
             ) : paymentStatus === 'pending' ? (
               <div className="text-center py-6">
                 <div className="relative">
-                  <Phone className="text-amber-400 mx-auto mb-4" size={48} />
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full animate-ping" />
+                  <Loader2 className="text-amber-400 mx-auto mb-4 animate-spin" size={48} />
                 </div>
-                <p className="text-white text-lg font-semibold">Waiting for Payment</p>
+                <p className="text-white text-lg font-semibold">Processing Payment</p>
                 <p className="text-slate-400 mt-2 text-sm">
-                  Please approve the MoMo prompt on your phone
+                  Complete your payment on the Hubtel checkout page
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
                   <Loader2 className="animate-spin" size={16} />
