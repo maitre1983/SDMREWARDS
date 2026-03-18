@@ -24,8 +24,20 @@ HUBTEL_API_KEY = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "https://sdmrewards.com")
 
 def is_vas_test_mode() -> bool:
-    """Check VAS test mode at RUNTIME, not import time"""
-    return os.environ.get("VAS_TEST_MODE", "false").lower() == "true"
+    """
+    Check VAS test mode at RUNTIME.
+    PRODUCTION SAFEGUARD: Always returns False to ensure real API calls.
+    To enable test mode, you must explicitly set VAS_TEST_MODE=true in env.
+    """
+    env_value = os.environ.get("VAS_TEST_MODE", "false").lower()
+    # Log for debugging
+    print(f"🚨 ACTIVE FILE: {__file__}")
+    print(f"🚨 VAS_TEST_MODE env value: '{env_value}'")
+    
+    # ONLY return True if explicitly set to "true"
+    is_test = env_value == "true"
+    print(f"🚨 is_vas_test_mode() returning: {is_test}")
+    return is_test
 
 # Hubtel Commission Services - CORRECT Service IDs (from Hubtel documentation)
 # Airtime Service IDs
@@ -213,18 +225,20 @@ class HubtelVASService:
         if self.db is not None:
             await self.db.vas_transactions.insert_one(transaction_log)
         
+        # CRITICAL SAFEGUARD: Test mode must NEVER deduct balance
         if is_vas_test_mode():
-            logger.info(f"[TEST] Hubtel Airtime: {normalized_phone} - GHS {amount}")
+            logger.warning(f"[TEST MODE BLOCKED] VAS test mode is active - refusing to process")
+            print("🚨🚨🚨 TEST MODE ACTIVE - BLOCKING TRANSACTION TO PREVENT BALANCE DEDUCTION 🚨🚨🚨")
             if self.db is not None:
                 await self.db.vas_transactions.update_one(
                     {"client_reference": client_reference},
-                    {"$set": {"status": "test_success"}}
+                    {"$set": {"status": "blocked_test_mode"}}
                 )
+            # Return success: FALSE to prevent balance deduction
             return {
-                "success": True,
+                "success": False,
                 "test_mode": True,
-                "transaction_id": f"TEST-AIR-{client_reference[:8]}",
-                "message": "Test mode - airtime simulated"
+                "error": "Service unavailable - system in test mode. No charges applied."
             }
         
         if not self.is_configured():
@@ -400,18 +414,19 @@ class HubtelVASService:
         if self.db is not None:
             await self.db.vas_transactions.insert_one(transaction_log)
         
+        # CRITICAL SAFEGUARD: Test mode must NEVER deduct balance
         if is_vas_test_mode():
-            logger.info(f"[TEST] Hubtel Data: {normalized_phone} - Bundle {bundle_id}")
+            logger.warning(f"[TEST MODE BLOCKED] VAS test mode is active - refusing to process data bundle")
+            print("🚨🚨🚨 TEST MODE ACTIVE - BLOCKING DATA BUNDLE TO PREVENT BALANCE DEDUCTION 🚨🚨🚨")
             if self.db is not None:
                 await self.db.vas_transactions.update_one(
                     {"client_reference": client_reference},
-                    {"$set": {"status": "test_success"}}
+                    {"$set": {"status": "blocked_test_mode"}}
                 )
             return {
-                "success": True,
+                "success": False,
                 "test_mode": True,
-                "transaction_id": f"TEST-DATA-{client_reference[:8]}",
-                "message": "Test mode - data bundle simulated"
+                "error": "Service unavailable - system in test mode. No charges applied."
             }
         
         if not self.is_configured():
@@ -525,19 +540,19 @@ class HubtelVASService:
         if self.db is not None:
             await self.db.vas_transactions.insert_one(transaction_log)
         
+        # CRITICAL SAFEGUARD: Test mode must NEVER deduct balance
         if is_vas_test_mode():
-            logger.info(f"[TEST] Hubtel ECG: {meter_number} - GHS {amount}")
+            logger.warning(f"[TEST MODE BLOCKED] VAS test mode is active - refusing to process ECG")
+            print("🚨🚨🚨 TEST MODE ACTIVE - BLOCKING ECG PAYMENT TO PREVENT BALANCE DEDUCTION 🚨🚨🚨")
             if self.db is not None:
                 await self.db.vas_transactions.update_one(
                     {"client_reference": client_reference},
-                    {"$set": {"status": "test_success", "token": "TEST-TOKEN-123456789"}}
+                    {"$set": {"status": "blocked_test_mode"}}
                 )
             return {
-                "success": True,
+                "success": False,
                 "test_mode": True,
-                "transaction_id": f"TEST-ECG-{client_reference[:8]}",
-                "token": "1234-5678-9012-3456-7890",
-                "message": "Test mode - ECG payment simulated"
+                "error": "Service unavailable - system in test mode. No charges applied."
             }
         
         if not self.is_configured():

@@ -420,6 +420,22 @@ async def purchase_airtime(request: AirtimeRequest, current_client: dict = Depen
         client_reference=transaction_id
     )
     
+    # CRITICAL SAFEGUARD: Double-check for test mode - NEVER deduct in test mode
+    if result.get("test_mode"):
+        logger.error("🚨 TEST MODE DETECTED IN VAS RESPONSE - BLOCKING BALANCE DEDUCTION")
+        await db.service_transactions.update_one(
+            {"id": service_tx["id"]},
+            {"$set": {
+                "status": "blocked_test_mode",
+                "error": "Transaction blocked - system in test mode",
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable - system in test mode. No charges applied."
+        )
+    
     if result.get("success"):
         # Deduct balance
         await db.clients.update_one(
@@ -522,6 +538,22 @@ async def purchase_data(request: DataBundleRequest, current_client: dict = Depen
         client_reference=transaction_id
     )
     
+    # CRITICAL SAFEGUARD: Double-check for test mode - NEVER deduct in test mode
+    if result.get("test_mode"):
+        logger.error("🚨 TEST MODE DETECTED IN DATA BUNDLE VAS RESPONSE - BLOCKING BALANCE DEDUCTION")
+        await db.service_transactions.update_one(
+            {"id": service_tx["id"]},
+            {"$set": {
+                "status": "blocked_test_mode",
+                "error": "Transaction blocked - system in test mode",
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable - system in test mode. No charges applied."
+        )
+    
     if result.get("success"):
         # Deduct balance
         await db.clients.update_one(
@@ -621,6 +653,22 @@ async def pay_ecg(request: ECGPaymentRequest, current_client: dict = Depends(get
         bill_type="prepaid",
         client_reference=transaction_id
     )
+    
+    # CRITICAL SAFEGUARD: Double-check for test mode - NEVER deduct in test mode
+    if result.get("test_mode"):
+        logger.error("🚨 TEST MODE DETECTED IN ECG VAS RESPONSE - BLOCKING BALANCE DEDUCTION")
+        await db.service_transactions.update_one(
+            {"id": service_tx["id"]},
+            {"$set": {
+                "status": "blocked_test_mode",
+                "error": "Transaction blocked - system in test mode",
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable - system in test mode. No charges applied."
+        )
     
     if result.get("success"):
         # Deduct balance
