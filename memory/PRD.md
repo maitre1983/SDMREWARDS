@@ -39,6 +39,14 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
+### 2026-03-18 (Current Session)
+- ✅ **Client Withdrawal Limits (Global)** - Centralized control system for client withdrawals
+  - Backend: `withdrawal_limits_service.py` with `effective_limit = MIN(global_limit, user_limit)`
+  - API: `GET/PUT /api/admin/withdrawal-limits` endpoints
+  - Frontend: `SettingsLimits.jsx` component with MoMo and Bank limit configuration
+  - New "Withdrawal Limits" tab in Admin Settings dashboard
+  - Full test coverage (6 backend tests, frontend E2E verified)
+
 ### 2026-03-16 (Session 3)
 - ✅ **Intégration Hubtel SMS Batch Personalized** - `POST /api/admin/sms/bulk/personalized` créé et testé
 - ✅ **Interface UI SMS Personnalisés** - Modal complet dans le SMS Center
@@ -105,6 +113,10 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 | Endpoint | Status | Description |
 |----------|--------|-------------|
+| `GET /api/admin/withdrawal-limits` | ✅ **NEW** | Get global withdrawal limits |
+| `PUT /api/admin/withdrawal-limits` | ✅ **NEW** | Update global withdrawal limits |
+| `GET /api/admin/withdrawal-limits/user/{id}` | ✅ **NEW** | Get user's effective limits |
+| `PUT /api/admin/withdrawal-limits/user/{id}` | ✅ **NEW** | Set individual user limits |
 | `POST /api/auth/otp/send` | ✅ | Envoi OTP via Hubtel SMS |
 | `POST /api/auth/otp/verify` | ✅ | Vérification OTP |
 | `POST /api/auth/client/register` | ✅ | Inscription client avec OTP |
