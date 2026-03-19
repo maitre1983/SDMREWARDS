@@ -6,6 +6,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useLanguage, LanguageSelector } from '../contexts/LanguageContext';
 import { QRCodeSVG } from 'qrcode.react';
+import { useNetwork } from '../hooks/useNetwork';
+import syncService from '../services/syncService';
+import NetworkIndicator from '../components/NetworkIndicator';
 
 // Lazy load heavy components
 const QRScanner = lazy(() => import('../components/QRScanner'));
@@ -81,6 +84,9 @@ export default function ClientDashboard() {
   const { language, syncLanguageWithServer } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
+  
+  // Network quality detection
+  const { quality: networkQuality, settings: networkSettings, isSlow, isOnline } = useNetwork();
   
   // Data states
   const [client, setClient] = useState(null);
@@ -379,19 +385,26 @@ export default function ClientDashboard() {
   };
   
   const startPolling = (pId) => {
-    // Poll every 3 seconds for payment status using the new endpoint
+    // Use adaptive polling interval based on network quality
+    const pollInterval = networkSettings?.pollingInterval || 3000;
+    
+    // Poll for payment status using the optimized endpoint
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/payments/poll-status/${pId}`);
+        const res = await axios.get(`${API_URL}/api/payments/poll-status/${pId}`, {
+          timeout: networkSettings?.requestTimeout || 15000
+        });
         
         if (res.data.completed || res.data.status === 'completed' || res.data.status === 'success') {
           clearInterval(pollingRef.current);
           setPaymentStatus('success');
           toast.success('Payment successful! Cashback credited.');
+          // Vibrate for success feedback
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           setTimeout(() => {
             setShowPaymentModal(false);
             fetchDashboardData();
-          }, 2000);
+          }, 1500);
         } else if (res.data.failed || res.data.status === 'failed') {
           clearInterval(pollingRef.current);
           setPaymentStatus('failed');
@@ -400,8 +413,9 @@ export default function ClientDashboard() {
         // Otherwise continue polling (should_poll will be true for pending/processing)
       } catch (error) {
         console.error('Polling error:', error);
+        // Don't stop polling on error, just continue
       }
-    }, 3000);
+    }, pollInterval);
     
     // Stop polling after 3 minutes
     setTimeout(() => {
@@ -586,19 +600,26 @@ export default function ClientDashboard() {
   };
   
   const startMerchantPolling = (pId) => {
+    // Use adaptive polling based on network quality
+    const pollInterval = networkSettings?.pollingInterval || 2000;
+    
     pollingRef.current = setInterval(async () => {
       try {
-        // Use the new poll-status endpoint that queries Hubtel directly
-        const res = await axios.get(`${API_URL}/api/payments/poll-status/${pId}`);
+        // Use the poll-status endpoint with adaptive timeout
+        const res = await axios.get(`${API_URL}/api/payments/poll-status/${pId}`, {
+          timeout: networkSettings?.requestTimeout || 15000
+        });
         
         if (res.data.completed || res.data.status === 'completed' || res.data.status === 'success') {
           clearInterval(pollingRef.current);
           setMerchantPayStatus('success');
           toast.success('Payment successful! Cashback credited.');
+          // Vibrate for success
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           setTimeout(() => {
             setShowMerchantPayModal(false);
             fetchDashboardData();
-          }, 2000);
+          }, 1500);
         } else if (res.data.failed || res.data.status === 'failed') {
           clearInterval(pollingRef.current);
           setMerchantPayStatus('failed');
@@ -607,8 +628,9 @@ export default function ClientDashboard() {
         // Continue polling if still pending
       } catch (error) {
         console.error('Polling error:', error);
+        // Continue polling even on error
       }
-    }, 3000);
+    }, pollInterval);
     
     // Stop polling after 3 minutes
     setTimeout(() => {
@@ -1209,8 +1231,11 @@ export default function ClientDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+      {/* Network Quality Indicator - shows only when connection is slow */}
+      <NetworkIndicator />
+      
       {/* Header */}
-      <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
+      <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-40">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-9 h-9 object-contain rounded-lg" />

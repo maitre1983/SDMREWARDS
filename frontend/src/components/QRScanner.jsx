@@ -1,42 +1,51 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, X, FlipHorizontal, Loader2 } from 'lucide-react';
+import { Camera, X, FlipHorizontal, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { Button } from './ui/button';
 
 export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code", scanHint = "Position the QR code within the frame" }) {
   const scannerRef = useRef(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState(null);
-  const [facingMode, setFacingMode] = useState('environment'); // 'environment' = back camera
+  const [facingMode, setFacingMode] = useState('environment');
   const html5QrCodeRef = useRef(null);
   const scannerInitialized = useRef(false);
+  const lastScanTime = useRef(0);
+  const [scanCount, setScanCount] = useState(0);
 
-  // Extract merchant QR code from various formats
-  const extractQRCode = (decodedText) => {
-    let qrCode = decodedText;
+  // Extract merchant QR code from various formats - OPTIMIZED
+  const extractQRCode = useCallback((decodedText) => {
+    // Quick validation
+    if (!decodedText || typeof decodedText !== 'string') return null;
+    
+    let qrCode = decodedText.trim();
+    
+    // Fast path for SDM codes
+    if (qrCode.startsWith('SDM-M-')) return qrCode;
     
     // Handle URL format: https://xxx/pay/SDM-M-XXXX
     if (decodedText.includes('/pay/')) {
       const match = decodedText.match(/\/pay\/([A-Z0-9-]+)/i);
-      if (match) {
-        qrCode = match[1];
-      }
+      if (match) return match[1];
     }
     // Handle SDM: prefix format
-    else if (decodedText.startsWith('SDM:')) {
-      qrCode = decodedText.replace('SDM:', '');
+    if (decodedText.startsWith('SDM:')) {
+      return decodedText.replace('SDM:', '');
     }
     // Handle full URL with ref parameter
-    else if (decodedText.includes('ref=')) {
-      const url = new URL(decodedText);
-      qrCode = url.searchParams.get('ref') || decodedText;
+    if (decodedText.includes('ref=')) {
+      try {
+        const url = new URL(decodedText);
+        return url.searchParams.get('ref') || qrCode;
+      } catch {
+        return qrCode;
+      }
     }
     
     return qrCode;
-  };
+  }, []);
 
   const startScanner = async () => {
-    // Prevent multiple initializations
     if (scannerInitialized.current) return;
     scannerInitialized.current = true;
     
@@ -44,20 +53,21 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
     setIsScanning(false);
 
     try {
-      // Small delay to ensure DOM is ready
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Minimal delay
+      await new Promise(resolve => setTimeout(resolve, 50));
       
       // Initialize scanner
       html5QrCodeRef.current = new Html5Qrcode('qr-reader');
       
-      // Optimized config for faster scanning
+      // ULTRA-OPTIMIZED config for instant scanning
       const config = {
-        fps: 15,  // Increased for faster scanning
-        qrbox: { width: 280, height: 280 },  // Larger scan area
+        fps: 30,  // Maximum FPS for instant detection
+        qrbox: { width: 300, height: 300 },  // Large scan area
         aspectRatio: 1.0,
         disableFlip: false,
+        formatsToSupport: [0],  // QR_CODE only (faster)
         experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true  // Use native API if available
+          useBarCodeDetectorIfSupported: true  // Use native API (fastest)
         }
       };
 
@@ -65,17 +75,26 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
         { facingMode },
         config,
         (decodedText) => {
-          // Extract QR code from decoded text
-          const qrCode = extractQRCode(decodedText);
-          console.log('QR Scanned:', decodedText, '→ Extracted:', qrCode);
+          // Debounce: prevent multiple scans within 500ms
+          const now = Date.now();
+          if (now - lastScanTime.current < 500) return;
+          lastScanTime.current = now;
           
-          // Stop scanner and return result
+          // Extract and validate QR code
+          const qrCode = extractQRCode(decodedText);
+          if (!qrCode) return;
+          
+          console.log('✅ QR Scanned instantly:', qrCode);
+          setScanCount(prev => prev + 1);
+          
+          // Vibrate for feedback (if supported)
+          if (navigator.vibrate) navigator.vibrate(100);
+          
+          // Stop scanner and return result immediately
           stopScanner();
           onScan(qrCode);
         },
-        (errorMessage) => {
-          // Ignore scan errors (no QR found), only log occasionally
-        }
+        () => {} // Ignore scan errors silently
       );
       
       setIsScanning(true);
