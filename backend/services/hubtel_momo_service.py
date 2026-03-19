@@ -441,9 +441,9 @@ class HubtelMoMoService:
                 # Enhanced error handling for 403
                 if response_status_code == 403:
                     error_msg = "Collection API access denied (403). IP may not be whitelisted or account not enabled for Receive Money."
-                    print(f"🔴 [MOMO COLLECT] 403 FORBIDDEN - Check Hubtel account configuration")
+                    print("🔴 [MOMO COLLECT] 403 FORBIDDEN - Check Hubtel account configuration")
                     print(f"🔴 [MOMO COLLECT] POS Sales ID: {self.pos_sales_id}")
-                    print(f"🔴 [MOMO COLLECT] Static IP should be: 52.5.155.132 (Fixie)")
+                    print("🔴 [MOMO COLLECT] Static IP should be: 52.5.155.132 (Fixie)")
                 
                 print(f"🔴 [MOMO COLLECT] FAILED - HTTP {response_status_code}")
                 print(f"🔴 [MOMO COLLECT] Error: {error_msg}")
@@ -579,9 +579,9 @@ class HubtelMoMoService:
                 try:
                     result = response.json()
                     print(f"🟢 [MOMO SEND] Response: {json.dumps(result, indent=2)}")
-                except:
+                except Exception as json_error:
                     result = {"raw": response.text}
-                    print(f"🟢 [MOMO SEND] Raw response: {response.text}")
+                    print(f"🟢 [MOMO SEND] Raw response (parse error: {json_error}): {response.text}")
             
             logger.info(f"Hubtel MoMo Transfer: status={response_status_code}, response={result}")
             
@@ -759,49 +759,95 @@ class HubtelMoMoService:
 
     async def query_hubtel_transaction_status(self, client_reference: str = None, transaction_id: str = None) -> Dict:
         """
-        Query Hubtel API directly for transaction status.
+        Query transaction status - checks both database and Hubtel API.
         
-        Uses two approaches:
-        1. Try the merchant account transactions endpoint
-        2. Try the txnstatus API
+        IMPORTANT: Hubtel's transaction status API often returns 403/404.
+        We rely primarily on:
+        1. Hubtel webhooks (primary - they POST to us when status changes)
+        2. Our database status (set by webhook)
+        3. Hubtel API as fallback (often fails with 403)
         
         Args:
             client_reference: The ClientReference used when initiating the payment
             transaction_id: The TransactionId returned by Hubtel
         """
-        if not self.is_configured():
-            return {"success": False, "error": "Hubtel not configured"}
+        logger.info(f"🔍 [STATUS CHECK] Starting - client_ref: {client_reference}, tx_id: {transaction_id}")
         
-        # We need the transaction_id for the status check
-        # If we only have client_reference, try to find transaction_id from our database
-        if not transaction_id and client_reference:
-            if self.db is not None:
-                payment = await self.db.hubtel_payments.find_one(
+        # STEP 1: Check our database first (most reliable - updated by webhooks)
+        if self.db is not None:
+            # Check hubtel_payments collection
+            hubtel_payment = None
+            if client_reference:
+                hubtel_payment = await self.db.hubtel_payments.find_one(
                     {"client_reference": client_reference},
-                    {"_id": 0, "hubtel_transaction_id": 1}
+                    {"_id": 0}
                 )
-                if payment:
-                    transaction_id = payment.get("hubtel_transaction_id")
+            elif transaction_id:
+                hubtel_payment = await self.db.hubtel_payments.find_one(
+                    {"hubtel_transaction_id": transaction_id},
+                    {"_id": 0}
+                )
+            
+            if hubtel_payment:
+                db_status = hubtel_payment.get("status", "unknown")
+                logger.info(f"🔍 [STATUS CHECK] Found in hubtel_payments: status={db_status}")
+                
+                # If callback already marked it completed or failed, trust that
+                if db_status in ["completed", "success", "failed"]:
+                    return {
+                        "success": True,
+                        "status": "completed" if db_status in ["completed", "success"] else "failed",
+                        "source": "database_callback",
+                        "data": hubtel_payment
+                    }
+                
+                # Get transaction_id from DB if we don't have it
+                if not transaction_id:
+                    transaction_id = hubtel_payment.get("hubtel_transaction_id")
+            
+            # Also check momo_payments collection
+            momo_payment = None
+            if client_reference:
+                momo_payment = await self.db.momo_payments.find_one(
+                    {"$or": [
+                        {"reference": client_reference},
+                        {"client_reference": client_reference}
+                    ]},
+                    {"_id": 0}
+                )
+            
+            if momo_payment:
+                db_status = momo_payment.get("status", "unknown")
+                logger.info(f"🔍 [STATUS CHECK] Found in momo_payments: status={db_status}")
+                
+                if db_status in ["completed", "success", "failed"]:
+                    return {
+                        "success": True,
+                        "status": "completed" if db_status in ["completed", "success"] else "failed",
+                        "source": "database_momo",
+                        "data": momo_payment
+                    }
+        
+        # STEP 2: Try Hubtel API (often returns 403, but worth trying)
+        if not self.is_configured():
+            logger.warning("🔍 [STATUS CHECK] Hubtel not configured, returning DB status")
+            return {"success": False, "error": "Hubtel not configured", "status": "unknown"}
         
         search_ref = transaction_id or client_reference
         if not search_ref:
-            print(f"🔴 [STATUS CHECK] No reference available for status check")
+            logger.warning("🔴 [STATUS CHECK] No reference available for status check")
             return {"success": False, "error": "Transaction reference not available", "status": "unknown"}
         
-        # Try merchant account transactions endpoint first
-        # GET /merchantaccount/merchants/{posId}/transactions?clientReference={ref}
+        # Try the transactions endpoint
         url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/transactions"
-        
-        print(f"🔍 [STATUS CHECK] Querying Hubtel Merchant API")
-        print(f"🔍 [STATUS CHECK] URL: {url}")
-        print(f"🔍 [STATUS CHECK] ClientReference: {client_reference}")
+        logger.info(f"🔍 [STATUS CHECK] Querying Hubtel API: {url}")
         
         try:
             async with httpx.AsyncClient(
                 proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None,
                 timeout=30.0
-            ) as client:
-                response = await client.get(
+            ) as http_client:
+                response = await http_client.get(
                     url,
                     headers={
                         "Authorization": self._get_auth_header(),
@@ -810,14 +856,24 @@ class HubtelMoMoService:
                     params={"clientReference": client_reference} if client_reference else {"transactionId": transaction_id}
                 )
                 
-                print(f"🔍 [STATUS CHECK] Response status: {response.status_code}")
-                print(f"🔍 [STATUS CHECK] Response body: {response.text[:500]}")
+                logger.info(f"🔍 [STATUS CHECK] Hubtel response: {response.status_code}")
+                
+                # Handle 403 Forbidden - common issue with Hubtel status API
+                if response.status_code == 403:
+                    logger.warning("🔴 [STATUS CHECK] Hubtel returned 403 - status check API not authorized")
+                    # Return unknown but don't fail - let polling continue
+                    return {
+                        "success": False,
+                        "error": "Hubtel status API returned 403 - awaiting webhook",
+                        "status": "processing",  # Keep as processing so polling continues
+                        "source": "hubtel_api_403"
+                    }
                 
                 if response.status_code == 200:
                     try:
                         data = response.json()
                         
-                        # Parse Hubtel status - check multiple possible field names
+                        # Parse Hubtel status
                         hubtel_status = (
                             data.get("Status") or 
                             data.get("status") or 
@@ -827,33 +883,24 @@ class HubtelMoMoService:
                         )
                         response_code = data.get("ResponseCode", data.get("Code", ""))
                         
-                        # ResponseCode 0000 usually means success
                         if response_code == "0000":
                             hubtel_status = "completed"
                         
-                        # Map Hubtel status to our status
+                        # Map to our status
                         status_map = {
-                            "success": "completed",
-                            "successful": "completed",
-                            "completed": "completed",
-                            "paid": "completed",
-                            "approved": "completed",
-                            "failed": "failed",
-                            "rejected": "failed",
-                            "declined": "failed",
-                            "cancelled": "failed",
-                            "expired": "failed",
-                            "pending": "processing",
-                            "processing": "processing",
-                            "awaiting": "processing"
+                            "success": "completed", "successful": "completed", "completed": "completed",
+                            "paid": "completed", "approved": "completed",
+                            "failed": "failed", "rejected": "failed", "declined": "failed",
+                            "cancelled": "failed", "expired": "failed",
+                            "pending": "processing", "processing": "processing", "awaiting": "processing"
                         }
                         
                         status_lower = hubtel_status.lower() if isinstance(hubtel_status, str) else "unknown"
                         mapped_status = status_map.get(status_lower, status_lower)
                         
-                        print(f"🔍 [STATUS CHECK] Hubtel status: {hubtel_status} -> Mapped: {mapped_status}")
+                        logger.info(f"🔍 [STATUS CHECK] Hubtel status: {hubtel_status} -> {mapped_status}")
                         
-                        # If completed, update our database
+                        # Update our database if completed
                         if mapped_status == "completed" and self.db is not None:
                             update_data = {
                                 "status": "completed",
@@ -861,11 +908,6 @@ class HubtelMoMoService:
                                 "hubtel_status_response": data
                             }
                             
-                            if transaction_id:
-                                await self.db.hubtel_payments.update_one(
-                                    {"hubtel_transaction_id": transaction_id},
-                                    {"$set": update_data}
-                                )
                             if client_reference:
                                 await self.db.hubtel_payments.update_one(
                                     {"client_reference": client_reference},
@@ -882,23 +924,24 @@ class HubtelMoMoService:
                             "hubtel_status": hubtel_status,
                             "response_code": response_code,
                             "transaction_id": transaction_id,
+                            "source": "hubtel_api",
                             "data": data
                         }
                     except Exception as e:
-                        print(f"🔴 [STATUS CHECK] Parse error: {e}")
+                        logger.error(f"🔴 [STATUS CHECK] Parse error: {e}")
                         return {"success": False, "error": f"Failed to parse response: {e}", "status": "unknown"}
                 else:
                     error_text = response.text[:200] if response.text else "No response body"
-                    print(f"🔴 [STATUS CHECK] HTTP {response.status_code}: {error_text}")
+                    logger.warning(f"🔴 [STATUS CHECK] HTTP {response.status_code}: {error_text}")
                     return {
                         "success": False,
                         "error": f"Hubtel returned HTTP {response.status_code}",
-                        "status": "unknown",
+                        "status": "processing",  # Keep polling
                         "response": error_text
                     }
                     
         except Exception as e:
-            print(f"🔴 [STATUS CHECK] Error: {e}")
+            logger.error(f"🔴 [STATUS CHECK] Error: {e}")
             return {"success": False, "error": str(e), "status": "unknown"}
 
 

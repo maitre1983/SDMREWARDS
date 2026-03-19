@@ -180,17 +180,134 @@ async def poll_payment_status(payment_id: str):
     Lightweight endpoint for automatic status polling.
     Frontend should call this every 3-5 seconds after payment initiation.
     
-    This queries Hubtel directly if payment is still pending.
+    This checks database first (for webhook updates), then queries Hubtel if still pending.
     No authentication required as payment_id is unique.
     """
     db = get_db()
     
+    logger.info(f"[POLL STATUS] Checking payment: {payment_id}")
+    
+    # STEP 1: Check our database directly first
+    # Look in momo_payments (where merchant.py creates the record)
+    payment = await db.momo_payments.find_one(
+        {"$or": [
+            {"id": payment_id},
+            {"reference": payment_id},
+            {"client_reference": payment_id}
+        ]},
+        {"_id": 0}
+    )
+    
+    if payment:
+        status = payment.get("status", "pending")
+        logger.info(f"[POLL STATUS] Found in momo_payments: status={status}")
+        
+        # If payment is already completed, ensure complete_payment was called
+        if status in ["completed", "success"]:
+            # Check if transaction was recorded (indicates complete_payment ran)
+            txn = await db.transactions.find_one(
+                {"payment_reference": payment.get("reference")},
+                {"_id": 0, "id": 1}
+            )
+            if not txn:
+                # Transaction not recorded - run complete_payment now
+                logger.info("[POLL STATUS] Payment completed but transaction missing - running complete_payment")
+                try:
+                    from .processing import complete_payment
+                    await complete_payment(payment.get("id"))
+                    logger.info(f"[POLL STATUS] complete_payment executed for {payment.get('id')}")
+                except Exception as e:
+                    logger.error(f"[POLL STATUS] Error in complete_payment: {e}")
+            
+            return {
+                "success": True,
+                "status": "completed",
+                "should_poll": False,
+                "completed": True,
+                "failed": False,
+                "message": "Payment successful! Cashback credited.",
+                "source": "database"
+            }
+        
+        if status == "failed":
+            return {
+                "success": True,
+                "status": "failed",
+                "should_poll": False,
+                "completed": False,
+                "failed": True,
+                "message": "Payment failed. Please try again.",
+                "source": "database"
+            }
+    
+    # Also check hubtel_payments (where hubtel_momo_service creates records)
+    hubtel_payment = await db.hubtel_payments.find_one(
+        {"$or": [
+            {"id": payment_id},
+            {"client_reference": payment_id}
+        ]},
+        {"_id": 0}
+    )
+    
+    if hubtel_payment:
+        status = hubtel_payment.get("status", "pending")
+        logger.info(f"[POLL STATUS] Found in hubtel_payments: status={status}")
+        
+        if status in ["completed", "success"]:
+            # Find and complete the corresponding momo_payment
+            client_ref = hubtel_payment.get("client_reference")
+            if client_ref:
+                momo = await db.momo_payments.find_one(
+                    {"$or": [{"reference": client_ref}, {"client_reference": client_ref}]},
+                    {"_id": 0, "id": 1}
+                )
+                if momo:
+                    try:
+                        from .processing import complete_payment
+                        await complete_payment(momo.get("id"))
+                        logger.info("[POLL STATUS] complete_payment executed via hubtel_payments")
+                    except Exception as e:
+                        logger.error(f"[POLL STATUS] Error in complete_payment: {e}")
+            
+            return {
+                "success": True,
+                "status": "completed",
+                "should_poll": False,
+                "completed": True,
+                "failed": False,
+                "message": "Payment successful! Cashback credited.",
+                "source": "hubtel_payments"
+            }
+        
+        if status == "failed":
+            return {
+                "success": True,
+                "status": "failed",
+                "should_poll": False,
+                "completed": False,
+                "failed": True,
+                "message": "Payment failed. Please try again.",
+                "source": "hubtel_payments"
+            }
+    
+    # STEP 2: If still pending, try Hubtel API (but it often returns 403)
     from services.payment_reconciliation_service import get_reconciliation_service
     reconciliation = get_reconciliation_service(db)
     
     result = await reconciliation.check_single_payment(payment_id=payment_id)
     
     status = result.get("status", "unknown")
+    logger.info(f"[POLL STATUS] Reconciliation result: status={status}, source={result.get('source')}")
+    
+    # If reconciliation found it completed, run complete_payment
+    if status == "completed":
+        if payment:
+            try:
+                from .processing import complete_payment
+                await complete_payment(payment.get("id"))
+                logger.info("[POLL STATUS] complete_payment executed after reconciliation")
+            except Exception as e:
+                logger.error(f"[POLL STATUS] Error in complete_payment: {e}")
     
     # Determine if frontend should continue polling
     should_poll = status in ["pending", "processing", "prompt_sent", "unknown"]
@@ -352,82 +469,132 @@ async def payment_callback(request: Request):
 
 @router.post("/hubtel/callback")
 async def hubtel_payment_callback(request: Request):
-    """Hubtel specific payment callback for Direct MoMo Prompt"""
+    """
+    Hubtel specific payment callback for Direct MoMo Prompt.
+    This is the PRIMARY mechanism for payment confirmation.
+    Hubtel sends callbacks when:
+    - Payment is approved by customer
+    - Payment fails or is declined
+    - Payment times out
+    """
     db = get_db()
     
     try:
         body = await request.json()
-        logger.info(f"Hubtel callback received: {body}")
+        logger.info(f"🔔 [HUBTEL CALLBACK] Received: {body}")
         
-        # Hubtel format
+        # Hubtel format - can be nested in "Data" or flat
         data = body.get("Data", body)
         client_reference = data.get("ClientReference") or body.get("ClientReference")
         status = (data.get("Status") or body.get("Status") or "").lower()
         transaction_id = data.get("TransactionId") or body.get("TransactionId")
+        amount = data.get("Amount") or body.get("Amount")
         
         if not client_reference:
-            logger.warning("Hubtel callback missing ClientReference")
+            logger.warning("🔔 [HUBTEL CALLBACK] Missing ClientReference")
             return {"ResponseCode": "0001", "Message": "Missing ClientReference"}
         
-        logger.info(f"Processing callback for ClientReference: {client_reference}, Status: {status}")
+        logger.info(f"🔔 [HUBTEL CALLBACK] Processing - ref: {client_reference}, status: {status}, amount: {amount}")
         
-        # Search in multiple collections
+        # Find payment in momo_payments (primary collection)
         payment = await db.momo_payments.find_one(
-            {"$or": [{"reference": client_reference}, {"client_reference": client_reference}]},
+            {"$or": [
+                {"reference": client_reference}, 
+                {"client_reference": client_reference}
+            ]},
             {"_id": 0}
         )
         
         if not payment:
-            payment = await db.hubtel_payments.find_one(
+            # Try hubtel_payments as fallback
+            hubtel_payment = await db.hubtel_payments.find_one(
                 {"client_reference": client_reference},
                 {"_id": 0}
             )
-        
-        if not payment:
-            logger.warning(f"Payment not found for ClientReference: {client_reference}")
+            if hubtel_payment:
+                logger.info("🔔 [HUBTEL CALLBACK] Found in hubtel_payments, looking for momo_payment")
+                # The hubtel_payment exists but we need the momo_payment to complete
+                # Update hubtel_payments status first
+                await db.hubtel_payments.update_one(
+                    {"client_reference": client_reference},
+                    {"$set": {
+                        "status": "completed" if status in ["success", "successful", "completed", "paid"] else "failed",
+                        "hubtel_transaction_id": transaction_id,
+                        "callback_received": True,
+                        "callback_data": body,
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+            
+            logger.warning(f"🔔 [HUBTEL CALLBACK] Payment not found in momo_payments for ref: {client_reference}")
             return {"ResponseCode": "0001", "Message": "Payment not found"}
         
         payment_id = payment.get("id")
-        logger.info(f"Found payment: {payment_id}")
+        logger.info(f"🔔 [HUBTEL CALLBACK] Found payment: {payment_id}")
+        
+        # Update hubtel_payments collection
+        await db.hubtel_payments.update_one(
+            {"client_reference": client_reference},
+            {"$set": {
+                "status": "completed" if status in ["success", "successful", "completed", "paid"] else status,
+                "hubtel_transaction_id": transaction_id,
+                "callback_received": True,
+                "callback_data": body,
+                "completed_at": datetime.now(timezone.utc).isoformat() if status in ["success", "successful", "completed", "paid"] else None,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
         
         if status in ["success", "successful", "completed", "paid"]:
+            logger.info("🔔 [HUBTEL CALLBACK] Payment SUCCESSFUL - calling complete_payment")
+            
+            # Call complete_payment to process the payment fully
             from .processing import complete_payment
-            await complete_payment(payment_id)
-            logger.info(f"Payment {payment_id} COMPLETED via callback")
+            try:
+                await complete_payment(payment_id)
+                logger.info(f"✅ [HUBTEL CALLBACK] complete_payment executed for {payment_id}")
+            except Exception as e:
+                logger.error(f"❌ [HUBTEL CALLBACK] Error in complete_payment: {e}")
+                # Even if complete_payment fails, update the status
+                await db.momo_payments.update_one(
+                    {"id": payment_id},
+                    {"$set": {
+                        "status": "success",
+                        "hubtel_transaction_id": transaction_id,
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "callback_data": body
+                    }}
+                )
             
-            # Also update hubtel_payments if exists
-            await db.hubtel_payments.update_one(
-                {"client_reference": client_reference},
-                {"$set": {
-                    "status": "completed",
-                    "hubtel_transaction_id": transaction_id,
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
-                    "updated_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            
-        elif status in ["failed", "error", "declined", "cancelled"]:
+        elif status in ["failed", "error", "declined", "cancelled", "expired"]:
+            logger.info("🔔 [HUBTEL CALLBACK] Payment FAILED - updating status")
             await db.momo_payments.update_one(
                 {"id": payment_id},
                 {"$set": {
                     "status": "failed",
                     "provider_reference": transaction_id,
-                    "provider_message": data.get("Description", "Payment failed"),
-                    "updated_at": datetime.now(timezone.utc).isoformat()
+                    "provider_message": data.get("Description") or data.get("Message") or "Payment failed",
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "callback_data": body
                 }}
             )
-            await db.hubtel_payments.update_one(
-                {"client_reference": client_reference},
+        else:
+            # Processing/pending update
+            await db.momo_payments.update_one(
+                {"id": payment_id},
                 {"$set": {
-                    "status": "failed",
-                    "error": data.get("Description", "Payment failed"),
+                    "status": status or "processing",
+                    "provider_reference": transaction_id,
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
-            logger.info(f"Payment {payment_id} marked as FAILED")
         
         return {"ResponseCode": "0000", "Message": "Success"}
         
     except Exception as e:
-        logger.error(f"Hubtel callback error: {e}")
+        logger.error(f"❌ [HUBTEL CALLBACK] Error: {e}")
+        import traceback
+        logger.error(f"❌ [HUBTEL CALLBACK] Traceback: {traceback.format_exc()}")
         return {"ResponseCode": "0001", "Message": str(e)}

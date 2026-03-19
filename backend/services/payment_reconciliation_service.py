@@ -112,8 +112,8 @@ class PaymentReconciliationService:
                                 await self._fail_payment(payment, {"reason": "Timeout - no confirmation received"})
                                 results["failed"] += 1
                                 logger.info(f"[RECONCILE] Payment {payment_id} timed out after {age_minutes:.1f} minutes")
-                        except:
-                            pass
+                        except Exception as age_error:
+                            logger.debug(f"[RECONCILE] Age check error: {age_error}")
                     
                     results["errors"].append(f"Payment {payment_id}: {status_result.get('error')}")
                     
@@ -176,27 +176,45 @@ class PaymentReconciliationService:
         """
         Check status of a single payment immediately.
         Used for real-time status updates.
+        
+        Priority:
+        1. Check database (momo_payments, hubtel_payments) - most reliable as updated by webhooks
+        2. Query Hubtel API - often fails with 403, but try anyway
         """
         if self.db is None:
             return {"success": False, "error": "Database not available", "status": "unknown"}
         
-        # Find the payment
+        logger.info(f"[RECONCILE SINGLE] Checking - payment_id: {payment_id}, client_ref: {client_reference}")
+        
+        # Find the payment in momo_payments
         payment = None
         
         if payment_id:
             payment = await self.db.momo_payments.find_one(
-                {"$or": [{"id": payment_id}, {"reference": payment_id}]},
+                {"$or": [
+                    {"id": payment_id}, 
+                    {"reference": payment_id},
+                    {"client_reference": payment_id}
+                ]},
                 {"_id": 0}
             )
+            
+            # Also check hubtel_payments
             if not payment:
                 payment = await self.db.hubtel_payments.find_one(
-                    {"$or": [{"id": payment_id}, {"client_reference": payment_id}]},
+                    {"$or": [
+                        {"id": payment_id}, 
+                        {"client_reference": payment_id}
+                    ]},
                     {"_id": 0}
                 )
         
         if not payment and client_reference:
             payment = await self.db.momo_payments.find_one(
-                {"$or": [{"reference": client_reference}, {"client_reference": client_reference}]},
+                {"$or": [
+                    {"reference": client_reference}, 
+                    {"client_reference": client_reference}
+                ]},
                 {"_id": 0}
             )
             if not payment:
@@ -206,15 +224,25 @@ class PaymentReconciliationService:
                 )
         
         if not payment:
+            logger.warning("[RECONCILE SINGLE] Payment not found")
             return {"success": False, "error": "Payment not found", "status": "not_found"}
         
         current_status = payment.get("status", "unknown")
+        logger.info(f"[RECONCILE SINGLE] Found payment - current status: {current_status}")
         
         # If already completed or failed, return immediately
-        if current_status in ["completed", "success", "failed"]:
+        if current_status in ["completed", "success"]:
             return {
                 "success": True,
-                "status": current_status,
+                "status": "completed",
+                "payment": payment,
+                "source": "database"
+            }
+        
+        if current_status == "failed":
+            return {
+                "success": True,
+                "status": "failed",
                 "payment": payment,
                 "source": "database"
             }
@@ -231,11 +259,15 @@ class PaymentReconciliationService:
             transaction_id=tx_id
         )
         
+        logger.info(f"[RECONCILE SINGLE] Hubtel result: {status_result.get('status')}, source: {status_result.get('source')}")
+        
         if status_result.get("success"):
             new_status = status_result.get("status")
             
             # Update if status changed
-            if new_status != current_status:
+            if new_status and new_status != current_status:
+                logger.info(f"[RECONCILE SINGLE] Status changed: {current_status} -> {new_status}")
+                
                 if new_status == "completed":
                     await self._complete_payment(payment)
                 elif new_status == "failed":
@@ -253,16 +285,17 @@ class PaymentReconciliationService:
             
             return {
                 "success": True,
-                "status": new_status,
+                "status": new_status or current_status,
                 "hubtel_response": status_result.get("data"),
-                "source": "hubtel"
+                "source": status_result.get("source", "hubtel")
             }
         
+        # Hubtel API failed (likely 403) - return current database status
         return {
             "success": False,
             "status": current_status,
             "error": status_result.get("error"),
-            "source": "database"
+            "source": "database_fallback"
         }
 
 

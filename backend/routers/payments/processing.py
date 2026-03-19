@@ -20,12 +20,38 @@ from .shared import (
 # ============== MAIN COMPLETION ==============
 
 async def complete_payment(payment_id: str):
-    """Process completed payment - update client/merchant records"""
+    """
+    Process completed payment - update client/merchant records.
+    
+    This is the CORE function that:
+    1. Updates payment status to 'success'
+    2. Credits cashback to client
+    3. Records transaction in transactions collection
+    4. Triggers gamification, SMS notifications, etc.
+    
+    MUST be called when a payment is confirmed (via webhook or status check).
+    """
     db = get_db()
+    logger.info(f"🎯 [COMPLETE_PAYMENT] Starting for payment_id: {payment_id}")
+    
     payment = await db.momo_payments.find_one({"id": payment_id}, {"_id": 0})
     
     if not payment:
+        logger.error(f"❌ [COMPLETE_PAYMENT] Payment not found: {payment_id}")
         return
+    
+    # Check if already processed to avoid double-crediting
+    if payment.get("status") == "success" and payment.get("completed_at"):
+        # Check if transaction already exists
+        existing_txn = await db.transactions.find_one(
+            {"payment_reference": payment.get("reference")},
+            {"_id": 0, "id": 1}
+        )
+        if existing_txn:
+            logger.info(f"⚠️ [COMPLETE_PAYMENT] Payment {payment_id} already processed - transaction exists")
+            return
+    
+    logger.info(f"🎯 [COMPLETE_PAYMENT] Payment found - type: {payment.get('type')}, amount: {payment.get('amount')}")
     
     # Update payment status
     await db.momo_payments.update_one(
@@ -41,11 +67,18 @@ async def complete_payment(payment_id: str):
     
     # Handle based on payment type
     if payment["type"] == "card_purchase":
+        logger.info("🎯 [COMPLETE_PAYMENT] Processing card_purchase")
         await process_card_purchase(payment)
     elif payment["type"] == "merchant_payment":
+        logger.info("🎯 [COMPLETE_PAYMENT] Processing merchant_payment")
         await process_merchant_payment(payment)
     elif payment["type"] == "card_upgrade":
+        logger.info("🎯 [COMPLETE_PAYMENT] Processing card_upgrade")
         await process_card_upgrade(payment)
+    else:
+        logger.warning(f"⚠️ [COMPLETE_PAYMENT] Unknown payment type: {payment.get('type')}")
+    
+    logger.info(f"✅ [COMPLETE_PAYMENT] Completed for payment_id: {payment_id}")
 
 
 # ============== CARD PURCHASE ==============
@@ -199,22 +232,28 @@ async def _process_referral_bonus(client_id: str, referrer_id: str, referrer_bon
 async def process_merchant_payment(payment: Dict):
     """Process completed merchant payment - credit cashback and pay merchant"""
     db = get_db()
-    logger.info(f"Processing merchant payment: {payment.get('id')}")
+    logger.info(f"💰 [MERCHANT_PAYMENT] Processing: {payment.get('id')}")
     
     client_id = payment["client_id"]
     metadata = payment.get("metadata", {})
     merchant_id = metadata.get("merchant_id") or payment.get("merchant_id")
     
     if not merchant_id:
-        logger.error(f"No merchant_id found in payment {payment.get('id')}")
+        logger.error(f"❌ [MERCHANT_PAYMENT] No merchant_id found in payment {payment.get('id')}")
         return
+    
+    logger.info(f"💰 [MERCHANT_PAYMENT] client_id: {client_id}, merchant_id: {merchant_id}")
     
     # Get client and merchant
     client = await db.clients.find_one({"id": client_id}, {"_id": 0})
     merchant = await db.merchants.find_one({"id": merchant_id}, {"_id": 0})
     
     if not merchant:
+        logger.error(f"❌ [MERCHANT_PAYMENT] Merchant not found: {merchant_id}")
         return
+    
+    if not client:
+        logger.warning(f"⚠️ [MERCHANT_PAYMENT] Client not found: {client_id}")
     
     # Calculate cashback
     cashback_rate = merchant.get("cashback_rate", 5) / 100
@@ -228,11 +267,14 @@ async def process_merchant_payment(payment: Dict):
     net_cashback = gross_cashback - commission
     merchant_share = round(payment["amount"] - gross_cashback, 2)
     
+    logger.info(f"💰 [MERCHANT_PAYMENT] Cashback: gross={gross_cashback}, net={net_cashback}, commission={commission}")
+    
     # Credit cashback to client
-    await db.clients.update_one(
+    result = await db.clients.update_one(
         {"id": client_id},
         {"$inc": {"cashback_balance": net_cashback}}
     )
+    logger.info(f"💰 [MERCHANT_PAYMENT] Credited cashback to client: modified={result.modified_count}")
     
     # Update merchant stats
     await db.merchants.update_one(
@@ -247,9 +289,9 @@ async def process_merchant_payment(payment: Dict):
         }
     )
     
-    # Record transaction
+    # Record transaction - THIS IS CRITICAL FOR "RECENT ACTIVITY"
     transaction_id = str(uuid.uuid4())
-    await db.transactions.insert_one({
+    transaction_doc = {
         "id": transaction_id,
         "type": "merchant_payment",
         "client_id": client_id,
@@ -264,7 +306,10 @@ async def process_merchant_payment(payment: Dict):
         "payment_reference": payment["reference"],
         "status": "completed",
         "created_at": datetime.now(timezone.utc).isoformat()
-    })
+    }
+    
+    insert_result = await db.transactions.insert_one(transaction_doc)
+    logger.info(f"✅ [MERCHANT_PAYMENT] Transaction recorded: {transaction_id}, inserted={insert_result.inserted_id is not None}")
     
     # Gamification
     try:
