@@ -757,20 +757,44 @@ class HubtelMoMoService:
             "completed_at": payment.get("completed_at")
         }
 
-    async def query_hubtel_transaction_status(self, client_reference: str) -> Dict:
+    async def query_hubtel_transaction_status(self, client_reference: str = None, transaction_id: str = None) -> Dict:
         """
         Query Hubtel API directly for transaction status.
-        Uses the POS Sales ID endpoint for checking collection status.
+        
+        Uses two approaches:
+        1. Try the merchant account transactions endpoint
+        2. Try the txnstatus API
+        
+        Args:
+            client_reference: The ClientReference used when initiating the payment
+            transaction_id: The TransactionId returned by Hubtel
         """
         if not self.is_configured():
             return {"success": False, "error": "Hubtel not configured"}
         
-        # Hubtel transaction status endpoint
-        # For collection: GET /merchantaccount/merchants/{posId}/transactions/status?clientReference={ref}
-        url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/transactions/status"
+        # We need the transaction_id for the status check
+        # If we only have client_reference, try to find transaction_id from our database
+        if not transaction_id and client_reference:
+            if self.db:
+                payment = await self.db.hubtel_payments.find_one(
+                    {"client_reference": client_reference},
+                    {"_id": 0, "hubtel_transaction_id": 1}
+                )
+                if payment:
+                    transaction_id = payment.get("hubtel_transaction_id")
         
-        print(f"🔍 [STATUS CHECK] Querying Hubtel for transaction: {client_reference}")
+        search_ref = transaction_id or client_reference
+        if not search_ref:
+            print(f"🔴 [STATUS CHECK] No reference available for status check")
+            return {"success": False, "error": "Transaction reference not available", "status": "unknown"}
+        
+        # Try merchant account transactions endpoint first
+        # GET /merchantaccount/merchants/{posId}/transactions?clientReference={ref}
+        url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/transactions"
+        
+        print(f"🔍 [STATUS CHECK] Querying Hubtel Merchant API")
         print(f"🔍 [STATUS CHECK] URL: {url}")
+        print(f"🔍 [STATUS CHECK] ClientReference: {client_reference}")
         
         try:
             async with httpx.AsyncClient(
@@ -783,7 +807,7 @@ class HubtelMoMoService:
                         "Authorization": self._get_auth_header(),
                         "Content-Type": "application/json"
                     },
-                    params={"clientReference": client_reference}
+                    params={"clientReference": client_reference} if client_reference else {"transactionId": transaction_id}
                 )
                 
                 print(f"🔍 [STATUS CHECK] Response status: {response.status_code}")
@@ -793,9 +817,19 @@ class HubtelMoMoService:
                     try:
                         data = response.json()
                         
-                        # Parse Hubtel status
-                        hubtel_status = data.get("Status", data.get("status", "unknown"))
-                        response_code = data.get("ResponseCode", "")
+                        # Parse Hubtel status - check multiple possible field names
+                        hubtel_status = (
+                            data.get("Status") or 
+                            data.get("status") or 
+                            data.get("TransactionStatus") or
+                            data.get("Data", {}).get("Status") or
+                            "unknown"
+                        )
+                        response_code = data.get("ResponseCode", data.get("Code", ""))
+                        
+                        # ResponseCode 0000 usually means success
+                        if response_code == "0000":
+                            hubtel_status = "completed"
                         
                         # Map Hubtel status to our status
                         status_map = {
@@ -803,30 +837,64 @@ class HubtelMoMoService:
                             "successful": "completed",
                             "completed": "completed",
                             "paid": "completed",
+                            "approved": "completed",
                             "failed": "failed",
                             "rejected": "failed",
                             "declined": "failed",
                             "cancelled": "failed",
+                            "expired": "failed",
                             "pending": "processing",
-                            "processing": "processing"
+                            "processing": "processing",
+                            "awaiting": "processing"
                         }
                         
-                        mapped_status = status_map.get(hubtel_status.lower(), hubtel_status.lower())
+                        status_lower = hubtel_status.lower() if isinstance(hubtel_status, str) else "unknown"
+                        mapped_status = status_map.get(status_lower, status_lower)
+                        
+                        print(f"🔍 [STATUS CHECK] Hubtel status: {hubtel_status} -> Mapped: {mapped_status}")
+                        
+                        # If completed, update our database
+                        if mapped_status == "completed" and self.db:
+                            update_data = {
+                                "status": "completed",
+                                "completed_at": datetime.now(timezone.utc).isoformat(),
+                                "hubtel_status_response": data
+                            }
+                            
+                            if transaction_id:
+                                await self.db.hubtel_payments.update_one(
+                                    {"hubtel_transaction_id": transaction_id},
+                                    {"$set": update_data}
+                                )
+                            if client_reference:
+                                await self.db.hubtel_payments.update_one(
+                                    {"client_reference": client_reference},
+                                    {"$set": update_data}
+                                )
+                                await self.db.momo_payments.update_one(
+                                    {"$or": [{"reference": client_reference}, {"client_reference": client_reference}]},
+                                    {"$set": update_data}
+                                )
                         
                         return {
                             "success": True,
                             "status": mapped_status,
                             "hubtel_status": hubtel_status,
                             "response_code": response_code,
+                            "transaction_id": transaction_id,
                             "data": data
                         }
                     except Exception as e:
-                        return {"success": False, "error": f"Failed to parse response: {e}"}
+                        print(f"🔴 [STATUS CHECK] Parse error: {e}")
+                        return {"success": False, "error": f"Failed to parse response: {e}", "status": "unknown"}
                 else:
+                    error_text = response.text[:200] if response.text else "No response body"
+                    print(f"🔴 [STATUS CHECK] HTTP {response.status_code}: {error_text}")
                     return {
                         "success": False,
-                        "error": f"Hubtel returned {response.status_code}",
-                        "status": "unknown"
+                        "error": f"Hubtel returned HTTP {response.status_code}",
+                        "status": "unknown",
+                        "response": error_text
                     }
                     
         except Exception as e:

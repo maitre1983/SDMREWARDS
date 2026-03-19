@@ -100,28 +100,23 @@ async def check_and_update_payment_status(payment_id: str):
         hubtel_tx_id = payment.get("hubtel_transaction_id") or payment.get("provider_reference")
         client_ref = payment.get("client_reference") or payment.get("reference")
         
+        logger.info(f"[CHECK STATUS] Querying Hubtel - tx_id: {hubtel_tx_id}, client_ref: {client_ref}")
+        
         if hubtel_tx_id or client_ref:
             from services.hubtel_momo_service import get_hubtel_momo_service
             
             hubtel_service = get_hubtel_momo_service(db)
             
-            # Check Hubtel for transaction status
+            # Check Hubtel for transaction status using the correct API
             status_result = await hubtel_service.query_hubtel_transaction_status(
-                client_reference=client_ref or hubtel_tx_id
+                client_reference=client_ref,
+                transaction_id=hubtel_tx_id
             )
             
+            logger.info(f"[CHECK STATUS] Hubtel response: {status_result}")
+            
             if status_result.get("success"):
-                hubtel_status = status_result.get("status", "").lower()
-                
-                # Map Hubtel status to our status
-                if hubtel_status in ["success", "successful", "completed"]:
-                    new_status = "completed"
-                elif hubtel_status in ["failed", "rejected", "declined"]:
-                    new_status = "failed"
-                elif hubtel_status in ["pending", "processing"]:
-                    new_status = "processing"
-                else:
-                    new_status = current_status
+                new_status = status_result.get("status", current_status)
                 
                 # Update status if changed
                 if new_status != current_status:
@@ -133,10 +128,20 @@ async def check_and_update_payment_status(payment_id: str):
                     
                     if new_status == "completed":
                         update_data["completed_at"] = datetime.now(timezone.utc).isoformat()
+                        
+                        # Also trigger payment completion logic
+                        from .processing import complete_payment
+                        payment_id_to_complete = payment.get("id")
+                        if payment_id_to_complete:
+                            try:
+                                await complete_payment(payment_id_to_complete)
+                                logger.info(f"[CHECK STATUS] Payment completed: {payment_id_to_complete}")
+                            except Exception as e:
+                                logger.error(f"[CHECK STATUS] Error completing payment: {e}")
                     
                     # Update in the appropriate collection
                     await db.momo_payments.update_one(
-                        {"id": payment_id},
+                        {"$or": [{"id": payment_id}, {"reference": payment_id}]},
                         {"$set": update_data}
                     )
                     await db.hubtel_payments.update_one(
@@ -145,6 +150,7 @@ async def check_and_update_payment_status(payment_id: str):
                     )
                     
                     current_status = new_status
+                    logger.info(f"[CHECK STATUS] Status updated to: {new_status}")
     
     # Prepare user-friendly message
     status_messages = {

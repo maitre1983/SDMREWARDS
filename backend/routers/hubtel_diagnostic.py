@@ -13,6 +13,11 @@ from services.hubtel_diagnostic_service import get_diagnostic_service
 
 router = APIRouter(prefix="/hubtel-diagnostic", tags=["Hubtel Diagnostics"])
 
+# Get db from server module
+def get_db():
+    from server import db
+    return db
+
 
 class MoMoTestRequest(BaseModel):
     phone: str
@@ -179,6 +184,50 @@ async def test_bank_disbursement(
             "status_401": "Invalid API credentials",
             "status_403": "IP not whitelisted or disbursement not enabled",
             "next_steps": "Share this response with Hubtel support for diagnosis"
+        }
+    }
+
+
+class StatusCheckRequest(BaseModel):
+    transaction_id: Optional[str] = None
+    client_reference: Optional[str] = None
+
+
+@router.post("/check-transaction-status")
+async def check_transaction_status_diagnostic(
+    request: StatusCheckRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Check transaction status directly with Hubtel API.
+    
+    Provide either transaction_id or client_reference to check status.
+    Uses: https://api-txnstatus.hubtel.com/transactions/{TransactionId}/status
+    """
+    if not request.transaction_id and not request.client_reference:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either transaction_id or client_reference"
+        )
+    
+    from services.hubtel_momo_service import get_hubtel_momo_service
+    
+    db = get_db()
+    hubtel_service = get_hubtel_momo_service(db)
+    
+    result = await hubtel_service.query_hubtel_transaction_status(
+        client_reference=request.client_reference,
+        transaction_id=request.transaction_id
+    )
+    
+    return {
+        "success": result.get("success", False),
+        "result": result,
+        "help": {
+            "completed": "Transaction was successful - cashback should be credited",
+            "processing": "Transaction is still being processed by Hubtel",
+            "failed": "Transaction failed or was declined",
+            "unknown": "Could not determine status - may need to wait or check with Hubtel"
         }
     }
 

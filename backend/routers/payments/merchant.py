@@ -132,6 +132,8 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
                     "status": "processing",
                     "provider": "hubtel",
                     "provider_reference": result.get("transaction_id"),
+                    "hubtel_transaction_id": result.get("transaction_id"),
+                    "client_reference": payment_ref,
                     "provider_message": result.get("message"),
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }
@@ -142,6 +144,7 @@ async def initiate_merchant_payment(request: MerchantPaymentRequest):
             "success": True,
             "payment_id": payment_record["id"],
             "reference": payment_ref,
+            "hubtel_transaction_id": result.get("transaction_id"),
             "amount": request.amount,
             "merchant": merchant["business_name"],
             "expected_cashback": expected_cashback,
