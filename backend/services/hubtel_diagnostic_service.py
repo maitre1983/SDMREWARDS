@@ -159,6 +159,90 @@ class HubtelDiagnosticService:
             diagnostics["error_type"] = type(e).__name__
             return diagnostics
     
+    async def test_momo_collection(self, phone: str, amount: float = 1.0) -> Dict:
+        """
+        Test MoMo collection (Receive Money) with detailed diagnostics
+        This tests if the account can COLLECT payments from customers
+        
+        ⚠️ This will send a payment prompt to the phone number!
+        """
+        # Get POS Sales ID for collection
+        pos_sales_id = os.environ.get("HUBTEL_POS_SALES_ID", "")
+        
+        # Normalize phone
+        if phone.startswith("0"):
+            phone = "233" + phone[1:]
+        elif not phone.startswith("233"):
+            phone = "233" + phone
+        
+        # Detect network
+        prefix = phone[3:5] if len(phone) >= 5 else ""
+        if prefix in ["24", "25", "53", "54", "55", "59"]:
+            channel = "mtn-gh"
+        elif prefix in ["20", "50"]:
+            channel = "vodafone-gh"
+        else:
+            channel = "tigo-gh"
+        
+        url = f"https://rmp.hubtel.com/merchantaccount/merchants/{pos_sales_id}/receive/mobilemoney"
+        
+        payload = {
+            "CustomerMsisdn": phone,
+            "Amount": amount,
+            "Channel": channel,
+            "Description": f"SDM Diagnostic Collection Test - {datetime.now().strftime('%H:%M:%S')}",
+            "ClientReference": f"DIAG-COL-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "PrimaryCallbackUrl": f"{CALLBACK_BASE_URL}/api/payments/hubtel/callback"
+        }
+        
+        diagnostics = {
+            "test_type": "MoMo Collection (Receive Money)",
+            "url": url,
+            "method": "POST",
+            "payload": payload,
+            "pos_sales_id": pos_sales_id,
+            "proxy_used": bool(self.proxy_url),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        try:
+            async with httpx.AsyncClient(
+                proxy=self.proxy_url if self.proxy_url else None,
+                timeout=30.0
+            ) as client:
+                response = await client.post(
+                    url,
+                    headers={
+                        "Authorization": self._get_auth_header(),
+                        "Content-Type": "application/json"
+                    },
+                    json=payload
+                )
+                
+                diagnostics["response"] = {
+                    "status_code": response.status_code,
+                    "headers": dict(response.headers),
+                    "body": self._safe_parse_json(response.text),
+                    "raw_body": response.text
+                }
+                
+                # Analyze response
+                analysis = self._analyze_response(response.status_code, response.text)
+                
+                # Add collection-specific analysis
+                if response.status_code == 403:
+                    analysis["issue"] = "Collection API access denied. POS Sales ID may not be enabled for Receive Money or IP not whitelisted."
+                    analysis["recommendation"] = f"Contact Hubtel to enable Receive Money for POS Sales ID: {pos_sales_id} and whitelist IP: 52.5.155.132"
+                
+                diagnostics["analysis"] = analysis
+                
+                return diagnostics
+                
+        except Exception as e:
+            diagnostics["error"] = str(e)
+            diagnostics["error_type"] = type(e).__name__
+            return diagnostics
+
     async def test_bank_disbursement(self, account_number: str, bank_code: str, 
                                       account_name: str, amount: float = 1.0) -> Dict:
         """

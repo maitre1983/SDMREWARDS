@@ -102,6 +102,42 @@ async def test_momo_disbursement(
     }
 
 
+@router.post("/test-collection")
+async def test_momo_collection(
+    request: MoMoTestRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Test MoMo COLLECTION (Receive Money from Customer) with detailed diagnostics
+    
+    ⚠️ WARNING: This will send a REAL payment prompt to the phone!
+    Use minimum amount (GHS 1) for testing.
+    
+    This tests if your account can COLLECT payments from customers.
+    If this fails with 403, your POS Sales ID is not enabled for collection.
+    """
+    if request.amount > 5:
+        raise HTTPException(
+            status_code=400, 
+            detail="Test amount should be <= GHS 5 to avoid accidental large charges"
+        )
+    
+    service = get_diagnostic_service()
+    result = await service.test_momo_collection(request.phone, request.amount)
+    
+    return {
+        "success": result.get("response", {}).get("status_code") == 200,
+        "diagnostics": result,
+        "help": {
+            "status_200": "Payment prompt sent successfully to customer's phone",
+            "status_400": "Invalid request parameters",
+            "status_401": "Invalid API credentials",
+            "status_403": "Collection not enabled for this POS Sales ID or IP not whitelisted",
+            "next_steps_if_403": "Contact Hubtel to enable Receive Money for your POS Sales ID and whitelist IP: 52.5.155.132"
+        }
+    }
+
+
 @router.post("/test-bank")
 async def test_bank_disbursement(
     request: BankTestRequest,

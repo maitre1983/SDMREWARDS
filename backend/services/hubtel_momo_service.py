@@ -259,6 +259,15 @@ class HubtelMoMoService:
         
         url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/receive/mobilemoney"
         
+        # DETAILED LOGGING
+        print("=" * 70)
+        print("🔵 [MOMO COLLECT] COLLECTION REQUEST (Customer → Merchant)")
+        print("=" * 70)
+        print(f"📍 URL: {url}")
+        print(f"📦 PAYLOAD: {json.dumps(payload, indent=2)}")
+        print(f"🔒 POS Sales ID: {self.pos_sales_id}")
+        print(f"🔒 Using Proxy: {'Yes' if FIXIE_PROXY_URL else 'No'}")
+        
         # Import required modules
         import subprocess
         import json as json_module
@@ -268,14 +277,21 @@ class HubtelMoMoService:
         payload_json = json_module.dumps(payload)
         
         async def _make_request_via_httpx():
-            """Fallback method using httpx if curl fails."""
+            """Fallback method using httpx with proxy if curl fails."""
             import httpx
             
+            # Use Fixie proxy for static IP (CRITICAL for production)
+            proxy = FIXIE_PROXY_URL if FIXIE_PROXY_URL else None
+            
             async with httpx.AsyncClient(
+                proxy=proxy,
                 timeout=30.0,
                 http2=False,
                 verify=True
             ) as client:
+                logger.info(f"🔵 [MOMO COLLECT] httpx request to: {url}")
+                logger.info(f"🔵 [MOMO COLLECT] Using proxy: {'Yes - ' + proxy[:20] + '...' if proxy else 'No'}")
+                
                 response = await client.post(
                     url,
                     headers={
@@ -285,6 +301,10 @@ class HubtelMoMoService:
                     },
                     json=payload
                 )
+                
+                logger.info(f"🔵 [MOMO COLLECT] Response status: {response.status_code}")
+                logger.info(f"🔵 [MOMO COLLECT] Response body: {response.text[:500]}")
+                
                 return {
                     "body": response.text,
                     "http_code": response.status_code,
@@ -418,13 +438,24 @@ class HubtelMoMoService:
             else:
                 error_msg = result.get("Message", result.get("message", f"Collection failed: {response_status_code}"))
                 
+                # Enhanced error handling for 403
+                if response_status_code == 403:
+                    error_msg = "Collection API access denied (403). IP may not be whitelisted or account not enabled for Receive Money."
+                    print(f"🔴 [MOMO COLLECT] 403 FORBIDDEN - Check Hubtel account configuration")
+                    print(f"🔴 [MOMO COLLECT] POS Sales ID: {self.pos_sales_id}")
+                    print(f"🔴 [MOMO COLLECT] Static IP should be: 52.5.155.132 (Fixie)")
+                
+                print(f"🔴 [MOMO COLLECT] FAILED - HTTP {response_status_code}")
+                print(f"🔴 [MOMO COLLECT] Error: {error_msg}")
+                print(f"🔴 [MOMO COLLECT] Full response: {result}")
+                
                 if self.db is not None:
                     await self.db.hubtel_payments.update_one(
                         {"client_reference": client_reference},
                         {"$set": {"status": "failed", "error": error_msg, "hubtel_response": result}}
                     )
                 
-                return {"success": False, "error": error_msg}
+                return {"success": False, "error": error_msg, "http_status": response_status_code}
                     
         except Exception as e:
             error_str = str(e)
