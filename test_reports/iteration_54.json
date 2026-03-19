@@ -1,0 +1,95 @@
+{
+  "summary": "Callback performance optimization fully verified. Hubtel callback endpoint responds in ~0.2 seconds (well under 1s requirement). All 13 tests passed: callback response time, callback logging to database, background async processing, admin callback-logs endpoint, admin payment-debug endpoint.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_callback_performance.py",
+    "/app/test_reports/pytest/callback_performance_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "✅ Callback endpoint returns HTTP 200 in ~0.2 seconds (was 19+ seconds before fix)",
+    "✅ BackgroundTasks properly used for async processing after immediate response",
+    "✅ Callbacks logged to callback_logs collection with id, received_at, raw_body, source_ip, processed flag",
+    "✅ Background process_callback_async correctly processes payment and calls complete_payment",
+    "✅ Admin callback-logs endpoint returns all logged callbacks with proper authentication",
+    "✅ Admin payment-debug endpoint provides comprehensive diagnosis across momo_payments, hubtel_payments, transactions, and callback_logs collections",
+    "✅ Error handling properly logs errors in callback record when payment not found"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_callback_performance.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 13/13 tests passed",
+    "frontend": "Not tested (backend only testing requested)"
+  },
+  "test_credentials": {
+    "admin_secret": "sdm-admin-2026"
+  },
+  "seed_data_creation": "Test callbacks created during tests are logged to callback_logs collection with TEST-* prefixes",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Callback performance optimization verified. Hubtel callback endpoint at POST /api/payments/hubtel/callback now responds in ~0.2s using FastAPI BackgroundTasks. Admin endpoints: GET /api/payments/admin/callback-logs?admin_secret=sdm-admin-2026 and GET /api/payments/admin/payment-debug/{ref}?admin_secret=sdm-admin-2026",
+  "endpoints_tested": {
+    "POST /api/payments/hubtel/callback": {
+      "status": "PASS",
+      "response_time": "~0.2 seconds (avg)",
+      "notes": "Returns immediately with HTTP 200 and processes in background",
+      "tested_scenarios": [
+        "Response time < 1 second verified",
+        "Multiple concurrent calls respond quickly",
+        "Callback logged to callback_logs collection",
+        "Background processing marks callback as processed"
+      ]
+    },
+    "GET /api/payments/admin/callback-logs": {
+      "status": "PASS",
+      "notes": "Returns logged callbacks with full details including source_ip",
+      "tested_scenarios": [
+        "Returns logs with proper structure",
+        "Requires admin_secret authentication",
+        "Limit parameter works correctly"
+      ]
+    },
+    "GET /api/payments/admin/payment-debug/{ref}": {
+      "status": "PASS",
+      "notes": "Provides comprehensive diagnosis across all payment collections",
+      "tested_scenarios": [
+        "Returns momo_payment, hubtel_payment, transaction, callback_logs",
+        "Provides human-readable diagnosis",
+        "Requires admin_secret authentication",
+        "Shows callback logs for the reference"
+      ]
+    },
+    "GET /api/payments/debug/callback-test": {
+      "status": "PASS",
+      "notes": "Debug endpoint to verify callback endpoint reachability"
+    }
+  },
+  "performance_metrics": {
+    "callback_response_time_before_fix": "19+ seconds",
+    "callback_response_time_after_fix": "~0.2 seconds",
+    "improvement": "95%+ reduction in response time",
+    "requirement": "< 1 second",
+    "status": "PASS"
+  },
+  "features_verified": [
+    "Callback endpoint response time < 1 second (was 19+ seconds)",
+    "Callback is logged to callback_logs collection immediately",
+    "Background processing runs after immediate response",
+    "complete_payment is triggered for successful callbacks",
+    "Admin callback-logs endpoint returns logged callbacks",
+    "Admin payment-debug endpoint shows correct diagnosis"
+  ],
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}
