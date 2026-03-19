@@ -598,3 +598,164 @@ async def hubtel_payment_callback(request: Request):
         import traceback
         logger.error(f"❌ [HUBTEL CALLBACK] Traceback: {traceback.format_exc()}")
         return {"ResponseCode": "0001", "Message": str(e)}
+
+
+
+# ========== ADMIN/DIAGNOSTIC ENDPOINTS ==========
+
+@router.post("/admin/force-complete/{payment_ref}")
+async def admin_force_complete_payment(payment_ref: str, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: Force complete a payment when Hubtel callback didn't arrive.
+    
+    This is a WORKAROUND for when:
+    - Customer approved the payment on their phone
+    - But Hubtel callback didn't reach our server
+    - Or the callback was processed but something went wrong
+    
+    Requires admin_secret for basic security (should match env ADMIN_SECRET).
+    
+    Usage: POST /api/payments/admin/force-complete/{payment_reference}?admin_secret=YOUR_SECRET
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        logger.warning(f"[ADMIN] Force complete attempt with invalid secret for {payment_ref}")
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    logger.info(f"🔧 [ADMIN] Force completing payment: {payment_ref}")
+    
+    # Find payment in momo_payments
+    payment = await db.momo_payments.find_one(
+        {"$or": [
+            {"id": payment_ref},
+            {"reference": payment_ref},
+            {"client_reference": payment_ref}
+        ]},
+        {"_id": 0}
+    )
+    
+    if not payment:
+        # Try hubtel_payments
+        hubtel_payment = await db.hubtel_payments.find_one(
+            {"$or": [
+                {"id": payment_ref},
+                {"client_reference": payment_ref}
+            ]},
+            {"_id": 0}
+        )
+        if hubtel_payment:
+            # Find corresponding momo_payment
+            client_ref = hubtel_payment.get("client_reference")
+            payment = await db.momo_payments.find_one(
+                {"$or": [{"reference": client_ref}, {"client_reference": client_ref}]},
+                {"_id": 0}
+            )
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail=f"Payment not found: {payment_ref}")
+    
+    payment_id = payment.get("id")
+    current_status = payment.get("status")
+    
+    logger.info(f"🔧 [ADMIN] Found payment {payment_id} with status: {current_status}")
+    
+    # Check if already completed
+    if current_status in ["success", "completed"]:
+        # Check if transaction exists
+        existing_txn = await db.transactions.find_one(
+            {"payment_reference": payment.get("reference")},
+            {"_id": 0, "id": 1}
+        )
+        if existing_txn:
+            return {
+                "success": True,
+                "message": "Payment was already completed",
+                "status": "completed",
+                "transaction_id": existing_txn.get("id")
+            }
+    
+    # Force complete the payment
+    from .processing import complete_payment
+    
+    try:
+        await complete_payment(payment_id)
+        logger.info(f"✅ [ADMIN] Force completed payment {payment_id}")
+        
+        # Verify transaction was created
+        txn = await db.transactions.find_one(
+            {"payment_reference": payment.get("reference")},
+            {"_id": 0, "id": 1}
+        )
+        
+        return {
+            "success": True,
+            "message": "Payment force completed successfully",
+            "status": "completed",
+            "payment_id": payment_id,
+            "transaction_id": txn.get("id") if txn else None
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [ADMIN] Error force completing: {e}")
+        raise HTTPException(status_code=500, detail=f"Error completing payment: {str(e)}")
+
+
+@router.get("/admin/pending-payments")
+async def admin_list_pending_payments(limit: int = 20, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: List pending payments that haven't been confirmed.
+    Useful for identifying payments that need manual intervention.
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    # Find pending payments
+    pending_payments = []
+    
+    cursor = db.momo_payments.find(
+        {"status": {"$in": ["pending", "processing", "prompt_sent"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit)
+    
+    async for payment in cursor:
+        pending_payments.append({
+            "id": payment.get("id"),
+            "reference": payment.get("reference"),
+            "amount": payment.get("amount"),
+            "status": payment.get("status"),
+            "created_at": payment.get("created_at"),
+            "type": payment.get("type"),
+            "client_id": payment.get("client_id")
+        })
+    
+    return {
+        "success": True,
+        "count": len(pending_payments),
+        "payments": pending_payments
+    }
+
+
+@router.get("/debug/callback-test")
+async def debug_callback_test():
+    """
+    Debug endpoint to test if callbacks can reach this server.
+    Call this from external services to verify connectivity.
+    """
+    return {
+        "success": True,
+        "message": "Callback endpoint is reachable",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "endpoints": {
+            "hubtel_callback": "/api/payments/hubtel/callback",
+            "generic_callback": "/api/payments/callback"
+        }
+    }

@@ -828,32 +828,67 @@ class HubtelMoMoService:
                         "data": momo_payment
                     }
         
-        # STEP 2: Try Hubtel API (often returns 403, but worth trying)
+        # STEP 2: Try Hubtel API - use the transaction status endpoint
         if not self.is_configured():
             logger.warning("🔍 [STATUS CHECK] Hubtel not configured, returning DB status")
             return {"success": False, "error": "Hubtel not configured", "status": "unknown"}
         
-        search_ref = transaction_id or client_reference
-        if not search_ref:
+        if not transaction_id and not client_reference:
             logger.warning("🔴 [STATUS CHECK] No reference available for status check")
             return {"success": False, "error": "Transaction reference not available", "status": "unknown"}
         
-        # Try the transactions endpoint
+        # Try the transaction detail endpoint first (more reliable than list)
+        # Format: GET /merchantaccount/merchants/{pos_sales_id}/transactions/{transaction_id}
+        if transaction_id:
+            url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/transactions/{transaction_id}"
+            logger.info(f"🔍 [STATUS CHECK] Querying Hubtel transaction detail: {url}")
+            
+            try:
+                async with httpx.AsyncClient(
+                    proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None,
+                    timeout=30.0
+                ) as http_client:
+                    response = await http_client.get(
+                        url,
+                        headers={
+                            "Authorization": self._get_auth_header(),
+                            "Content-Type": "application/json"
+                        }
+                    )
+                    
+                    logger.info(f"🔍 [STATUS CHECK] Hubtel transaction detail response: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            return self._parse_hubtel_status_response(data, client_reference, transaction_id)
+                        except Exception as e:
+                            logger.error(f"🔴 [STATUS CHECK] Parse error: {e}")
+            except Exception as e:
+                logger.error(f"🔴 [STATUS CHECK] Transaction detail error: {e}")
+        
+        # Fallback: Try the transactions list endpoint with clientReference filter
         url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/transactions"
-        logger.info(f"🔍 [STATUS CHECK] Querying Hubtel API: {url}")
+        logger.info(f"🔍 [STATUS CHECK] Querying Hubtel transactions list: {url}")
         
         try:
             async with httpx.AsyncClient(
                 proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None,
                 timeout=30.0
             ) as http_client:
+                params = {}
+                if client_reference:
+                    params["clientReference"] = client_reference
+                if transaction_id:
+                    params["transactionId"] = transaction_id
+                
                 response = await http_client.get(
                     url,
                     headers={
                         "Authorization": self._get_auth_header(),
                         "Content-Type": "application/json"
                     },
-                    params={"clientReference": client_reference} if client_reference else {"transactionId": transaction_id}
+                    params=params
                 )
                 
                 logger.info(f"🔍 [STATUS CHECK] Hubtel response: {response.status_code}")
@@ -872,61 +907,7 @@ class HubtelMoMoService:
                 if response.status_code == 200:
                     try:
                         data = response.json()
-                        
-                        # Parse Hubtel status
-                        hubtel_status = (
-                            data.get("Status") or 
-                            data.get("status") or 
-                            data.get("TransactionStatus") or
-                            data.get("Data", {}).get("Status") or
-                            "unknown"
-                        )
-                        response_code = data.get("ResponseCode", data.get("Code", ""))
-                        
-                        if response_code == "0000":
-                            hubtel_status = "completed"
-                        
-                        # Map to our status
-                        status_map = {
-                            "success": "completed", "successful": "completed", "completed": "completed",
-                            "paid": "completed", "approved": "completed",
-                            "failed": "failed", "rejected": "failed", "declined": "failed",
-                            "cancelled": "failed", "expired": "failed",
-                            "pending": "processing", "processing": "processing", "awaiting": "processing"
-                        }
-                        
-                        status_lower = hubtel_status.lower() if isinstance(hubtel_status, str) else "unknown"
-                        mapped_status = status_map.get(status_lower, status_lower)
-                        
-                        logger.info(f"🔍 [STATUS CHECK] Hubtel status: {hubtel_status} -> {mapped_status}")
-                        
-                        # Update our database if completed
-                        if mapped_status == "completed" and self.db is not None:
-                            update_data = {
-                                "status": "completed",
-                                "completed_at": datetime.now(timezone.utc).isoformat(),
-                                "hubtel_status_response": data
-                            }
-                            
-                            if client_reference:
-                                await self.db.hubtel_payments.update_one(
-                                    {"client_reference": client_reference},
-                                    {"$set": update_data}
-                                )
-                                await self.db.momo_payments.update_one(
-                                    {"$or": [{"reference": client_reference}, {"client_reference": client_reference}]},
-                                    {"$set": update_data}
-                                )
-                        
-                        return {
-                            "success": True,
-                            "status": mapped_status,
-                            "hubtel_status": hubtel_status,
-                            "response_code": response_code,
-                            "transaction_id": transaction_id,
-                            "source": "hubtel_api",
-                            "data": data
-                        }
+                        return self._parse_hubtel_status_response(data, client_reference, transaction_id)
                     except Exception as e:
                         logger.error(f"🔴 [STATUS CHECK] Parse error: {e}")
                         return {"success": False, "error": f"Failed to parse response: {e}", "status": "unknown"}
@@ -943,6 +924,46 @@ class HubtelMoMoService:
         except Exception as e:
             logger.error(f"🔴 [STATUS CHECK] Error: {e}")
             return {"success": False, "error": str(e), "status": "unknown"}
+    
+    def _parse_hubtel_status_response(self, data: Dict, client_reference: str = None, transaction_id: str = None) -> Dict:
+        """Parse Hubtel status response and update database if completed."""
+        # Parse Hubtel status - check multiple possible field names
+        hubtel_status = (
+            data.get("Status") or 
+            data.get("status") or 
+            data.get("TransactionStatus") or
+            data.get("Data", {}).get("Status") or
+            "unknown"
+        )
+        response_code = data.get("ResponseCode", data.get("Code", ""))
+        
+        # ResponseCode 0000 usually means success
+        if response_code == "0000":
+            hubtel_status = "completed"
+        
+        # Map Hubtel status to our status
+        status_map = {
+            "success": "completed", "successful": "completed", "completed": "completed",
+            "paid": "completed", "approved": "completed",
+            "failed": "failed", "rejected": "failed", "declined": "failed",
+            "cancelled": "failed", "expired": "failed",
+            "pending": "processing", "processing": "processing", "awaiting": "processing"
+        }
+        
+        status_lower = hubtel_status.lower() if isinstance(hubtel_status, str) else "unknown"
+        mapped_status = status_map.get(status_lower, status_lower)
+        
+        logger.info(f"🔍 [STATUS CHECK] Hubtel status: {hubtel_status} -> {mapped_status}")
+        
+        return {
+            "success": True,
+            "status": mapped_status,
+            "hubtel_status": hubtel_status,
+            "response_code": response_code,
+            "transaction_id": transaction_id,
+            "source": "hubtel_api",
+            "data": data
+        }
 
 
 # Global service instance
