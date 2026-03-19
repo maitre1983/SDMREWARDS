@@ -757,6 +757,82 @@ class HubtelMoMoService:
             "completed_at": payment.get("completed_at")
         }
 
+    async def query_hubtel_transaction_status(self, client_reference: str) -> Dict:
+        """
+        Query Hubtel API directly for transaction status.
+        Uses the POS Sales ID endpoint for checking collection status.
+        """
+        if not self.is_configured():
+            return {"success": False, "error": "Hubtel not configured"}
+        
+        # Hubtel transaction status endpoint
+        # For collection: GET /merchantaccount/merchants/{posId}/transactions/status?clientReference={ref}
+        url = f"{HUBTEL_RMP_BASE_URL}/{self.pos_sales_id}/transactions/status"
+        
+        print(f"🔍 [STATUS CHECK] Querying Hubtel for transaction: {client_reference}")
+        print(f"🔍 [STATUS CHECK] URL: {url}")
+        
+        try:
+            async with httpx.AsyncClient(
+                proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None,
+                timeout=30.0
+            ) as client:
+                response = await client.get(
+                    url,
+                    headers={
+                        "Authorization": self._get_auth_header(),
+                        "Content-Type": "application/json"
+                    },
+                    params={"clientReference": client_reference}
+                )
+                
+                print(f"🔍 [STATUS CHECK] Response status: {response.status_code}")
+                print(f"🔍 [STATUS CHECK] Response body: {response.text[:500]}")
+                
+                if response.status_code == 200:
+                    try:
+                        data = response.json()
+                        
+                        # Parse Hubtel status
+                        hubtel_status = data.get("Status", data.get("status", "unknown"))
+                        response_code = data.get("ResponseCode", "")
+                        
+                        # Map Hubtel status to our status
+                        status_map = {
+                            "success": "completed",
+                            "successful": "completed",
+                            "completed": "completed",
+                            "paid": "completed",
+                            "failed": "failed",
+                            "rejected": "failed",
+                            "declined": "failed",
+                            "cancelled": "failed",
+                            "pending": "processing",
+                            "processing": "processing"
+                        }
+                        
+                        mapped_status = status_map.get(hubtel_status.lower(), hubtel_status.lower())
+                        
+                        return {
+                            "success": True,
+                            "status": mapped_status,
+                            "hubtel_status": hubtel_status,
+                            "response_code": response_code,
+                            "data": data
+                        }
+                    except Exception as e:
+                        return {"success": False, "error": f"Failed to parse response: {e}"}
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Hubtel returned {response.status_code}",
+                        "status": "unknown"
+                    }
+                    
+        except Exception as e:
+            print(f"🔴 [STATUS CHECK] Error: {e}")
+            return {"success": False, "error": str(e), "status": "unknown"}
+
 
 # Global service instance
 _hubtel_momo_service = None

@@ -34,6 +34,140 @@ async def get_payment_status(payment_id: str):
     }
 
 
+@router.post("/check-status/{payment_id}")
+async def check_and_update_payment_status(payment_id: str):
+    """
+    Check payment status and update from Hubtel if needed.
+    Called when user clicks "I have paid - Check Status"
+    
+    This endpoint:
+    1. Looks up the payment in our database
+    2. If still pending/processing, queries Hubtel for current status
+    3. Updates our database with the latest status
+    4. Returns the current status to the user
+    """
+    db = get_db()
+    
+    logger.info(f"[CHECK STATUS] Looking up payment: {payment_id}")
+    
+    # First check momo_payments collection - search by id, reference, or client_reference
+    payment = await db.momo_payments.find_one(
+        {"$or": [
+            {"id": payment_id},
+            {"reference": payment_id},
+            {"client_reference": payment_id}
+        ]},
+        {"_id": 0}
+    )
+    
+    if payment:
+        logger.info(f"[CHECK STATUS] Found in momo_payments: {payment.get('id')}")
+    
+    # If not found in momo_payments, check hubtel_payments by client_reference
+    if not payment:
+        payment = await db.hubtel_payments.find_one(
+            {"$or": [
+                {"id": payment_id},
+                {"client_reference": payment_id},
+                {"hubtel_transaction_id": payment_id}
+            ]},
+            {"_id": 0}
+        )
+        if payment:
+            logger.info(f"[CHECK STATUS] Found in hubtel_payments: {payment.get('client_reference')}")
+    
+    # Also check transactions collection
+    if not payment:
+        payment = await db.transactions.find_one(
+            {"$or": [
+                {"id": payment_id},
+                {"reference": payment_id},
+                {"payment_reference": payment_id}
+            ]},
+            {"_id": 0}
+        )
+        if payment:
+            logger.info(f"[CHECK STATUS] Found in transactions: {payment.get('id')}")
+    
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found. Please wait a moment and try again.")
+    
+    current_status = payment.get("status", "unknown")
+    
+    # If payment is still pending/processing, try to get updated status from Hubtel
+    if current_status in ["pending", "processing", "prompt_sent"]:
+        # Try to get status from Hubtel using the transaction ID or client reference
+        hubtel_tx_id = payment.get("hubtel_transaction_id") or payment.get("provider_reference")
+        client_ref = payment.get("client_reference") or payment.get("reference")
+        
+        if hubtel_tx_id or client_ref:
+            from services.hubtel_momo_service import get_hubtel_momo_service
+            
+            hubtel_service = get_hubtel_momo_service(db)
+            
+            # Check Hubtel for transaction status
+            status_result = await hubtel_service.query_hubtel_transaction_status(
+                client_reference=client_ref or hubtel_tx_id
+            )
+            
+            if status_result.get("success"):
+                hubtel_status = status_result.get("status", "").lower()
+                
+                # Map Hubtel status to our status
+                if hubtel_status in ["success", "successful", "completed"]:
+                    new_status = "completed"
+                elif hubtel_status in ["failed", "rejected", "declined"]:
+                    new_status = "failed"
+                elif hubtel_status in ["pending", "processing"]:
+                    new_status = "processing"
+                else:
+                    new_status = current_status
+                
+                # Update status if changed
+                if new_status != current_status:
+                    update_data = {
+                        "status": new_status,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "hubtel_status_check": status_result
+                    }
+                    
+                    if new_status == "completed":
+                        update_data["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    
+                    # Update in the appropriate collection
+                    await db.momo_payments.update_one(
+                        {"id": payment_id},
+                        {"$set": update_data}
+                    )
+                    await db.hubtel_payments.update_one(
+                        {"$or": [{"id": payment_id}, {"client_reference": payment_id}]},
+                        {"$set": update_data}
+                    )
+                    
+                    current_status = new_status
+    
+    # Prepare user-friendly message
+    status_messages = {
+        "completed": "Payment confirmed! Cashback has been credited to your account.",
+        "success": "Payment confirmed! Cashback has been credited to your account.",
+        "failed": "Payment failed or was declined. Please try again.",
+        "pending": "Payment is pending. Please complete the MoMo prompt on your phone.",
+        "processing": "Payment is being processed. Please wait a moment.",
+        "prompt_sent": "MoMo prompt sent. Please approve the payment on your phone."
+    }
+    
+    return {
+        "success": True,
+        "payment_id": payment_id,
+        "status": current_status,
+        "message": status_messages.get(current_status, f"Payment status: {current_status}"),
+        "amount": payment.get("amount"),
+        "merchant": payment.get("merchant_name") or payment.get("description", ""),
+        "created_at": payment.get("created_at"),
+        "completed_at": payment.get("completed_at")
+    }
+
+
 @router.get("/cash/status")
 async def check_cash_payment_status(client_phone: str, merchant_id: str):
     """
