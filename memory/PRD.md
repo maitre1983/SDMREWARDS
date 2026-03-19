@@ -39,7 +39,29 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-19 (Current Session) - PAYMENT CONFIRMATION FIX
+### 2026-03-19 (Current Session) - PAYMENT CALLBACK OPTIMIZATION
+- ✅ **Critical Callback Performance Fix** - Redesigned endpoint to return immediately
+  - **Problem:** Callback endpoint took 19+ seconds to respond, causing Hubtel webhooks to timeout
+  - **Solution:** Implemented FastAPI BackgroundTasks for async processing
+  - **New Flow:**
+    1. Receive callback from Hubtel
+    2. Log minimal data to `callback_logs` collection
+    3. Return HTTP 200 immediately (< 500ms)
+    4. Process payment in background (payment lookup, status update, cashback)
+  - **Performance:**
+    - Before: 19.6 seconds response time
+    - After: ~0.2 seconds response time (95%+ improvement)
+  - **Files Modified:**
+    - `/app/backend/routers/payments/callbacks.py` - Added `process_callback_async()` background function
+  - **Testing:** 13/13 tests passed
+
+- ✅ **Admin Diagnostic Endpoints** - For production debugging
+  - `GET /api/payments/admin/callback-logs` - View ALL callbacks that reached server
+  - `GET /api/payments/admin/payment-debug/{ref}` - Comprehensive payment diagnosis
+  - `GET /api/payments/admin/pending-payments` - List payments waiting for confirmation
+  - `POST /api/payments/admin/force-complete/{ref}` - Emergency manual completion (backup only)
+
+### 2026-03-19 (Earlier) - PAYMENT CONFIRMATION FIX
 - ✅ **Critical Payment Confirmation Bug Fixed** - Complete overhaul of payment confirmation system
   - **Root Cause:** Multiple issues causing payments to be approved by MoMo but not confirmed in the system:
     1. Hubtel status check API returning 403 Forbidden (IP whitelisting issue)
