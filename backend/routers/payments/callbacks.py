@@ -5,8 +5,9 @@ Handles payment status checks and Hubtel callbacks
 """
 
 from fastapi import APIRouter, HTTPException, Request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
+import uuid
 
 from .shared import get_db, logger
 
@@ -481,7 +482,20 @@ async def hubtel_payment_callback(request: Request):
     
     try:
         body = await request.json()
-        logger.info(f"🔔 [HUBTEL CALLBACK] Received: {body}")
+        
+        # STEP 0: Log ALL callbacks to database for debugging (CRITICAL for production debugging)
+        callback_log = {
+            "id": str(uuid.uuid4()),
+            "received_at": datetime.now(timezone.utc).isoformat(),
+            "raw_body": body,
+            "source_ip": request.client.host if request.client else "unknown",
+            "headers": dict(request.headers),
+            "processed": False,
+            "error": None
+        }
+        await db.callback_logs.insert_one(callback_log)
+        logger.info(f"🔔 [HUBTEL CALLBACK] === CALLBACK RECEIVED === ID: {callback_log['id']}")
+        logger.info(f"🔔 [HUBTEL CALLBACK] Raw body: {body}")
         
         # Hubtel format - can be nested in "Data" or flat
         data = body.get("Data", body)
@@ -492,18 +506,34 @@ async def hubtel_payment_callback(request: Request):
         
         if not client_reference:
             logger.warning("🔔 [HUBTEL CALLBACK] Missing ClientReference")
+            await db.callback_logs.update_one(
+                {"id": callback_log["id"]},
+                {"$set": {"error": "Missing ClientReference", "processed": True}}
+            )
             return {"ResponseCode": "0001", "Message": "Missing ClientReference"}
         
-        logger.info(f"🔔 [HUBTEL CALLBACK] Processing - ref: {client_reference}, status: {status}, amount: {amount}")
+        logger.info(f"🔔 [HUBTEL CALLBACK] Processing - ref: {client_reference}, status: {status}, amount: {amount}, tx_id: {transaction_id}")
+        
+        # IMPROVED: Search with multiple reference patterns
+        # The reference might be stored differently in momo_payments vs what Hubtel sends
+        search_patterns = [
+            {"reference": client_reference},
+            {"client_reference": client_reference},
+            {"reference": {"$regex": client_reference.replace("SDM-", ""), "$options": "i"}},
+        ]
+        
+        # Also search by partial match if it's an SDM reference
+        if client_reference.startswith("SDM-"):
+            short_ref = client_reference.split("-")[-1]  # Get last part after SDM-
+            search_patterns.append({"reference": {"$regex": short_ref, "$options": "i"}})
         
         # Find payment in momo_payments (primary collection)
-        payment = await db.momo_payments.find_one(
-            {"$or": [
-                {"reference": client_reference}, 
-                {"client_reference": client_reference}
-            ]},
-            {"_id": 0}
-        )
+        payment = None
+        for pattern in search_patterns:
+            payment = await db.momo_payments.find_one(pattern, {"_id": 0})
+            if payment:
+                logger.info(f"🔔 [HUBTEL CALLBACK] Found payment with pattern: {pattern}")
+                break
         
         if not payment:
             # Try hubtel_payments as fallback
@@ -512,9 +542,8 @@ async def hubtel_payment_callback(request: Request):
                 {"_id": 0}
             )
             if hubtel_payment:
-                logger.info("🔔 [HUBTEL CALLBACK] Found in hubtel_payments, looking for momo_payment")
-                # The hubtel_payment exists but we need the momo_payment to complete
-                # Update hubtel_payments status first
+                logger.info("🔔 [HUBTEL CALLBACK] Found in hubtel_payments, updating status")
+                # Update hubtel_payments status
                 await db.hubtel_payments.update_one(
                     {"client_reference": client_reference},
                     {"$set": {
@@ -526,16 +555,50 @@ async def hubtel_payment_callback(request: Request):
                         "updated_at": datetime.now(timezone.utc).isoformat()
                     }}
                 )
+                
+                # Try to find momo_payment by searching recent pending payments
+                recent_pending = await db.momo_payments.find_one(
+                    {
+                        "status": {"$in": ["pending", "processing", "prompt_sent"]},
+                        "amount": amount,
+                        "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()}
+                    },
+                    {"_id": 0},
+                    sort=[("created_at", -1)]
+                )
+                if recent_pending:
+                    logger.info(f"🔔 [HUBTEL CALLBACK] Found recent pending payment: {recent_pending.get('id')}")
+                    payment = recent_pending
             
-            logger.warning(f"🔔 [HUBTEL CALLBACK] Payment not found in momo_payments for ref: {client_reference}")
-            return {"ResponseCode": "0001", "Message": "Payment not found"}
+            if not payment:
+                logger.warning(f"🔔 [HUBTEL CALLBACK] Payment not found for ref: {client_reference}")
+                await db.callback_logs.update_one(
+                    {"id": callback_log["id"]},
+                    {"$set": {
+                        "error": f"Payment not found for ref: {client_reference}",
+                        "processed": True,
+                        "client_reference": client_reference,
+                        "status": status
+                    }}
+                )
+                return {"ResponseCode": "0001", "Message": "Payment not found"}
         
         payment_id = payment.get("id")
         logger.info(f"🔔 [HUBTEL CALLBACK] Found payment: {payment_id}")
         
+        # Update callback log with payment info
+        await db.callback_logs.update_one(
+            {"id": callback_log["id"]},
+            {"$set": {
+                "payment_id": payment_id,
+                "client_reference": client_reference,
+                "status": status
+            }}
+        )
+        
         # Update hubtel_payments collection
         await db.hubtel_payments.update_one(
-            {"client_reference": client_reference},
+            {"client_reference": payment.get("reference") or payment.get("client_reference") or client_reference},
             {"$set": {
                 "status": "completed" if status in ["success", "successful", "completed", "paid"] else status,
                 "hubtel_transaction_id": transaction_id,
@@ -543,7 +606,14 @@ async def hubtel_payment_callback(request: Request):
                 "callback_data": body,
                 "completed_at": datetime.now(timezone.utc).isoformat() if status in ["success", "successful", "completed", "paid"] else None,
                 "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
+            }},
+            upsert=True
+        )
+        
+        # Mark callback log as processed
+        await db.callback_logs.update_one(
+            {"id": callback_log["id"]},
+            {"$set": {"processed": True}}
         )
         
         if status in ["success", "successful", "completed", "paid"]:
@@ -759,3 +829,137 @@ async def debug_callback_test():
             "generic_callback": "/api/payments/callback"
         }
     }
+
+
+
+@router.get("/admin/callback-logs")
+async def admin_view_callback_logs(limit: int = 50, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: View all callback logs received.
+    This is CRITICAL for debugging callback delivery issues.
+    Shows ALL callbacks that reached the server, even if payment wasn't found.
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    # Get recent callback logs
+    logs = []
+    cursor = db.callback_logs.find({}, {"_id": 0}).sort("received_at", -1).limit(limit)
+    
+    async for log in cursor:
+        logs.append(log)
+    
+    return {
+        "success": True,
+        "count": len(logs),
+        "logs": logs,
+        "message": "If callbacks are missing here, Hubtel is NOT sending them"
+    }
+
+
+@router.get("/admin/payment-debug/{payment_ref}")
+async def admin_debug_payment(payment_ref: str, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: Debug a specific payment - shows all related data across collections.
+    Helps identify why a payment isn't completing.
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    result = {
+        "payment_ref": payment_ref,
+        "momo_payment": None,
+        "hubtel_payment": None,
+        "transaction": None,
+        "callback_logs": [],
+        "diagnosis": []
+    }
+    
+    # Check momo_payments
+    momo_payment = await db.momo_payments.find_one(
+        {"$or": [
+            {"id": payment_ref},
+            {"reference": payment_ref},
+            {"client_reference": payment_ref},
+            {"reference": {"$regex": payment_ref, "$options": "i"}}
+        ]},
+        {"_id": 0}
+    )
+    result["momo_payment"] = momo_payment
+    
+    # Check hubtel_payments
+    search_ref = payment_ref
+    if momo_payment:
+        search_ref = momo_payment.get("reference", payment_ref)
+    
+    hubtel_payment = await db.hubtel_payments.find_one(
+        {"$or": [
+            {"client_reference": search_ref},
+            {"client_reference": payment_ref},
+            {"id": payment_ref}
+        ]},
+        {"_id": 0}
+    )
+    result["hubtel_payment"] = hubtel_payment
+    
+    # Check transaction
+    if momo_payment:
+        transaction = await db.transactions.find_one(
+            {"payment_reference": momo_payment.get("reference")},
+            {"_id": 0}
+        )
+        result["transaction"] = transaction
+    
+    # Check callback logs for this reference
+    callback_logs = []
+    cursor = db.callback_logs.find(
+        {"$or": [
+            {"client_reference": payment_ref},
+            {"client_reference": search_ref},
+            {"raw_body.ClientReference": payment_ref},
+            {"raw_body.ClientReference": search_ref},
+            {"raw_body.Data.ClientReference": payment_ref},
+            {"raw_body.Data.ClientReference": search_ref}
+        ]},
+        {"_id": 0}
+    ).sort("received_at", -1).limit(10)
+    
+    async for log in cursor:
+        callback_logs.append(log)
+    result["callback_logs"] = callback_logs
+    
+    # Generate diagnosis
+    if not momo_payment:
+        result["diagnosis"].append("❌ No momo_payment record found - payment may not have been initiated")
+    else:
+        result["diagnosis"].append(f"✅ momo_payment found: status={momo_payment.get('status')}")
+        
+    if not hubtel_payment:
+        result["diagnosis"].append("❌ No hubtel_payment record - Hubtel API may not have been called")
+    else:
+        result["diagnosis"].append(f"✅ hubtel_payment found: status={hubtel_payment.get('status')}, callback_received={hubtel_payment.get('callback_received')}")
+        
+    if not callback_logs:
+        result["diagnosis"].append("❌ No callback logs found - Hubtel callback may not have reached the server")
+    else:
+        result["diagnosis"].append(f"✅ Found {len(callback_logs)} callback log(s)")
+        
+    if momo_payment and not result["transaction"]:
+        if momo_payment.get("status") in ["success", "completed"]:
+            result["diagnosis"].append("⚠️ Payment marked success but NO transaction record - complete_payment may have failed")
+        else:
+            result["diagnosis"].append(f"ℹ️ No transaction yet - payment status: {momo_payment.get('status')}")
+    elif result["transaction"]:
+        result["diagnosis"].append("✅ Transaction record exists - payment was fully processed")
+    
+    return result
