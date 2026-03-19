@@ -364,34 +364,38 @@ export default function ClientDashboard() {
   };
   
   const startPolling = (pId) => {
-    // Poll every 3 seconds for payment status
+    // Poll every 3 seconds for payment status using the new endpoint
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/payments/status/${pId}`);
-        if (res.data.status === 'success') {
+        const res = await axios.get(`${API_URL}/api/payments/poll-status/${pId}`);
+        
+        if (res.data.completed || res.data.status === 'completed' || res.data.status === 'success') {
           clearInterval(pollingRef.current);
           setPaymentStatus('success');
-          toast.success('Payment successful! Your card is now active.');
+          toast.success('Payment successful! Cashback credited.');
           setTimeout(() => {
             setShowPaymentModal(false);
             fetchDashboardData();
           }, 2000);
-        } else if (res.data.status === 'failed') {
+        } else if (res.data.failed || res.data.status === 'failed') {
           clearInterval(pollingRef.current);
           setPaymentStatus('failed');
           toast.error('Payment failed. Please try again.');
         }
+        // Otherwise continue polling (should_poll will be true for pending/processing)
       } catch (error) {
         console.error('Polling error:', error);
       }
     }, 3000);
     
-    // Stop polling after 2 minutes
+    // Stop polling after 3 minutes
     setTimeout(() => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
+        // One final check
+        checkPaymentStatus();
       }
-    }, 120000);
+    }, 180000);
   };
   
   const confirmTestPayment = async () => {
@@ -543,8 +547,10 @@ export default function ClientDashboard() {
   const startMerchantPolling = (pId) => {
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await axios.get(`${API_URL}/api/payments/status/${pId}`);
-        if (res.data.status === 'success') {
+        // Use the new poll-status endpoint that queries Hubtel directly
+        const res = await axios.get(`${API_URL}/api/payments/poll-status/${pId}`);
+        
+        if (res.data.completed || res.data.status === 'completed' || res.data.status === 'success') {
           clearInterval(pollingRef.current);
           setMerchantPayStatus('success');
           toast.success('Payment successful! Cashback credited.');
@@ -552,18 +558,25 @@ export default function ClientDashboard() {
             setShowMerchantPayModal(false);
             fetchDashboardData();
           }, 2000);
-        } else if (res.data.status === 'failed') {
+        } else if (res.data.failed || res.data.status === 'failed') {
           clearInterval(pollingRef.current);
           setMerchantPayStatus('failed');
+          toast.error(res.data.message || 'Payment failed');
         }
+        // Continue polling if still pending
       } catch (error) {
         console.error('Polling error:', error);
       }
     }, 3000);
     
+    // Stop polling after 3 minutes
     setTimeout(() => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    }, 120000);
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        // Final check
+        checkMerchantPaymentStatus();
+      }
+    }, 180000);
   };
   
   const confirmMerchantTestPayment = async () => {

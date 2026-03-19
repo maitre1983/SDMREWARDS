@@ -808,6 +808,25 @@ async def send_card_expiration_reminders():
     }
 
 
+# ============== PAYMENT RECONCILIATION TASK ==============
+@app.post("/api/tasks/reconcile-payments")
+async def reconcile_pending_payments_task():
+    """
+    Reconcile pending MoMo payments by checking Hubtel directly.
+    Should be called by cron job every minute to ensure timely reconciliation.
+    """
+    from services.payment_reconciliation_service import get_reconciliation_service
+    
+    reconciliation = get_reconciliation_service(db)
+    result = await reconciliation.reconcile_pending_payments()
+    
+    return {
+        "success": True,
+        "result": result,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)

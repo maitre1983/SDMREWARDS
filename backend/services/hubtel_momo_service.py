@@ -775,7 +775,7 @@ class HubtelMoMoService:
         # We need the transaction_id for the status check
         # If we only have client_reference, try to find transaction_id from our database
         if not transaction_id and client_reference:
-            if self.db:
+            if self.db is not None:
                 payment = await self.db.hubtel_payments.find_one(
                     {"client_reference": client_reference},
                     {"_id": 0, "hubtel_transaction_id": 1}
@@ -854,7 +854,7 @@ class HubtelMoMoService:
                         print(f"🔍 [STATUS CHECK] Hubtel status: {hubtel_status} -> Mapped: {mapped_status}")
                         
                         # If completed, update our database
-                        if mapped_status == "completed" and self.db:
+                        if mapped_status == "completed" and self.db is not None:
                             update_data = {
                                 "status": "completed",
                                 "completed_at": datetime.now(timezone.utc).isoformat(),

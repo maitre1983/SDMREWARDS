@@ -174,6 +174,53 @@ async def check_and_update_payment_status(payment_id: str):
     }
 
 
+@router.get("/poll-status/{payment_id}")
+async def poll_payment_status(payment_id: str):
+    """
+    Lightweight endpoint for automatic status polling.
+    Frontend should call this every 3-5 seconds after payment initiation.
+    
+    This queries Hubtel directly if payment is still pending.
+    No authentication required as payment_id is unique.
+    """
+    db = get_db()
+    
+    from services.payment_reconciliation_service import get_reconciliation_service
+    reconciliation = get_reconciliation_service(db)
+    
+    result = await reconciliation.check_single_payment(payment_id=payment_id)
+    
+    status = result.get("status", "unknown")
+    
+    # Determine if frontend should continue polling
+    should_poll = status in ["pending", "processing", "prompt_sent", "unknown"]
+    
+    return {
+        "success": result.get("success", False),
+        "status": status,
+        "should_poll": should_poll,
+        "completed": status == "completed",
+        "failed": status == "failed",
+        "message": _get_status_message(status),
+        "source": result.get("source", "unknown")
+    }
+
+
+def _get_status_message(status: str) -> str:
+    """Get user-friendly message for status"""
+    messages = {
+        "completed": "Payment successful! Cashback credited.",
+        "success": "Payment successful! Cashback credited.",
+        "failed": "Payment failed. Please try again.",
+        "pending": "Waiting for payment approval...",
+        "processing": "Processing payment...",
+        "prompt_sent": "Please approve on your phone.",
+        "not_found": "Payment not found.",
+        "unknown": "Checking payment status..."
+    }
+    return messages.get(status, f"Status: {status}")
+
+
 @router.get("/cash/status")
 async def check_cash_payment_status(client_phone: str, merchant_id: str):
     """
