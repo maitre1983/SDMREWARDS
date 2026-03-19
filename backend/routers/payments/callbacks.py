@@ -29,9 +29,26 @@ async def process_callback_async(callback_id: str, body: dict):
         # Parse callback data
         data = body.get("Data", body)
         client_reference = data.get("ClientReference") or body.get("ClientReference")
-        status = (data.get("Status") or body.get("Status") or "").lower()
         transaction_id = data.get("TransactionId") or body.get("TransactionId")
         amount = data.get("Amount") or body.get("Amount")
+        
+        # CRITICAL FIX: Hubtel uses ResponseCode to indicate success, not a Status field
+        # ResponseCode "0000" = Success, anything else = failure
+        response_code = body.get("ResponseCode", "")
+        message = body.get("Message", "").lower()
+        
+        # Determine status from ResponseCode or Message
+        if response_code == "0000" or message == "success":
+            status = "success"
+        elif response_code in ["0001", "2001"] or "pending" in message:
+            status = "pending"
+        elif "fail" in message or "decline" in message or "reject" in message:
+            status = "failed"
+        else:
+            # Fallback: check Data.Status if exists
+            status = (data.get("Status") or body.get("Status") or message or "unknown").lower()
+        
+        logger.info(f"🔄 [ASYNC PROCESS] Parsed - ResponseCode={response_code}, Message={message}, Determined status={status}")
         
         if not client_reference:
             logger.warning(f"🔄 [ASYNC PROCESS] No ClientReference in callback {callback_id}")
