@@ -39,7 +39,28 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-18 (Current Session)
+### 2026-03-19 (Current Session) - PAYMENT CONFIRMATION FIX
+- ✅ **Critical Payment Confirmation Bug Fixed** - Complete overhaul of payment confirmation system
+  - **Root Cause:** Multiple issues causing payments to be approved by MoMo but not confirmed in the system:
+    1. Hubtel status check API returning 403 Forbidden (IP whitelisting issue)
+    2. Poll-status endpoint not checking database before calling external API
+    3. Missing error handling for database bool() check on MongoDB objects
+    4. `complete_payment` not being triggered consistently
+  - **Solutions Implemented:**
+    1. Poll-status endpoint now checks `momo_payments` and `hubtel_payments` collections FIRST
+    2. Added fallback logic - if Hubtel API returns 403, rely on database status set by webhooks
+    3. Hubtel callback handler (`/api/payments/hubtel/callback`) enhanced with extensive logging
+    4. `complete_payment` function now has idempotency checks to prevent double-crediting
+    5. Added automatic trigger of `complete_payment` when poll-status finds completed payment
+  - **Files Modified:**
+    - `/app/backend/routers/payments/callbacks.py` - Enhanced poll-status and webhook handling
+    - `/app/backend/routers/payments/processing.py` - Added logging and idempotency checks
+    - `/app/backend/services/hubtel_momo_service.py` - Improved status check with database-first approach
+    - `/app/backend/services/payment_reconciliation_service.py` - Better error handling
+  - **Testing:** 32/32 backend tests passed (test_payment_confirmation_system.py)
+  - **Verified Flow:** MoMo payment → Hubtel → callback → complete_payment → transaction recorded → cashback credited
+
+### 2026-03-18 (Previous Session)
 - ✅ **Client Withdrawal Limits (Global)** - Centralized control system for client withdrawals
   - Backend: `withdrawal_limits_service.py` with `effective_limit = MIN(global_limit, user_limit)`
   - API: `GET/PUT /api/admin/withdrawal-limits` endpoints
@@ -154,6 +175,26 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 | `POST /api/services/cashback/withdraw` | ⚠️ BLOQUÉ | Retrait MoMo (403 en prod) |
 
 ## Technical Notes
+
+### Payment Confirmation Flow (Updated 2026-03-19)
+The payment confirmation now works as follows:
+1. **Initiation:** Client initiates payment → `momo_payments` record created with status "pending"
+2. **MoMo Prompt:** Hubtel sends prompt to customer phone → `hubtel_payments` record created
+3. **Customer Approval:** Customer approves on phone → Hubtel sends callback to `/api/payments/hubtel/callback`
+4. **Callback Processing:** Callback handler triggers `complete_payment()` function
+5. **Transaction Recording:** `complete_payment()` inserts into `transactions` collection
+6. **Cashback Credit:** Client's `cashback_balance` is incremented
+7. **UI Update:** Frontend polling (`/api/payments/poll-status/{id}`) detects completed status
+
+**Key Collections:**
+- `momo_payments` - Primary payment records (created by merchant.py)
+- `hubtel_payments` - Hubtel-specific tracking (created by hubtel_momo_service.py)
+- `transactions` - Completed transactions (shown in Recent Activity)
+
+**Fallback Mechanism:**
+- If Hubtel API returns 403 for status check, system relies on:
+  1. Database status (set by webhook callbacks)
+  2. Frontend polling with 3-minute timeout
 
 ### Solution Curl pour API Hubtel
 La fonction `_execute_curl_command` dans `hubtel_momo_service.py` utilise `subprocess` avec `curl --http1.1 --ignore-content-length` pour contourner les problèmes de réponses tronquées de l'API Hubtel.
