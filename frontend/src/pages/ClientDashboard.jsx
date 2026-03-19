@@ -177,9 +177,15 @@ export default function ClientDashboard() {
     
     // Check if navigated from Partners page or PayPage with merchant to pay
     if (location.state?.payMerchant && location.state?.merchantQR) {
-      handleMerchantFromPartners(location.state);
-      // Clear the location state
-      navigate(location.pathname, { replace: true, state: {} });
+      // Use a small delay to ensure component is fully mounted
+      const timer = setTimeout(() => {
+        handleMerchantFromPartners(location.state);
+      }, 100);
+      
+      // Clear the location state to prevent re-triggering
+      window.history.replaceState({}, document.title);
+      
+      return () => clearTimeout(timer);
     }
     
     // Cleanup polling on unmount
@@ -188,7 +194,16 @@ export default function ClientDashboard() {
         clearInterval(pollingRef.current);
       }
     };
-  }, [token, location.state]);
+  }, [token]);
+  
+  // Separate effect for location state changes (from PartnersPage)
+  useEffect(() => {
+    if (location.state?.payMerchant && location.state?.merchantQR && location.state?.timestamp) {
+      handleMerchantFromPartners(location.state);
+      // Clear state after handling
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state?.timestamp]);
   
   const handleMerchantFromPartners = async (state) => {
     // Look up merchant and open payment modal
@@ -498,7 +513,7 @@ export default function ClientDashboard() {
     }
   };
   
-  const initiateMerchantPayment = async () => {
+  const initiateMerchantPayment = async (retryCount = 0) => {
     const amount = parseFloat(merchantPayAmount);
     if (!amount || amount < 1) {
       toast.error('Please enter a valid amount (minimum GHS 1)');
@@ -521,6 +536,8 @@ export default function ClientDashboard() {
         merchant_qr_code: selectedMerchant?.payment_qr_code,
         amount: amount,
         network: merchantPayNetwork
+      }, {
+        timeout: 60000  // 60 second timeout for slow connections
       });
       
       if (res.data.success) {
@@ -537,10 +554,34 @@ export default function ClientDashboard() {
         }
       }
     } catch (error) {
+      const errorDetail = error.response?.data?.detail || '';
+      const is403Error = errorDetail.includes('403') || errorDetail.includes('access denied');
+      const isRetryable = error.response?.data?.retry_suggested || is403Error;
+      
+      // Auto-retry for transient 403 errors (up to 3 times)
+      if (isRetryable && retryCount < 3) {
+        const retryDelay = (retryCount + 1) * 2000;  // 2s, 4s, 6s
+        toast.info(`Connection issue, retrying in ${retryDelay/1000}s... (${retryCount + 1}/3)`);
+        setMerchantPayStatus('retrying');
+        
+        setTimeout(() => {
+          initiateMerchantPayment(retryCount + 1);
+        }, retryDelay);
+        return;
+      }
+      
       setMerchantPayStatus('failed');
-      toast.error(error.response?.data?.detail || 'Payment failed');
+      
+      // Show user-friendly error message
+      if (is403Error) {
+        toast.error('Payment service temporarily unavailable. Please try again in a moment.');
+      } else {
+        toast.error(error.response?.data?.detail || 'Payment failed. Please try again.');
+      }
     } finally {
-      setIsProcessingPayment(false);
+      if (retryCount === 0) {
+        setIsProcessingPayment(false);
+      }
     }
   };
   

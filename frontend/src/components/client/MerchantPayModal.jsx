@@ -171,12 +171,32 @@ export default function MerchantPayModal({
           <div className="text-center py-8">
             <AlertCircle className="text-red-400 mx-auto mb-4" size={64} />
             <p className="text-white text-lg font-semibold">Payment Failed</p>
+            <p className="text-slate-400 mt-2 text-sm">The payment service may be temporarily busy. Please try again.</p>
             <Button
               onClick={() => setStatus(null)}
               className="mt-4 bg-amber-500 hover:bg-amber-600"
             >
               Try Again
             </Button>
+          </div>
+        ) : status === 'processing' || status === 'retrying' ? (
+          <div className="text-center py-8">
+            <div className="relative inline-block">
+              <Loader2 className="text-amber-400 mx-auto mb-4 animate-spin" size={64} />
+            </div>
+            <p className="text-white text-lg font-semibold">
+              {status === 'retrying' ? 'Retrying...' : 'Connecting to Payment Service...'}
+            </p>
+            <p className="text-slate-400 mt-2 text-sm">
+              {status === 'retrying' 
+                ? 'Connection issue detected. Retrying automatically...' 
+                : 'Please wait while we connect to the payment network'}
+            </p>
+            <div className="mt-4 flex justify-center gap-1">
+              <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}} />
+              <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}} />
+              <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}} />
+            </div>
           </div>
         ) : status === 'pending' ? (
           <div className="text-center py-6">

@@ -89,15 +89,23 @@ export default function PartnersPage() {
   };
 
   const handlePayMerchant = (merchant) => {
-    // Navigate back to dashboard with merchant QR code
-    navigate('/client/dashboard', { 
-      state: { 
-        payMerchant: true, 
-        merchantQR: merchant.payment_qr_code,
-        merchantName: merchant.business_name,
-        cashbackRate: merchant.cashback_rate
-      } 
-    });
+    // Close the modal first
+    setSelectedMerchant(null);
+    
+    // Small delay to ensure modal is closed before navigation
+    setTimeout(() => {
+      // Navigate to dashboard with merchant info
+      navigate('/client/dashboard', { 
+        state: { 
+          payMerchant: true, 
+          merchantQR: merchant.payment_qr_code,
+          merchantName: merchant.business_name,
+          cashbackRate: merchant.cashback_rate,
+          timestamp: Date.now()  // Force state update
+        },
+        replace: false  // Don't replace history
+      });
+    }, 100);
   };
 
   if (isLoading) {

@@ -380,48 +380,50 @@ class HubtelMoMoService:
         ])
         
         try:
-            # Try curl first in a separate thread with RETRY logic
-            max_retries = 3
+            # Try curl first in a separate thread with RETRY logic and exponential backoff
+            max_retries = 5  # Increased from 3
             last_error = None
             
             for attempt in range(max_retries):
                 response_data = await asyncio.to_thread(_make_hubtel_request_via_curl, curl_cmd)
                 response_status_code = response_data["http_code"]
                 
-                # If we got a 403, retry after a short delay (might be transient)
+                # Success! Break out
+                if response_status_code in [200, 201]:
+                    break
+                
+                # If we got a 403, retry after exponential backoff (might be transient)
                 if response_status_code == 403 and attempt < max_retries - 1:
-                    logger.warning(f"🔄 [MOMO COLLECT] Got 403 on attempt {attempt+1}, retrying in 2 seconds...")
-                    await asyncio.sleep(2)
+                    backoff_time = (2 ** attempt) + (attempt * 0.5)  # 2, 4.5, 9, 16.5 seconds
+                    logger.warning(f"🔄 [MOMO COLLECT] Got 403 on attempt {attempt+1}/{max_retries}, retrying in {backoff_time:.1f}s...")
+                    await asyncio.sleep(backoff_time)
                     continue
                 
-                # If curl succeeded or got a definitive error, break
-                if response_status_code > 0:
-                    break
-                    
                 # If curl failed (http_code=0), try httpx as fallback
-                logger.warning(f"Curl failed (returncode={response_data.get('returncode')}, stderr={response_data.get('stderr')}), trying httpx fallback...")
-                try:
-                    response_data = await _make_request_via_httpx()
-                    response_status_code = response_data["http_code"]
-                    logger.info(f"Httpx fallback result: http_code={response_status_code}")
-                    if response_status_code > 0:
-                        break
-                except Exception as httpx_error:
-                    logger.error(f"Httpx fallback also failed: {httpx_error}")
-                    last_error = str(httpx_error)
+                if response_status_code == 0:
+                    logger.warning(f"Curl failed (returncode={response_data.get('returncode')}, stderr={response_data.get('stderr')}), trying httpx fallback...")
+                    try:
+                        response_data = await _make_request_via_httpx()
+                        response_status_code = response_data["http_code"]
+                        logger.info(f"Httpx fallback result: http_code={response_status_code}")
+                        if response_status_code in [200, 201]:
+                            break
+                    except Exception as httpx_error:
+                        logger.error(f"Httpx fallback also failed: {httpx_error}")
+                        last_error = str(httpx_error)
                 
                 if attempt < max_retries - 1:
-                    logger.warning(f"🔄 [MOMO COLLECT] Attempt {attempt+1} failed, retrying...")
+                    logger.warning(f"🔄 [MOMO COLLECT] Attempt {attempt+1} failed with code {response_status_code}, retrying...")
                     await asyncio.sleep(1)
             
             if response_status_code == 0:
-                error_msg = f"Payment service unavailable. Please try again. ({last_error or response_data.get('stderr', 'connection failed')})"
+                error_msg = f"Payment service temporarily unavailable. Please try again. ({last_error or response_data.get('stderr', 'connection failed')})"
                 if self.db is not None:
                     await self.db.hubtel_payments.update_one(
                         {"client_reference": client_reference},
                         {"$set": {"status": "error", "error": error_msg}}
                     )
-                return {"success": False, "error": error_msg}
+                return {"success": False, "error": error_msg, "retry_suggested": True}
             
             try:
                 result = json_module.loads(response_data["body"]) if response_data["body"] else {}

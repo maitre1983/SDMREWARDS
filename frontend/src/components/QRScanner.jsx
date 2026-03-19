@@ -9,6 +9,7 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
   const [error, setError] = useState(null);
   const [facingMode, setFacingMode] = useState('environment'); // 'environment' = back camera
   const html5QrCodeRef = useRef(null);
+  const scannerInitialized = useRef(false);
 
   // Extract merchant QR code from various formats
   const extractQRCode = (decodedText) => {
@@ -35,17 +36,29 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
   };
 
   const startScanner = async () => {
+    // Prevent multiple initializations
+    if (scannerInitialized.current) return;
+    scannerInitialized.current = true;
+    
     setError(null);
-    setIsScanning(true);
+    setIsScanning(false);
 
     try {
+      // Small delay to ensure DOM is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Initialize scanner
       html5QrCodeRef.current = new Html5Qrcode('qr-reader');
       
+      // Optimized config for faster scanning
       const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
+        fps: 15,  // Increased for faster scanning
+        qrbox: { width: 280, height: 280 },  // Larger scan area
         aspectRatio: 1.0,
+        disableFlip: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true  // Use native API if available
+        }
       };
 
       await html5QrCodeRef.current.start(
@@ -61,37 +74,48 @@ export default function QRScanner({ onScan, onClose, scanTitle = "Scan QR Code",
           onScan(qrCode);
         },
         (errorMessage) => {
-          // Ignore scan errors (no QR found), only log
+          // Ignore scan errors (no QR found), only log occasionally
         }
       );
+      
+      setIsScanning(true);
     } catch (err) {
       console.error('Scanner error:', err);
       setError(err.message || 'Unable to access camera. Please check permissions.');
       setIsScanning(false);
+      scannerInitialized.current = false;
     }
   };
 
   const stopScanner = async () => {
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+    scannerInitialized.current = false;
+    if (html5QrCodeRef.current) {
       try {
-        await html5QrCodeRef.current.stop();
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop();
+        }
         html5QrCodeRef.current.clear();
       } catch (err) {
-        console.error('Error stopping scanner:', err);
+        console.warn('Error stopping scanner:', err);
       }
     }
     setIsScanning(false);
   };
 
   const switchCamera = async () => {
+    scannerInitialized.current = false;
     await stopScanner();
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
   useEffect(() => {
-    startScanner();
+    // Start scanner after mount
+    const timer = setTimeout(() => {
+      startScanner();
+    }, 200);
     
     return () => {
+      clearTimeout(timer);
       stopScanner();
     };
   }, [facingMode]);
