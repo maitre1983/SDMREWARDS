@@ -183,8 +183,8 @@ export default function MerchantPayModal({
             <div className="relative inline-block">
               <Loader2 className="text-amber-400 mx-auto mb-4 animate-spin" size={48} />
             </div>
-            <p className="text-white text-lg font-semibold">Processing Payment</p>
-            <p className="text-slate-400 mt-2 text-sm">Complete your payment on the secure checkout page</p>
+            <p className="text-white text-lg font-semibold">MoMo Prompt Sent</p>
+            <p className="text-slate-400 mt-2 text-sm">Please approve the payment on your phone</p>
             
             {/* Cashback Preview */}
             <div className="mt-4 bg-slate-900 rounded-lg p-3">

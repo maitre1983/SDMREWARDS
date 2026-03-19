@@ -398,18 +398,14 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             setUpgradePaymentId(null);
             if (onRefresh) onRefresh();
           }, 2000);
-        } else if (res.data.checkout_url) {
-          // Online Checkout - redirect to Hubtel payment page
-          toast.success('Redirecting to secure payment page...');
-          window.location.href = res.data.checkout_url;
         } else {
-          // Legacy/Test mode - show pending status
+          // Direct MoMo Prompt flow
           setUpgradeStatus('pending');
           
           if (res.data.test_mode) {
             toast.info('Test mode: Waiting for confirmation');
           } else {
-            toast.success('Payment processing...');
+            toast.success('MoMo prompt sent! Please approve on your phone.');
           }
           
           // Start polling for payment status

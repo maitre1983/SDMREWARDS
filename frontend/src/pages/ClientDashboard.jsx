@@ -342,14 +342,7 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
         
-        // Check if we have a checkout URL (Online Checkout API)
-        if (res.data.checkout_url) {
-          // Redirect to Hubtel checkout page
-          toast.success('Redirecting to secure payment page...');
-          window.location.href = res.data.checkout_url;
-          return;
-        }
-        
+        // Direct MoMo Prompt flow (no checkout redirect)
         setPaymentStatus('pending');
         setIsPaymentTestMode(res.data.test_mode || false);
         
@@ -357,8 +350,8 @@ export default function ClientDashboard() {
         if (res.data.test_mode) {
           toast.info('Test mode: Click "Confirm Payment" to simulate payment');
         } else {
-          toast.success('Redirecting to payment...');
-          // Start polling for status (fallback for non-redirect payments)
+          toast.success('MoMo prompt sent! Please approve on your phone.');
+          // Start polling for status
           startPolling(res.data.payment_id);
         }
       }
@@ -1067,19 +1060,15 @@ export default function ClientDashboard() {
             setShowUpgradeModal(false);
             fetchDashboardData();
           }, 2000);
-        } else if (res.data.checkout_url) {
-          // Online Checkout - redirect to Hubtel payment page
-          toast.success('Redirecting to payment page...');
-          window.location.href = res.data.checkout_url;
         } else {
-          // MoMo payment needed (legacy flow)
+          // Direct MoMo Prompt flow
           setIsUpgradeTestMode(res.data.test_mode || false);
           setUpgradeStatus('pending');
           
           if (res.data.test_mode) {
             toast.info('Test mode: Click "Confirm" to simulate payment');
           } else {
-            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount}! Approve on your phone.`);
+            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount || res.data.amount}! Approve on your phone.`);
             startPolling(res.data.payment_id);
           }
         }
@@ -1978,9 +1967,9 @@ export default function ClientDashboard() {
                 <div className="relative">
                   <Loader2 className="text-amber-400 mx-auto mb-4 animate-spin" size={48} />
                 </div>
-                <p className="text-white text-lg font-semibold">Processing Payment</p>
+                <p className="text-white text-lg font-semibold">MoMo Prompt Sent</p>
                 <p className="text-slate-400 mt-2 text-sm">
-                  Complete your payment on the Hubtel checkout page
+                  Please approve the payment on your phone
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
                   <Loader2 className="animate-spin" size={16} />
