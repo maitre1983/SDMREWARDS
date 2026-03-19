@@ -45,6 +45,10 @@ HUBTEL_PREPAID_DEPOSIT_ID = os.environ.get("HUBTEL_PREPAID_DEPOSIT_ID", "2021772
 # Test mode flag
 PAYMENT_TEST_MODE = os.environ.get("PAYMENT_TEST_MODE", "false").lower() == "true"
 
+# Connection method cache - tracks which method worked last
+# This helps prioritize the working method on subsequent calls
+_last_working_method = {"method": "proxy", "timestamp": None, "failures": 0}
+
 
 class MoMoNetwork(str, Enum):
     MTN = "mtn-gh"
@@ -359,62 +363,136 @@ class HubtelMoMoService:
                 logger.error(f"Curl subprocess exception: {e}")
                 return {"body": "", "http_code": 0, "stderr": str(e), "returncode": -3}
         
-        # Create command list for curl WITH PROXY
-        curl_cmd = ["curl", "-s"]
+        # ========== INTELLIGENT FALLBACK SYSTEM ==========
+        # Strategy: Try proxy first, if fails try direct, alternate on retries
         
-        # Add Fixie proxy for static IP (CRITICAL for production)
-        if FIXIE_PROXY_URL:
-            curl_cmd.extend(["--proxy", FIXIE_PROXY_URL])
-            logger.info("🔒 [MOMO] Using Fixie static IP proxy")
+        def _build_curl_command(use_proxy: bool) -> list:
+            """Build curl command with or without proxy"""
+            cmd = ["curl", "-s"]
+            if use_proxy and FIXIE_PROXY_URL:
+                cmd.extend(["--proxy", FIXIE_PROXY_URL])
+            cmd.extend([
+                "-X", "POST", url,
+                "--http1.1",
+                "--ignore-content-length",
+                "-H", "Content-Type: application/json",
+                "-H", f"Authorization: {auth_header}",
+                "-H", "Connection: close",
+                "-d", payload_json,
+                "--max-time", "30",
+                "-w", "\n---HTTP_CODE:%{http_code}---"
+            ])
+            return cmd
         
-        curl_cmd.extend([
-            "-X", "POST", url,
-            "--http1.1",
-            "--ignore-content-length",
-            "-H", "Content-Type: application/json",
-            "-H", f"Authorization: {auth_header}",
-            "-H", "Connection: close",
-            "-d", payload_json,
-            "--max-time", "30",
-            "-w", "\n---HTTP_CODE:%{http_code}---"
-        ])
+        async def _try_httpx_direct():
+            """Direct httpx call without proxy"""
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json"
+                    }
+                )
+                return {
+                    "body": response.text,
+                    "http_code": response.status_code,
+                    "method": "httpx_direct"
+                }
+        
+        async def _try_httpx_with_proxy():
+            """httpx call with Fixie proxy"""
+            if not FIXIE_PROXY_URL:
+                raise Exception("No proxy configured")
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL, timeout=30.0) as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json"
+                    }
+                )
+                return {
+                    "body": response.text,
+                    "http_code": response.status_code,
+                    "method": "httpx_proxy"
+                }
         
         try:
-            # Try curl first in a separate thread with RETRY logic and exponential backoff
-            max_retries = 5  # Increased from 3
+            # Intelligent retry with fallback between proxy and direct
+            # Uses cached knowledge of which method worked last
+            global _last_working_method
+            
+            max_retries = 6
             last_error = None
+            response_status_code = 0
+            response_data = {"body": "", "http_code": 0}
+            
+            # Start with the method that worked last time
+            start_with_proxy = _last_working_method.get("method", "proxy") == "proxy"
             
             for attempt in range(max_retries):
-                response_data = await asyncio.to_thread(_make_hubtel_request_via_curl, curl_cmd)
-                response_status_code = response_data["http_code"]
+                # Alternate between proxy and direct, starting with last working method
+                if attempt == 0:
+                    use_proxy = start_with_proxy
+                else:
+                    # After first attempt, alternate
+                    use_proxy = ((attempt + (0 if start_with_proxy else 1)) % 2 == 0)
                 
-                # Success! Break out
-                if response_status_code in [200, 201]:
-                    break
+                method_name = "proxy" if use_proxy else "direct"
                 
-                # If we got a 403, retry after exponential backoff (might be transient)
-                if response_status_code == 403 and attempt < max_retries - 1:
-                    backoff_time = (2 ** attempt) + (attempt * 0.5)  # 2, 4.5, 9, 16.5 seconds
-                    logger.warning(f"🔄 [MOMO COLLECT] Got 403 on attempt {attempt+1}/{max_retries}, retrying in {backoff_time:.1f}s...")
-                    await asyncio.sleep(backoff_time)
-                    continue
+                logger.info(f"🔄 [MOMO COLLECT] Attempt {attempt+1}/{max_retries} using {method_name}")
                 
-                # If curl failed (http_code=0), try httpx as fallback
-                if response_status_code == 0:
-                    logger.warning(f"Curl failed (returncode={response_data.get('returncode')}, stderr={response_data.get('stderr')}), trying httpx fallback...")
-                    try:
-                        response_data = await _make_request_via_httpx()
-                        response_status_code = response_data["http_code"]
-                        logger.info(f"Httpx fallback result: http_code={response_status_code}")
-                        if response_status_code in [200, 201]:
-                            break
-                    except Exception as httpx_error:
-                        logger.error(f"Httpx fallback also failed: {httpx_error}")
-                        last_error = str(httpx_error)
+                try:
+                    # Try curl first
+                    curl_cmd = _build_curl_command(use_proxy)
+                    response_data = await asyncio.to_thread(_make_hubtel_request_via_curl, curl_cmd)
+                    response_status_code = response_data["http_code"]
+                    response_data["method"] = f"curl_{method_name}"
+                    
+                    # If curl completely failed (http_code=0), try httpx
+                    if response_status_code == 0:
+                        logger.warning(f"[MOMO] Curl failed, trying httpx {method_name}...")
+                        try:
+                            if use_proxy:
+                                response_data = await _try_httpx_with_proxy()
+                            else:
+                                response_data = await _try_httpx_direct()
+                            response_status_code = response_data["http_code"]
+                        except Exception as httpx_err:
+                            logger.warning(f"[MOMO] Httpx {method_name} failed: {httpx_err}")
+                            last_error = str(httpx_err)
+                    
+                    # Success! Update cache and break out
+                    if response_status_code in [200, 201]:
+                        _last_working_method = {
+                            "method": method_name,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "failures": 0
+                        }
+                        logger.info(f"✅ [MOMO COLLECT] Success on attempt {attempt+1} using {response_data.get('method', method_name)}")
+                        break
+                    
+                    # If we got a 403 or other error, log and retry
+                    if response_status_code == 403:
+                        logger.warning(f"⚠️ [MOMO COLLECT] Got 403 with {method_name}, will try {('direct' if use_proxy else 'proxy')} next...")
+                        # Track failures for this method
+                        if _last_working_method.get("method") == method_name:
+                            _last_working_method["failures"] = _last_working_method.get("failures", 0) + 1
+                    elif response_status_code > 0:
+                        logger.warning(f"⚠️ [MOMO COLLECT] Got HTTP {response_status_code} with {method_name}")
+                    
+                except Exception as attempt_error:
+                    logger.error(f"[MOMO] Attempt {attempt+1} error: {attempt_error}")
+                    last_error = str(attempt_error)
                 
+                # Wait before next retry (exponential backoff, but shorter)
                 if attempt < max_retries - 1:
-                    logger.warning(f"🔄 [MOMO COLLECT] Attempt {attempt+1} failed with code {response_status_code}, retrying...")
-                    await asyncio.sleep(1)
+                    wait_time = min(2 ** attempt, 8)  # Cap at 8 seconds
+                    logger.info(f"[MOMO] Waiting {wait_time}s before retry...")
+                    await asyncio.sleep(wait_time)
             
             if response_status_code == 0:
                 error_msg = f"Payment service temporarily unavailable. Please try again. ({last_error or response_data.get('stderr', 'connection failed')})"

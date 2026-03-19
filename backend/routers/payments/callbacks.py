@@ -885,6 +885,28 @@ async def debug_callback_test():
     }
 
 
+@router.get("/debug/connection-status")
+async def debug_connection_status():
+    """
+    Debug endpoint to check connection method status.
+    Shows which method (proxy vs direct) is currently working.
+    """
+    from services.hubtel_momo_service import _last_working_method, FIXIE_PROXY_URL
+    
+    return {
+        "success": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "connection_status": {
+            "last_working_method": _last_working_method.get("method", "unknown"),
+            "last_success_time": _last_working_method.get("timestamp"),
+            "recent_failures": _last_working_method.get("failures", 0),
+            "proxy_configured": bool(FIXIE_PROXY_URL),
+            "fallback_enabled": True
+        },
+        "strategy": "System alternates between proxy and direct connection. If one fails, it tries the other."
+    }
+
+
 
 @router.get("/admin/callback-logs")
 async def admin_view_callback_logs(limit: int = 50, admin_secret: str = None):
