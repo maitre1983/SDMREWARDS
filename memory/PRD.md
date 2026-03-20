@@ -200,6 +200,7 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 ### 2026-03-20
 - ✅ **Hubtel RMP 403 Error** - RESOLVED: IP whitelisting by Hubtel fixed the issue
 - ✅ **Hubtel SMP 500 Error** - RESOLVED: `RecipientName` field is REQUIRED (was causing 500 instead of proper validation error)
+- ✅ **Withdrawal Failed Bug** - RESOLVED: `max_withdrawal` variable was undefined in `/app/backend/routers/services.py`, causing NameError crash
 
 ## Key API Endpoints
 

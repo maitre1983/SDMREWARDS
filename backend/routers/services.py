@@ -733,7 +733,7 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     # DETAILED LOGGING - Log everything for debugging
     logger.info("=" * 50)
     logger.info("WITHDRAWAL REQUEST RECEIVED")
-    logger.info(f"Raw request data:")
+    logger.info("Raw request data:")
     logger.info(f"  - phone: {repr(request.phone)}")
     logger.info(f"  - amount: {repr(request.amount)}")
     logger.info(f"  - network: {repr(request.network)}")
@@ -769,9 +769,15 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     # ===================================================
     
     min_withdrawal = 5.0
+    max_withdrawal = limit_check.get("max_allowed", 5000.0)  # Use limit from service or default
+    
+    if amount < min_withdrawal:
+        error_msg = f"Minimum withdrawal is GHS {min_withdrawal:.2f}. You requested GHS {amount:.2f}"
+        logger.warning(f"VALIDATION ERROR: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
     
     if amount > max_withdrawal:
-        error_msg = f"Maximum withdrawal is GHS {max_withdrawal}. You requested GHS {amount}"
+        error_msg = f"Maximum withdrawal is GHS {max_withdrawal:.2f}. You requested GHS {amount:.2f}"
         logger.warning(f"VALIDATION ERROR: {error_msg}")
         raise HTTPException(status_code=400, detail=error_msg)
     
@@ -792,7 +798,7 @@ async def initiate_withdrawal(request: WithdrawalRequest, current_client: dict =
     # Validate phone length
     if len(phone) != 12:
         logger.warning(f"Withdrawal rejected: invalid phone format {request.phone} -> normalized {phone}")
-        raise HTTPException(status_code=400, detail=f"Invalid phone number format. Please enter a valid Ghana phone number.")
+        raise HTTPException(status_code=400, detail="Invalid phone number format. Please enter a valid Ghana phone number.")
     
     logger.info(f"Phone normalized: {request.phone} -> {phone}")
     
