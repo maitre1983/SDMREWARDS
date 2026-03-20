@@ -196,6 +196,11 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 - [ ] Whitelisting IP dans dashboard marchand  
 - [ ] Full WebSocket implementation for all dashboards (upgrade from SSE)
 
+## Known Issues - RESOLVED
+### 2026-03-20
+- ✅ **Hubtel RMP 403 Error** - RESOLVED: IP whitelisting by Hubtel fixed the issue
+- ✅ **Hubtel SMP 500 Error** - RESOLVED: `RecipientName` field is REQUIRED (was causing 500 instead of proper validation error)
+
 ## Key API Endpoints
 
 | Endpoint | Status | Description |
