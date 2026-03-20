@@ -38,6 +38,7 @@ FIXIE_PROXY_URL = os.environ.get("FIXIE_URL", "")
 HUBTEL_RMP_BASE_URL = "https://rmp.hubtel.com/merchantaccount/merchants"  # For Receive Money
 HUBTEL_SEND_BASE_URL = "https://smp.hubtel.com/api/merchants"  # For Send Money
 HUBTEL_CHECKOUT_URL = "https://payproxyapi.hubtel.com/items/initiate"
+HUBTEL_VERIFY_BASE_URL = "https://rnv.hubtel.com/v2/merchantaccount/merchants"  # For verification
 
 # Prepaid Deposit ID for Send Money
 HUBTEL_PREPAID_DEPOSIT_ID = os.environ.get("HUBTEL_PREPAID_DEPOSIT_ID", "2021772")
@@ -884,6 +885,200 @@ class HubtelMoMoService:
             error_str = str(e)
             logger.error(f"🏦 [BANK SEND] Exception: {error_str}")
             return {"success": False, "error": error_str}
+
+    # ============== VERIFICATION APIs ==============
+    
+    async def verify_momo_number(
+        self,
+        phone: str,
+        network: str = "mtn-gh"
+    ) -> Dict:
+        """
+        Verify if a phone number is registered on Mobile Money and get the account name.
+        
+        API: GET https://rnv.hubtel.com/v2/merchantaccount/merchants/{POS_ID}/mobilemoney/verify
+        
+        Args:
+            phone: Mobile number (will be normalized to 233 format)
+            network: Channel - mtn-gh, vodafone-gh, tigo-gh
+            
+        Returns:
+            Dict with success status and account holder name
+        """
+        if not HUBTEL_CLIENT_ID or not HUBTEL_CLIENT_SECRET:
+            return {"success": False, "error": "Hubtel credentials not configured"}
+        
+        # Normalize phone number
+        phone = phone.strip().replace(" ", "").replace("-", "")
+        if phone.startswith("0"):
+            phone = "233" + phone[1:]
+        elif phone.startswith("+"):
+            phone = phone[1:]
+        elif not phone.startswith("233"):
+            phone = "233" + phone
+        
+        # Normalize network
+        network_map = {
+            "MTN": "mtn-gh",
+            "MTN MOMO": "mtn-gh",
+            "VODAFONE": "vodafone-gh",
+            "VODAFONE CASH": "vodafone-gh",
+            "TELECEL": "tigo-gh",
+            "TIGO": "tigo-gh",
+            "AIRTELTIGO": "tigo-gh"
+        }
+        channel = network_map.get(network.upper(), network.lower())
+        
+        url = f"{HUBTEL_VERIFY_BASE_URL}/{self.pos_sales_id}/mobilemoney/verify"
+        params = {
+            "channel": channel,
+            "customerMsisdn": phone
+        }
+        
+        auth_header = self._get_auth_header()
+        
+        try:
+            logger.info(f"📱 [MOMO VERIFY] Checking {phone} on {channel}")
+            
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None, timeout=30.0) as client:
+                response = await client.get(
+                    url,
+                    params=params,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                logger.info(f"📱 [MOMO VERIFY] Status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"📱 [MOMO VERIFY] Response: {result}")
+                    
+                    # Extract account name from response
+                    data = result.get("Data", result.get("data", {}))
+                    account_name = (
+                        data.get("AccountName") or 
+                        data.get("accountName") or
+                        data.get("CustomerName") or
+                        data.get("customerName") or
+                        data.get("Name") or
+                        data.get("name", "")
+                    )
+                    is_registered = data.get("IsRegistered", data.get("isRegistered", True))
+                    
+                    if account_name:
+                        return {
+                            "success": True,
+                            "account_name": account_name,
+                            "phone": phone,
+                            "network": channel,
+                            "is_registered": is_registered
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Account name not found",
+                            "is_registered": is_registered
+                        }
+                else:
+                    error_text = response.text
+                    logger.error(f"📱 [MOMO VERIFY] Failed: {response.status_code} - {error_text}")
+                    return {
+                        "success": False,
+                        "error": f"Verification failed: {response.status_code}"
+                    }
+                    
+        except Exception as e:
+            logger.error(f"📱 [MOMO VERIFY] Exception: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def verify_bank_account(
+        self,
+        bank_code: str,
+        account_number: str
+    ) -> Dict:
+        """
+        Verify a bank account and get the account holder name.
+        
+        API: GET https://rnv.hubtel.com/v2/merchantaccount/merchants/{POS_ID}/bank/verify/{bankcode}/{accountNumber}
+        
+        Args:
+            bank_code: Hubtel bank code (e.g., "300335" for GCB) or bank name
+            account_number: Bank account number
+            
+        Returns:
+            Dict with success status and account holder name
+        """
+        if not HUBTEL_CLIENT_ID or not HUBTEL_CLIENT_SECRET:
+            return {"success": False, "error": "Hubtel credentials not configured"}
+        
+        # Resolve bank code if name was provided
+        resolved_bank_code = self.GHANA_BANK_CODES.get(bank_code.upper(), bank_code)
+        
+        # Clean account number
+        account_number = account_number.strip().replace(" ", "").replace("-", "")
+        
+        url = f"{HUBTEL_VERIFY_BASE_URL}/{self.pos_sales_id}/bank/verify/{resolved_bank_code}/{account_number}"
+        
+        auth_header = self._get_auth_header()
+        
+        try:
+            logger.info(f"🏦 [BANK VERIFY] Checking {account_number} at bank {resolved_bank_code}")
+            
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None, timeout=30.0) as client:
+                response = await client.get(
+                    url,
+                    headers={
+                        "Authorization": auth_header,
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                logger.info(f"🏦 [BANK VERIFY] Status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"🏦 [BANK VERIFY] Response: {result}")
+                    
+                    # Extract account name from response
+                    data = result.get("Data", result.get("data", {}))
+                    account_name = (
+                        data.get("AccountName") or 
+                        data.get("accountName") or
+                        data.get("CustomerName") or
+                        data.get("customerName") or
+                        data.get("Name") or
+                        data.get("name", "")
+                    )
+                    
+                    if account_name:
+                        return {
+                            "success": True,
+                            "account_name": account_name,
+                            "account_number": account_number,
+                            "bank_code": resolved_bank_code
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "error": "Account name not found or invalid account"
+                        }
+                else:
+                    error_text = response.text
+                    logger.error(f"🏦 [BANK VERIFY] Failed: {response.status_code} - {error_text}")
+                    
+                    if response.status_code == 404:
+                        return {"success": False, "error": "Account not found"}
+                    elif response.status_code == 400:
+                        return {"success": False, "error": "Invalid account number format"}
+                    else:
+                        return {"success": False, "error": f"Verification failed: {response.status_code}"}
+                    
+        except Exception as e:
+            logger.error(f"🏦 [BANK VERIFY] Exception: {e}")
+            return {"success": False, "error": str(e)}
 
     async def handle_collection_callback(self, callback_data: Dict) -> Dict:
         """

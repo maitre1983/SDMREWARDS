@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, Wallet, Phone, Building2, CheckCircle, AlertCircle, 
-  Loader2, Send, Settings, ArrowDownLeft
+  Loader2, Send, Settings, ArrowDownLeft, User
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import axios from 'axios';
+import { API_URL } from '../../config/api';
 
 export default function WithdrawalModal({
   isOpen,
@@ -28,8 +30,13 @@ export default function WithdrawalModal({
   onInitiate,
   onCheckStatus,
   onConfirmTest,
-  onOpenPaymentSettings
+  onOpenPaymentSettings,
+  token
 }) {
+  const [isVerifyingMoMo, setIsVerifyingMoMo] = useState(false);
+  const [momoVerified, setMomoVerified] = useState(false);
+  const [momoAccountName, setMomoAccountName] = useState('');
+  
   if (!isOpen) return null;
 
   const maxAmount = Math.min(balance || 0, 1000);
@@ -41,6 +48,45 @@ export default function WithdrawalModal({
     ? amountNum * (withdrawalFee.rate / 100) 
     : withdrawalFee.rate;
   const netAmount = Math.max(0, amountNum - feeAmount);
+
+  const handlePhoneChange = (value) => {
+    setPhone(value);
+    setMomoVerified(false);
+    setMomoAccountName('');
+  };
+
+  const handleNetworkChange = (value) => {
+    setNetwork(value);
+    setMomoVerified(false);
+    setMomoAccountName('');
+  };
+
+  const verifyMoMo = async () => {
+    if (!phone || !network) return;
+    
+    setIsVerifyingMoMo(true);
+    try {
+      const res = await axios.post(
+        `${API_URL}/api/verify/momo/verify`,
+        { phone, network },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      if (res.data.verified) {
+        setMomoAccountName(res.data.account_name);
+        setMomoVerified(true);
+      } else {
+        setMomoVerified(false);
+        setMomoAccountName('');
+      }
+    } catch (error) {
+      console.error('MoMo verification failed:', error);
+      setMomoVerified(false);
+      setMomoAccountName('');
+    } finally {
+      setIsVerifyingMoMo(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -181,7 +227,7 @@ export default function WithdrawalModal({
                       type="tel"
                       placeholder="0XX XXX XXXX"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
                       className="pl-10 bg-slate-900 border-slate-700 text-white"
                       data-testid="withdrawal-phone"
                     />
@@ -192,7 +238,7 @@ export default function WithdrawalModal({
                   <label className="text-slate-300 text-sm block mb-2">Network</label>
                   <select
                     value={network}
-                    onChange={(e) => setNetwork(e.target.value)}
+                    onChange={(e) => handleNetworkChange(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2"
                     data-testid="withdrawal-network"
                   >
@@ -202,6 +248,43 @@ export default function WithdrawalModal({
                     <option value="AIRTELTIGO">AirtelTigo (AT)</option>
                   </select>
                 </div>
+
+                {/* MoMo Verification */}
+                {phone && network && (
+                  <div className="mb-4">
+                    {!momoVerified ? (
+                      <Button
+                        onClick={verifyMoMo}
+                        disabled={isVerifyingMoMo}
+                        variant="outline"
+                        className="w-full border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                        data-testid="verify-withdrawal-momo-btn"
+                      >
+                        {isVerifyingMoMo ? (
+                          <>
+                            <Loader2 className="animate-spin mr-2" size={16} />
+                            Verifying...
+                          </>
+                        ) : (
+                          <>
+                            <User className="mr-2" size={16} />
+                            Verify Account Name
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="text-purple-400 shrink-0" size={18} />
+                          <div>
+                            <p className="text-purple-400 text-sm font-medium">Account Verified</p>
+                            <p className="text-white text-sm">{momoAccountName}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
             

@@ -94,6 +94,11 @@ export default function MerchantDashboard() {
   const [isFetchingBanks, setIsFetchingBanks] = useState(false);
   const [isVerifyingBank, setIsVerifyingBank] = useState(false);
   const [bankVerified, setBankVerified] = useState(false);
+  
+  // MoMo verification
+  const [isVerifyingMoMo, setIsVerifyingMoMo] = useState(false);
+  const [momoVerified, setMomoVerified] = useState(false);
+  const [momoAccountName, setMomoAccountName] = useState('');
 
   // Settings sub-tabs
   const [settingsTab, setSettingsTab] = useState('cashback');
@@ -366,10 +371,23 @@ export default function MerchantDashboard() {
   const fetchBankList = async () => {
     setIsFetchingBanks(true);
     try {
-      const res = await axios.get(`${API_URL}/api/public/banks`);
+      // Use the new verification API for bank list
+      const res = await axios.get(`${API_URL}/api/verify/banks`);
       setBankList(res.data.banks || []);
     } catch (error) {
       console.error('Failed to fetch banks:', error);
+      // Fallback to hardcoded list if API fails
+      setBankList([
+        { code: "300335", name: "GCB Bank", id: "300335" },
+        { code: "300330", name: "Ecobank Ghana", id: "300330" },
+        { code: "300331", name: "Stanbic Bank", id: "300331" },
+        { code: "300329", name: "Absa Bank Ghana", id: "300329" },
+        { code: "300332", name: "Zenith Bank Ghana", id: "300332" },
+        { code: "300323", name: "Fidelity Bank Ghana", id: "300323" },
+        { code: "300333", name: "United Bank for Africa", id: "300333" },
+        { code: "300328", name: "Access Bank Ghana", id: "300328" },
+        { code: "300327", name: "CAL Bank", id: "300327" },
+      ]);
     } finally {
       setIsFetchingBanks(false);
     }
@@ -386,18 +404,25 @@ export default function MerchantDashboard() {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const res = await axios.post(
-        `${API_URL}/api/merchants/banks/verify-account?account_number=${settings.bank_account}&bank_id=${settings.bank_id}`,
-        {},
+        `${API_URL}/api/verify/bank/verify`,
+        {
+          bank_code: settings.bank_id,
+          account_number: settings.bank_account
+        },
         { headers }
       );
       
-      if (res.data.success) {
+      if (res.data.verified) {
         setSettings(prev => ({
           ...prev,
-          bank_account_name: res.data.account_name
+          bank_account_name: res.data.account_name,
+          bank_code: res.data.bank_code
         }));
         setBankVerified(true);
         toast.success(`Account verified: ${res.data.account_name}`);
+      } else {
+        toast.error(res.data.error || 'Account verification failed');
+        setBankVerified(false);
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to verify account');
@@ -407,15 +432,65 @@ export default function MerchantDashboard() {
     }
   };
 
-  const handleBankChange = (bankId) => {
-    const selectedBank = bankList.find(b => b.id === bankId);
+  const handleVerifyMoMo = async () => {
+    if (!settings.momo_number || !settings.momo_network) {
+      toast.error('Please enter MoMo number and select network');
+      return;
+    }
+
+    setIsVerifyingMoMo(true);
+    setMomoVerified(false);
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await axios.post(
+        `${API_URL}/api/verify/momo/verify/merchant`,
+        {
+          phone: settings.momo_number,
+          network: settings.momo_network
+        },
+        { headers }
+      );
+      
+      if (res.data.verified) {
+        setMomoAccountName(res.data.account_name);
+        setMomoVerified(true);
+        toast.success(`MoMo verified: ${res.data.account_name}`);
+      } else {
+        toast.error(res.data.error || 'MoMo verification failed');
+        setMomoVerified(false);
+        setMomoAccountName('');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to verify MoMo');
+      setMomoVerified(false);
+      setMomoAccountName('');
+    } finally {
+      setIsVerifyingMoMo(false);
+    }
+  };
+
+  const handleBankChange = (bankCode) => {
+    const selectedBank = bankList.find(b => b.code === bankCode || b.id === bankCode);
     setSettings(prev => ({
       ...prev,
-      bank_id: bankId,
+      bank_id: bankCode,
+      bank_code: bankCode,
       bank_name: selectedBank?.name || '',
       bank_account_name: '' // Reset verification when bank changes
     }));
     setBankVerified(false);
+  };
+
+  const handleMoMoChange = (value) => {
+    setSettings(prev => ({ ...prev, momo_number: value }));
+    setMomoVerified(false);
+    setMomoAccountName('');
+  };
+
+  const handleMoMoNetworkChange = (value) => {
+    setSettings(prev => ({ ...prev, momo_network: value }));
+    setMomoVerified(false);
+    setMomoAccountName('');
   };
 
   const copyQRCode = (code) => {
@@ -1250,7 +1325,7 @@ export default function MerchantDashboard() {
                           type="tel"
                           placeholder="0XX XXX XXXX"
                           value={settings.momo_number}
-                          onChange={(e) => setSettings({...settings, momo_number: e.target.value})}
+                          onChange={(e) => handleMoMoChange(e.target.value)}
                           className="pl-10 bg-slate-900 border-slate-700 text-white"
                         />
                       </div>
@@ -1259,7 +1334,7 @@ export default function MerchantDashboard() {
                       <Label className="text-slate-400 text-xs">Network</Label>
                       <select
                         value={settings.momo_network}
-                        onChange={(e) => setSettings({...settings, momo_network: e.target.value})}
+                        onChange={(e) => handleMoMoNetworkChange(e.target.value)}
                         className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
                       >
                         <option value="">Select Network</option>
@@ -1269,6 +1344,42 @@ export default function MerchantDashboard() {
                       </select>
                     </div>
                   </div>
+                  
+                  {/* MoMo Verification */}
+                  {settings.momo_number && settings.momo_network && (
+                    <div className="mt-3">
+                      {!momoVerified ? (
+                        <Button
+                          onClick={handleVerifyMoMo}
+                          disabled={isVerifyingMoMo}
+                          className="w-full bg-purple-600 hover:bg-purple-700"
+                          data-testid="verify-momo-btn"
+                        >
+                          {isVerifyingMoMo ? (
+                            <>
+                              <Loader2 className="animate-spin mr-2" size={16} />
+                              Verifying MoMo...
+                            </>
+                          ) : (
+                            <>
+                              <Phone className="mr-2" size={16} />
+                              Verify MoMo Account
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="text-purple-400" size={18} />
+                            <div>
+                              <p className="text-purple-400 text-sm font-medium">MoMo Verified</p>
+                              <p className="text-white text-sm">{momoAccountName}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Bank Settings */}
@@ -1283,14 +1394,14 @@ export default function MerchantDashboard() {
                     <div>
                       <Label className="text-slate-400 text-xs">Select Bank</Label>
                       <select
-                        value={settings.bank_id}
+                        value={settings.bank_id || settings.bank_code}
                         onChange={(e) => handleBankChange(e.target.value)}
                         className="w-full mt-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-white"
                         disabled={isFetchingBanks}
                       >
                         <option value="">Select Bank</option>
                         {bankList.map(bank => (
-                          <option key={bank.id} value={bank.id}>{bank.name}</option>
+                          <option key={bank.code || bank.id} value={bank.code || bank.id}>{bank.name}</option>
                         ))}
                       </select>
                     </div>
@@ -1307,6 +1418,18 @@ export default function MerchantDashboard() {
                         className="mt-1 bg-slate-900 border-slate-700 text-white"
                       />
                     </div>
+                  </div>
+                  
+                  {/* Branch Name (Optional) */}
+                  <div>
+                    <Label className="text-slate-400 text-xs">Branch Name (Optional)</Label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Osu Branch, Accra Main"
+                      value={settings.bank_branch || ''}
+                      onChange={(e) => setSettings({...settings, bank_branch: e.target.value})}
+                      className="mt-1 bg-slate-900 border-slate-700 text-white"
+                    />
                   </div>
                   
                   {/* Bank Verification */}

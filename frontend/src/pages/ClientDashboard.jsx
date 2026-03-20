@@ -2212,6 +2212,7 @@ export default function ClientDashboard() {
           onCheckStatus={checkTransactionStatus} 
           onConfirmTest={confirmTestWithdrawal}
           onOpenPaymentSettings={() => setShowPaymentSettings(true)}
+          token={token}
         />
       )}
       {/* Payment Settings Modal */}

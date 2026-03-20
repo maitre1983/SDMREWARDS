@@ -39,7 +39,7 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-20 (Current Session) - MERCHANT PUSH NOTIFICATIONS + AUTO PAYOUT + BANK TRANSFERS
+### 2026-03-20 (Current Session) - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo
 - ✅ **Bank Transfer Support** - Merchants can now receive payouts via bank transfer
@@ -51,7 +51,18 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Payout breakdown by method (MoMo vs Bank)
   - Filterable and paginated payout list
   - Mobile-responsive design
+- ✅ **MoMo & Bank Account Verification via Hubtel API**:
+  - **Merchant MoMo Verification** - In Settings > Payment, merchants can verify their MoMo number to see the registered account name
+  - **Merchant Bank Verification** - Verify bank account number and see account holder name before saving
+  - **Client MoMo Verification** - In Withdrawal modal, clients can verify their MoMo number before withdrawing
+  - **Bank Dropdown** - 21 Ghana banks available in dropdown with codes
+  - **API Endpoints:**
+    - `GET /api/verify/banks` - List all Ghana banks (no auth required)
+    - `POST /api/verify/momo/verify` - Verify client MoMo number
+    - `POST /api/verify/momo/verify/merchant` - Verify merchant MoMo number
+    - `POST /api/verify/bank/verify` - Verify bank account
   - **Files Created:**
+    - `/app/backend/routers/verification.py` - New verification API router
     - `/app/frontend/src/components/merchant/PayoutHistory.jsx`
   - **Files Modified:**
     - `/app/backend/services/hubtel_momo_service.py` - Added `send_bank()` and `GHANA_BANK_CODES`
