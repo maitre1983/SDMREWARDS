@@ -749,6 +749,142 @@ class HubtelMoMoService:
     
     # ============== CALLBACK HANDLERS ==============
     
+    # Ghana Bank Codes for Hubtel Bank Transfer
+    GHANA_BANK_CODES = {
+        "GCB": "300335",      # GCB Bank
+        "ECOBANK": "300330",  # Ecobank Ghana
+        "STANBIC": "300331",  # Stanbic Bank
+        "ABSA": "300329",     # Absa Bank (formerly Barclays)
+        "ZENITH": "300332",   # Zenith Bank
+        "FIDELITY": "300323", # Fidelity Bank
+        "UBA": "300333",      # United Bank for Africa
+        "ACCESS": "300328",   # Access Bank
+        "CAL": "300327",      # CAL Bank
+        "PRUDENTIAL": "300324", # Prudential Bank
+        "ADB": "300322",      # Agricultural Development Bank
+        "GTB": "300334",      # GT Bank
+        "FBN": "300325",      # First Bank Nigeria
+        "REPUBLIC": "300326", # Republic Bank
+        "SOCIETE": "300321",  # Societe Generale
+        "NIB": "300320",      # National Investment Bank
+        "BOA": "300319",      # Bank of Africa
+        "FNB": "300336",      # First National Bank
+        "STANDARD": "300337", # Standard Chartered
+    }
+    
+    async def send_bank(
+        self,
+        account_number: str,
+        bank_code: str,
+        amount: float,
+        description: str,
+        client_reference: str,
+        recipient_name: str = "",
+        callback_url: str = None
+    ) -> Dict:
+        """
+        Send/transfer money to a bank account (disbursement)
+        Used for merchant payouts via bank transfer.
+        
+        API: POST https://smp.hubtel.com/api/merchants/{PREPAID_ID}/send/bank/gh/{BankCode}
+        
+        Args:
+            account_number: Bank account number
+            bank_code: Hubtel bank code (e.g., "300335" for GCB) or bank name (e.g., "GCB")
+            amount: Amount to send in GHS
+            description: Transaction description
+            client_reference: Unique reference ID
+            recipient_name: Name of account holder
+            callback_url: Optional callback URL for status updates
+            
+        Returns:
+            Dict with success status and transaction details
+        """
+        # Resolve bank code if name was provided
+        resolved_bank_code = self.GHANA_BANK_CODES.get(bank_code.upper(), bank_code)
+        
+        if not HUBTEL_CLIENT_ID or not HUBTEL_CLIENT_SECRET:
+            logger.error("Hubtel credentials not configured")
+            return {"success": False, "error": "Hubtel payment not configured"}
+        
+        callback_url = callback_url or f"{self.callback_base_url}/api/payments/hubtel/transfer-callback"
+        
+        payload = {
+            "RecipientAccountNumber": account_number,
+            "Amount": amount,
+            "Description": description,
+            "ClientReference": client_reference,
+            "RecipientName": recipient_name or "Account Holder",
+            "PrimaryCallbackUrl": callback_url
+        }
+        
+        # Use SMP endpoint with bank code
+        url = f"{HUBTEL_SEND_BASE_URL}/{self.prepaid_deposit_id}/send/bank/gh/{resolved_bank_code}"
+        
+        auth_header = self._get_auth_header()
+        
+        try:
+            logger.info("=" * 70)
+            logger.info("🏦 [BANK SEND] TRANSFER REQUEST")
+            logger.info("=" * 70)
+            logger.info(f"📍 URL: {url}")
+            logger.info(f"📦 PAYLOAD: {json.dumps(payload, indent=2)}")
+            logger.info(f"🔒 Using Proxy: {'Yes' if FIXIE_PROXY_URL else 'No'}")
+            
+            headers = {
+                "Authorization": auth_header,
+                "Content-Type": "application/json"
+            }
+            
+            async with httpx.AsyncClient(proxy=FIXIE_PROXY_URL if FIXIE_PROXY_URL else None, timeout=30.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response_status_code = response.status_code
+                
+                logger.info(f"🏦 [BANK SEND] HTTP Code: {response_status_code}")
+                
+                try:
+                    result = response.json()
+                    logger.info(f"🏦 [BANK SEND] Response: {json.dumps(result, indent=2)}")
+                except Exception:
+                    result = {"raw": response.text}
+                    logger.info(f"🏦 [BANK SEND] Raw response: {response.text}")
+            
+            response_code = result.get("ResponseCode", result.get("responseCode", ""))
+            is_success = response_status_code in [200, 201] and response_code in ["0000", "0001"]
+            
+            if is_success:
+                data = result.get("Data", result.get("data", {}))
+                transaction_id = data.get("TransactionId", data.get("transactionId", ""))
+                
+                logger.info(f"✅ [BANK SEND] SUCCESS - TransactionId: {transaction_id}")
+                
+                return {
+                    "success": True,
+                    "transaction_id": transaction_id,
+                    "client_reference": client_reference,
+                    "message": "Bank transfer initiated successfully"
+                }
+            else:
+                error_msg = result.get("Message", result.get("message", f"Bank transfer failed: {response_status_code}"))
+                
+                if response_code == "4075":
+                    error_msg = "Insufficient balance in Hubtel account"
+                elif response_code == "4105":
+                    error_msg = "Invalid bank account number"
+                elif response_code == "5000":
+                    error_msg = f"Hubtel server error: {result.get('Errors', 'Service temporarily unavailable')}"
+                elif response_status_code == 403:
+                    error_msg = "Access denied. IP may not be whitelisted for Bank Transfer API."
+                
+                logger.error(f"❌ [BANK SEND] FAILED - {error_msg}")
+                
+                return {"success": False, "error": error_msg, "response_code": response_code}
+                
+        except Exception as e:
+            error_str = str(e)
+            logger.error(f"🏦 [BANK SEND] Exception: {error_str}")
+            return {"success": False, "error": error_str}
+
     async def handle_collection_callback(self, callback_data: Dict) -> Dict:
         """
         Handle callback from Hubtel after collection payment

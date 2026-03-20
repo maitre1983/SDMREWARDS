@@ -34,6 +34,7 @@ import {
   Info,
   Banknote,
   ArrowUpRight,
+  ArrowDownToLine,
   AlertTriangle,
   Smartphone,
   XCircle,
@@ -54,6 +55,7 @@ const MonthlyStatements = lazy(() => import('../components/merchant/MonthlyState
 const APIKeysManager = lazy(() => import('../components/merchant/APIKeysManager'));
 const WebhooksManager = lazy(() => import('../components/merchant/WebhooksManager'));
 const PaymentNotificationToast = lazy(() => import('../components/merchant/PaymentNotificationToast'));
+const PayoutHistory = lazy(() => import('../components/merchant/PayoutHistory'));
 
 // Mini loader for lazy components
 const MiniLoader = () => (
@@ -1130,6 +1132,7 @@ export default function MerchantDashboard() {
               {[
                 { id: 'cashback', label: 'Cashback', icon: Percent },
                 { id: 'payment', label: 'Payment', icon: Wallet },
+                { id: 'payouts', label: 'Payouts', icon: ArrowDownToLine },
                 { id: 'statements', label: 'Relevés', icon: FileText },
                 { id: 'cashiers', label: 'Caissiers', icon: UserCog },
                 { id: 'business', label: 'Commerce', icon: Building },
@@ -1185,6 +1188,13 @@ export default function MerchantDashboard() {
             {/* Monthly Statements */}
             {settingsTab === 'statements' && (
               <MonthlyStatements token={token} />
+            )}
+
+            {/* Payouts History */}
+            {settingsTab === 'payouts' && (
+              <Suspense fallback={<div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-slate-400" /></div>}>
+                <PayoutHistory token={token} />
+              </Suspense>
             )}
 
             {/* Payment Settings */}

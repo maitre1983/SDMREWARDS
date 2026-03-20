@@ -39,18 +39,25 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-20 (Current Session) - MERCHANT PUSH NOTIFICATIONS + AUTO PAYOUT
+### 2026-03-20 (Current Session) - MERCHANT PUSH NOTIFICATIONS + AUTO PAYOUT + BANK TRANSFERS
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo
-  - **Implementation:**
-    - Function `_process_merchant_payout()` in `/app/backend/routers/payments/processing.py`
-    - Called automatically after every successful merchant payment
-    - Uses merchant's configured MoMo number and network from Settings > Payment
-    - Sends SMS notification to merchant after successful payout
-    - Records all payouts in `merchant_payouts` collection for tracking
-  - **Key Files Modified:**
-    - `/app/backend/routers/payments/processing.py` - Fixed `send_money` → `send_momo`, added `recipient_name`, network normalization
-    - `/app/backend/routers/services.py` - Fixed undefined `max_withdrawal` bug
+- ✅ **Bank Transfer Support** - Merchants can now receive payouts via bank transfer
+  - Added `send_bank()` function in `hubtel_momo_service.py`
+  - Added `_process_bank_payout()` in `processing.py`
+  - Ghana bank codes mapped (GCB, Ecobank, Stanbic, Absa, etc.)
+- ✅ **Payout History UI** - New "Payouts" tab in Settings showing:
+  - Total received, pending, failed amounts
+  - Payout breakdown by method (MoMo vs Bank)
+  - Filterable and paginated payout list
+  - Mobile-responsive design
+  - **Files Created:**
+    - `/app/frontend/src/components/merchant/PayoutHistory.jsx`
+  - **Files Modified:**
+    - `/app/backend/services/hubtel_momo_service.py` - Added `send_bank()` and `GHANA_BANK_CODES`
+    - `/app/backend/routers/payments/processing.py` - Separated MoMo and Bank payout logic
+    - `/app/backend/routers/merchants/legacy_routes.py` - Enhanced `/payouts` API with stats
+    - `/app/frontend/src/pages/MerchantDashboard.jsx` - Added "Payouts" tab
   - **Implementation:**
     - Backend: New SSE router at `/api/notifications/sse/` with two endpoints:
       - `GET /api/notifications/sse/status` - Check active SSE connections

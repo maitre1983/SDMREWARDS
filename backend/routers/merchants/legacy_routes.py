@@ -890,33 +890,96 @@ async def export_transactions(
 async def get_merchant_payouts(
     page: int = 1,
     limit: int = 20,
+    status: str = None,
+    payout_method: str = None,
     current_merchant: dict = Depends(get_current_merchant)
 ):
-    """Get merchant payout history - money received from customer payments"""
+    """
+    Get merchant payout history - money received from customer payments.
+    
+    Query params:
+    - page: Page number (default 1)
+    - limit: Items per page (default 20)
+    - status: Filter by status (pending, completed, failed)
+    - payout_method: Filter by method (momo, bank)
+    """
     merchant_id = current_merchant["id"]
     
     skip = (page - 1) * limit
     
+    # Build query
+    query = {"merchant_id": merchant_id}
+    if status:
+        query["status"] = status
+    if payout_method:
+        query["payout_method"] = payout_method
+    
     # Get payouts
     payouts = await db.merchant_payouts.find(
-        {"merchant_id": merchant_id},
+        query,
         {"_id": 0}
     ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     
     # Get total count
-    total_count = await db.merchant_payouts.count_documents({"merchant_id": merchant_id})
+    total_count = await db.merchant_payouts.count_documents(query)
     
-    # Calculate totals
-    all_payouts = await db.merchant_payouts.find(
-        {"merchant_id": merchant_id, "status": "completed"},
-        {"_id": 0, "amount": 1}
-    ).to_list(100000)
+    # Calculate stats
+    pipeline = [
+        {"$match": {"merchant_id": merchant_id}},
+        {"$group": {
+            "_id": "$status",
+            "total": {"$sum": "$amount"},
+            "count": {"$sum": 1}
+        }}
+    ]
+    stats_cursor = db.merchant_payouts.aggregate(pipeline)
+    stats_list = await stats_cursor.to_list(10)
     
-    total_received = sum(p.get("amount", 0) for p in all_payouts)
+    stats = {
+        "total_completed": 0,
+        "total_pending": 0,
+        "total_failed": 0,
+        "count_completed": 0,
+        "count_pending": 0,
+        "count_failed": 0
+    }
+    
+    for s in stats_list:
+        status_key = s["_id"]
+        if status_key == "completed":
+            stats["total_completed"] = round(s["total"], 2)
+            stats["count_completed"] = s["count"]
+        elif status_key == "pending":
+            stats["total_pending"] = round(s["total"], 2)
+            stats["count_pending"] = s["count"]
+        elif status_key == "failed":
+            stats["total_failed"] = round(s["total"], 2)
+            stats["count_failed"] = s["count"]
+    
+    # Calculate by payout method
+    method_pipeline = [
+        {"$match": {"merchant_id": merchant_id, "status": "completed"}},
+        {"$group": {
+            "_id": "$payout_method",
+            "total": {"$sum": "$amount"},
+            "count": {"$sum": 1}
+        }}
+    ]
+    method_cursor = db.merchant_payouts.aggregate(method_pipeline)
+    method_list = await method_cursor.to_list(10)
+    
+    by_method = {}
+    for m in method_list:
+        method_key = m["_id"] or "momo"
+        by_method[method_key] = {
+            "total": round(m["total"], 2),
+            "count": m["count"]
+        }
     
     return {
         "payouts": payouts,
-        "total_received": round(total_received, 2),
+        "stats": stats,
+        "by_method": by_method,
         "pagination": {
             "page": page,
             "limit": limit,
