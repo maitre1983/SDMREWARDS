@@ -39,8 +39,18 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-20 (Current Session) - MERCHANT PUSH NOTIFICATIONS
+### 2026-03-20 (Current Session) - MERCHANT PUSH NOTIFICATIONS + AUTO PAYOUT
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
+- ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo
+  - **Implementation:**
+    - Function `_process_merchant_payout()` in `/app/backend/routers/payments/processing.py`
+    - Called automatically after every successful merchant payment
+    - Uses merchant's configured MoMo number and network from Settings > Payment
+    - Sends SMS notification to merchant after successful payout
+    - Records all payouts in `merchant_payouts` collection for tracking
+  - **Key Files Modified:**
+    - `/app/backend/routers/payments/processing.py` - Fixed `send_money` → `send_momo`, added `recipient_name`, network normalization
+    - `/app/backend/routers/services.py` - Fixed undefined `max_withdrawal` bug
   - **Implementation:**
     - Backend: New SSE router at `/api/notifications/sse/` with two endpoints:
       - `GET /api/notifications/sse/status` - Check active SSE connections

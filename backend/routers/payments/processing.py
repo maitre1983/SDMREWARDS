@@ -365,16 +365,41 @@ async def process_merchant_payment(payment: Dict):
 
 
 async def _process_merchant_payout(merchant: Dict, merchant_share: float, transaction_id: str):
-    """Process automatic payout to merchant"""
+    """
+    Process automatic payout to merchant after a successful payment.
+    
+    This function:
+    1. Checks if merchant has MoMo configured for payouts
+    2. Creates a payout record
+    3. Sends funds to merchant via Hubtel Send Money API
+    4. Updates merchant balance
+    
+    SDM does not hold merchant funds - payments are forwarded instantly.
+    """
     db = get_db()
+    merchant_id = merchant.get("id", "unknown")
+    
+    logger.info(f"💸 [MERCHANT_PAYOUT] Starting for merchant {merchant_id[:8]}..., amount: GHS {merchant_share:.2f}")
     
     if merchant_share <= 0:
+        logger.info("💸 [MERCHANT_PAYOUT] Skipping - amount is zero or negative")
         return
     
+    # Get payout configuration
+    preferred_method = merchant.get("preferred_payout_method", "momo")
     merchant_momo = merchant.get("momo_number")
-    merchant_network = merchant.get("momo_network", "MTN").upper()
+    merchant_network = merchant.get("momo_network", "MTN MoMo").upper()
+    
+    logger.info(f"💸 [MERCHANT_PAYOUT] Payout method: {preferred_method}, MoMo: {merchant_momo}, Network: {merchant_network}")
+    
+    # For now, only MoMo payouts are supported
+    if preferred_method == "bank":
+        logger.warning(f"💸 [MERCHANT_PAYOUT] Bank payouts not yet implemented for {merchant_id[:8]}...")
+        # Store in pending balance for manual processing
+        return
     
     if not merchant_momo:
+        logger.warning(f"💸 [MERCHANT_PAYOUT] No MoMo number configured for merchant {merchant_id[:8]}... - funds stored in pending_balance")
         return
     
     payout_ref = f"SDM-PAYOUT-{uuid.uuid4().hex[:8].upper()}"
@@ -413,14 +438,29 @@ async def _process_merchant_payout(merchant: Dict, merchant_share: float, transa
         from services.hubtel_momo_service import get_hubtel_momo_service
         hubtel_service = get_hubtel_momo_service(db)
         
-        result = await hubtel_service.send_money(
+        # Normalize network to Hubtel channel format
+        network_map = {
+            "MTN": "mtn-gh",
+            "MTN MOMO": "mtn-gh",
+            "VODAFONE": "vodafone-gh",
+            "VODAFONE CASH": "vodafone-gh",
+            "TELECEL": "tigo-gh",
+            "TIGO": "tigo-gh",
+            "AIRTELTIGO": "tigo-gh"
+        }
+        hubtel_channel = network_map.get(merchant_network, "mtn-gh")
+        
+        result = await hubtel_service.send_momo(
             phone=merchant_momo,
             amount=merchant_share,
             description=f"SDM Rewards payment - {payout_ref}",
-            client_reference=payout_ref
+            client_reference=payout_ref,
+            recipient_name=merchant.get("business_name", "Merchant"),
+            channel=hubtel_channel
         )
         
         if result.get("success"):
+            logger.info(f"✅ [MERCHANT_PAYOUT] SUCCESS - Sent GHS {merchant_share:.2f} to {merchant_momo}, ref: {result.get('transaction_id')}")
             await db.merchant_payouts.update_one(
                 {"id": payout_record["id"]},
                 {"$set": {
@@ -433,7 +473,19 @@ async def _process_merchant_payout(merchant: Dict, merchant_share: float, transa
                 {"id": merchant["id"]},
                 {"$inc": {"pending_balance": -merchant_share, "total_paid_out": merchant_share}}
             )
+            
+            # Send SMS notification to merchant about payout
+            try:
+                sms = get_sms()
+                if merchant.get("phone"):
+                    await sms.send_sms(
+                        merchant["phone"],
+                        f"SDM Rewards: GHS {merchant_share:.2f} has been sent to your MoMo {merchant_momo}. Ref: {payout_ref}"
+                    )
+            except Exception as sms_error:
+                logger.error(f"Payout SMS error: {sms_error}")
         else:
+            logger.error(f"❌ [MERCHANT_PAYOUT] FAILED - {result.get('error')}")
             await db.merchant_payouts.update_one(
                 {"id": payout_record["id"]},
                 {"$set": {"status": "failed", "provider_message": result.get("error")}}
