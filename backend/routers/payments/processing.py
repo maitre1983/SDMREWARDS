@@ -344,6 +344,24 @@ async def process_merchant_payment(payment: Dict):
             await sms.notify_merchant_payment(merchant["phone"], payment["amount"], client_name)
     except Exception as e:
         logger.error(f"Merchant payment SMS error: {e}")
+    
+    # Real-time push notification to merchant via SSE
+    try:
+        from routers.notifications_sse import notify_merchant_payment
+        client_name = client.get("full_name", "Customer") if client else "Customer"
+        await notify_merchant_payment(
+            merchant_id=merchant_id,
+            payment_data={
+                "amount": payment["amount"],
+                "cashback": gross_cashback,
+                "client_name": client_name,
+                "payment_method": "momo",
+                "transaction_id": transaction_id
+            }
+        )
+        logger.info(f"📢 [MERCHANT_PAYMENT] SSE notification sent to merchant {merchant_id[:8]}...")
+    except Exception as e:
+        logger.error(f"SSE notification error: {e}")
 
 
 async def _process_merchant_payout(merchant: Dict, merchant_share: float, transaction_id: str):

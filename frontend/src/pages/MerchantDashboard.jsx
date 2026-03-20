@@ -53,6 +53,7 @@ const AdvancedDashboard = lazy(() => import('../components/merchant/AdvancedDash
 const MonthlyStatements = lazy(() => import('../components/merchant/MonthlyStatements'));
 const APIKeysManager = lazy(() => import('../components/merchant/APIKeysManager'));
 const WebhooksManager = lazy(() => import('../components/merchant/WebhooksManager'));
+const PaymentNotificationToast = lazy(() => import('../components/merchant/PaymentNotificationToast'));
 
 // Mini loader for lazy components
 const MiniLoader = () => (
@@ -1460,6 +1461,19 @@ export default function MerchantDashboard() {
         merchantPhone={merchant?.phone}
         merchantEmail={merchant?.email}
       />
+
+      {/* Real-time Payment Notifications */}
+      <Suspense fallback={null}>
+        <PaymentNotificationToast 
+          token={token}
+          onNotification={(notification) => {
+            // Refresh dashboard data when payment received
+            fetchDashboardData();
+            fetchTodayCashStats();
+            fetchTransactions();
+          }}
+        />
+      </Suspense>
 
       {/* Cash Payment Info Modal - Removed: Clients now initiate cash payments */}
 

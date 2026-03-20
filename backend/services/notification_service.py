@@ -209,3 +209,7 @@ def get_notification_service(db):
     if _notification_service is None or _notification_service.db != db:
         _notification_service = NotificationService(db)
     return _notification_service
+
+
+# Alias for backwards compatibility with existing routers
+SmartNotificationService = NotificationService

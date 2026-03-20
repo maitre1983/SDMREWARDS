@@ -668,6 +668,7 @@ from routers.growth import router as growth_router
 from routers.two_factor import router as two_factor_router
 from routers import integration as integration_router_module
 from routers.hubtel_diagnostic import router as hubtel_diagnostic_router
+from routers.notifications_sse import router as notifications_sse_router
 
 # Set database for payments router (new package)
 set_payments_db(db)
@@ -691,6 +692,7 @@ app.include_router(growth_router, prefix="/api/growth", tags=["Growth & Gamifica
 app.include_router(two_factor_router, prefix="/api/2fa", tags=["Two-Factor Authentication"])
 app.include_router(integration_router_module.router, prefix="/api", tags=["Integration API"])
 app.include_router(hubtel_diagnostic_router, prefix="/api/admin", tags=["Hubtel Diagnostics"])
+app.include_router(notifications_sse_router, prefix="/api/notifications", tags=["Real-time Notifications"])
 
 # ============== MOBILE APP STATIC FILES ==============
 import os
