@@ -39,7 +39,31 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-19 (Current Session) - PAYMENT CALLBACK OPTIMIZATION
+### 2026-03-20 (Current Session) - MERCHANT PUSH NOTIFICATIONS
+- ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
+  - **Implementation:**
+    - Backend: New SSE router at `/api/notifications/sse/` with two endpoints:
+      - `GET /api/notifications/sse/status` - Check active SSE connections
+      - `GET /api/notifications/sse/merchant?token=` - SSE stream for authenticated merchants
+    - Integration: `notify_merchant_payment()` called in `process_merchant_payment()` after successful payment
+    - Frontend: 
+      - `sseNotificationService.js` - Singleton for EventSource management with reconnection
+      - `useSSENotifications.js` - React hook for SSE subscription
+      - `PaymentNotificationToast.jsx` - Toast component with sound alerts
+      - Integration in `MerchantDashboard.jsx` - Live notification indicator
+  - **Files Created:**
+    - `/app/backend/routers/notifications_sse.py`
+    - `/app/frontend/src/services/sseNotificationService.js`
+    - `/app/frontend/src/hooks/useSSENotifications.js`
+    - `/app/frontend/src/components/merchant/PaymentNotificationToast.jsx`
+  - **Files Modified:**
+    - `/app/backend/routers/payments/processing.py` - Added SSE notification call
+    - `/app/backend/server.py` - Registered SSE router
+    - `/app/backend/services/notification_service.py` - Added SmartNotificationService alias
+    - `/app/frontend/src/pages/MerchantDashboard.jsx` - Added PaymentNotificationToast component
+  - **Testing:** 10/10 backend tests passed, frontend components load without errors
+
+### 2026-03-19 (Previous Session) - PAYMENT CALLBACK OPTIMIZATION
 - ✅ **Critical Callback Performance Fix** - Redesigned endpoint to return immediately
   - **Problem:** Callback endpoint took 19+ seconds to respond, causing Hubtel webhooks to timeout
   - **Solution:** Implemented FastAPI BackgroundTasks for async processing
@@ -170,13 +194,15 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 - [ ] Interface gestion appareils de confiance
 - [ ] Whitelisting IP dans dashboard marchand  
-- [ ] Notifications push enrichies
+- [ ] Full WebSocket implementation for all dashboards (upgrade from SSE)
 
 ## Key API Endpoints
 
 | Endpoint | Status | Description |
 |----------|--------|-------------|
-| `GET /api/admin/withdrawal-limits` | ✅ **NEW** | Get global withdrawal limits |
+| `GET /api/notifications/sse/status` | ✅ **NEW** | Check active SSE connections |
+| `GET /api/notifications/sse/merchant` | ✅ **NEW** | SSE stream for merchant notifications |
+| `GET /api/admin/withdrawal-limits` | ✅ | Get global withdrawal limits |
 | `PUT /api/admin/withdrawal-limits` | ✅ **NEW** | Update global withdrawal limits |
 | `GET /api/admin/withdrawal-limits/user/{id}` | ✅ **NEW** | Get user's effective limits |
 | `PUT /api/admin/withdrawal-limits/user/{id}` | ✅ **NEW** | Set individual user limits |
