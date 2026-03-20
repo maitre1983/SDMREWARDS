@@ -240,7 +240,7 @@ async def get_chart_data(
                 daily_data[day_key]["volume"] += t.get("amount", 0)
                 daily_data[day_key]["transactions"] += 1
                 daily_data[day_key]["cashback"] += t.get("cashback_amount", 0)
-        except:
+        except Exception:
             continue
     
     return {
@@ -254,18 +254,115 @@ async def get_chart_data(
 
 
 @router.get("/dashboard/payment-methods")
-async def get_payment_methods_breakdown(current_merchant: dict = Depends(get_current_merchant)):
-    """Get payment methods breakdown"""
+async def get_payment_methods_breakdown(
+    chart_type: str = "daily",
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """Get payment methods breakdown with chart data for Today's Payments"""
     db = _get_db()
     merchant_id = current_merchant["id"]
+    now = datetime.now(timezone.utc)
     
-    transactions = await db.transactions.find(
+    # Build periods based on chart_type
+    periods = []
+    if chart_type == "daily":
+        # Last 7 days including today
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            periods.append({
+                "label": day.strftime("%a"),
+                "date": day_start.isoformat(),
+                "start": day_start,
+                "end": day_end
+            })
+    elif chart_type == "weekly":
+        # Last 4 weeks
+        for i in range(3, -1, -1):
+            week_start = now - timedelta(weeks=i, days=now.weekday())
+            week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            week_end = week_start + timedelta(weeks=1)
+            periods.append({
+                "label": f"W{week_start.isocalendar()[1]}",
+                "date": week_start.isoformat(),
+                "start": week_start,
+                "end": week_end
+            })
+    elif chart_type == "monthly":
+        # Last 6 months
+        for i in range(5, -1, -1):
+            month = now.month - i
+            year = now.year
+            if month <= 0:
+                month += 12
+                year -= 1
+            month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+            if month == 12:
+                month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+            periods.append({
+                "label": month_start.strftime("%b"),
+                "date": month_start.isoformat(),
+                "start": month_start,
+                "end": month_end
+            })
+    
+    # Fetch data for each period
+    data = []
+    for period in periods:
+        start_str = period["start"].isoformat()
+        end_str = period["end"].isoformat()
+        
+        # Get MoMo transactions
+        momo_txs = await db.transactions.find({
+            "merchant_id": merchant_id,
+            "status": "completed",
+            "created_at": {"$gte": start_str, "$lt": end_str},
+            "$or": [
+                {"payment_method": "momo"},
+                {"payment_method": {"$exists": False}}  # Legacy default to momo
+            ]
+        }, {"_id": 0, "amount": 1, "cashback_amount": 1, "net_cashback": 1}).to_list(10000)
+        
+        # Get cash transactions
+        cash_txs = await db.transactions.find({
+            "merchant_id": merchant_id,
+            "status": "completed",
+            "created_at": {"$gte": start_str, "$lt": end_str},
+            "payment_method": "cash"
+        }, {"_id": 0, "amount": 1, "cashback_amount": 1, "net_cashback": 1}).to_list(10000)
+        
+        momo_volume = sum(t.get("amount", 0) for t in momo_txs)
+        momo_count = len(momo_txs)
+        momo_cashback = sum(t.get("cashback_amount", 0) or t.get("net_cashback", 0) for t in momo_txs)
+        
+        cash_volume = sum(t.get("amount", 0) for t in cash_txs)
+        cash_count = len(cash_txs)
+        cash_cashback = sum(t.get("cashback_amount", 0) or t.get("net_cashback", 0) for t in cash_txs)
+        
+        data.append({
+            "label": period["label"],
+            "date": period["date"],
+            "momo_volume": round(momo_volume, 2),
+            "momo_count": momo_count,
+            "momo_cashback": round(momo_cashback, 2),
+            "cash_volume": round(cash_volume, 2),
+            "cash_count": cash_count,
+            "cash_cashback": round(cash_cashback, 2),
+            "total_volume": round(momo_volume + cash_volume, 2),
+            "total_count": momo_count + cash_count
+        })
+    
+    # Also get overall breakdown
+    all_transactions = await db.transactions.find(
         {"merchant_id": merchant_id, "status": "completed"},
         {"_id": 0, "payment_method": 1, "amount": 1}
     ).to_list(100000)
     
     breakdown = {}
-    for t in transactions:
+    for t in all_transactions:
         method = t.get("payment_method", "momo")
         if method not in breakdown:
             breakdown[method] = {"count": 0, "volume": 0}
@@ -273,9 +370,13 @@ async def get_payment_methods_breakdown(current_merchant: dict = Depends(get_cur
         breakdown[method]["volume"] += t.get("amount", 0)
     
     total = sum(b["count"] for b in breakdown.values())
-    
     for method in breakdown:
         breakdown[method]["percentage"] = round((breakdown[method]["count"] / total * 100), 1) if total > 0 else 0
         breakdown[method]["volume"] = round(breakdown[method]["volume"], 2)
     
-    return {"breakdown": breakdown, "total_transactions": total}
+    return {
+        "data": data,
+        "breakdown": breakdown,
+        "total_transactions": total,
+        "chart_type": chart_type
+    }

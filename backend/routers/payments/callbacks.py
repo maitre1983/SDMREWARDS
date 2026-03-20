@@ -1039,3 +1039,56 @@ async def admin_debug_payment(payment_ref: str, admin_secret: str = None):
         result["diagnosis"].append("✅ Transaction record exists - payment was fully processed")
     
     return result
+
+
+
+@router.get("/admin/transactions")
+async def admin_list_transactions(limit: int = 30, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: List all transactions in the system.
+    Shows transactions across all merchants with merchant_id verification.
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    # Get recent transactions
+    transactions = []
+    cursor = db.transactions.find(
+        {},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit)
+    
+    async for txn in cursor:
+        transactions.append({
+            "id": txn.get("id"),
+            "type": txn.get("type"),
+            "amount": txn.get("amount"),
+            "merchant_id": txn.get("merchant_id"),
+            "client_id": txn.get("client_id"),
+            "payment_method": txn.get("payment_method"),
+            "status": txn.get("status"),
+            "created_at": txn.get("created_at"),
+            "description": txn.get("description")
+        })
+    
+    # Count by type
+    type_counts = {}
+    for t in transactions:
+        tx_type = t.get("type", "unknown")
+        type_counts[tx_type] = type_counts.get(tx_type, 0) + 1
+    
+    # Count with merchant_id
+    with_merchant = sum(1 for t in transactions if t.get("merchant_id"))
+    
+    return {
+        "success": True,
+        "count": len(transactions),
+        "with_merchant_id": with_merchant,
+        "type_breakdown": type_counts,
+        "transactions": transactions
+    }
