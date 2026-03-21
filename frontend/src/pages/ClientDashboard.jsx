@@ -1236,27 +1236,27 @@ export default function ClientDashboard() {
       
       {/* Header */}
       <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-40">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-lg mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-9 h-9 object-contain rounded-lg" />
+            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-lg" />
             <span className="font-bold text-white">SDM</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button 
               onClick={() => setShowNotificationSettings(true)} 
-              className="text-slate-400 hover:text-amber-400"
+              className="text-slate-400 hover:text-amber-400 p-1"
               data-testid="notifications-btn"
             >
               <Bell size={20} />
             </button>
             <button 
               onClick={() => navigate('/client/profile')} 
-              className="text-slate-400 hover:text-white"
+              className="text-slate-400 hover:text-white p-1"
               data-testid="profile-btn"
             >
               <User size={20} />
             </button>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-white">
+            <button onClick={handleLogout} className="text-slate-400 hover:text-white p-1">
               <LogOut size={20} />
             </button>
           </div>
@@ -1264,13 +1264,13 @@ export default function ClientDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-lg mx-auto px-4 py-6 pb-24">
+      <main className="max-w-lg mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-24">
         {/* Balance Card */}
-        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white mb-6">
+        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-4 sm:p-6 text-white mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-amber-100 text-sm">Cashback Balance</p>
-              <p className="text-3xl font-bold">GHS {(client?.cashback_balance || 0).toFixed(2)}</p>
+              <p className="text-2xl sm:text-3xl font-bold">GHS {(client?.cashback_balance || 0).toFixed(2)}</p>
             </div>
             {isActive && (
               <div className={`px-3 py-1 rounded-full text-xs font-medium ${

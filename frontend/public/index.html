@@ -37,6 +37,13 @@
         <link rel="icon" type="image/png" href="/sdm-logo.png" />
         <link rel="apple-touch-icon" href="/sdm-logo.png" />
         
+        <!-- PWA Manifest -->
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="SDM Rewards" />
+        
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -174,6 +181,22 @@
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
+        
+        <!-- PWA Service Worker Registration -->
+        <script>
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js')
+                .then(function(registration) {
+                  console.log('SDM Rewards: ServiceWorker registered');
+                })
+                .catch(function(error) {
+                  console.log('SDM Rewards: ServiceWorker registration failed:', error);
+                });
+            });
+          }
+        </script>
+        
         <script>
             !(function (t, e) {
                 var o, n, p, r;

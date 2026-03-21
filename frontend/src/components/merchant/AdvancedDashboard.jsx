@@ -106,10 +106,10 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
       {/* Period Selector */}
       <div className="flex flex-wrap gap-2">
         {[
-          { id: 'day', label: 'Aujourd\'hui' },
-          { id: 'week', label: 'Semaine' },
-          { id: 'month', label: 'Mois' },
-          { id: 'year', label: 'Année' }
+          { id: 'day', label: 'Today' },
+          { id: 'week', label: 'Week' },
+          { id: 'month', label: 'Month' },
+          { id: 'year', label: 'Year' }
         ].map((p) => (
           <button
             key={p.id}
@@ -136,7 +136,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
             </div>
             <GrowthIndicator value={advancedStats?.growth?.volume} />
           </div>
-          <p className="text-slate-400 text-sm">Ventes</p>
+          <p className="text-slate-400 text-sm">Sales</p>
           <p className="text-white text-xl font-bold">
             {formatCurrency(advancedStats?.current?.volume)}
           </p>
@@ -200,7 +200,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
       {/* Mini Accounting Summary */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-6">
         <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-          <Calculator size={18} /> Mini Comptabilité
+          <Calculator size={18} /> Mini Accounting
         </h3>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -223,7 +223,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
             </p>
           </div>
           <div>
-            <p className="text-slate-400 text-sm">Clients uniques</p>
+            <p className="text-slate-400 text-sm">Unique customers</p>
             <p className="text-emerald-400 text-2xl font-bold flex items-center gap-2">
               <Users size={20} />
               {summary?.all_time?.unique_clients || 0}
@@ -233,13 +233,13 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
 
         {/* Period breakdown */}
         <div className="mt-6 pt-6 border-t border-slate-700">
-          <h4 className="text-slate-300 text-sm font-medium mb-3">Ventes par période</h4>
+          <h4 className="text-slate-300 text-sm font-medium mb-3">Sales by period</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { key: 'day', label: 'Aujourd\'hui' },
-              { key: 'week', label: 'Semaine' },
-              { key: 'month', label: 'Mois' },
-              { key: 'year', label: 'Année' }
+              { key: 'day', label: 'Today' },
+              { key: 'week', label: 'Week' },
+              { key: 'month', label: 'Month' },
+              { key: 'year', label: 'Year' }
             ].map((p) => (
               <div key={p.key} className="bg-slate-900/50 rounded-lg p-3">
                 <p className="text-slate-500 text-xs">{p.label}</p>
@@ -305,7 +305,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
                 />
                 <Bar 
                   dataKey="volume" 
-                  name="Ventes (GHS)" 
+                  name="Sales (GHS)" 
                   fill="#10b981" 
                   radius={[4, 4, 0, 0]}
                 />
@@ -320,7 +320,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
           </div>
         ) : (
           <div className="h-64 flex items-center justify-center text-slate-500">
-            Pas de données pour cette période
+            No data for this period
           </div>
         )}
 
@@ -347,7 +347,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-white font-semibold flex items-center gap-2">
-            <Banknote size={18} className="text-amber-400" /> Revenus: Cash vs MoMo
+            <Banknote size={18} className="text-amber-400" /> Revenue: Cash vs MoMo
           </h3>
         </div>
 
@@ -420,7 +420,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
                 {formatCurrency(paymentMethodsData.totals.total_cashback)}
               </p>
               <p className="text-slate-400 text-xs">
-                distribué aux clients
+                distributed to customers
               </p>
             </div>
           </div>
@@ -500,7 +500,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
       {/* Cashback Rate Info */}
       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p className="text-emerald-400 font-medium">Taux de cashback actuel</p>
+          <p className="text-emerald-400 font-medium">Current cashback rate</p>
           <p className="text-slate-400 text-sm">
             Member since {summary?.member_since ? new Date(summary.member_since).toLocaleDateString('en-US') : 'N/A'}
           </p>

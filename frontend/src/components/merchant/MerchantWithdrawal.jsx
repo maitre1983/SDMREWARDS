@@ -3,8 +3,8 @@
  * ============================
  * Simplified payout destination configuration.
  * 
- * SDM ne garde pas l'argent du marchand - après chaque paiement client,
- * la part du marchand est envoyée automatiquement vers son compte MoMo ou Bank.
+ * SDM doesn't hold merchant funds - after each customer payment,
+ * the merchant's share is sent automatically to their MoMo or Bank account.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -75,7 +75,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       return;
     }
     if (amount > balance.available) {
-      toast.error('Solde insuffisant');
+      toast.error('Insufficient balance');
       return;
     }
 
@@ -89,15 +89,15 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       );
       
       if (res.data.success) {
-        toast.success(`Retrait de GHS ${amount.toFixed(2)} initié!`);
+        toast.success(`Withdrawal of GHS ${amount.toFixed(2)} initiated!`);
         setWithdrawAmount('');
         fetchBalanceData();
         onRefresh?.();
       } else {
-        toast.error(res.data.error || 'Échec du retrait');
+        toast.error(res.data.error || 'Withdrawal failed');
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Échec du retrait');
+      toast.error(error.response?.data?.detail || 'Withdrawal failed');
     } finally {
       setIsWithdrawing(false);
     }
@@ -107,7 +107,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
   
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('fr-FR', {
+    return new Date(dateStr).toLocaleDateString('en-US', {
       day: '2-digit',
       month: 'short',
       hour: '2-digit',
@@ -126,44 +126,44 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
   return (
     <div className="space-y-6">
       {/* Auto-Payout Info Banner */}
-      <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 rounded-xl p-5">
-        <div className="flex items-start gap-4">
+      <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 rounded-xl p-4 sm:p-5">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
           <div className="w-12 h-12 bg-emerald-500/30 rounded-xl flex items-center justify-center flex-shrink-0">
             <Zap className="text-emerald-400" size={24} />
           </div>
-          <div>
-            <h3 className="text-white text-lg font-semibold mb-1">Paiements Automatiques Activés</h3>
+          <div className="flex-1 w-full">
+            <h3 className="text-white text-lg font-semibold mb-1">Automatic Payouts Enabled</h3>
             <p className="text-slate-300 text-sm mb-3">
-              Après chaque paiement client, votre part est envoyée <span className="text-emerald-400 font-semibold">instantanément</span> vers votre compte configuré.
+              After each customer payment, your share is sent <span className="text-emerald-400 font-semibold">instantly</span> to your configured account.
             </p>
             <div className="flex items-center gap-3 bg-slate-800/50 rounded-lg px-4 py-3">
               {payoutSettings?.preferred_payout_method === 'bank' ? (
                 <>
-                  <Building2 className="text-blue-400" size={20} />
-                  <div>
-                    <p className="text-white font-medium">{payoutSettings?.bank_name || 'Compte Bancaire'}</p>
+                  <Building2 className="text-blue-400 flex-shrink-0" size={20} />
+                  <div className="min-w-0">
+                    <p className="text-white font-medium truncate">{payoutSettings?.bank_name || 'Bank Account'}</p>
                     <p className="text-slate-400 text-sm">****{(payoutSettings?.bank_account || '').slice(-4)}</p>
                   </div>
                 </>
               ) : (
                 <>
-                  <Phone className="text-purple-400" size={20} />
-                  <div>
-                    <p className="text-white font-medium">{payoutSettings?.momo_network || 'Mobile Money'}</p>
-                    <p className="text-slate-400 text-sm">{payoutSettings?.momo_number || 'Non configuré'}</p>
+                  <Phone className="text-purple-400 flex-shrink-0" size={20} />
+                  <div className="min-w-0">
+                    <p className="text-white font-medium truncate">{payoutSettings?.momo_network || 'Mobile Money'}</p>
+                    <p className="text-slate-400 text-sm">{payoutSettings?.momo_number || 'Not configured'}</p>
                   </div>
                 </>
               )}
               {payoutSettings?.momo_number || payoutSettings?.bank_account ? (
-                <CheckCircle className="text-emerald-400 ml-auto" size={20} />
+                <CheckCircle className="text-emerald-400 ml-auto flex-shrink-0" size={20} />
               ) : (
-                <AlertCircle className="text-amber-400 ml-auto" size={20} />
+                <AlertCircle className="text-amber-400 ml-auto flex-shrink-0" size={20} />
               )}
             </div>
             {!payoutSettings?.momo_number && payoutSettings?.preferred_payout_method !== 'bank' && (
               <p className="text-amber-400 text-xs mt-2 flex items-center gap-1">
                 <Info size={14} />
-                Configurez votre MoMo dans Settings &gt; Payment
+                Configure your MoMo in Settings &gt; Payment
               </p>
             )}
           </div>
@@ -171,45 +171,45 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       </div>
 
       {/* Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Available Balance */}
-        <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 rounded-xl p-5">
+        <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 rounded-xl p-4 sm:p-5">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-slate-400 text-sm mb-1">Solde Disponible</p>
-              <p className="text-3xl font-bold text-emerald-400">{formatCurrency(balance.available)}</p>
-              <p className="text-xs text-slate-500 mt-1">Prêt à retirer</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-slate-400 text-sm mb-1">Available Balance</p>
+              <p className="text-2xl sm:text-3xl font-bold text-emerald-400 truncate">{formatCurrency(balance.available)}</p>
+              <p className="text-xs text-slate-500 mt-1">Ready to withdraw</p>
             </div>
-            <div className="w-12 h-12 bg-emerald-500/30 rounded-xl flex items-center justify-center">
-              <Wallet className="text-emerald-400" size={24} />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-500/30 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Wallet className="text-emerald-400" size={20} />
             </div>
           </div>
         </div>
 
         {/* Pending Balance */}
-        <div className="bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 rounded-xl p-5">
+        <div className="bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 rounded-xl p-4 sm:p-5">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-slate-400 text-sm mb-1">En Attente</p>
-              <p className="text-3xl font-bold text-amber-400">{formatCurrency(balance.pending)}</p>
-              <p className="text-xs text-slate-500 mt-1">Paiements en cours</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-slate-400 text-sm mb-1">Pending</p>
+              <p className="text-2xl sm:text-3xl font-bold text-amber-400 truncate">{formatCurrency(balance.pending)}</p>
+              <p className="text-xs text-slate-500 mt-1">Processing payments</p>
             </div>
-            <div className="w-12 h-12 bg-amber-500/30 rounded-xl flex items-center justify-center">
-              <Clock className="text-amber-400" size={24} />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-500/30 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Clock className="text-amber-400" size={20} />
             </div>
           </div>
         </div>
 
         {/* Total Received */}
-        <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-xl p-5">
+        <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-xl p-4 sm:p-5 sm:col-span-2 lg:col-span-1">
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-slate-400 text-sm mb-1">Total Reçu</p>
-              <p className="text-3xl font-bold text-purple-400">{formatCurrency(balance.total_received)}</p>
-              <p className="text-xs text-slate-500 mt-1">Gains totaux</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-slate-400 text-sm mb-1">Total Received</p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-400 truncate">{formatCurrency(balance.total_received)}</p>
+              <p className="text-xs text-slate-500 mt-1">Lifetime earnings</p>
             </div>
-            <div className="w-12 h-12 bg-purple-500/30 rounded-xl flex items-center justify-center">
-              <TrendingUp className="text-purple-400" size={24} />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500/30 rounded-xl flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="text-purple-400" size={20} />
             </div>
           </div>
         </div>
@@ -217,21 +217,21 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
 
       {/* Manual Withdraw Section - Only shown if there's available balance */}
       {balance.available >= 5 && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
               <Send className="text-blue-400" size={20} />
             </div>
             <div>
-              <h3 className="text-white font-semibold">Retrait Manuel</h3>
-              <p className="text-slate-400 text-xs">Retirer le solde restant vers votre compte</p>
+              <h3 className="text-white font-semibold">Manual Withdrawal</h3>
+              <p className="text-slate-400 text-xs">Withdraw remaining balance to your account</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Quick Amount Buttons */}
             <div>
-              <label className="text-slate-300 text-sm block mb-2">Montant (GHS)</label>
+              <label className="text-slate-300 text-sm block mb-2">Amount (GHS)</label>
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {[50, 100, 500].filter(a => a <= balance.available).map(amt => (
                   <button
@@ -254,7 +254,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                       : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
-                  TOUT
+                  ALL
                 </button>
               </div>
               
@@ -262,7 +262,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">GHS</span>
                 <Input
                   type="number"
-                  placeholder="Montant"
+                  placeholder="Amount"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   className="pl-14 bg-slate-900 border-slate-600 text-white h-11"
@@ -279,13 +279,13 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                 <p className="text-slate-500 text-xs mb-1">Destination</p>
                 {payoutSettings?.preferred_payout_method === 'bank' ? (
                   <div className="flex items-center gap-2">
-                    <Building2 className="text-blue-400" size={16} />
-                    <span className="text-white text-sm">{payoutSettings?.bank_name} - ****{(payoutSettings?.bank_account || '').slice(-4)}</span>
+                    <Building2 className="text-blue-400 flex-shrink-0" size={16} />
+                    <span className="text-white text-sm truncate">{payoutSettings?.bank_name} - ****{(payoutSettings?.bank_account || '').slice(-4)}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Phone className="text-purple-400" size={16} />
-                    <span className="text-white text-sm">{payoutSettings?.momo_network} - {payoutSettings?.momo_number}</span>
+                    <Phone className="text-purple-400 flex-shrink-0" size={16} />
+                    <span className="text-white text-sm truncate">{payoutSettings?.momo_network} - {payoutSettings?.momo_number}</span>
                   </div>
                 )}
               </div>
@@ -299,12 +299,12 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                 {isWithdrawing ? (
                   <>
                     <Loader2 className="animate-spin mr-2" size={18} />
-                    Traitement...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <ArrowDownToLine className="mr-2" size={18} />
-                    Retirer {withdrawAmount ? formatCurrency(parseFloat(withdrawAmount)) : ''}
+                    Withdraw {withdrawAmount ? formatCurrency(parseFloat(withdrawAmount)) : ''}
                   </>
                 )}
               </Button>
@@ -315,14 +315,14 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
 
       {/* Recent Payouts History */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-slate-700">
           <div className="flex items-center gap-2">
             <History className="text-slate-400" size={18} />
-            <h3 className="text-white font-semibold">Historique des Paiements</h3>
+            <h3 className="text-white font-semibold">Payment History</h3>
           </div>
           <button
             onClick={fetchBalanceData}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="text-slate-400 hover:text-white transition-colors p-2"
           >
             <RefreshCw size={16} />
           </button>
@@ -331,15 +331,15 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
         {payoutHistory.length === 0 ? (
           <div className="p-8 text-center">
             <ArrowDownToLine className="text-slate-600 mx-auto mb-2" size={32} />
-            <p className="text-slate-400">Aucun paiement encore</p>
-            <p className="text-slate-500 text-sm mt-1">Vos paiements automatiques apparaîtront ici</p>
+            <p className="text-slate-400">No payments yet</p>
+            <p className="text-slate-500 text-sm mt-1">Your automatic payouts will appear here</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-700/50">
             {payoutHistory.map((p, idx) => (
-              <div key={p.id || idx} className="flex items-center justify-between px-5 py-3 hover:bg-slate-700/30">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              <div key={p.id || idx} className="flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-slate-700/30">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                     p.status === 'completed' ? 'bg-emerald-500/20' :
                     p.status === 'processing' ? 'bg-amber-500/20' : 'bg-red-500/20'
                   }`}>
@@ -347,18 +347,18 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                      p.status === 'processing' ? <Clock className="text-amber-400" size={16} /> :
                      <AlertCircle className="text-red-400" size={16} />}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-white text-sm font-medium">{formatCurrency(p.amount)}</p>
-                    <p className="text-slate-500 text-xs">{formatDate(p.created_at)}</p>
+                    <p className="text-slate-500 text-xs truncate">{formatDate(p.created_at)}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0 ml-2">
                   <p className={`text-xs font-medium ${
                     p.status === 'completed' ? 'text-emerald-400' :
                     p.status === 'processing' ? 'text-amber-400' : 'text-red-400'
                   }`}>
-                    {p.status === 'completed' ? 'Complété' :
-                     p.status === 'processing' ? 'En cours' : 'Échoué'}
+                    {p.status === 'completed' ? 'Completed' :
+                     p.status === 'processing' ? 'Processing' : 'Failed'}
                   </p>
                   <p className="text-slate-500 text-xs">
                     {p.payout_method === 'bank' ? 'Bank' : 'MoMo'}

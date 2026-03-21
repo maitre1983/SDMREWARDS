@@ -1161,7 +1161,7 @@ export default function FintechDashboard({ token }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Montant minimum (GHS)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Minimum Amount (GHS)</label>
                   <Input
                     type="number"
                     value={newPromo.min_amount}
@@ -2239,7 +2239,7 @@ export default function FintechDashboard({ token }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Téléphone</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
                   <Input
                     value={newPartner.phone}
                     onChange={(e) => setNewPartner({...newPartner, phone: e.target.value})}

@@ -68,7 +68,7 @@ export default function NotificationSettings({ clientToken, language = 'en' }) {
       push: 'Notifications Push',
       pushDesc: 'Alertes instantanées sur votre appareil',
       sms: 'Messages SMS',
-      smsDesc: 'Messages texte sur votre téléphone',
+      smsDesc: 'Text messages to your phone',
       email: 'Email',
       emailDesc: 'Mises à jour par email',
       types: 'Types de Notification',

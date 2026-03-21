@@ -70,7 +70,7 @@ export default function PinModal({ isOpen, onClose, onVerify, isLoading, error }
             </div>
             <div>
               <h3 className="text-white font-semibold">Code PIN requis</h3>
-              <p className="text-slate-400 text-sm">Entrez votre code PIN</p>
+              <p className="text-slate-400 text-sm">Enter your PIN code</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
@@ -114,7 +114,7 @@ export default function PinModal({ isOpen, onClose, onVerify, isLoading, error }
           ) : (
             <KeyRound className="mr-2" size={18} />
           )}
-          {isLoading ? 'Vérification...' : 'Vérifier'}
+          {isLoading ? 'Verifying...' : 'Verify'}
         </Button>
 
         <button

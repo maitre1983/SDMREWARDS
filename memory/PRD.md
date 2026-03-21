@@ -106,6 +106,31 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Gère les références SDM-PAYOUT-XXXXXXXX
 - ✅ **SMS Notification** - Marchand notifié après chaque payout réussi
 
+### 2026-03-21 (Fork 2 - Part 4) - ENGLISH TRANSLATION, RESPONSIVE & PWA
+- ✅ **English Translation (Priority Language):**
+  - MerchantWithdrawal.jsx - fully translated
+  - MerchantDashboard.jsx - tabs, labels, messages
+  - AdvancedDashboard.jsx - periods, stats, charts
+  - PinModal.jsx - verification prompts
+  - ClientDashboard.jsx - balance card, headers
+  - Various admin components
+  - Default language changed to English in LanguageContext
+- ✅ **Responsive Design Improvements:**
+  - Mobile-first padding: `px-3 sm:px-4`, `p-4 sm:p-6`
+  - Header: truncated business name, smaller icons on mobile
+  - Balance cards: responsive text sizes `text-2xl sm:text-3xl`
+  - QR codes: responsive sizing `w-[150px] sm:w-[180px]`
+  - Touch-friendly buttons with `p-1` or `p-2` padding
+- ✅ **PWA (Progressive Web App) Setup:**
+  - `/public/manifest.json` - app name, icons, shortcuts, theme colors
+  - `/public/sw.js` - service worker with offline caching
+  - `index.html` - PWA meta tags, apple-mobile-web-app-capable
+  - Service worker registration on page load
+  - App installable from browser (Add to Home Screen)
+- ✅ **Cleanup:**
+  - Removed "Relevés" (Statements) tab from merchant dashboard
+  - Removed BulkClix from .env and config.py completely
+
 ### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo

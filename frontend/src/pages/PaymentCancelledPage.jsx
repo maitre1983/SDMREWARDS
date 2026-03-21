@@ -16,7 +16,7 @@ const PaymentCancelledPage = () => {
               <XCircle className="w-10 h-10 text-white" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white mt-6 mb-2">Paiement Annulé</h1>
+          <h1 className="text-2xl font-bold text-white mt-6 mb-2">Payment Cancelled</h1>
           <p className="text-slate-400">Vous avez annulé le processus de paiement</p>
         </div>
 

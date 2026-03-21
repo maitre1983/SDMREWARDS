@@ -153,7 +153,7 @@ export default function AIAssistant({ clientToken, language = 'en' }) {
       setChatMessages(prev => [...prev, { 
         role: 'assistant', 
         content: language === 'fr' 
-          ? 'Désolé, je n\'ai pas pu traiter votre demande.' 
+          ? 'Sorry, I could not process your request.' 
           : 'Sorry, I couldn\'t process your request.'
       }]);
     } finally {

@@ -166,7 +166,7 @@ export default function UsersAndMerchantsPanel({ token }) {
         toast.error(
           <div>
             <p className="font-semibold">Vérification échouée</p>
-            <p className="text-sm">{response.data.error || 'Numéro non trouvé'}</p>
+            <p className="text-sm">{response.data.error || 'Number not found'}</p>
           </div>
         );
       }

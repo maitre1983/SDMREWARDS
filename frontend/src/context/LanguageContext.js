@@ -12,7 +12,11 @@ export const useLanguage = () => {
 };
 
 export const LanguageProvider = ({ children }) => {
-  const [language, setLanguageState] = useState(getLanguageFromStorage());
+  // Default to English
+  const [language, setLanguageState] = useState(() => {
+    const stored = getLanguageFromStorage();
+    return stored || 'en';
+  });
 
   useEffect(() => {
     // Set HTML lang attribute

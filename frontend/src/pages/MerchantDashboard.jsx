@@ -602,22 +602,22 @@ export default function MerchantDashboard() {
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <header className="bg-slate-900/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-9 h-9 object-contain rounded-lg" />
-            <div>
-              <span className="font-bold text-white block">{merchant?.business_name}</span>
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src={SDM_LOGO_URL} alt="SDM Rewards" className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-lg flex-shrink-0" />
+            <div className="min-w-0">
+              <span className="font-bold text-white block text-sm sm:text-base truncate">{merchant?.business_name}</span>
               {getStatusBadge(merchant?.status)}
             </div>
           </div>
-          <button onClick={handleLogout} className="text-slate-400 hover:text-white">
+          <button onClick={handleLogout} className="text-slate-400 hover:text-white p-2 -mr-2">
             <LogOut size={20} />
           </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-6 pb-24">
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-24">
         {/* Advanced Dashboard Tab */}
         {activeTab === 'home' && (
           <AdvancedDashboard 
@@ -631,7 +631,7 @@ export default function MerchantDashboard() {
         {activeTab === 'qr' && (
           <div className="space-y-8">
             {/* Payment QR Code - Green/Emerald Theme */}
-            <div className="bg-gradient-to-br from-emerald-900/50 to-slate-800 border-2 border-emerald-500/50 rounded-2xl p-6 relative overflow-hidden">
+            <div className="bg-gradient-to-br from-emerald-900/50 to-slate-800 border-2 border-emerald-500/50 rounded-2xl p-4 sm:p-6 relative overflow-hidden">
               {/* Background decoration */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl" />
               <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-400/10 rounded-full blur-2xl" />
@@ -652,14 +652,15 @@ export default function MerchantDashboard() {
                 <div className="text-center">
                   <div className="relative inline-block">
                     {/* QR Code with green border */}
-                    <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-emerald-500/20 border-4 border-emerald-500">
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-2xl shadow-emerald-500/20 border-4 border-emerald-500">
                       <QRCodeSVG 
                         value={`https://web-boost-seo.preview.emergentagent.com/pay/${merchant?.payment_qr_code || 'DEMO'}`}
-                        size={200}
+                        size={180}
                         level="H"
                         includeMargin={false}
                         fgColor="#059669"
                         bgColor="#ffffff"
+                        className="w-[150px] h-[150px] sm:w-[180px] sm:h-[180px]"
                       />
                     </div>
                     {/* Badge */}
@@ -692,7 +693,7 @@ export default function MerchantDashboard() {
             </div>
 
             {/* Recruitment QR Code - Purple/Blue Theme */}
-            <div className="bg-gradient-to-br from-purple-900/50 to-slate-800 border-2 border-purple-500/50 rounded-2xl p-6 relative overflow-hidden">
+            <div className="bg-gradient-to-br from-purple-900/50 to-slate-800 border-2 border-purple-500/50 rounded-2xl p-4 sm:p-6 relative overflow-hidden">
               {/* Background decoration */}
               <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
               <div className="absolute bottom-0 right-0 w-24 h-24 bg-blue-400/10 rounded-full blur-2xl" />
@@ -713,7 +714,7 @@ export default function MerchantDashboard() {
                 <div className="text-center">
                   <div className="relative inline-block">
                     {/* QR Code with purple border */}
-                    <div className="bg-white rounded-2xl p-6 shadow-2xl shadow-purple-500/20 border-4 border-purple-500">
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-2xl shadow-purple-500/20 border-4 border-purple-500">
                       <QRCodeSVG 
                         value={`https://web-boost-seo.preview.emergentagent.com/register?ref=${merchant?.recruitment_qr_code || 'DEMO'}`}
                         size={200}
@@ -1209,9 +1210,9 @@ export default function MerchantDashboard() {
                 { id: 'payment', label: 'Payment', icon: Wallet },
                 { id: 'withdrawal', label: 'Withdrawal', icon: ArrowDownToLine },
                 { id: 'payouts', label: 'Payouts', icon: History },
-                { id: 'cashiers', label: 'Caissiers', icon: UserCog },
-                { id: 'business', label: 'Commerce', icon: Building },
-                { id: 'security', label: 'Sécurité', icon: Shield },
+                { id: 'cashiers', label: 'Cashiers', icon: UserCog },
+                { id: 'business', label: 'Business', icon: Building },
+                { id: 'security', label: 'Security', icon: Shield },
                 { id: 'api', label: 'API & Webhooks', icon: Key }
               ].map((tab) => (
                 <button
@@ -1234,7 +1235,7 @@ export default function MerchantDashboard() {
             {settingsTab === 'cashback' && (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
                 <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                  <Percent size={18} /> Taux de Cashback
+                  <Percent size={18} /> Cashback Rate
                 </h3>
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
@@ -1247,7 +1248,7 @@ export default function MerchantDashboard() {
                       onChange={(e) => setSettings({...settings, cashback_rate: e.target.value})}
                       className="bg-slate-900 border-slate-700 text-white text-lg"
                     />
-                    <p className="text-slate-500 text-xs mt-1">Plage: 1% - 20%</p>
+                    <p className="text-slate-500 text-xs mt-1">Range: 1% - 20%</p>
                   </div>
                   <Button
                     onClick={handleSaveCashbackRate}
