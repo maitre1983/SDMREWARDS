@@ -43,20 +43,20 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 - ✅ **Merchant Withdrawal Tab** - New "Withdrawal" tab in Settings showing:
   - **Balance Cards**: Available balance, Pending, Total Received
   - **Manual Withdraw**: Button to withdraw funds to configured MoMo/Bank
-  - **Automatic Withdraw**: Toggle and settings for scheduled payouts:
-    - Frequency: Instant, Daily, Weekly
-    - Minimum amount threshold
-    - Destination: MoMo or Bank
-  - **Recent Withdrawals**: History of withdrawal transactions
-  - **API Endpoints:**
-    - `GET /api/merchants/balance` - Get merchant balance
-    - `POST /api/merchants/withdraw` - Initiate manual withdrawal
-    - `GET /api/merchants/withdrawals` - Get withdrawal history
-    - `GET /api/merchants/auto-withdraw/settings` - Get auto-withdraw settings
-    - `POST /api/merchants/auto-withdraw/settings` - Save auto-withdraw settings
-  - **Files Created:**
-    - `/app/backend/routers/merchant_withdrawal.py` - Merchant withdrawal API
-    - `/app/frontend/src/components/merchant/MerchantWithdrawal.jsx` - Withdrawal UI component
+  - **Automatic Withdraw**: Toggle and settings for scheduled payouts
+- ✅ **Balance Calculation Fixed** - Now correctly aggregates from all payment sources:
+  - transactions, cash_payments, momo_payments collections
+  - Uses `$ifNull` to handle missing `merchant_amount` field
+- ✅ **Auto-Withdrawal Worker** - Background service for scheduled withdrawals:
+  - Instant: Process immediately after each payment
+  - Daily: Process at midnight
+  - Weekly: Process every Sunday
+  - File: `/app/backend/services/auto_withdrawal_worker.py`
+  - Task endpoint: `POST /api/tasks/process-auto-withdrawals`
+- ✅ **Admin Withdrawal History** - Admin can view all merchant withdrawals:
+  - Endpoint: `GET /api/admin/merchant-withdrawals`
+  - Shows: merchant name, amount, date/time, status, payout method
+  - Stats: completed, pending, processing, failed counts and amounts
 
 ### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received

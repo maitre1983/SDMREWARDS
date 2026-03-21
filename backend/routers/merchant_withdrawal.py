@@ -63,33 +63,56 @@ async def get_merchant_balance(current_merchant: dict = Depends(get_current_merc
     if not merchant:
         raise HTTPException(status_code=404, detail="Merchant not found")
     
-    # Calculate balances from transactions if not stored
-    # Available = completed payments not yet withdrawn
-    # Pending = processing payments
-    
-    # Get completed payments sum (merchant share)
-    pipeline = [
+    # Calculate balances from all payment sources
+    # 1. From transactions collection (main payment records)
+    tx_pipeline = [
         {"$match": {"merchant_id": merchant_id, "status": "completed"}},
         {"$group": {
             "_id": None,
-            "total": {"$sum": "$merchant_amount"}
+            "total": {"$sum": {"$ifNull": ["$merchant_amount", "$amount"]}}
         }}
     ]
-    total_result = await db.transactions.aggregate(pipeline).to_list(1)
-    total_received = total_result[0]["total"] if total_result else 0
+    tx_result = await db.transactions.aggregate(tx_pipeline).to_list(1)
+    tx_total = tx_result[0]["total"] if tx_result else 0
+    
+    # 2. From cash_payments collection
+    cash_pipeline = [
+        {"$match": {"merchant_id": merchant_id, "status": "completed"}},
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": {"$ifNull": ["$merchant_amount", "$amount"]}}
+        }}
+    ]
+    cash_result = await db.cash_payments.aggregate(cash_pipeline).to_list(1)
+    cash_total = cash_result[0]["total"] if cash_result else 0
+    
+    # 3. From momo_payments collection
+    momo_pipeline = [
+        {"$match": {"merchant_id": merchant_id, "status": "completed"}},
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": {"$ifNull": ["$merchant_amount", "$amount"]}}
+        }}
+    ]
+    momo_result = await db.momo_payments.aggregate(momo_pipeline).to_list(1)
+    momo_total = momo_result[0]["total"] if momo_result else 0
+    
+    # Total received from all sources (avoid double counting)
+    # transactions collection is the main one, others may duplicate
+    total_received = tx_total or (cash_total + momo_total)
     
     # Get pending payments sum
     pending_pipeline = [
         {"$match": {"merchant_id": merchant_id, "status": {"$in": ["pending", "processing"]}}},
         {"$group": {
             "_id": None,
-            "total": {"$sum": "$merchant_amount"}
+            "total": {"$sum": {"$ifNull": ["$merchant_amount", "$amount"]}}
         }}
     ]
     pending_result = await db.transactions.aggregate(pending_pipeline).to_list(1)
     pending = pending_result[0]["total"] if pending_result else 0
     
-    # Get total withdrawn
+    # Get total withdrawn (manual withdrawals)
     withdrawn_pipeline = [
         {"$match": {"merchant_id": merchant_id, "status": "completed"}},
         {"$group": {
@@ -100,7 +123,7 @@ async def get_merchant_balance(current_merchant: dict = Depends(get_current_merc
     withdrawn_result = await db.merchant_withdrawals.aggregate(withdrawn_pipeline).to_list(1)
     total_withdrawn = withdrawn_result[0]["total"] if withdrawn_result else 0
     
-    # Also count merchant_payouts (automatic payouts)
+    # Get auto payouts (automatic payouts already sent)
     payout_pipeline = [
         {"$match": {"merchant_id": merchant_id, "status": "completed"}},
         {"$group": {
@@ -113,6 +136,8 @@ async def get_merchant_balance(current_merchant: dict = Depends(get_current_merc
     
     # Available = total received - total withdrawn - auto paid out
     available = max(0, total_received - total_withdrawn - auto_paid_out)
+    
+    logger.info(f"Merchant {merchant_id[:8]}... balance: received={total_received}, withdrawn={total_withdrawn}, auto_paid={auto_paid_out}, available={available}")
     
     return {
         "available": round(available, 2),

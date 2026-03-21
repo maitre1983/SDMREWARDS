@@ -833,6 +833,103 @@ async def reconcile_pending_payments_task():
     }
 
 
+# ============== AUTO WITHDRAWAL TASK ==============
+@app.post("/api/tasks/process-auto-withdrawals")
+async def process_auto_withdrawals_task():
+    """
+    Process scheduled auto-withdrawals for merchants.
+    Should be called by cron job every hour.
+    """
+    from services.auto_withdrawal_worker import process_scheduled_withdrawals
+    
+    try:
+        await process_scheduled_withdrawals()
+        return {
+            "success": True,
+            "message": "Auto-withdrawals processed",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Auto-withdrawal task error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+
+# ============== ADMIN WITHDRAWAL HISTORY ==============
+@app.get("/api/admin/merchant-withdrawals")
+async def get_all_merchant_withdrawals(
+    page: int = 1,
+    limit: int = 20,
+    merchant_id: str = None,
+    status: str = None,
+    admin_secret: str = None
+):
+    """
+    Get all merchant withdrawals for admin dashboard.
+    Shows withdrawal history across all merchants.
+    """
+    # Simple admin auth
+    if admin_secret != os.environ.get("ADMIN_SECRET", "sdm-admin-2026"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    skip = (page - 1) * limit
+    
+    # Build query
+    query = {}
+    if merchant_id:
+        query["merchant_id"] = merchant_id
+    if status:
+        query["status"] = status
+    
+    # Get withdrawals with merchant info
+    withdrawals = await db.merchant_withdrawals.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    # Get total count
+    total = await db.merchant_withdrawals.count_documents(query)
+    
+    # Get stats
+    stats_pipeline = [
+        {"$group": {
+            "_id": "$status",
+            "total_amount": {"$sum": "$amount"},
+            "count": {"$sum": 1}
+        }}
+    ]
+    stats_result = await db.merchant_withdrawals.aggregate(stats_pipeline).to_list(10)
+    
+    stats = {
+        "completed": {"amount": 0, "count": 0},
+        "pending": {"amount": 0, "count": 0},
+        "processing": {"amount": 0, "count": 0},
+        "failed": {"amount": 0, "count": 0}
+    }
+    
+    for s in stats_result:
+        status_key = s["_id"]
+        if status_key in stats:
+            stats[status_key] = {
+                "amount": round(s["total_amount"], 2),
+                "count": s["count"]
+            }
+    
+    return {
+        "withdrawals": withdrawals,
+        "stats": stats,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "pages": (total + limit - 1) // limit
+        }
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
