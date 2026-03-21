@@ -725,6 +725,196 @@ async def hubtel_payment_callback(request: Request, background_tasks: Background
         return {"ResponseCode": "0000", "Message": "Callback received"}
 
 
+@router.post("/hubtel/transfer-callback")
+async def hubtel_transfer_callback(request: Request, background_tasks: BackgroundTasks):
+    """
+    Hubtel callback for Send Money (MoMo and Bank transfers).
+    
+    Handles callbacks for:
+    - Merchant manual withdrawals (MW-XXXXXXXX references)
+    - Merchant automatic withdrawals (AW-XXXXXXXX references)
+    - Client cashback withdrawals
+    - Merchant payouts (SDM-PAYOUT-XXXXXXXX references)
+    
+    Updates withdrawal/payout status based on Hubtel response.
+    """
+    db = get_db()
+    start_time = datetime.now(timezone.utc)
+    
+    try:
+        body = await request.json()
+        
+        # Log the callback
+        callback_id = str(uuid.uuid4())
+        callback_log = {
+            "id": callback_id,
+            "type": "transfer_callback",
+            "received_at": start_time.isoformat(),
+            "raw_body": body,
+            "source_ip": request.client.host if request.client else "unknown"
+        }
+        await db.transfer_callback_logs.insert_one(callback_log)
+        
+        # Parse callback data
+        data = body.get("Data", body)
+        client_reference = data.get("ClientReference") or body.get("ClientReference")
+        transaction_id = data.get("TransactionId") or body.get("TransactionId")
+        response_code = body.get("ResponseCode", "")
+        message = (body.get("Message", "") or "").lower()
+        
+        logger.info(f"💸 [TRANSFER-CALLBACK] Received: ref={client_reference}, code={response_code}, msg={message}")
+        
+        if not client_reference:
+            logger.warning("💸 [TRANSFER-CALLBACK] No client reference in callback")
+            return {"ResponseCode": "0000", "Message": "Callback received - no reference"}
+        
+        # Determine status from response
+        if response_code == "0000" or "success" in message:
+            new_status = "completed"
+        elif response_code in ["0001", "2001"] or "pending" in message or "processing" in message:
+            new_status = "processing"
+        else:
+            new_status = "failed"
+        
+        logger.info(f"💸 [TRANSFER-CALLBACK] Determined status: {new_status}")
+        
+        # Schedule background processing
+        background_tasks.add_task(
+            process_transfer_callback_async, 
+            callback_id, 
+            client_reference, 
+            new_status, 
+            transaction_id,
+            body
+        )
+        
+        return {"ResponseCode": "0000", "Message": "Callback received"}
+        
+    except Exception as e:
+        logger.error(f"❌ [TRANSFER-CALLBACK] Error: {e}")
+        return {"ResponseCode": "0000", "Message": "Callback received"}
+
+
+async def process_transfer_callback_async(
+    callback_id: str, 
+    client_reference: str, 
+    status: str, 
+    transaction_id: str,
+    raw_body: dict
+):
+    """
+    Background processing for transfer callbacks.
+    Updates the appropriate collection based on reference prefix.
+    """
+    db = get_db()
+    
+    try:
+        logger.info(f"🔄 [TRANSFER-ASYNC] Processing: ref={client_reference}, status={status}")
+        
+        update_data = {
+            "status": status,
+            "provider_reference": transaction_id,
+            "callback_received_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        if status == "failed":
+            update_data["error"] = raw_body.get("Message", "Transfer failed")
+        
+        # Determine which collection to update based on reference prefix
+        if client_reference.startswith("MW-") or client_reference.startswith("AW-"):
+            # Merchant withdrawals (manual MW- or auto AW-)
+            result = await db.merchant_withdrawals.update_one(
+                {"reference": client_reference},
+                {"$set": update_data}
+            )
+            logger.info(f"✅ [TRANSFER-ASYNC] Updated merchant_withdrawals: ref={client_reference}, matched={result.matched_count}")
+            
+            # If failed, we might need to reverse or notify
+            if status == "failed":
+                withdrawal = await db.merchant_withdrawals.find_one({"reference": client_reference}, {"_id": 0})
+                if withdrawal:
+                    logger.warning(f"❌ [TRANSFER-ASYNC] Merchant withdrawal failed: {client_reference}, merchant={withdrawal.get('merchant_id', 'unknown')[:8]}...")
+        
+        elif client_reference.startswith("SDM-PAYOUT-"):
+            # Automatic merchant payouts
+            result = await db.merchant_payouts.update_one(
+                {"reference": client_reference},
+                {"$set": update_data}
+            )
+            logger.info(f"✅ [TRANSFER-ASYNC] Updated merchant_payouts: ref={client_reference}, matched={result.matched_count}")
+        
+        elif client_reference.startswith("SDM-WD-") or client_reference.startswith("WD-"):
+            # Client cashback withdrawals
+            result = await db.withdrawals.update_one(
+                {"reference": client_reference},
+                {"$set": update_data}
+            )
+            logger.info(f"✅ [TRANSFER-ASYNC] Updated withdrawals: ref={client_reference}, matched={result.matched_count}")
+            
+            # If completed, record transaction
+            if status == "completed":
+                withdrawal = await db.withdrawals.find_one({"reference": client_reference}, {"_id": 0})
+                if withdrawal and withdrawal.get("client_id"):
+                    # Transaction already recorded when initiating, just log
+                    logger.info(f"✅ [TRANSFER-ASYNC] Client withdrawal completed: {client_reference}")
+        
+        else:
+            # Try all collections
+            logger.info(f"🔄 [TRANSFER-ASYNC] Unknown prefix, trying all collections for: {client_reference}")
+            
+            # Try merchant_withdrawals
+            result = await db.merchant_withdrawals.update_one(
+                {"reference": client_reference},
+                {"$set": update_data}
+            )
+            if result.matched_count > 0:
+                logger.info(f"✅ [TRANSFER-ASYNC] Found in merchant_withdrawals")
+                return
+            
+            # Try merchant_payouts
+            result = await db.merchant_payouts.update_one(
+                {"reference": client_reference},
+                {"$set": update_data}
+            )
+            if result.matched_count > 0:
+                logger.info(f"✅ [TRANSFER-ASYNC] Found in merchant_payouts")
+                return
+            
+            # Try withdrawals (client)
+            result = await db.withdrawals.update_one(
+                {"reference": client_reference},
+                {"$set": update_data}
+            )
+            if result.matched_count > 0:
+                logger.info(f"✅ [TRANSFER-ASYNC] Found in withdrawals")
+                return
+            
+            # Try hubtel_payments
+            result = await db.hubtel_payments.update_one(
+                {"client_reference": client_reference},
+                {"$set": update_data}
+            )
+            if result.matched_count > 0:
+                logger.info(f"✅ [TRANSFER-ASYNC] Found in hubtel_payments")
+                return
+            
+            logger.warning(f"⚠️ [TRANSFER-ASYNC] No matching record found for: {client_reference}")
+        
+        # Update callback log
+        await db.transfer_callback_logs.update_one(
+            {"id": callback_id},
+            {"$set": {"processed": True, "processed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ [TRANSFER-ASYNC] Error processing callback: {e}")
+        await db.transfer_callback_logs.update_one(
+            {"id": callback_id},
+            {"$set": {"processed": True, "error": str(e)}}
+        )
+
+
 # ========== ADMIN/DIAGNOSTIC ENDPOINTS ==========
 
 @router.post("/admin/force-complete/{payment_ref}")
@@ -866,6 +1056,193 @@ async def admin_list_pending_payments(limit: int = 20, admin_secret: str = None)
         "count": len(pending_payments),
         "payments": pending_payments
     }
+
+
+@router.get("/admin/pending-withdrawals")
+async def admin_list_pending_withdrawals(limit: int = 20, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: List pending merchant withdrawals stuck in processing.
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    # Find pending merchant withdrawals
+    pending_withdrawals = []
+    
+    cursor = db.merchant_withdrawals.find(
+        {"status": {"$in": ["pending", "processing"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit)
+    
+    async for w in cursor:
+        pending_withdrawals.append({
+            "id": w.get("id"),
+            "reference": w.get("reference"),
+            "merchant_name": w.get("merchant_name"),
+            "amount": w.get("amount"),
+            "status": w.get("status"),
+            "payout_method": w.get("payout_method"),
+            "phone": w.get("phone"),
+            "created_at": w.get("created_at"),
+            "error": w.get("error")
+        })
+    
+    return {
+        "success": True,
+        "count": len(pending_withdrawals),
+        "withdrawals": pending_withdrawals
+    }
+
+
+@router.post("/admin/force-complete-withdrawal/{withdrawal_ref}")
+async def admin_force_complete_withdrawal(withdrawal_ref: str, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: Force complete a merchant withdrawal stuck in processing.
+    
+    Usage: POST /api/payments/admin/force-complete-withdrawal/{reference}?admin_secret=YOUR_SECRET
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    logger.info(f"🔧 [ADMIN] Force completing withdrawal: {withdrawal_ref}")
+    
+    # Find the withdrawal
+    withdrawal = await db.merchant_withdrawals.find_one(
+        {"$or": [
+            {"id": withdrawal_ref},
+            {"reference": withdrawal_ref}
+        ]},
+        {"_id": 0}
+    )
+    
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    
+    if withdrawal.get("status") == "completed":
+        return {"success": True, "message": "Withdrawal already completed"}
+    
+    # Update to completed
+    await db.merchant_withdrawals.update_one(
+        {"id": withdrawal["id"]},
+        {"$set": {
+            "status": "completed",
+            "force_completed": True,
+            "force_completed_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    logger.info(f"✅ [ADMIN] Withdrawal force completed: {withdrawal_ref}")
+    
+    return {
+        "success": True,
+        "message": "Withdrawal force completed",
+        "reference": withdrawal.get("reference"),
+        "amount": withdrawal.get("amount"),
+        "merchant_name": withdrawal.get("merchant_name")
+    }
+
+
+@router.post("/admin/mark-withdrawal-failed/{withdrawal_ref}")
+async def admin_mark_withdrawal_failed(withdrawal_ref: str, reason: str = "Manual failure", admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: Mark a withdrawal as failed (e.g., if Hubtel rejected it).
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    withdrawal = await db.merchant_withdrawals.find_one(
+        {"$or": [{"id": withdrawal_ref}, {"reference": withdrawal_ref}]},
+        {"_id": 0}
+    )
+    
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    
+    await db.merchant_withdrawals.update_one(
+        {"id": withdrawal["id"]},
+        {"$set": {
+            "status": "failed",
+            "error": reason,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    logger.info(f"❌ [ADMIN] Withdrawal marked failed: {withdrawal_ref}, reason: {reason}")
+    
+    return {
+        "success": True,
+        "message": "Withdrawal marked as failed",
+        "reference": withdrawal.get("reference")
+    }
+
+
+@router.get("/admin/withdrawal-debug/{withdrawal_ref}")
+async def admin_withdrawal_debug(withdrawal_ref: str, admin_secret: str = None):
+    """
+    ADMIN ENDPOINT: Debug a specific withdrawal - shows all related records.
+    """
+    import os
+    
+    db = get_db()
+    expected_secret = os.environ.get("ADMIN_SECRET", "sdm-admin-2026")
+    
+    if admin_secret != expected_secret:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
+    
+    result = {
+        "reference": withdrawal_ref,
+        "merchant_withdrawal": None,
+        "hubtel_payment": None,
+        "transfer_callbacks": [],
+        "merchant": None
+    }
+    
+    # Find in merchant_withdrawals
+    withdrawal = await db.merchant_withdrawals.find_one(
+        {"$or": [{"id": withdrawal_ref}, {"reference": withdrawal_ref}]},
+        {"_id": 0}
+    )
+    result["merchant_withdrawal"] = withdrawal
+    
+    if withdrawal:
+        # Find related hubtel_payment
+        hubtel_payment = await db.hubtel_payments.find_one(
+            {"client_reference": withdrawal.get("reference")},
+            {"_id": 0}
+        )
+        result["hubtel_payment"] = hubtel_payment
+        
+        # Find transfer callbacks
+        callbacks = await db.transfer_callback_logs.find(
+            {"raw_body.Data.ClientReference": withdrawal.get("reference")}
+        ).sort("received_at", -1).limit(5).to_list(5)
+        result["transfer_callbacks"] = [{"id": c.get("id"), "received_at": c.get("received_at"), "raw_body": c.get("raw_body")} for c in callbacks]
+        
+        # Get merchant info
+        if withdrawal.get("merchant_id"):
+            merchant = await db.merchants.find_one(
+                {"id": withdrawal["merchant_id"]},
+                {"_id": 0, "id": 1, "business_name": 1, "momo_number": 1, "momo_network": 1}
+            )
+            result["merchant"] = merchant
+    
+    return result
 
 
 @router.get("/debug/callback-test")
