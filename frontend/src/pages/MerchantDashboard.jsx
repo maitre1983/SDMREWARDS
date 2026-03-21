@@ -51,7 +51,6 @@ const CashierManager = lazy(() => import('../components/merchant/CashierManager'
 const BusinessInfoEditor = lazy(() => import('../components/merchant/BusinessInfoEditor'));
 const PinSettings = lazy(() => import('../components/merchant/PinSettings'));
 const AdvancedDashboard = lazy(() => import('../components/merchant/AdvancedDashboard'));
-const MonthlyStatements = lazy(() => import('../components/merchant/MonthlyStatements'));
 const APIKeysManager = lazy(() => import('../components/merchant/APIKeysManager'));
 const WebhooksManager = lazy(() => import('../components/merchant/WebhooksManager'));
 const PaymentNotificationToast = lazy(() => import('../components/merchant/PaymentNotificationToast'));
@@ -1210,7 +1209,6 @@ export default function MerchantDashboard() {
                 { id: 'payment', label: 'Payment', icon: Wallet },
                 { id: 'withdrawal', label: 'Withdrawal', icon: ArrowDownToLine },
                 { id: 'payouts', label: 'Payouts', icon: History },
-                { id: 'statements', label: 'Relevés', icon: FileText },
                 { id: 'cashiers', label: 'Caissiers', icon: UserCog },
                 { id: 'business', label: 'Commerce', icon: Building },
                 { id: 'security', label: 'Sécurité', icon: Shield },
@@ -1260,11 +1258,6 @@ export default function MerchantDashboard() {
                   </Button>
                 </div>
               </div>
-            )}
-
-            {/* Monthly Statements */}
-            {settingsTab === 'statements' && (
-              <MonthlyStatements token={token} />
             )}
 
             {/* Payouts History */}

@@ -27,13 +27,10 @@ def get_db():
 
 
 # ============== CONFIG ==============
-# Legacy BulkClix variables (DEPRECATED - kept for backward compatibility)
-BULKCLIX_API_KEY = os.environ.get("BULKCLIX_API_KEY", "")  # DEPRECATED
-BULKCLIX_BASE_URL = os.environ.get("BULKCLIX_BASE_URL", "https://api.bulkclix.com/api/v1")  # DEPRECATED
 CALLBACK_BASE_URL = os.environ.get("CALLBACK_BASE_URL", "")
 PAYMENT_TEST_MODE = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
 
-# Hubtel is now the primary payment provider
+# Hubtel is the primary payment provider
 HUBTEL_CLIENT_ID = os.environ.get("HUBTEL_CLIENT_ID", "")
 HUBTEL_CLIENT_SECRET = os.environ.get("HUBTEL_CLIENT_SECRET", "")
 
