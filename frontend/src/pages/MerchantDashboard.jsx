@@ -56,6 +56,7 @@ const WebhooksManager = lazy(() => import('../components/merchant/WebhooksManage
 const PaymentNotificationToast = lazy(() => import('../components/merchant/PaymentNotificationToast'));
 const PayoutHistory = lazy(() => import('../components/merchant/PayoutHistory'));
 const MerchantWithdrawal = lazy(() => import('../components/merchant/MerchantWithdrawal'));
+const PWAInstallPrompt = lazy(() => import('../components/PWAInstallPrompt'));
 
 // Mini loader for lazy components
 const MiniLoader = () => (
@@ -610,9 +611,15 @@ export default function MerchantDashboard() {
               {getStatusBadge(merchant?.status)}
             </div>
           </div>
-          <button onClick={handleLogout} className="text-slate-400 hover:text-white p-2 -mr-2">
-            <LogOut size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* PWA Install Button */}
+            <Suspense fallback={null}>
+              <PWAInstallPrompt variant="icon" />
+            </Suspense>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-white p-2 -mr-2">
+              <LogOut size={20} />
+            </button>
+          </div>
         </div>
       </header>
 

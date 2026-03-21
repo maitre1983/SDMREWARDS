@@ -22,6 +22,7 @@ const NotificationSettings = lazy(() => import('../components/client/Notificatio
 const MissionsHub = lazy(() => import('../components/client/MissionsHub'));
 const ReferralShare = lazy(() => import('../components/client/ReferralShare'));
 const ServicesPage = lazy(() => import('./ServicesPage'));
+const PWAInstallPrompt = lazy(() => import('../components/PWAInstallPrompt'));
 
 // Mini loader for lazy components
 const MiniLoader = () => (
@@ -1242,6 +1243,10 @@ export default function ClientDashboard() {
             <span className="font-bold text-white">SDM</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* PWA Install Button in Header */}
+            <Suspense fallback={null}>
+              <PWAInstallPrompt variant="icon" />
+            </Suspense>
             <button 
               onClick={() => setShowNotificationSettings(true)} 
               className="text-slate-400 hover:text-amber-400 p-1"

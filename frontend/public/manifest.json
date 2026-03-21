@@ -1,44 +1,121 @@
 {
-  "short_name": "SDM Rewards",
-  "name": "SDM Rewards - Cashback Platform",
-  "description": "Earn cashback on every purchase with SDM Rewards. Join Ghana's smartest loyalty platform.",
-  "icons": [
-    {
-      "src": "sdm-logo.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "sdm-logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "start_url": "/",
+  "name": "SDM Rewards",
+  "short_name": "SDM",
+  "description": "Earn cashback on every purchase. Ghana's smartest loyalty and rewards platform.",
+  "start_url": "/?source=pwa",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
   "theme_color": "#10B981",
   "background_color": "#0F172A",
-  "orientation": "portrait-primary",
   "scope": "/",
-  "categories": ["finance", "shopping", "lifestyle"],
+  "id": "com.sdmrewards.app",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["finance", "shopping", "lifestyle", "business"],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/home.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Home Screen"
+    },
+    {
+      "src": "/screenshots/scan.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Scan QR Code"
+    }
+  ],
   "shortcuts": [
     {
-      "name": "Scan QR Code",
+      "name": "Scan & Pay",
       "short_name": "Scan",
       "description": "Scan merchant QR code to pay",
       "url": "/client?tab=qr",
-      "icons": [{ "src": "sdm-logo.png", "sizes": "96x96" }]
+      "icons": [{"src": "/icons/icon-96x96.png", "sizes": "96x96"}]
     },
     {
       "name": "My Balance",
       "short_name": "Balance",
       "description": "Check your cashback balance",
       "url": "/client?tab=home",
-      "icons": [{ "src": "sdm-logo.png", "sizes": "96x96" }]
+      "icons": [{"src": "/icons/icon-96x96.png", "sizes": "96x96"}]
+    },
+    {
+      "name": "Withdraw",
+      "short_name": "Withdraw",
+      "description": "Withdraw your cashback",
+      "url": "/client?tab=withdraw",
+      "icons": [{"src": "/icons/icon-96x96.png", "sizes": "96x96"}]
     }
   ],
   "related_applications": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
 }

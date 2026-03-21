@@ -1,24 +1,25 @@
 /**
- * PWA Install Prompt Component
- * ============================
- * Shows a visible "Install App" button when the PWA can be installed.
- * Works on Chrome, Edge, Samsung Internet, and other Chromium-based browsers.
+ * PWA Install Prompt Component - Modern & Trustworthy
+ * ====================================================
+ * Shows a beautiful, secure-looking install prompt.
+ * Compatible with all Android versions and iOS.
  */
 
 import React, { useState, useEffect } from 'react';
-import { Download, X, Smartphone } from 'lucide-react';
+import { Download, X, Smartphone, Shield, Zap, Wifi, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 
-// Store the deferred prompt globally so it persists
+// Store the deferred prompt globally
 let deferredPrompt = null;
 
 export default function PWAInstallPrompt({ variant = 'banner' }) {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
 
   useEffect(() => {
-    // Check if already installed (standalone mode)
+    // Check if already installed
     const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
       || window.navigator.standalone 
       || document.referrer.includes('android-app://');
@@ -28,23 +29,28 @@ export default function PWAInstallPrompt({ variant = 'banner' }) {
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     setIsIOS(isIOSDevice);
 
-    // If iOS and not standalone, show the prompt
-    if (isIOSDevice && !isStandaloneMode) {
-      setShowInstallPrompt(true);
+    // Don't show if dismissed recently
+    const dismissedAt = localStorage.getItem('pwa-dismissed-at');
+    if (dismissedAt) {
+      const hoursSinceDismiss = (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60);
+      if (hoursSinceDismiss < 24) return; // Don't show for 24 hours after dismiss
     }
 
-    // Listen for beforeinstallprompt event (Chrome, Edge, etc.)
+    // Show for iOS if not standalone
+    if (isIOSDevice && !isStandaloneMode) {
+      setTimeout(() => setShowInstallPrompt(true), 2000); // Delay for better UX
+    }
+
+    // Listen for beforeinstallprompt (Chrome, Edge, Samsung, etc.)
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       deferredPrompt = e;
       if (!isStandaloneMode) {
-        setShowInstallPrompt(true);
+        setTimeout(() => setShowInstallPrompt(true), 2000);
       }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Listen for successful install
     window.addEventListener('appinstalled', () => {
       setShowInstallPrompt(false);
       deferredPrompt = null;
@@ -57,50 +63,92 @@ export default function PWAInstallPrompt({ variant = 'banner' }) {
 
   const handleInstallClick = async () => {
     if (isIOS) {
-      // iOS doesn't support beforeinstallprompt, show instructions
-      alert('To install SDM Rewards:\n\n1. Tap the Share button (□↑)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
+      setShowIOSInstructions(true);
       return;
     }
 
-    if (!deferredPrompt) {
-      return;
-    }
+    if (!deferredPrompt) return;
 
-    // Show the install prompt
     deferredPrompt.prompt();
-    
-    // Wait for the user to respond
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
       setShowInstallPrompt(false);
     }
-    
     deferredPrompt = null;
   };
 
   const handleDismiss = () => {
     setShowInstallPrompt(false);
-    // Remember dismissal for this session
-    sessionStorage.setItem('pwa-prompt-dismissed', 'true');
+    setShowIOSInstructions(false);
+    localStorage.setItem('pwa-dismissed-at', Date.now().toString());
   };
 
-  // Don't show if already installed or dismissed
-  if (isStandalone || !showInstallPrompt) {
-    return null;
+  if (isStandalone || !showInstallPrompt) return null;
+
+  // iOS Instructions Modal
+  if (showIOSInstructions) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+        <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-6 text-center relative">
+            <button 
+              onClick={handleDismiss}
+              className="absolute top-4 right-4 text-white/70 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            <div className="w-16 h-16 bg-white rounded-2xl mx-auto mb-3 flex items-center justify-center shadow-lg">
+              <img src="/icons/icon-96x96.png" alt="SDM" className="w-12 h-12 rounded-xl" />
+            </div>
+            <h2 className="text-white font-bold text-xl">Install SDM Rewards</h2>
+            <p className="text-emerald-100 text-sm mt-1">Add to your home screen</p>
+          </div>
+          
+          {/* Instructions */}
+          <div className="p-6 space-y-4">
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">1</div>
+              <div>
+                <p className="text-white font-medium">Tap the Share button</p>
+                <p className="text-slate-400 text-sm">Look for the <span className="inline-flex items-center bg-slate-800 px-2 py-0.5 rounded">□↑</span> icon at the bottom of Safari</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">2</div>
+              <div>
+                <p className="text-white font-medium">Scroll and tap "Add to Home Screen"</p>
+                <p className="text-slate-400 text-sm">It has a <span className="inline-flex items-center bg-slate-800 px-2 py-0.5 rounded">＋</span> icon</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0 text-emerald-400 font-bold">3</div>
+              <div>
+                <p className="text-white font-medium">Tap "Add" to confirm</p>
+                <p className="text-slate-400 text-sm">The app will appear on your home screen</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="px-6 pb-6">
+            <Button onClick={handleDismiss} className="w-full bg-slate-800 hover:bg-slate-700 text-white">
+              Got it
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  // Check session dismissal
-  if (sessionStorage.getItem('pwa-prompt-dismissed')) {
-    return null;
-  }
-
-  // Compact button variant (for headers/navs)
+  // Compact button variant
   if (variant === 'button') {
     return (
       <Button
         onClick={handleInstallClick}
-        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white gap-2"
+        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white gap-2 shadow-lg shadow-emerald-500/25"
         size="sm"
       >
         <Download size={16} />
@@ -109,7 +157,7 @@ export default function PWAInstallPrompt({ variant = 'banner' }) {
     );
   }
 
-  // Icon-only variant
+  // Icon variant
   if (variant === 'icon') {
     return (
       <button
@@ -123,43 +171,77 @@ export default function PWAInstallPrompt({ variant = 'banner' }) {
     );
   }
 
-  // Full banner variant (default)
+  // Full banner variant (default) - Modern & Trustworthy Design
   return (
-    <div className="fixed bottom-20 sm:bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 z-50 animate-in slide-in-from-bottom-4">
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-emerald-500/30 rounded-2xl p-4 shadow-2xl shadow-emerald-500/20">
+    <div className="fixed bottom-20 sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-50 animate-in slide-in-from-bottom-6 duration-500">
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950 border border-emerald-500/20 rounded-3xl overflow-hidden shadow-2xl shadow-black/50">
+        {/* Dismiss button */}
         <button 
           onClick={handleDismiss}
-          className="absolute top-2 right-2 text-slate-400 hover:text-white p-1"
+          className="absolute top-3 right-3 text-slate-500 hover:text-white p-1.5 rounded-full hover:bg-slate-800 transition-colors z-10"
         >
           <X size={16} />
         </button>
         
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Smartphone className="text-white" size={24} />
+        {/* Main content */}
+        <div className="p-5">
+          <div className="flex items-start gap-4">
+            {/* App icon */}
+            <div className="relative flex-shrink-0">
+              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <img src="/icons/icon-96x96.png" alt="SDM" className="w-12 h-12 rounded-xl" onError={(e) => { e.target.style.display = 'none'; }} />
+                <Smartphone className="text-white w-8 h-8" style={{ display: 'none' }} />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
+                <CheckCircle2 size={14} className="text-white" />
+              </div>
+            </div>
+            
+            {/* Text content */}
+            <div className="flex-1 min-w-0 pr-6">
+              <h3 className="text-white font-bold text-lg leading-tight">Install SDM Rewards</h3>
+              <p className="text-slate-400 text-sm mt-1">
+                Get instant access with our free app
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-white font-semibold text-sm">Install SDM Rewards</h3>
-            <p className="text-slate-400 text-xs mt-0.5 mb-3">
-              {isIOS 
-                ? 'Add to your home screen for quick access'
-                : 'Get the app for a better experience'}
-            </p>
-            <Button
-              onClick={handleInstallClick}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white h-9 text-sm"
-            >
-              <Download size={16} className="mr-2" />
-              {isIOS ? 'How to Install' : 'Install Now'}
-            </Button>
+          
+          {/* Trust badges */}
+          <div className="flex items-center gap-4 mt-4 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5">
+              <Shield size={14} className="text-emerald-500" />
+              <span>Secure</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Zap size={14} className="text-amber-500" />
+              <span>Fast</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Wifi size={14} className="text-blue-500" />
+              <span>Works offline</span>
+            </div>
           </div>
+          
+          {/* Install button */}
+          <Button
+            onClick={handleInstallClick}
+            className="w-full mt-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold h-12 rounded-xl shadow-lg shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40 hover:scale-[1.02]"
+          >
+            <Download size={18} className="mr-2" />
+            Install Free
+          </Button>
+          
+          {/* Small note */}
+          <p className="text-center text-slate-600 text-[11px] mt-3">
+            No app store needed • Installs in seconds
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// Export a hook for programmatic access
+// Export hook for programmatic access
 export function usePWAInstall() {
   const [canInstall, setCanInstall] = useState(false);
 
