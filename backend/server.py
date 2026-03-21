@@ -71,13 +71,20 @@ async def lifespan(app: FastAPI):
     sms_worker_task = asyncio.create_task(start_scheduled_sms_worker())
     logger.info("📬 Scheduled SMS worker started")
     
+    # Start auto-withdrawal worker (processes daily/weekly scheduled withdrawals)
+    from services.auto_withdrawal_worker import auto_withdrawal_worker
+    withdrawal_worker_task = asyncio.create_task(auto_withdrawal_worker())
+    logger.info("💰 Auto-withdrawal worker started")
+    
     yield
     
     # Shutdown
     logger.info("🛑 SDM REWARDS Server Shutting Down...")
     sms_worker_task.cancel()
+    withdrawal_worker_task.cancel()
     try:
         await sms_worker_task
+        await withdrawal_worker_task
     except asyncio.CancelledError:
         pass
     client.close()
@@ -839,6 +846,10 @@ async def process_auto_withdrawals_task():
     """
     Process scheduled auto-withdrawals for merchants.
     Should be called by cron job every hour.
+    
+    Processes:
+    - Daily withdrawals (at midnight UTC)
+    - Weekly withdrawals (Sunday at midnight UTC)
     """
     from services.auto_withdrawal_worker import process_scheduled_withdrawals
     
@@ -856,6 +867,62 @@ async def process_auto_withdrawals_task():
             "error": str(e),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+
+@app.post("/api/tasks/process-instant-withdrawals")
+async def process_instant_withdrawals_task():
+    """
+    Process instant withdrawals for merchants who have enabled instant payout.
+    Called after each successful payment via webhook or callback.
+    """
+    from services.auto_withdrawal_worker import process_instant_withdrawals
+    
+    try:
+        await process_instant_withdrawals()
+        return {
+            "success": True,
+            "message": "Instant withdrawals processed",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Instant withdrawal task error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+
+@app.get("/api/tasks/auto-withdrawal-status")
+async def get_auto_withdrawal_status():
+    """
+    Get the status of the auto-withdrawal system.
+    """
+    from services.auto_withdrawal_worker import _worker_running
+    
+    # Count merchants with auto-withdraw enabled
+    enabled_count = await db.merchant_auto_withdraw.count_documents({"enabled": True})
+    instant_count = await db.merchant_auto_withdraw.count_documents({"enabled": True, "frequency": "instant"})
+    daily_count = await db.merchant_auto_withdraw.count_documents({"enabled": True, "frequency": "daily"})
+    weekly_count = await db.merchant_auto_withdraw.count_documents({"enabled": True, "frequency": "weekly"})
+    
+    # Get recent withdrawals
+    recent_withdrawals = await db.merchant_withdrawals.find(
+        {"is_auto": True},
+        {"_id": 0, "id": 1, "amount": 1, "status": 1, "created_at": 1, "payout_method": 1}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    return {
+        "worker_running": _worker_running,
+        "merchants_enabled": {
+            "total": enabled_count,
+            "instant": instant_count,
+            "daily": daily_count,
+            "weekly": weekly_count
+        },
+        "recent_auto_withdrawals": recent_withdrawals,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 
 # ============== ADMIN WITHDRAWAL HISTORY ==============

@@ -70,6 +70,23 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Fix: Check merchant existence with simple id projection first
 - ✅ **French Labels** - UI uses French: 'Retirer', 'Montant à retirer', 'TOUT', etc.
 
+### 2026-03-21 (Fork 2 - Part 2) - AUTO-WITHDRAWAL CRON JOB
+- ✅ **Auto-Withdrawal Worker Integration** - Worker starts automatically with server
+  - Runs every hour checking for daily/weekly scheduled withdrawals
+  - Daily: Processes at midnight UTC
+  - Weekly: Processes on Sunday at midnight UTC
+- ✅ **Instant Withdrawal Trigger** - Called after each successful merchant payment
+  - Merchants with `frequency: "instant"` get paid immediately after customer pays
+- ✅ **New API Endpoints:**
+  - `POST /api/tasks/process-auto-withdrawals` - Manual trigger for scheduled withdrawals
+  - `POST /api/tasks/process-instant-withdrawals` - Manual trigger for instant withdrawals  
+  - `GET /api/tasks/auto-withdrawal-status` - Check worker status and merchant counts
+- ✅ **Cron Script Created** - `/app/backend/scripts/cron_auto_withdrawals.sh`
+  - For external cron/scheduler to call every hour in production
+- ✅ **Hubtel APIs Used:**
+  - MoMo: `POST https://smp.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/send/mobilemoney`
+  - Bank: `POST https://smp.hubtel.com/api/merchants/{Hubtel_Prepaid_Deposit_ID}/send/bank/gh/{BankCode}`
+
 ### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo

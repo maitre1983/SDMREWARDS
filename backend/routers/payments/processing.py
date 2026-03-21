@@ -362,6 +362,14 @@ async def process_merchant_payment(payment: Dict):
         logger.info(f"📢 [MERCHANT_PAYMENT] SSE notification sent to merchant {merchant_id[:8]}...")
     except Exception as e:
         logger.error(f"SSE notification error: {e}")
+    
+    # Process instant withdrawals if merchant has it enabled
+    try:
+        from services.auto_withdrawal_worker import process_instant_withdrawals
+        await process_instant_withdrawals()
+        logger.info(f"💰 [MERCHANT_PAYMENT] Instant withdrawals processed")
+    except Exception as e:
+        logger.error(f"Instant withdrawal error: {e}")
 
 
 async def _process_merchant_payout(merchant: Dict, merchant_share: float, transaction_id: str):
