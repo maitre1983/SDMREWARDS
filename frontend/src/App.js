@@ -1,9 +1,10 @@
 import "@/App.css";
-import React, { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import React, { Suspense, lazy, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { LanguageProvider } from "./context/LanguageContext";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import useRoutePreload from "./hooks/useRoutePreload";
 
 // Loading Spinner Component
 const PageLoader = () => (
@@ -55,6 +56,13 @@ const getAdminPaths = () => {
   return paths;
 };
 
+// Route preloader component
+function RoutePreloader() {
+  const location = useLocation();
+  useRoutePreload(location.pathname);
+  return null;
+}
+
 function App() {
   const adminPaths = getAdminPaths();
   
@@ -74,6 +82,7 @@ function App() {
         {/* PWA Install Banner - shows on all pages */}
         <PWAInstallPrompt variant="banner" />
         <BrowserRouter>
+          <RoutePreloader />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Landing Page */}

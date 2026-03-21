@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import axios from 'axios';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
@@ -13,6 +13,69 @@ import {
 // API URL imported from config
 import { API_URL } from '@/config/api';
 
+// Memoized stat card component
+const StatCard = memo(function StatCard({ icon: Icon, iconColor, label, value, previous, growth }) {
+  const formatCurrency = (val) => `GHS ${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+      <div className="flex items-start justify-between mb-2">
+        <div className={`p-2 rounded-lg`} style={{ backgroundColor: `${iconColor}1a` }}>
+          <Icon className={iconColor} size={20} />
+        </div>
+        <GrowthIndicator value={growth} />
+      </div>
+      <p className="text-slate-400 text-sm">{label}</p>
+      <p className="text-white text-xl font-bold">{formatCurrency(value)}</p>
+      <p className="text-slate-500 text-xs mt-1">vs {formatCurrency(previous)}</p>
+    </div>
+  );
+});
+
+// Memoized growth indicator
+const GrowthIndicator = memo(function GrowthIndicator({ value }) {
+  if (value > 0) {
+    return (
+      <span className="flex items-center text-emerald-400 text-sm">
+        <ArrowUpRight size={16} />
+        +{value}%
+      </span>
+    );
+  } else if (value < 0) {
+    return (
+      <span className="flex items-center text-red-400 text-sm">
+        <ArrowDownRight size={16} />
+        {value}%
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center text-slate-400 text-sm">
+      <Minus size={16} />
+      0%
+    </span>
+  );
+});
+
+// Memoized tooltip
+const CustomTooltip = memo(function CustomTooltip({ active, payload, label }) {
+  const formatCurrency = (val) => `GHS ${(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
+        <p className="text-white font-medium mb-2">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} style={{ color: entry.color }} className="text-sm">
+            {entry.name}: {formatCurrency(entry.value)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+});
+
 export default function AdvancedDashboard({ token, basicStats, merchant }) {
   const [period, setPeriod] = useState('day');
   const [advancedStats, setAdvancedStats] = useState(null);
@@ -22,11 +85,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
   const [chartType, setChartType] = useState('daily');
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAllData();
-  }, [period, chartType]);
-
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
@@ -47,51 +106,24 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token, period, chartType]);
 
-  const formatCurrency = (value) => {
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
+  // Memoized format function
+  const formatCurrency = useCallback((value) => {
     return `GHS ${(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  }, []);
 
-  const GrowthIndicator = ({ value }) => {
-    if (value > 0) {
-      return (
-        <span className="flex items-center text-emerald-400 text-sm">
-          <ArrowUpRight size={16} />
-          +{value}%
-        </span>
-      );
-    } else if (value < 0) {
-      return (
-        <span className="flex items-center text-red-400 text-sm">
-          <ArrowDownRight size={16} />
-          {value}%
-        </span>
-      );
-    }
-    return (
-      <span className="flex items-center text-slate-400 text-sm">
-        <Minus size={16} />
-        0%
-      </span>
-    );
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
-          <p className="text-white font-medium mb-2">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className="text-sm">
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
+  // Memoized period buttons
+  const periodButtons = useMemo(() => [
+    { id: 'day', label: 'Today' },
+    { id: 'week', label: 'Week' },
+    { id: 'month', label: 'Month' },
+    { id: 'year', label: 'Year' }
+  ], []);
 
   if (isLoading && !advancedStats) {
     return (

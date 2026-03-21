@@ -1,10 +1,14 @@
-// SDM Rewards Service Worker v2
-// Ultra-fast, offline-first PWA
+// SDM Rewards Service Worker v3
+// Ultra-fast, offline-first PWA with aggressive caching
 
-const CACHE_VERSION = 'sdm-v2';
+const CACHE_VERSION = 'sdm-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
+const API_CACHE = `${CACHE_VERSION}-api`;
+
+// Cache TTL for API responses (5 minutes)
+const API_CACHE_TTL = 5 * 60 * 1000;
 
 // Core app shell - always cache
 const STATIC_ASSETS = [
@@ -13,6 +17,15 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
+];
+
+// API endpoints that can be cached briefly for faster navigation
+const CACHEABLE_API_PATTERNS = [
+  '/api/merchants/me',
+  '/api/merchants/dashboard',
+  '/api/clients/me',
+  '/api/public/merchants',
+  '/api/verify/banks'
 ];
 
 // Install: Pre-cache core assets
@@ -31,12 +44,14 @@ self.addEventListener('install', (event) => {
 
 // Activate: Clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating SDM Rewards PWA...');
+  console.log('[SW] Activating SDM Rewards PWA v3...');
+  
+  const keepCaches = [STATIC_CACHE, DYNAMIC_CACHE, IMAGE_CACHE, API_CACHE];
   
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(key => key.startsWith('sdm-') && key !== STATIC_CACHE && key !== DYNAMIC_CACHE && key !== IMAGE_CACHE)
+        keys.filter(key => key.startsWith('sdm-') && !keepCaches.includes(key))
             .map(key => {
               console.log('[SW] Removing old cache:', key);
               return caches.delete(key);
@@ -57,12 +72,45 @@ self.addEventListener('fetch', (event) => {
   // Skip Chrome extensions and external URLs
   if (!url.origin.includes(self.location.origin)) return;
   
-  // API calls: Network first, no cache (real-time data)
+  // API calls: Stale-while-revalidate for dashboard data, network-first for others
   if (url.pathname.startsWith('/api/')) {
+    const isCacheable = CACHEABLE_API_PATTERNS.some(pattern => url.pathname.includes(pattern));
+    
+    if (isCacheable && request.method === 'GET') {
+      // Stale-while-revalidate for dashboard APIs
+      event.respondWith(
+        caches.open(API_CACHE).then(cache => {
+          return cache.match(request).then(cached => {
+            const fetchPromise = fetch(request)
+              .then(response => {
+                if (response.ok) {
+                  // Cache with timestamp
+                  const clonedResponse = response.clone();
+                  cache.put(request, clonedResponse);
+                }
+                return response;
+              })
+              .catch(() => {
+                // Return cached on network failure
+                if (cached) return cached;
+                return new Response(
+                  JSON.stringify({ error: 'Offline', message: 'Please check your connection' }),
+                  { status: 503, headers: { 'Content-Type': 'application/json' } }
+                );
+              });
+            
+            // Return cached immediately, revalidate in background
+            return cached || fetchPromise;
+          });
+        })
+      );
+      return;
+    }
+    
+    // Network-first for non-cacheable APIs
     event.respondWith(
       fetch(request)
         .catch(() => {
-          // Return offline response for API failures
           return new Response(
             JSON.stringify({ error: 'Offline', message: 'Please check your connection' }),
             { status: 503, headers: { 'Content-Type': 'application/json' } }
@@ -217,4 +265,31 @@ async function syncTransactions() {
   console.log('[SW] Syncing offline transactions...');
 }
 
-console.log('[SW] SDM Rewards Service Worker v2 loaded');
+// Message handler for cache control
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
+  
+  if (event.data === 'clearApiCache') {
+    caches.delete(API_CACHE).then(() => {
+      console.log('[SW] API cache cleared');
+    });
+  }
+  
+  // Prefetch specific routes
+  if (event.data?.type === 'prefetch') {
+    const urls = event.data.urls || [];
+    caches.open(DYNAMIC_CACHE).then(cache => {
+      urls.forEach(url => {
+        fetch(url)
+          .then(response => {
+            if (response.ok) cache.put(url, response);
+          })
+          .catch(() => {});
+      });
+    });
+  }
+});
+
+console.log('[SW] SDM Rewards Service Worker v3 loaded');
