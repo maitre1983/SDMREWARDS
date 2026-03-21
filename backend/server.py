@@ -925,6 +925,68 @@ async def get_auto_withdrawal_status():
     }
 
 
+@app.get("/api/admin/debug-merchant-summary/{merchant_id}")
+async def debug_merchant_summary(merchant_id: str, admin_secret: str = None):
+    """
+    Debug endpoint to see exactly what data the dashboard/summary endpoint sees.
+    """
+    if admin_secret != os.environ.get("ADMIN_SECRET", "sdm-admin-2026"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Check each collection
+    collections_data = {}
+    collections_to_check = ['transactions', 'momo_payments', 'cash_payments']
+    
+    for collection_name in collections_to_check:
+        collection = db[collection_name]
+        
+        # Get all completed transactions for this merchant
+        all_txns = await collection.find({
+            "merchant_id": merchant_id,
+            "status": "completed"
+        }, {"_id": 0, "amount": 1, "merchant_amount": 1, "cashback_amount": 1, "created_at": 1}).to_list(1000)
+        
+        # Get month transactions
+        month_txns = await collection.find({
+            "merchant_id": merchant_id,
+            "status": "completed",
+            "created_at": {"$gte": month_start.isoformat()}
+        }, {"_id": 0}).to_list(1000)
+        
+        total = sum(t.get("merchant_amount", t.get("amount", 0)) for t in all_txns)
+        month_total = sum(t.get("merchant_amount", t.get("amount", 0)) for t in month_txns)
+        
+        collections_data[collection_name] = {
+            "count": len(all_txns),
+            "total": total,
+            "month_count": len(month_txns),
+            "month_total": month_total,
+            "sample": all_txns[:3] if all_txns else []
+        }
+    
+    # Also check without status filter
+    all_no_status = await db.transactions.find(
+        {"merchant_id": merchant_id},
+        {"_id": 0, "status": 1, "amount": 1}
+    ).to_list(100)
+    
+    status_counts = {}
+    for t in all_no_status:
+        status = t.get("status", "no_status")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    return {
+        "merchant_id": merchant_id,
+        "month_start": month_start.isoformat(),
+        "collections": collections_data,
+        "transactions_by_status": status_counts,
+        "transactions_total_no_filter": len(all_no_status)
+    }
+
+
 @app.get("/api/admin/debug-merchant-balance/{merchant_id}")
 async def debug_merchant_balance(merchant_id: str, admin_secret: str = None):
     """
