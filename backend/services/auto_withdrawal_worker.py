@@ -41,21 +41,28 @@ async def process_instant_withdrawals():
     )
     
     merchants = await merchants_cursor.to_list(100)
+    logger.info(f"🔄 [INSTANT-WITHDRAW] Checking {len(merchants)} merchants with instant enabled")
     
     for settings in merchants:
         merchant_id = settings["merchant_id"]
-        min_amount = settings.get("min_amount", 50)
+        min_amount = settings.get("min_amount", 5)  # Default to 5, not 50
         destination = settings.get("destination", "momo")
+        
+        logger.info(f"🔄 [INSTANT-WITHDRAW] Checking merchant {merchant_id[:8]}..., min_amount={min_amount}, destination={destination}")
         
         try:
             # Get merchant balance
             balance = await calculate_merchant_balance(db, merchant_id)
+            logger.info(f"🔄 [INSTANT-WITHDRAW] Merchant {merchant_id[:8]}... balance: available={balance['available']}, min_amount={min_amount}")
             
             if balance["available"] >= min_amount:
+                logger.info(f"💰 [INSTANT-WITHDRAW] Triggering withdrawal for merchant {merchant_id[:8]}...: GHS {balance['available']:.2f}")
                 await process_withdrawal(db, merchant_id, balance["available"], destination)
-                logger.info(f"✅ Instant withdrawal processed for merchant {merchant_id[:8]}...: GHS {balance['available']:.2f}")
+                logger.info(f"✅ [INSTANT-WITHDRAW] Withdrawal processed for merchant {merchant_id[:8]}...: GHS {balance['available']:.2f}")
+            else:
+                logger.info(f"⏭️ [INSTANT-WITHDRAW] Skipping merchant {merchant_id[:8]}...: available ({balance['available']}) < min_amount ({min_amount})")
         except Exception as e:
-            logger.error(f"Error processing instant withdrawal for {merchant_id[:8]}...: {e}")
+            logger.error(f"❌ [INSTANT-WITHDRAW] Error for {merchant_id[:8]}...: {e}")
 
 
 async def process_scheduled_withdrawals():
@@ -155,10 +162,14 @@ async def process_withdrawal(db, merchant_id: str, amount: float, destination: s
     """Process a single auto-withdrawal"""
     from services.hubtel_momo_service import get_hubtel_momo_service
     
+    logger.info(f"💸 [AUTO-WITHDRAW] Starting withdrawal: merchant={merchant_id[:8]}..., amount={amount}, destination={destination}")
+    
     # Get merchant details
     merchant = await db.merchants.find_one({"id": merchant_id}, {"_id": 0})
     if not merchant:
         raise ValueError(f"Merchant {merchant_id} not found")
+    
+    logger.info(f"💸 [AUTO-WITHDRAW] Merchant found: {merchant.get('business_name')}, momo={merchant.get('momo_number')}")
     
     # Create withdrawal record
     withdrawal_id = str(uuid.uuid4())
@@ -183,6 +194,7 @@ async def process_withdrawal(db, merchant_id: str, amount: float, destination: s
             raise ValueError("No MoMo number configured")
         withdrawal["phone"] = momo_number
         withdrawal["network"] = momo_network
+        logger.info(f"💸 [AUTO-WITHDRAW] MoMo destination: {momo_number} ({momo_network})")
     else:
         bank_account = merchant.get("bank_account_number") or merchant.get("bank_account")
         bank_code = merchant.get("bank_code") or merchant.get("bank_id")
@@ -191,8 +203,10 @@ async def process_withdrawal(db, merchant_id: str, amount: float, destination: s
         withdrawal["bank_account"] = bank_account
         withdrawal["bank_code"] = bank_code
         withdrawal["bank_name"] = merchant.get("bank_name", "Bank")
+        logger.info(f"💸 [AUTO-WITHDRAW] Bank destination: {bank_account} ({bank_code})")
     
     await db.merchant_withdrawals.insert_one(withdrawal)
+    logger.info(f"💸 [AUTO-WITHDRAW] Withdrawal record created: {withdrawal_ref}")
     
     # Process via Hubtel
     hubtel = get_hubtel_momo_service(db)

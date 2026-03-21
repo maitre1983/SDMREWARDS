@@ -925,6 +925,102 @@ async def get_auto_withdrawal_status():
     }
 
 
+@app.get("/api/admin/debug-merchant-balance/{merchant_id}")
+async def debug_merchant_balance(merchant_id: str, admin_secret: str = None):
+    """
+    Debug endpoint to see how merchant balance is calculated.
+    """
+    if admin_secret != os.environ.get("ADMIN_SECRET", "sdm-admin-2026"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Get merchant info
+    merchant = await db.merchants.find_one({"id": merchant_id}, {"_id": 0, "id": 1, "business_name": 1, "momo_number": 1})
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    
+    # Get transactions total
+    tx_pipeline = [
+        {"$match": {"merchant_id": merchant_id, "status": "completed"}},
+        {"$group": {"_id": None, "total": {"$sum": {"$ifNull": ["$merchant_amount", "$amount"]}}, "count": {"$sum": 1}}}
+    ]
+    tx_result = await db.transactions.aggregate(tx_pipeline).to_list(1)
+    tx_total = tx_result[0]["total"] if tx_result else 0
+    tx_count = tx_result[0]["count"] if tx_result else 0
+    
+    # Get manual withdrawals total
+    wd_pipeline = [
+        {"$match": {"merchant_id": merchant_id, "status": "completed"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
+    ]
+    wd_result = await db.merchant_withdrawals.aggregate(wd_pipeline).to_list(1)
+    wd_total = wd_result[0]["total"] if wd_result else 0
+    wd_count = wd_result[0]["count"] if wd_result else 0
+    
+    # Get auto payouts total
+    po_pipeline = [
+        {"$match": {"merchant_id": merchant_id, "status": "completed"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}}
+    ]
+    po_result = await db.merchant_payouts.aggregate(po_pipeline).to_list(1)
+    po_total = po_result[0]["total"] if po_result else 0
+    po_count = po_result[0]["count"] if po_result else 0
+    
+    # Get auto-withdraw settings
+    auto_settings = await db.merchant_auto_withdraw.find_one({"merchant_id": merchant_id}, {"_id": 0})
+    
+    available = max(0, tx_total - wd_total - po_total)
+    
+    return {
+        "merchant": merchant,
+        "transactions": {"total": tx_total, "count": tx_count},
+        "manual_withdrawals": {"total": wd_total, "count": wd_count},
+        "auto_payouts": {"total": po_total, "count": po_count},
+        "available_balance": available,
+        "auto_withdraw_settings": auto_settings,
+        "formula": f"available = {tx_total} - {wd_total} - {po_total} = {available}"
+    }
+
+
+@app.post("/api/admin/trigger-instant-withdrawal/{merchant_id}")
+async def trigger_instant_withdrawal(merchant_id: str, admin_secret: str = None):
+    """
+    Manually trigger instant withdrawal for a specific merchant.
+    """
+    if admin_secret != os.environ.get("ADMIN_SECRET", "sdm-admin-2026"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from services.auto_withdrawal_worker import calculate_merchant_balance, process_withdrawal
+    
+    # Check auto-withdraw settings
+    settings = await db.merchant_auto_withdraw.find_one({"merchant_id": merchant_id, "enabled": True}, {"_id": 0})
+    if not settings:
+        return {"success": False, "error": "Auto-withdraw not enabled for this merchant"}
+    
+    min_amount = settings.get("min_amount", 50)
+    destination = settings.get("destination", "momo")
+    
+    # Get balance
+    balance = await calculate_merchant_balance(db, merchant_id)
+    
+    if balance["available"] < min_amount:
+        return {
+            "success": False, 
+            "error": f"Available balance ({balance['available']}) is less than minimum ({min_amount})",
+            "balance": balance
+        }
+    
+    # Process withdrawal
+    try:
+        await process_withdrawal(db, merchant_id, balance["available"], destination)
+        return {
+            "success": True,
+            "message": f"Withdrawal of GHS {balance['available']:.2f} initiated",
+            "balance": balance
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "balance": balance}
+
+
 # ============== ADMIN WITHDRAWAL HISTORY ==============
 @app.get("/api/admin/merchant-withdrawals")
 async def get_all_merchant_withdrawals(
