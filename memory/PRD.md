@@ -131,6 +131,24 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Removed "Relevés" (Statements) tab from merchant dashboard
   - Removed BulkClix from .env and config.py completely
 
+### 2026-03-21 (Fork 2 - Part 5) - PWA INSTALL BUTTON, DATA SYNC & TIME DISPLAY
+- ✅ **PWA Install Button Visible:**
+  - Created `/components/PWAInstallPrompt.jsx` component
+  - Shows floating banner on all pages when installable
+  - Supports iOS with "How to Install" instructions
+  - Icon-only and button variants for headers
+  - Auto-dismissible per session
+- ✅ **Mini Accounting Data Sync Fixed:**
+  - Updated `/api/merchants/dashboard/summary` to aggregate from ALL sources
+  - Now checks: `transactions`, `momo_payments`, `cash_payments`
+  - Includes `merchant_withdrawals` in total paid out
+  - Returns unique customer count
+- ✅ **Time Added to All Transaction Histories:**
+  - Format: `DD Mon HH:MM` (e.g., "21 Mar 14:35")
+  - Updated: ClientDashboard, MerchantDashboard, AdminDashboard
+  - Updated: PayoutHistory, MerchantWithdrawal
+  - Created `/utils/dateFormat.js` utility
+
 ### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo

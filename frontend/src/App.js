@@ -3,6 +3,7 @@ import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
 import { LanguageProvider } from "./context/LanguageContext";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 // Loading Spinner Component
 const PageLoader = () => (
@@ -70,6 +71,8 @@ function App() {
             },
           }}
         />
+        {/* PWA Install Banner - shows on all pages */}
+        <PWAInstallPrompt variant="banner" />
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
             <Routes>

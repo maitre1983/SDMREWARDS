@@ -1584,7 +1584,7 @@ export default function ClientDashboard() {
                         <div>
                           <p className="text-white text-sm">{txn.description || txn.type}</p>
                           <p className="text-slate-500 text-xs">
-                            {new Date(txn.created_at).toLocaleDateString()}
+                            {new Date(txn.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
                           </p>
                         </div>
                       </div>
@@ -1778,7 +1778,7 @@ export default function ClientDashboard() {
                         <div>
                           <p className="text-white text-sm">{ref.referred_client?.full_name || 'User'}</p>
                           <p className="text-slate-500 text-xs">
-                            {new Date(ref.created_at).toLocaleDateString('en-GB')}
+                            {new Date(ref.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
                           </p>
                         </div>
                       </div>

@@ -1804,7 +1804,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-slate-700/50">
                     {clientTransactions.map((tx, idx) => (
                       <tr key={idx} className="hover:bg-slate-900/50">
-                        <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString()}</td>
+                        <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</td>
                         <td className="p-2 text-slate-300 capitalize">{tx.type?.replace('_', ' ')}</td>
                         <td className="p-2 text-right text-emerald-400">GHS {tx.amount?.toFixed(2)}</td>
                         <td className="p-2">{getStatusBadge(tx.status || 'completed')}</td>
@@ -2135,7 +2135,7 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-slate-700/50">
                     {merchantTransactions.map((tx, idx) => (
                       <tr key={idx} className="hover:bg-slate-900/50">
-                        <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString()}</td>
+                        <td className="p-2 text-slate-300">{new Date(tx.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</td>
                         <td className="p-2 text-slate-300">{tx.client_name || 'Unknown'}</td>
                         <td className="p-2 text-center">
                           {tx.payment_method === 'cash' ? (

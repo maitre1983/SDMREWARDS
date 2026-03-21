@@ -924,7 +924,7 @@ export default function MerchantDashboard() {
                         </div>
                         
                         <div className="flex items-center justify-between text-xs text-slate-500 mb-3">
-                          <span>{new Date(txn.created_at).toLocaleString()}</span>
+                          <span>{new Date(txn.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                           <span className={hoursLeft < 12 ? 'text-red-400' : 'text-orange-400'}>
                             Expires in {hoursLeft}h
                           </span>
@@ -1111,7 +1111,7 @@ export default function MerchantDashboard() {
                         </div>
                         <div>
                           <p className="text-white text-sm">{entry.description?.slice(0, 40)}...</p>
-                          <p className="text-slate-500 text-xs">{new Date(entry.created_at).toLocaleString()}</p>
+                          <p className="text-slate-500 text-xs">{new Date(entry.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -1167,7 +1167,7 @@ export default function MerchantDashboard() {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-500">
-                        {new Date(txn.created_at).toLocaleString()}
+                        {new Date(txn.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
                       </span>
                       <span className="text-emerald-400">
                         Cashback: GHS {txn.cashback_amount?.toFixed(2)}

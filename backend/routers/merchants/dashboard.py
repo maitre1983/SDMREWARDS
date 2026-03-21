@@ -138,31 +138,54 @@ async def get_advanced_stats(
 
 @router.get("/dashboard/summary")
 async def get_merchant_summary(current_merchant: dict = Depends(get_current_merchant)):
-    """Get merchant accounting summary"""
+    """Get merchant accounting summary - aggregates from all payment sources"""
     db = _get_db()
     merchant_id = current_merchant["id"]
     now = datetime.now(timezone.utc)
     
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    month_transactions = await db.transactions.find({
-        "merchant_id": merchant_id,
-        "status": "completed",
-        "created_at": {"$gte": month_start.isoformat()}
-    }, {"_id": 0}).to_list(10000)
+    # Aggregate from ALL payment sources
+    collections_to_check = ['transactions', 'momo_payments', 'cash_payments']
     
-    month_volume = sum(t.get("amount", 0) for t in month_transactions)
-    month_cashback = sum(t.get("cashback_amount", 0) for t in month_transactions)
+    all_month_transactions = []
+    all_transactions = []
     
-    all_transactions = await db.transactions.find({
-        "merchant_id": merchant_id,
-        "status": "completed"
-    }, {"_id": 0}).to_list(100000)
+    for collection_name in collections_to_check:
+        collection = db[collection_name]
+        
+        # Month transactions
+        month_txns = await collection.find({
+            "merchant_id": merchant_id,
+            "status": "completed",
+            "created_at": {"$gte": month_start.isoformat()}
+        }, {"_id": 0, "amount": 1, "merchant_amount": 1, "cashback_amount": 1}).to_list(10000)
+        all_month_transactions.extend(month_txns)
+        
+        # All-time transactions
+        all_txns = await collection.find({
+            "merchant_id": merchant_id,
+            "status": "completed"
+        }, {"_id": 0, "amount": 1, "merchant_amount": 1, "cashback_amount": 1}).to_list(100000)
+        all_transactions.extend(all_txns)
     
-    total_volume = sum(t.get("amount", 0) for t in all_transactions)
+    # Remove duplicates (by checking if same transaction exists in multiple collections)
+    seen_amounts = set()
+    unique_month = []
+    for t in all_month_transactions:
+        key = f"{t.get('amount', 0)}_{t.get('cashback_amount', 0)}"
+        if key not in seen_amounts:
+            unique_month.append(t)
+            seen_amounts.add(key)
+    
+    month_volume = sum(t.get("merchant_amount", t.get("amount", 0)) for t in all_month_transactions)
+    month_cashback = sum(t.get("cashback_amount", 0) for t in all_month_transactions)
+    
+    total_volume = sum(t.get("merchant_amount", t.get("amount", 0)) for t in all_transactions)
     total_cashback = sum(t.get("cashback_amount", 0) for t in all_transactions)
     total_net = total_volume - total_cashback
     
+    # Get payouts
     month_payouts = await db.merchant_payouts.find({
         "merchant_id": merchant_id,
         "status": "completed",
@@ -178,24 +201,44 @@ async def get_merchant_summary(current_merchant: dict = Depends(get_current_merc
     
     total_paid_out = sum(p.get("amount", 0) for p in all_payouts)
     
+    # Also include manual withdrawals
+    all_withdrawals = await db.merchant_withdrawals.find({
+        "merchant_id": merchant_id,
+        "status": "completed"
+    }, {"_id": 0}).to_list(10000)
+    total_withdrawn = sum(w.get("amount", 0) for w in all_withdrawals)
+    
+    # Get unique customers count
+    unique_customers = set()
+    for collection_name in collections_to_check:
+        collection = db[collection_name]
+        cursor = collection.find(
+            {"merchant_id": merchant_id, "status": "completed"},
+            {"_id": 0, "client_id": 1}
+        )
+        async for doc in cursor:
+            if doc.get("client_id"):
+                unique_customers.add(doc["client_id"])
+    
     return {
         "this_month": {
             "volume": round(month_volume, 2),
             "cashback_given": round(month_cashback, 2),
             "net_earnings": round(month_volume - month_cashback, 2),
             "paid_out": round(month_paid_out, 2),
-            "transactions": len(month_transactions)
+            "transactions": len(all_month_transactions)
         },
         "all_time": {
             "volume": round(total_volume, 2),
             "cashback_given": round(total_cashback, 2),
             "net_earnings": round(total_net, 2),
-            "paid_out": round(total_paid_out, 2),
-            "transactions": len(all_transactions)
+            "paid_out": round(total_paid_out + total_withdrawn, 2),
+            "transactions": len(all_transactions),
+            "unique_customers": len(unique_customers)
         },
         "current_balance": {
             "pending": round(current_merchant.get("pending_balance", 0), 2),
-            "available": round(total_net - total_paid_out, 2)
+            "available": round(total_net - total_paid_out - total_withdrawn, 2)
         }
     }
 
