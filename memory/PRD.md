@@ -58,6 +58,18 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - Shows: merchant name, amount, date/time, status, payout method
   - Stats: completed, pending, processing, failed counts and amounts
 
+### 2026-03-21 (Fork 2) - MANUAL WITHDRAW UI REFINEMENT
+- ✅ **Quick Amount Buttons** - Added 50, 100, 500, TOUT buttons for fast selection
+  - Buttons dynamically filter based on available balance (only show if <= balance)
+  - TOUT button sets amount to full available balance
+- ✅ **Custom Amount Input** - GHS-prefixed input for manual entry
+- ✅ **Destination Display** - Shows MoMo network/number or Bank info based on settings
+- ✅ **Code Cleanup** - Removed unused `showManualWithdraw` state variable
+- ✅ **Balance API Fix** - Fixed 404 bug in `/api/merchants/balance` endpoint
+  - Root cause: Empty projection result evaluating to falsy
+  - Fix: Check merchant existence with simple id projection first
+- ✅ **French Labels** - UI uses French: 'Retirer', 'Montant à retirer', 'TOUT', etc.
+
 ### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo
