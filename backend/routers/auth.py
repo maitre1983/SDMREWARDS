@@ -194,8 +194,13 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash"""
-    return bcrypt.checkpw(password.encode(), hashed.encode())
+    """Verify password against hash - supports both bcrypt and passlib hashes"""
+    try:
+        from passlib.context import CryptContext
+        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        return pwd_context.verify(password, hashed)
+    except Exception:
+        return False
 
 
 def create_token(user_id: str, user_type: str) -> str:
@@ -680,7 +685,10 @@ async def login_admin(request: Request, login_request: AdminLoginRequest):
     if not admin_doc:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    if not verify_password(login_request.password, admin_doc["password_hash"]):
+    # Check password_hash first, then password field (for backward compatibility)
+    stored_hash = admin_doc.get("password_hash") or admin_doc.get("password", "")
+    
+    if not verify_password(login_request.password, stored_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     if not admin_doc.get("is_active"):

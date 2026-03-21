@@ -436,48 +436,99 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
         })
     
     # ============== 9. SDM CASHBACK COMMISSIONS ==============
-    # Commission on cashback (5% default) - stored as commission_amount or sdm_commission
-    all_transactions_with_commission = await db.transactions.find(
-        {
-            "type": "payment",
-            "$or": [
-                {"commission_amount": {"$exists": True, "$gt": 0}},
-                {"sdm_commission": {"$exists": True, "$gt": 0}}
-            ]
-        },
-        {"_id": 0, "commission_amount": 1, "sdm_commission": 1, "created_at": 1}
-    ).to_list(100000)
+    # Commission on cashback (5% default) - aggregated from all payment collections
+    # SDM takes 5% of the cashback distributed to clients
     
-    # Sum both fields (some transactions use commission_amount, others use sdm_commission)
-    total_sdm_commissions = sum(
-        t.get("commission_amount", 0) + t.get("sdm_commission", 0) 
-        for t in all_transactions_with_commission
-    )
-    
-    # Commission by period
-    sdm_commission_by_period = {
-        "day": 0,
-        "week": 0,
-        "month": 0,
-        "year": 0
-    }
+    # Helper function to process commissions from any collection
+    def process_commission_data(records, day_start, week_start, month_start, year_start):
+        total = 0
+        by_period = {"day": 0, "week": 0, "month": 0, "year": 0}
+        
+        for r in records:
+            # Get commission from multiple possible field names
+            commission = (
+                r.get("sdm_commission", 0) or 
+                r.get("commission_amount", 0) or
+                r.get("platform_commission", 0)
+            )
+            
+            # If no explicit commission, calculate 5% of cashback
+            if commission == 0 and r.get("cashback", 0) > 0:
+                commission = round(r.get("cashback", 0) * 0.05, 2)
+            
+            total += commission
+            
+            created_at = r.get("created_at", "") or r.get("timestamp", "")
+            if created_at:
+                if created_at >= day_start.isoformat():
+                    by_period["day"] += commission
+                if created_at >= week_start.isoformat():
+                    by_period["week"] += commission
+                if created_at >= month_start.isoformat():
+                    by_period["month"] += commission
+                if created_at >= year_start.isoformat():
+                    by_period["year"] += commission
+        
+        return total, by_period
     
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    for t in all_transactions_with_commission:
-        created_at = t.get("created_at", "")
-        commission = t.get("commission_amount", 0) + t.get("sdm_commission", 0)
-        if created_at >= day_start.isoformat():
-            sdm_commission_by_period["day"] += commission
-        if created_at >= week_start.isoformat():
-            sdm_commission_by_period["week"] += commission
-        if created_at >= month_start.isoformat():
-            sdm_commission_by_period["month"] += commission
-        if created_at >= year_start.isoformat():
-            sdm_commission_by_period["year"] += commission
+    total_sdm_commissions = 0
+    sdm_commission_by_period = {"day": 0, "week": 0, "month": 0, "year": 0}
+    
+    # 1. Commissions from transactions collection
+    transactions_with_commission = await db.transactions.find(
+        {
+            "$or": [
+                {"type": "payment"},
+                {"type": "merchant_payment"},
+                {"commission_amount": {"$exists": True}},
+                {"sdm_commission": {"$exists": True}},
+                {"cashback": {"$gt": 0}}
+            ]
+        },
+        {"_id": 0, "commission_amount": 1, "sdm_commission": 1, "platform_commission": 1, "cashback": 1, "created_at": 1}
+    ).to_list(100000)
+    
+    logger.info(f"SDM Commission: Found {len(transactions_with_commission)} transactions")
+    print(f"DEBUG SDM Commission: Found {len(transactions_with_commission)} transactions")
+    
+    t_total, t_period = process_commission_data(transactions_with_commission, day_start, week_start, month_start, year_start)
+    total_sdm_commissions += t_total
+    for k in sdm_commission_by_period:
+        sdm_commission_by_period[k] += t_period[k]
+    
+    logger.info(f"SDM Commission: After transactions - total={total_sdm_commissions}, periods={sdm_commission_by_period}")
+    print(f"DEBUG SDM Commission: After transactions - total={total_sdm_commissions}, periods={sdm_commission_by_period}")
+    
+    # 2. Commissions from momo_payments collection
+    momo_with_commission = await db.momo_payments.find(
+        {"status": "completed"},
+        {"_id": 0, "sdm_commission": 1, "commission_amount": 1, "platform_commission": 1, "cashback": 1, "created_at": 1, "timestamp": 1}
+    ).to_list(100000)
+    
+    m_total, m_period = process_commission_data(momo_with_commission, day_start, week_start, month_start, year_start)
+    total_sdm_commissions += m_total
+    for k in sdm_commission_by_period:
+        sdm_commission_by_period[k] += m_period[k]
+    
+    # 3. Commissions from cash_payments collection
+    cash_with_commission = await db.cash_payments.find(
+        {"status": "completed"},
+        {"_id": 0, "sdm_commission": 1, "commission_amount": 1, "platform_commission": 1, "cashback": 1, "created_at": 1, "timestamp": 1}
+    ).to_list(100000)
+    
+    c_total, c_period = process_commission_data(cash_with_commission, day_start, week_start, month_start, year_start)
+    total_sdm_commissions += c_total
+    for k in sdm_commission_by_period:
+        sdm_commission_by_period[k] += c_period[k]
+    
+    # If still no commissions found, estimate from total cashback distributed (5%)
+    if total_sdm_commissions == 0 and total_cashback_all > 0:
+        total_sdm_commissions = round(total_cashback_all * 0.05, 2)
     
     # ============== 10. SERVICE FEES ANALYTICS ==============
     service_transactions = await db.transactions.find(
