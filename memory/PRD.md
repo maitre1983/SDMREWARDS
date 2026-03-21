@@ -67,6 +67,38 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - All routes lazy-loaded with React.lazy()
   - Vendor chunks properly split (~80+ chunks)
 
+### 2026-03-21 (Fork) - WEBSOCKET REAL-TIME SYNC 🔄
+- ✅ **Backend WebSocket Router** (`/app/backend/routers/websocket_router.py`)
+  - `/api/ws/merchant` - Merchant real-time updates
+  - `/api/ws/client` - Client real-time updates
+  - `/api/ws/admin` - Admin real-time updates
+  - `/api/ws/status` - Connection statistics
+  - ConnectionManager class for pub/sub functionality
+  - Auto-reconnection and heartbeat support
+- ✅ **Frontend WebSocket Service** (`/app/frontend/src/services/webSocketService.js`)
+  - Singleton WebSocket manager
+  - Automatic reconnection with exponential backoff
+  - Event-based subscription system
+  - Ping/pong heartbeat to keep connections alive
+- ✅ **React WebSocket Hooks** (`/app/frontend/src/hooks/useWebSocket.js`)
+  - `useWebSocket` - Generic hook
+  - `useMerchantWebSocket` - Merchant-specific
+  - `useClientWebSocket` - Client-specific
+  - `useAdminWebSocket` - Admin-specific
+- ✅ **WebSocket Connection Indicator** (`/app/frontend/src/components/WebSocketIndicator.jsx`)
+  - Visual status indicator in dashboard headers
+  - Shows: Connected (green pulse), Connecting (amber), Offline (gray)
+- ✅ **Dashboard Integration**
+  - MerchantDashboard: Auto-refresh on payment_received events
+  - ClientDashboard: Auto-refresh on balance_update events
+  - Toast notifications for real-time events
+- ✅ **Event Types Supported**:
+  - `payment_received` - New payment notification
+  - `balance_update` - Cashback balance changed
+  - `dashboard_refresh` - Request to refresh data
+  - `payout_update` - Payout status changed
+  - `heartbeat` - Keep-alive ping
+
 ### 2026-03-21 (Current Session) - MERCHANT WITHDRAWAL SYSTEM
 - ✅ **Merchant Withdrawal Tab** - New "Withdrawal" tab in Settings showing:
   - **Balance Cards**: Available balance, Pending, Total Received

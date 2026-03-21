@@ -7,6 +7,8 @@ import { Input } from '../components/ui/input';
 import { useLanguage, LanguageSelector } from '../contexts/LanguageContext';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNetwork } from '../hooks/useNetwork';
+import { useClientWebSocket } from '../hooks/useWebSocket';
+import WebSocketIndicator from '../components/WebSocketIndicator';
 import syncService from '../services/syncService';
 import NetworkIndicator from '../components/NetworkIndicator';
 
@@ -173,6 +175,24 @@ export default function ClientDashboard() {
   const cardSelectionRef = useRef(null);
 
   const token = localStorage.getItem('sdm_client_token');
+
+  // WebSocket for real-time updates
+  const handleBalanceUpdate = useCallback((data) => {
+    if (data.change > 0) {
+      toast.success(`+GHS ${data.change.toFixed(2)} cashback! New balance: GHS ${data.new_balance.toFixed(2)}`);
+    }
+    // Refresh dashboard data
+    fetchDashboardData();
+  }, []);
+
+  const handleDashboardRefresh = useCallback(() => {
+    fetchDashboardData();
+  }, []);
+
+  const { isConnected, connectionState, reconnectAttempt } = useClientWebSocket(token, {
+    onBalanceUpdate: handleBalanceUpdate,
+    onDashboardRefresh: handleDashboardRefresh,
+  });
 
   useEffect(() => {
     if (!token) {
@@ -1243,6 +1263,12 @@ export default function ClientDashboard() {
             <span className="font-bold text-white">SDM</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* WebSocket Connection Indicator */}
+            <WebSocketIndicator 
+              isConnected={isConnected}
+              connectionState={connectionState}
+              reconnectAttempt={reconnectAttempt}
+            />
             {/* PWA Install Button in Header */}
             <Suspense fallback={null}>
               <PWAInstallPrompt variant="icon" />

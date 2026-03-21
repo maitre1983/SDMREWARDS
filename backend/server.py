@@ -678,6 +678,7 @@ from routers.hubtel_diagnostic import router as hubtel_diagnostic_router
 from routers.notifications_sse import router as notifications_sse_router
 from routers.verification import router as verification_router
 from routers.merchant_withdrawal import router as merchant_withdrawal_router
+from routers.websocket_router import router as websocket_router
 
 # Set database for payments router (new package)
 set_payments_db(db)
@@ -704,6 +705,7 @@ app.include_router(hubtel_diagnostic_router, prefix="/api/admin", tags=["Hubtel 
 app.include_router(notifications_sse_router, prefix="/api/notifications", tags=["Real-time Notifications"])
 app.include_router(verification_router, prefix="/api/verify", tags=["Account Verification"])
 app.include_router(merchant_withdrawal_router, prefix="/api/merchants", tags=["Merchant Withdrawals"])
+app.include_router(websocket_router, prefix="/api", tags=["WebSocket Real-time"])
 
 # ============== MOBILE APP STATIC FILES ==============
 import os

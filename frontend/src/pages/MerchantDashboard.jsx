@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { useMerchantWebSocket } from '../hooks/useWebSocket';
+import WebSocketIndicator from '../components/WebSocketIndicator';
 import { 
   Store, 
   QrCode, 
@@ -129,6 +131,26 @@ export default function MerchantDashboard() {
   const [isRejecting, setIsRejecting] = useState(null);
 
   const token = localStorage.getItem('sdm_merchant_token');
+
+  // WebSocket for real-time updates
+  const handlePaymentReceived = useCallback((data) => {
+    toast.success(`Payment received: GHS ${data.amount?.toFixed(2)} from ${data.client_name || 'Customer'}`, {
+      duration: 5000,
+    });
+    // Refresh dashboard data
+    fetchDashboardData();
+    fetchPendingConfirmations();
+  }, []);
+
+  const handleDashboardRefresh = useCallback(() => {
+    fetchDashboardData();
+    fetchPendingConfirmations();
+  }, []);
+
+  const { isConnected, connectionState, reconnectAttempt } = useMerchantWebSocket(token, {
+    onPaymentReceived: handlePaymentReceived,
+    onDashboardRefresh: handleDashboardRefresh,
+  });
 
   useEffect(() => {
     if (!token) {
@@ -612,6 +634,12 @@ export default function MerchantDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* WebSocket Connection Indicator */}
+            <WebSocketIndicator 
+              isConnected={isConnected}
+              connectionState={connectionState}
+              reconnectAttempt={reconnectAttempt}
+            />
             {/* PWA Install Button */}
             <Suspense fallback={null}>
               <PWAInstallPrompt variant="icon" />
