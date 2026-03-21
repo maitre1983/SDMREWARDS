@@ -87,6 +87,25 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
   - MoMo: `POST https://smp.hubtel.com/api/merchants/{Prepaid_Deposit_ID}/send/mobilemoney`
   - Bank: `POST https://smp.hubtel.com/api/merchants/{Hubtel_Prepaid_Deposit_ID}/send/bank/gh/{BankCode}`
 
+### 2026-03-21 (Fork 2 - Part 3) - SIMPLIFIED PAYOUT SYSTEM
+- ✅ **Removed Auto-Withdrawal Complexity** - SDM ne garde pas l'argent du marchand
+  - Supprimé le système d'auto-withdrawal (redondant avec auto-payout)
+  - Supprimé l'appel à `process_instant_withdrawals()` du flux de paiement
+- ✅ **Simplified UI** - MerchantWithdrawal.jsx simplifié:
+  - Bannière "Paiements Automatiques Activés" montrant la destination configurée
+  - Cartes de solde (Disponible, En Attente, Total Reçu)
+  - Section retrait manuel (uniquement si solde > 5 GHS)
+  - Historique des paiements
+- ✅ **Auto-Payout via `_process_merchant_payout()`** - Fonctionne après chaque paiement client:
+  - Vérifie `preferred_payout_method` (momo ou bank)
+  - Crée un enregistrement dans `merchant_payouts`
+  - Envoie via Hubtel Send Money API
+  - Status géré via callback (processing → completed/failed)
+- ✅ **Transfer Callback Improvements:**
+  - Met à jour le solde marchand quand payout confirmé "completed"
+  - Gère les références SDM-PAYOUT-XXXXXXXX
+- ✅ **SMS Notification** - Marchand notifié après chaque payout réussi
+
 ### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo

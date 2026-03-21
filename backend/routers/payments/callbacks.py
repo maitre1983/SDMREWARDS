@@ -843,6 +843,16 @@ async def process_transfer_callback_async(
                 {"$set": update_data}
             )
             logger.info(f"✅ [TRANSFER-ASYNC] Updated merchant_payouts: ref={client_reference}, matched={result.matched_count}")
+            
+            # If completed, update merchant balance
+            if status == "completed" and result.matched_count > 0:
+                payout = await db.merchant_payouts.find_one({"reference": client_reference}, {"_id": 0})
+                if payout and payout.get("merchant_id"):
+                    await db.merchants.update_one(
+                        {"id": payout["merchant_id"]},
+                        {"$inc": {"total_paid_out": payout.get("amount", 0)}}
+                    )
+                    logger.info(f"✅ [TRANSFER-ASYNC] Updated merchant balance for payout: {client_reference}")
         
         elif client_reference.startswith("SDM-WD-") or client_reference.startswith("WD-"):
             # Client cashback withdrawals

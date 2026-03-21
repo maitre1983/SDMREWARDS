@@ -362,14 +362,6 @@ async def process_merchant_payment(payment: Dict):
         logger.info(f"📢 [MERCHANT_PAYMENT] SSE notification sent to merchant {merchant_id[:8]}...")
     except Exception as e:
         logger.error(f"SSE notification error: {e}")
-    
-    # Process instant withdrawals if merchant has it enabled
-    try:
-        from services.auto_withdrawal_worker import process_instant_withdrawals
-        await process_instant_withdrawals()
-        logger.info(f"💰 [MERCHANT_PAYMENT] Instant withdrawals processed")
-    except Exception as e:
-        logger.error(f"Instant withdrawal error: {e}")
 
 
 async def _process_merchant_payout(merchant: Dict, merchant_share: float, transaction_id: str):
@@ -477,19 +469,28 @@ async def _process_momo_payout(merchant: Dict, merchant_share: float, transactio
         )
         
         if result.get("success"):
-            logger.info(f"✅ [MERCHANT_PAYOUT] SUCCESS - Sent GHS {merchant_share:.2f} to {merchant_momo}, ref: {result.get('transaction_id')}")
+            # Note: Hubtel may return success=True with status "processing"
+            # The actual completion status will come via callback
+            hubtel_status = result.get("status", "").lower()
+            final_status = "completed" if hubtel_status == "success" else "processing"
+            
+            logger.info(f"✅ [MERCHANT_PAYOUT] {final_status.upper()} - Sent GHS {merchant_share:.2f} to {merchant_momo}, ref: {result.get('transaction_id')}")
             await db.merchant_payouts.update_one(
                 {"id": payout_record["id"]},
                 {"$set": {
-                    "status": "completed",
+                    "status": final_status,
                     "provider_reference": result.get("transaction_id"),
-                    "completed_at": datetime.now(timezone.utc).isoformat()
+                    "hubtel_response": result,
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }}
             )
-            await db.merchants.update_one(
-                {"id": merchant["id"]},
-                {"$inc": {"pending_balance": -merchant_share, "total_paid_out": merchant_share}}
-            )
+            
+            # Only update merchant balance if confirmed completed
+            if final_status == "completed":
+                await db.merchants.update_one(
+                    {"id": merchant["id"]},
+                    {"$inc": {"pending_balance": -merchant_share, "total_paid_out": merchant_share}}
+                )
             
             # Send SMS notification to merchant about payout
             try:
@@ -497,7 +498,7 @@ async def _process_momo_payout(merchant: Dict, merchant_share: float, transactio
                 if merchant.get("phone"):
                     await sms.send_sms(
                         merchant["phone"],
-                        f"SDM Rewards: GHS {merchant_share:.2f} has been sent to your MoMo {merchant_momo}. Ref: {payout_ref}"
+                        f"SDM Rewards: GHS {merchant_share:.2f} envoyé vers votre MoMo {merchant_momo}. Ref: {payout_ref}"
                     )
             except Exception as sms_error:
                 logger.error(f"Payout SMS error: {sms_error}")
