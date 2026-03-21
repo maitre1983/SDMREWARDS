@@ -1,0 +1,93 @@
+{
+  "summary": "Merchant Withdrawal UI and API testing completed successfully. All features working: Quick amount buttons (50, 100, TOUT), custom amount input, destination display (MoMo/Bank), auto-withdraw toggle with settings, and withdrawal history. Backend APIs all passing (10/10 tests). Fixed a bug in GET /api/merchants/balance endpoint that was returning 404 due to empty projection result.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Withdrawal tab",
+        "issues": ["500 quick amount button not shown when balance is 130 (correct behavior - only shows amounts <= available balance)"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_merchant_withdrawal.py",
+    "/app/test_reports/pytest/merchant_withdrawal_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "✅ Fixed bug in /api/merchants/balance - was returning 404 when merchant had no balance fields (empty projection result)",
+    "✅ Quick amount buttons correctly filter based on available balance (50, 100, 500 only show if <= balance)",
+    "✅ TOUT button correctly sets amount to full available balance",
+    "✅ Destination display shows MoMo network and number from payoutSettings",
+    "✅ Auto-withdraw toggle reveals settings panel with frequency, min_amount, and destination options",
+    "✅ French labels used throughout: 'Retirer', 'Montant à retirer', 'Vous recevrez', 'Destination du retrait'",
+    "✅ All withdrawal APIs properly authenticated with merchant JWT token"
+  ],
+  "updated_files": [
+    "/app/backend/routers/merchant_withdrawal.py",
+    "/app/backend/tests/test_merchant_withdrawal.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 10/10 tests passed, 2 skipped (rate limit)",
+    "frontend": "100% - All UI elements working correctly"
+  },
+  "test_credentials": {
+    "merchant_phone": "+233500700500",
+    "merchant_password": "test123"
+  },
+  "seed_data_creation": "No seed data needed - used existing test merchant",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Merchant withdrawal feature fully tested. Backend endpoints: GET /api/merchants/balance, POST /api/merchants/withdraw, GET /api/merchants/withdrawals, GET/POST /api/merchants/auto-withdraw/settings. Frontend: MerchantWithdrawal.jsx component in Settings > Withdrawal tab. Test merchant has momo_number: 0541234567, available balance: GHS 130.00.",
+  "endpoints_tested": {
+    "GET /api/merchants/balance": {
+      "status": "PASS",
+      "response": "{available: 130.0, pending: 0, total_received: 130.0, total_withdrawn: 0}",
+      "notes": "Fixed bug - was returning 404 due to empty projection result"
+    },
+    "GET /api/merchants/withdrawals": {
+      "status": "PASS",
+      "response": "{withdrawals: []}",
+      "notes": "Returns withdrawal history, respects limit parameter"
+    },
+    "GET /api/merchants/auto-withdraw/settings": {
+      "status": "PASS",
+      "response": "{enabled: false, min_amount: 50, frequency: 'daily', destination: 'momo'}",
+      "notes": "Returns default settings if none configured"
+    },
+    "POST /api/merchants/auto-withdraw/settings": {
+      "status": "PASS",
+      "notes": "Saves settings and returns {success: true}"
+    },
+    "POST /api/merchants/withdraw": {
+      "status": "PASS",
+      "notes": "Validates minimum amount (5 GHS) and sufficient balance"
+    }
+  },
+  "features_verified": [
+    "Balance cards display (Available, Pending, Total Received)",
+    "Quick amount buttons (50, 100, 500, TOUT) - only shows amounts <= available balance",
+    "Custom amount input with GHS prefix",
+    "Destination display showing MoMo network and number",
+    "Withdraw button shows amount and is disabled when invalid",
+    "Auto-withdraw toggle reveals settings panel",
+    "Auto-withdraw settings: frequency, min_amount, destination (MoMo/Bank)",
+    "Recent Withdrawals history section",
+    "French labels throughout UI"
+  ],
+  "bug_fixed": {
+    "file": "/app/backend/routers/merchant_withdrawal.py",
+    "issue": "GET /api/merchants/balance returning 404 'Merchant not found'",
+    "root_cause": "The query used a projection that only returned balance fields. If merchant had no balance fields, the result was an empty dict {}, which evaluated to falsy in 'if not merchant:' check",
+    "fix": "Changed to first check if merchant exists with a simple id projection, then proceed with balance calculations"
+  },
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}

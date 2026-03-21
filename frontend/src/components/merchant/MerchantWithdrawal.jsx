@@ -48,7 +48,6 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
   });
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [showManualWithdraw, setShowManualWithdraw] = useState(false);
   const [isSavingAutoSettings, setIsSavingAutoSettings] = useState(false);
 
   // Fetch merchant balance and withdrawal history
@@ -111,7 +110,6 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       if (res.data.success) {
         toast.success(`Withdrawal of GHS ${amount.toFixed(2)} initiated!`);
         setWithdrawAmount('');
-        setShowManualWithdraw(false);
         fetchBalanceData();
         onRefresh?.();
       } else {

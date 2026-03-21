@@ -54,13 +54,9 @@ async def get_merchant_balance(current_merchant: dict = Depends(get_current_merc
     db = get_db()
     merchant_id = current_merchant["id"]
     
-    # Get merchant record with balance
-    merchant = await db.merchants.find_one(
-        {"id": merchant_id},
-        {"_id": 0, "pending_balance": 1, "available_balance": 1, "total_received": 1, "total_paid_out": 1}
-    )
-    
-    if not merchant:
+    # Check if merchant exists first
+    merchant_exists = await db.merchants.find_one({"id": merchant_id}, {"_id": 0, "id": 1})
+    if not merchant_exists:
         raise HTTPException(status_code=404, detail="Merchant not found")
     
     # Calculate balances from all payment sources
