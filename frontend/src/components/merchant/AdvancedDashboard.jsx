@@ -170,7 +170,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
             </div>
             <GrowthIndicator value={advancedStats?.growth?.cashback} />
           </div>
-          <p className="text-slate-400 text-sm">Cashback distribué</p>
+          <p className="text-slate-400 text-sm">Cashback distributed</p>
           <p className="text-white text-xl font-bold">
             {formatCurrency(advancedStats?.current?.cashback)}
           </p>
@@ -259,13 +259,13 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-white font-semibold flex items-center gap-2">
-            <BarChart3 size={18} /> Évolution des ventes
+            <BarChart3 size={18} /> Sales Trend
           </h3>
           <div className="flex gap-2">
             {[
-              { id: 'daily', label: '7 jours' },
-              { id: 'weekly', label: '4 sem.' },
-              { id: 'monthly', label: '6 mois' }
+              { id: 'daily', label: '7 days' },
+              { id: 'weekly', label: '4 weeks' },
+              { id: 'monthly', label: '6 months' }
             ].map((t) => (
               <button
                 key={t.id}
@@ -289,7 +289,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
               <BarChart data={chartData.data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                 <XAxis 
-                  dataKey="label" 
+                  dataKey="name" 
                   stroke="#94a3b8" 
                   tick={{ fill: '#94a3b8', fontSize: 12 }}
                 />
@@ -328,7 +328,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
         {chartData?.totals && (
           <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-slate-400 text-xs">Total ventes</p>
+              <p className="text-slate-400 text-xs">Total sales</p>
               <p className="text-emerald-400 font-bold">{formatCurrency(chartData.totals.volume)}</p>
             </div>
             <div>
@@ -491,8 +491,8 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
         ) : (
           <div className="h-64 flex flex-col items-center justify-center text-slate-500">
             <Banknote size={48} className="mb-3 opacity-50" />
-            <p>Pas de données pour cette période</p>
-            <p className="text-sm">Les ventes cash et MoMo apparaîtront ici</p>
+            <p>No data for this period</p>
+            <p className="text-sm">Cash and MoMo sales will appear here</p>
           </div>
         )}
       </div>
