@@ -56,6 +56,7 @@ const APIKeysManager = lazy(() => import('../components/merchant/APIKeysManager'
 const WebhooksManager = lazy(() => import('../components/merchant/WebhooksManager'));
 const PaymentNotificationToast = lazy(() => import('../components/merchant/PaymentNotificationToast'));
 const PayoutHistory = lazy(() => import('../components/merchant/PayoutHistory'));
+const MerchantWithdrawal = lazy(() => import('../components/merchant/MerchantWithdrawal'));
 
 // Mini loader for lazy components
 const MiniLoader = () => (
@@ -1207,7 +1208,8 @@ export default function MerchantDashboard() {
               {[
                 { id: 'cashback', label: 'Cashback', icon: Percent },
                 { id: 'payment', label: 'Payment', icon: Wallet },
-                { id: 'payouts', label: 'Payouts', icon: ArrowDownToLine },
+                { id: 'withdrawal', label: 'Withdrawal', icon: ArrowDownToLine },
+                { id: 'payouts', label: 'Payouts', icon: History },
                 { id: 'statements', label: 'Relevés', icon: FileText },
                 { id: 'cashiers', label: 'Caissiers', icon: UserCog },
                 { id: 'business', label: 'Commerce', icon: Building },
@@ -1269,6 +1271,18 @@ export default function MerchantDashboard() {
             {settingsTab === 'payouts' && (
               <Suspense fallback={<div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-slate-400" /></div>}>
                 <PayoutHistory token={token} />
+              </Suspense>
+            )}
+
+            {/* Withdrawal */}
+            {settingsTab === 'withdrawal' && (
+              <Suspense fallback={<div className="text-center py-8"><Loader2 className="animate-spin mx-auto text-slate-400" /></div>}>
+                <MerchantWithdrawal 
+                  token={token} 
+                  merchant={merchant}
+                  payoutSettings={settings}
+                  onRefresh={fetchDashboardData}
+                />
               </Suspense>
             )}
 

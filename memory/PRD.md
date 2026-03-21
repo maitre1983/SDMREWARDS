@@ -39,7 +39,26 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
-### 2026-03-20 (Current Session) - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
+### 2026-03-21 (Current Session) - MERCHANT WITHDRAWAL SYSTEM
+- ✅ **Merchant Withdrawal Tab** - New "Withdrawal" tab in Settings showing:
+  - **Balance Cards**: Available balance, Pending, Total Received
+  - **Manual Withdraw**: Button to withdraw funds to configured MoMo/Bank
+  - **Automatic Withdraw**: Toggle and settings for scheduled payouts:
+    - Frequency: Instant, Daily, Weekly
+    - Minimum amount threshold
+    - Destination: MoMo or Bank
+  - **Recent Withdrawals**: History of withdrawal transactions
+  - **API Endpoints:**
+    - `GET /api/merchants/balance` - Get merchant balance
+    - `POST /api/merchants/withdraw` - Initiate manual withdrawal
+    - `GET /api/merchants/withdrawals` - Get withdrawal history
+    - `GET /api/merchants/auto-withdraw/settings` - Get auto-withdraw settings
+    - `POST /api/merchants/auto-withdraw/settings` - Save auto-withdraw settings
+  - **Files Created:**
+    - `/app/backend/routers/merchant_withdrawal.py` - Merchant withdrawal API
+    - `/app/frontend/src/components/merchant/MerchantWithdrawal.jsx` - Withdrawal UI component
+
+### 2026-03-20 - MERCHANT NOTIFICATIONS + PAYOUTS + VERIFICATION
 - ✅ **Real-time Payment Notifications via SSE** - Merchants receive instant notifications when payments are received
 - ✅ **Automatic Merchant Payouts** - When customers pay (MoMo/Cashback/Hybrid), merchants receive funds instantly to their configured MoMo
 - ✅ **Bank Transfer Support** - Merchants can now receive payouts via bank transfer
