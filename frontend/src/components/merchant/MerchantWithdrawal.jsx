@@ -218,101 +218,136 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       </div>
 
       {/* Withdrawal Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Manual Withdraw */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-              <Send className="text-blue-400" size={20} />
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
+              <Send className="text-blue-400" size={24} />
             </div>
             <div>
-              <h3 className="text-white font-semibold">Manual Withdraw</h3>
-              <p className="text-slate-400 text-xs">Withdraw to {payoutSettings?.preferred_payout_method === 'bank' ? 'Bank' : 'MoMo'}</p>
+              <h3 className="text-white text-lg font-semibold">Manual Withdraw</h3>
+              <p className="text-slate-400 text-sm">Retirer vers votre compte</p>
             </div>
           </div>
 
-          {!showManualWithdraw ? (
-            <Button
-              onClick={() => setShowManualWithdraw(true)}
-              disabled={balance.available < 5}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              data-testid="manual-withdraw-btn"
-            >
-              <ArrowDownToLine className="mr-2" size={18} />
-              Withdraw Now
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                {[10, 50, 100].filter(a => a <= balance.available).map(amt => (
+          {/* Destination Info */}
+          <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 mb-5">
+            <p className="text-slate-400 text-xs mb-2">Destination du retrait</p>
+            {payoutSettings?.preferred_payout_method === 'bank' ? (
+              <div className="flex items-center gap-3">
+                <Building2 className="text-blue-400" size={20} />
+                <div>
+                  <p className="text-white font-medium">{payoutSettings?.bank_name || 'Bank Account'}</p>
+                  <p className="text-slate-400 text-sm">****{(payoutSettings?.bank_account || '').slice(-4)}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Phone className="text-purple-400" size={20} />
+                <div>
+                  <p className="text-white font-medium">{payoutSettings?.momo_network || 'Mobile Money'}</p>
+                  <p className="text-slate-400 text-sm">{payoutSettings?.momo_number || 'Non configuré'}</p>
+                </div>
+              </div>
+            )}
+            {!payoutSettings?.momo_number && payoutSettings?.preferred_payout_method !== 'bank' && (
+              <p className="text-amber-400 text-xs mt-2">⚠️ Configurez votre MoMo dans Settings &gt; Payment</p>
+            )}
+          </div>
+
+          {/* Amount Selection */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-slate-300 text-sm block mb-2">Montant à retirer (GHS)</label>
+              
+              {/* Quick Amount Buttons */}
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {[50, 100, 500].filter(a => a <= balance.available).map(amt => (
                   <button
                     key={amt}
                     onClick={() => setWithdrawAmount(amt.toString())}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
                       withdrawAmount === amt.toString() 
-                        ? 'bg-blue-600 text-white' 
+                        ? 'bg-blue-600 text-white ring-2 ring-blue-400' 
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
-                    GHS {amt}
+                    {amt}
                   </button>
                 ))}
+                <button
+                  onClick={() => setWithdrawAmount(balance.available.toString())}
+                  className={`py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    parseFloat(withdrawAmount) === balance.available 
+                      ? 'bg-emerald-600 text-white ring-2 ring-emerald-400' 
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  TOUT
+                </button>
               </div>
+              
+              {/* Custom Amount Input */}
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">GHS</span>
                 <Input
                   type="number"
-                  placeholder="Enter amount"
+                  placeholder="Entrez le montant"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="pl-10 bg-slate-900 border-slate-700 text-white"
+                  className="pl-14 bg-slate-900 border-slate-600 text-white text-lg font-semibold h-12"
                   max={balance.available}
                   min={5}
+                  data-testid="withdraw-amount-input"
                 />
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => { setShowManualWithdraw(false); setWithdrawAmount(''); }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleManualWithdraw}
-                  disabled={isWithdrawing || !withdrawAmount}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  {isWithdrawing ? (
-                    <>
-                      <Loader2 className="animate-spin mr-2" size={16} />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2" size={16} />
-                      Withdraw
-                    </>
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-slate-500 text-center">
-                Destination: {payoutSettings?.momo_number || payoutSettings?.bank_account || 'Not configured'}
-              </p>
+              
+              {withdrawAmount && parseFloat(withdrawAmount) > 0 && (
+                <p className="text-slate-400 text-xs mt-2">
+                  Vous recevrez: <span className="text-emerald-400 font-semibold">{formatCurrency(parseFloat(withdrawAmount))}</span>
+                </p>
+              )}
             </div>
-          )}
+
+            {/* Withdraw Button */}
+            <Button
+              onClick={handleManualWithdraw}
+              disabled={isWithdrawing || !withdrawAmount || parseFloat(withdrawAmount) < 5 || parseFloat(withdrawAmount) > balance.available || !payoutSettings?.momo_number}
+              className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
+              data-testid="confirm-withdraw-btn"
+            >
+              {isWithdrawing ? (
+                <>
+                  <Loader2 className="animate-spin mr-2" size={20} />
+                  Traitement en cours...
+                </>
+              ) : (
+                <>
+                  <ArrowDownToLine className="mr-2" size={20} />
+                  Retirer {withdrawAmount ? formatCurrency(parseFloat(withdrawAmount)) : ''}
+                </>
+              )}
+            </Button>
+            
+            {balance.available < 5 && (
+              <p className="text-amber-400 text-sm text-center">
+                Solde minimum requis: GHS 5.00
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Automatic Withdraw */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <Settings2 className="text-purple-400" size={20} />
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                <Settings2 className="text-purple-400" size={24} />
               </div>
               <div>
-                <h3 className="text-white font-semibold">Automatic Withdraw</h3>
-                <p className="text-slate-400 text-xs">Schedule automatic payouts</p>
+                <h3 className="text-white text-lg font-semibold">Automatic Withdraw</h3>
+                <p className="text-slate-400 text-sm">Retraits automatiques programmés</p>
               </div>
             </div>
             <button
@@ -320,63 +355,74 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
               className={`p-1 rounded-lg transition-colors ${autoWithdrawEnabled ? 'text-emerald-400' : 'text-slate-500'}`}
               data-testid="auto-withdraw-toggle"
             >
-              {autoWithdrawEnabled ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+              {autoWithdrawEnabled ? <ToggleRight size={36} /> : <ToggleLeft size={36} />}
             </button>
           </div>
 
           {autoWithdrawEnabled && (
             <div className="space-y-4">
+              {/* Destination Info */}
+              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3 mb-2">
+                <p className="text-slate-400 text-xs mb-1">Destination</p>
+                <p className="text-white text-sm">
+                  {autoWithdrawSettings.destination === 'momo' 
+                    ? `MoMo: ${payoutSettings?.momo_number || 'Non configuré'}`
+                    : `Bank: ${payoutSettings?.bank_name || 'Non configuré'}`
+                  }
+                </p>
+              </div>
+
               {/* Frequency */}
               <div>
-                <label className="text-slate-400 text-xs block mb-2">Frequency</label>
+                <label className="text-slate-300 text-sm block mb-2">Fréquence</label>
                 <select
                   value={autoWithdrawSettings.frequency}
                   onChange={(e) => setAutoWithdrawSettings({...autoWithdrawSettings, frequency: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-slate-900 border border-slate-600 text-white rounded-lg px-3 py-2.5"
                 >
-                  <option value="instant">Instant (After each payment)</option>
-                  <option value="daily">Daily (End of day)</option>
-                  <option value="weekly">Weekly (Every Sunday)</option>
+                  <option value="instant">Instantané (après chaque paiement)</option>
+                  <option value="daily">Journalier (à minuit)</option>
+                  <option value="weekly">Hebdomadaire (chaque dimanche)</option>
                 </select>
               </div>
 
               {/* Minimum Amount */}
               <div>
-                <label className="text-slate-400 text-xs block mb-2">Minimum Amount (GHS)</label>
+                <label className="text-slate-300 text-sm block mb-2">Montant minimum (GHS)</label>
                 <Input
                   type="number"
                   value={autoWithdrawSettings.min_amount}
                   onChange={(e) => setAutoWithdrawSettings({...autoWithdrawSettings, min_amount: parseFloat(e.target.value) || 0})}
-                  className="bg-slate-900 border-slate-700 text-white"
+                  className="bg-slate-900 border-slate-600 text-white"
                   min={5}
                 />
-                <p className="text-xs text-slate-500 mt-1">Auto-withdraw when balance exceeds this amount</p>
+                <p className="text-xs text-slate-500 mt-1">Retrait auto quand le solde dépasse ce montant</p>
               </div>
 
-              {/* Destination */}
+              {/* Destination Choice */}
               <div>
-                <label className="text-slate-400 text-xs block mb-2">Destination</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="text-slate-300 text-sm block mb-2">Envoyer vers</label>
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setAutoWithdrawSettings({...autoWithdrawSettings, destination: 'momo'})}
-                    className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition-colors ${
+                    className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all ${
                       autoWithdrawSettings.destination === 'momo'
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-purple-600 text-white ring-2 ring-purple-400'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
-                    <Phone size={16} />
+                    <Phone size={18} />
                     MoMo
                   </button>
                   <button
                     onClick={() => setAutoWithdrawSettings({...autoWithdrawSettings, destination: 'bank'})}
-                    className={`flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition-colors ${
+                    className={`flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-medium transition-all ${
                       autoWithdrawSettings.destination === 'bank'
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-purple-600 text-white ring-2 ring-purple-400'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
-                    <Building2 size={16} />
+                    <Building2 size={18} />
                     Bank
                   </button>
                 </div>
