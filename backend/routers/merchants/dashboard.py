@@ -220,22 +220,51 @@ async def get_merchant_summary(current_merchant: dict = Depends(get_current_merc
             if doc.get("client_id"):
                 unique_customers.add(doc["client_id"])
     
+    # Calculate by period (day, week, month, year)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start = today_start - timedelta(days=today_start.weekday())
+    year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    by_period = {}
+    periods = {
+        'day': today_start,
+        'week': week_start,
+        'month': month_start,
+        'year': year_start
+    }
+    
+    for period_name, period_start in periods.items():
+        period_txns = [t for t in all_transactions if t.get("created_at", "") >= period_start.isoformat()]
+        period_volume = sum(t.get("merchant_amount", t.get("amount", 0)) for t in period_txns)
+        by_period[period_name] = {
+            "volume": round(period_volume, 2),
+            "transactions": len(period_txns)
+        }
+    
     return {
         "this_month": {
             "volume": round(month_volume, 2),
+            "total_volume": round(month_volume, 2),
             "cashback_given": round(month_cashback, 2),
+            "total_cashback": round(month_cashback, 2),
             "net_earnings": round(month_volume - month_cashback, 2),
             "paid_out": round(month_paid_out, 2),
-            "transactions": len(all_month_transactions)
+            "transactions": len(all_month_transactions),
+            "total_transactions": len(all_month_transactions)
         },
         "all_time": {
             "volume": round(total_volume, 2),
+            "total_volume": round(total_volume, 2),
             "cashback_given": round(total_cashback, 2),
+            "total_cashback": round(total_cashback, 2),
             "net_earnings": round(total_net, 2),
             "paid_out": round(total_paid_out + total_withdrawn, 2),
             "transactions": len(all_transactions),
-            "unique_customers": len(unique_customers)
+            "total_transactions": len(all_transactions),
+            "unique_customers": len(unique_customers),
+            "unique_clients": len(unique_customers)
         },
+        "by_period": by_period,
         "current_balance": {
             "pending": round(current_merchant.get("pending_balance", 0), 2),
             "available": round(total_net - total_paid_out - total_withdrawn, 2)

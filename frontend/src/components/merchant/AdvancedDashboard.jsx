@@ -205,28 +205,28 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div>
-            <p className="text-slate-400 text-sm">Total ventes (depuis inscription)</p>
+            <p className="text-slate-400 text-sm">Total Sales</p>
             <p className="text-white text-2xl font-bold">
-              {formatCurrency(summary?.all_time?.total_volume)}
+              {formatCurrency(summary?.all_time?.total_volume || summary?.all_time?.volume || 0)}
             </p>
           </div>
           <div>
-            <p className="text-slate-400 text-sm">Total cashback distribué</p>
+            <p className="text-slate-400 text-sm">Total Cashback</p>
             <p className="text-amber-400 text-2xl font-bold">
-              {formatCurrency(summary?.all_time?.total_cashback)}
+              {formatCurrency(summary?.all_time?.total_cashback || summary?.all_time?.cashback_given || 0)}
             </p>
           </div>
           <div>
-            <p className="text-slate-400 text-sm">Total transactions</p>
+            <p className="text-slate-400 text-sm">Total Transactions</p>
             <p className="text-white text-2xl font-bold">
-              {summary?.all_time?.total_transactions || 0}
+              {summary?.all_time?.total_transactions || summary?.all_time?.transactions || 0}
             </p>
           </div>
           <div>
-            <p className="text-slate-400 text-sm">Unique customers</p>
+            <p className="text-slate-400 text-sm">Unique Customers</p>
             <p className="text-emerald-400 text-2xl font-bold flex items-center gap-2">
               <Users size={20} />
-              {summary?.all_time?.unique_clients || 0}
+              {summary?.all_time?.unique_clients || summary?.all_time?.unique_customers || 0}
             </p>
           </div>
         </div>
@@ -244,7 +244,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
               <div key={p.key} className="bg-slate-900/50 rounded-lg p-3">
                 <p className="text-slate-500 text-xs">{p.label}</p>
                 <p className="text-white font-medium">
-                  {formatCurrency(summary?.by_period?.[p.key]?.volume)}
+                  {formatCurrency(summary?.by_period?.[p.key]?.volume || 0)}
                 </p>
                 <p className="text-slate-400 text-xs">
                   {summary?.by_period?.[p.key]?.transactions || 0} txn
