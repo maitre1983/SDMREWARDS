@@ -105,13 +105,56 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
     total_gmv = sum(t.get("amount", 0) for t in all_payments)
     total_cashback_distributed = sum(t.get("cashback_amount", 0) for t in all_payments)
     
-    # Referral bonuses
+    # Referral bonuses (excluding welcome bonuses for separate tracking)
     referral_transactions = await db.transactions.find(
-        {"type": {"$in": ["referral_bonus", "welcome_bonus"]}},
+        {"type": "referral_bonus"},
         {"_id": 0, "amount": 1}
     ).to_list(100000)
     total_referral_bonuses = sum(t.get("amount", 0) for t in referral_transactions)
-    total_cashback_all = total_cashback_distributed + total_referral_bonuses
+    
+    # Welcome bonuses (separate tracking)
+    welcome_transactions = await db.transactions.find(
+        {"type": "welcome_bonus"},
+        {"_id": 0, "amount": 1}
+    ).to_list(100000)
+    total_welcome_bonus = sum(t.get("amount", 0) for t in welcome_transactions)
+    
+    total_cashback_all = total_cashback_distributed + total_referral_bonuses + total_welcome_bonus
+    
+    # Total cashback available (sum of all active client cashback balances)
+    all_clients = await db.clients.find(
+        {"status": "active"},
+        {"_id": 0, "cashback_balance": 1}
+    ).to_list(100000)
+    total_cashback_available = sum(c.get("cashback_balance", 0) for c in all_clients)
+    
+    # Total cashback used = Total distributed - Total available
+    # Or calculate from actual usage transactions
+    cashback_usage_types = ["airtime", "data_bundle", "ecg_payment", "cashback_withdraw", "cashback_debit", "cashback_payment"]
+    
+    # Get cashback used from transactions
+    cashback_usage_txns = await db.transactions.find(
+        {"type": {"$in": cashback_usage_types}},
+        {"_id": 0, "amount": 1, "cashback_used": 1}
+    ).to_list(100000)
+    
+    # Also check service_transactions for cashback deductions
+    service_txns = await db.service_transactions.find(
+        {"status": "completed"},
+        {"_id": 0, "total_deducted": 1, "amount": 1}
+    ).to_list(100000)
+    
+    # Calculate total cashback used
+    total_cashback_used_from_txns = sum(t.get("cashback_used", 0) or t.get("amount", 0) for t in cashback_usage_txns)
+    total_cashback_used_from_services = sum(t.get("total_deducted", 0) for t in service_txns)
+    
+    # The most accurate way: distributed - available = used
+    total_cashback_used = round(total_cashback_all - total_cashback_available, 2)
+    
+    # If we have actual usage data, use the higher of the two values
+    actual_usage = total_cashback_used_from_txns + total_cashback_used_from_services
+    if actual_usage > total_cashback_used:
+        total_cashback_used = round(actual_usage, 2)
     
     # Top merchants
     merchant_stats = {}
@@ -293,6 +336,9 @@ async def get_advanced_dashboard_stats(current_admin: dict = Depends(get_current
         "financial_stats": {
             "total_gmv": total_gmv,
             "total_cashback_distributed": total_cashback_all,
+            "total_cashback_used": total_cashback_used,
+            "total_cashback_available": round(total_cashback_available, 2),
+            "total_welcome_bonus": round(total_welcome_bonus, 2),
             "total_card_revenue": card_revenue,
             "total_referral_bonuses": total_referral_bonuses,
             "total_sdm_commissions": round(total_sdm_commissions, 2),

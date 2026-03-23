@@ -92,7 +92,7 @@ export default function AdminOverview({
         </div>
       </div>
 
-      {/* Financial Statistics */}
+      {/* Financial Statistics - Extended */}
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-gradient-to-br from-emerald-900/50 to-emerald-800/30 border border-emerald-700/50 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
@@ -125,7 +125,84 @@ export default function AdminOverview({
         </div>
       </div>
 
-      {/* Cashback Ecosystem Stats */}
+      {/* New Cashback Ecosystem Stats - From API */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+          <Wallet size={20} className="text-purple-400" />
+          Cashback Ecosystem Overview
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Total Cashback Used */}
+          <div className="bg-gradient-to-br from-red-900/40 to-slate-900 border border-red-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ArrowUpRight className="text-red-400" size={20} />
+              <span className="text-red-400 text-sm font-medium">Total Cashback Used</span>
+            </div>
+            <p className="text-2xl font-bold text-white">
+              GHS {(advancedStats?.financial_stats?.total_cashback_used || 0).toLocaleString()}
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
+              Purchases, Airtime, Data, Withdrawals
+            </p>
+          </div>
+          
+          {/* Total Cashback Available */}
+          <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border border-emerald-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Wallet className="text-emerald-400" size={20} />
+              <span className="text-emerald-400 text-sm font-medium">Cashback Available</span>
+            </div>
+            <p className="text-2xl font-bold text-emerald-400">
+              GHS {(advancedStats?.financial_stats?.total_cashback_available || 0).toLocaleString()}
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
+              In user wallets (not yet used)
+            </p>
+            <div className="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-emerald-500 h-full transition-all"
+                style={{ 
+                  width: `${advancedStats?.financial_stats?.total_cashback_distributed > 0 
+                    ? Math.min(100, (advancedStats?.financial_stats?.total_cashback_available / advancedStats?.financial_stats?.total_cashback_distributed) * 100) 
+                    : 0}%` 
+                }}
+              />
+            </div>
+          </div>
+          
+          {/* Total Welcome Bonus */}
+          <div className="bg-gradient-to-br from-blue-900/40 to-slate-900 border border-blue-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="text-blue-400" size={20} />
+              <span className="text-blue-400 text-sm font-medium">Welcome Bonus Distributed</span>
+            </div>
+            <p className="text-2xl font-bold text-white">
+              GHS {(advancedStats?.financial_stats?.total_welcome_bonus || 0).toLocaleString()}
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
+              New member bonuses
+            </p>
+          </div>
+
+          {/* Usage Rate */}
+          <div className="bg-gradient-to-br from-purple-900/40 to-slate-900 border border-purple-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="text-purple-400" size={20} />
+              <span className="text-purple-400 text-sm font-medium">Usage Rate</span>
+            </div>
+            <p className="text-2xl font-bold text-white">
+              {advancedStats?.financial_stats?.total_cashback_distributed > 0 
+                ? Math.round((advancedStats?.financial_stats?.total_cashback_used / advancedStats?.financial_stats?.total_cashback_distributed) * 100) 
+                : 0}%
+            </p>
+            <p className="text-slate-400 text-xs mt-1">
+              Of distributed cashback
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Legacy Cashback Ecosystem Stats (if available) */}
       {cashbackEcosystem && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
           <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
