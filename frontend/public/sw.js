@@ -1,7 +1,7 @@
-// SDM Rewards Service Worker v3
-// Ultra-fast, offline-first PWA with aggressive caching
+// SDM Rewards Service Worker v4
+// Ultra-fast, offline-first PWA with aggressive caching for <1s load
 
-const CACHE_VERSION = 'sdm-v3';
+const CACHE_VERSION = 'sdm-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
@@ -10,13 +10,19 @@ const API_CACHE = `${CACHE_VERSION}-api`;
 // Cache TTL for API responses (5 minutes)
 const API_CACHE_TTL = 5 * 60 * 1000;
 
-// Core app shell - always cache
+// Core app shell - always cache (CRITICAL for instant load)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/sdm-logo.png',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png'
+];
+
+// Pre-cache critical images for homepage
+const CRITICAL_IMAGES = [
+  'https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg'
 ];
 
 // API endpoints that can be cached briefly for faster navigation
@@ -25,26 +31,37 @@ const CACHEABLE_API_PATTERNS = [
   '/api/merchants/dashboard',
   '/api/clients/me',
   '/api/public/merchants',
+  '/api/public/card-types',
   '/api/verify/banks'
 ];
 
-// Install: Pre-cache core assets
+// Install: Pre-cache core assets + critical images
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing SDM Rewards PWA...');
+  console.log('[SW] Installing SDM Rewards PWA v4...');
   
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(cache => {
+    Promise.all([
+      caches.open(STATIC_CACHE).then(cache => {
         console.log('[SW] Pre-caching app shell');
         return cache.addAll(STATIC_ASSETS);
+      }),
+      caches.open(IMAGE_CACHE).then(cache => {
+        console.log('[SW] Pre-caching critical images');
+        return Promise.all(
+          CRITICAL_IMAGES.map(url => 
+            fetch(url, { mode: 'cors' })
+              .then(response => response.ok ? cache.put(url, response) : null)
+              .catch(() => null)
+          )
+        );
       })
-      .then(() => self.skipWaiting())
+    ]).then(() => self.skipWaiting())
   );
 });
 
 // Activate: Clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating SDM Rewards PWA v3...');
+  console.log('[SW] Activating SDM Rewards PWA v4...');
   
   const keepCaches = [STATIC_CACHE, DYNAMIC_CACHE, IMAGE_CACHE, API_CACHE];
   

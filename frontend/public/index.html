@@ -14,6 +14,15 @@
         <meta name="language" content="English">
         <meta name="author" content="GIT NFT GHANA Ltd">
         
+        <!-- PERFORMANCE: Preconnect to critical origins -->
+        <link rel="preconnect" href="https://customer-assets.emergentagent.com" crossorigin>
+        <link rel="preconnect" href="https://static.prod-images.emergentagent.com" crossorigin>
+        <link rel="dns-prefetch" href="https://customer-assets.emergentagent.com">
+        <link rel="dns-prefetch" href="https://static.prod-images.emergentagent.com">
+        
+        <!-- PERFORMANCE: Preload critical hero image -->
+        <link rel="preload" as="image" href="https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg" fetchpriority="high">
+        
         <!-- Open Graph / Facebook -->
         <meta property="og:type" content="website">
         <meta property="og:url" content="https://web-boost-seo.preview.emergentagent.com/">
@@ -44,32 +53,57 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SDM Rewards" />
         
-        <!-- Fonts -->
+        <!-- PERFORMANCE: Critical CSS for instant render -->
+        <style>
+          :root{--bg-primary:#0f172a;--bg-secondary:#1e293b;--text-primary:#fff;--text-secondary:#94a3b8;--accent:#a855f7}
+          *{margin:0;padding:0;box-sizing:border-box}
+          body{background:var(--bg-primary);color:var(--text-primary);font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh}
+          #root{min-height:100vh}
+          .loading-skeleton{background:linear-gradient(90deg,#1e293b 25%,#334155 50%,#1e293b 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+          @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+          .hero-instant{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px;text-align:center}
+          .hero-instant h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:700;margin-bottom:1rem;background:linear-gradient(135deg,#fff 0%,#a855f7 50%,#3b82f6 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+          .hero-instant p{font-size:clamp(1rem,2vw,1.25rem);color:var(--text-secondary);max-width:600px}
+        </style>
+        
+        <!-- Fonts - Load async -->
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+        <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /></noscript>
         
-        <!-- Google Analytics 4 - Replace GA_MEASUREMENT_ID with your actual ID -->
-        <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+        <!-- Google Analytics 4 - Defer loading -->
         <script>
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'GA_MEASUREMENT_ID', {
-            page_title: document.title,
-            page_location: window.location.href,
-            send_page_view: true
+          window.addEventListener('load', function() {
+            setTimeout(function() {
+              var ga = document.createElement('script');
+              ga.src = 'https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID';
+              ga.async = true;
+              document.head.appendChild(ga);
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = gtag;
+              gtag('js', new Date());
+              gtag('config', 'GA_MEASUREMENT_ID', {page_title: document.title, page_location: window.location.href, send_page_view: true});
+            }, 2000);
           });
         </script>
         
-        <!-- OneSignal Push Notifications -->
-        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+        <!-- OneSignal - Defer loading -->
         <script>
-          window.OneSignalDeferred = window.OneSignalDeferred || [];
-          OneSignalDeferred.push(async function(OneSignal) {
-            await OneSignal.init({
-              appId: "5c95e6f8-d2e8-4c22-b070-dfd556d746a0",
-            });
+          window.addEventListener('load', function() {
+            setTimeout(function() {
+              var os = document.createElement('script');
+              os.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+              os.defer = true;
+              os.onload = function() {
+                window.OneSignalDeferred = window.OneSignalDeferred || [];
+                OneSignalDeferred.push(async function(OneSignal) {
+                  await OneSignal.init({appId: "5c95e6f8-d2e8-4c22-b070-dfd556d746a0"});
+                });
+              };
+              document.head.appendChild(os);
+            }, 3000);
           });
         </script>
         

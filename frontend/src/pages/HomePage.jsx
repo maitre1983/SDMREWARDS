@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { Button } from '../components/ui/button';
@@ -36,7 +36,7 @@ import {
 // SDM Logo URL - Stored externally
 const SDM_LOGO_URL = "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/5mzvtg97_WhatsApp%20Image%202026-03-02%20at%2003.18.22.jpeg";
 
-// AI Generated Images
+// AI Generated Images - Lazy load below the fold
 const IMAGES = {
   heroCustomer: "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/3bc26256f284229dfbc342c0efeb60357d57a98a41b6c8197e35fdde94cfe5a7.png",
   paymentScene: "https://static.prod-images.emergentagent.com/jobs/2b0d7634-108c-4eb1-b22d-82f976c95531/images/3633d37a7a9cfe2587ac3913dff44d1f729eb7b9fb65b87e6f6277418d72f94f.png",
@@ -51,63 +51,187 @@ const PAYMENT_LOGOS = {
   hubtel: "https://customer-assets.emergentagent.com/job_web-boost-seo/artifacts/04kz6bx9_GBGTr3NWoAAQ5Xc.jpg",
 };
 
+// Default card types for instant render (no API wait)
+const DEFAULT_CARD_TYPES = [
+  { name: 'Silver', price: 25, cashback_rate: 3, color: 'from-gray-400 to-gray-500', icon: CreditCard },
+  { name: 'Gold', price: 50, cashback_rate: 5, color: 'from-yellow-500 to-amber-600', icon: Award },
+  { name: 'Platinum', price: 100, cashback_rate: 7, color: 'from-slate-300 to-slate-500', icon: Star },
+  { name: 'Diamond', price: 500, cashback_rate: 10, color: 'from-blue-400 to-purple-500', icon: Sparkles },
+];
+
+// Memoized Hero Section for instant render
+const HeroSection = memo(({ navigate, t, SDM_LOGO_URL }) => (
+  <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+    {/* Optimized Background */}
+    <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-slate-900 to-blue-900/30" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(168,85,247,0.15),transparent_50%)]" />
+    
+    <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-20">
+      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        {/* Left Content */}
+        <div className="text-center lg:text-left space-y-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 rounded-full border border-purple-500/30">
+            <Sparkles size={16} className="text-purple-400" />
+            <span className="text-purple-300 text-sm font-medium">Ghana's #1 Cashback Platform</span>
+          </div>
+          
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
+            <span className="text-white">Earn </span>
+            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">Cashback</span>
+            <span className="text-white"> on Every Purchase</span>
+          </h1>
+          
+          <p className="text-lg sm:text-xl text-slate-300 max-w-xl mx-auto lg:mx-0">
+            Join thousands of smart shoppers earning real money back. 
+            Pay with Mobile Money or Card at partner merchants and watch your rewards grow!
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            <Button 
+              onClick={() => navigate('/client')}
+              size="lg"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-6 text-lg rounded-xl shadow-lg shadow-purple-500/25 transition-all hover:scale-105"
+              data-testid="get-started-btn"
+            >
+              Get Started Free
+              <ArrowRight className="ml-2" size={20} />
+            </Button>
+            <Button 
+              onClick={() => navigate('/merchant')}
+              variant="outline"
+              size="lg"
+              className="border-slate-600 text-slate-300 hover:bg-slate-800 px-8 py-6 text-lg rounded-xl"
+              data-testid="merchant-portal-btn"
+            >
+              <Store className="mr-2" size={20} />
+              Merchant Portal
+            </Button>
+          </div>
+          
+          {/* Trust Badges */}
+          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 pt-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Shield size={20} className="text-green-400" />
+              <span className="text-sm">Secure Payments</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-400">
+              <Users size={20} className="text-blue-400" />
+              <span className="text-sm">5,000+ Users</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-400">
+              <Store size={20} className="text-purple-400" />
+              <span className="text-sm">100+ Merchants</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Right - Logo/Visual */}
+        <div className="relative flex justify-center lg:justify-end">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-3xl blur-3xl opacity-20 scale-110" />
+            <img 
+              src={SDM_LOGO_URL} 
+              alt="SDM Rewards" 
+              className="relative w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 object-contain rounded-3xl shadow-2xl"
+              loading="eager"
+              fetchpriority="high"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+));
+
 export default function HomePage() {
   const navigate = useNavigate();
   const { t, language, setLanguage, availableLanguages } = useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Scroll handler - debounced
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setIsScrolled(window.scrollY > 50);
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fetch card types and platform info from API (Auto-synced with Admin Dashboard)
-  const [cardTypes, setCardTypes] = useState([]);
+  // Card types - use defaults immediately, update from API in background
+  const [cardTypes, setCardTypes] = useState(DEFAULT_CARD_TYPES);
   const [platformInfo, setPlatformInfo] = useState({});
   
+  // Defer API call until after paint
   useEffect(() => {
     const fetchCards = async () => {
       try {
         const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/public/card-types`);
         const data = await res.json();
-        setCardTypes(data.card_types || []);
+        if (data.card_types?.length > 0) {
+          setCardTypes(data.card_types);
+        }
         setPlatformInfo(data.platform_info || {});
       } catch (error) {
+        // Keep defaults on error
         console.error('Error fetching card types:', error);
       }
     };
-    fetchCards();
+    
+    // Defer API call until after first paint using requestIdleCallback
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => fetchCards(), { timeout: 2000 });
+    } else {
+      setTimeout(fetchCards, 100);
+    }
     
     // Auto-refresh every 5 minutes to catch Admin changes
     const refreshInterval = setInterval(fetchCards, 5 * 60 * 1000);
     return () => clearInterval(refreshInterval);
   }, []);
 
-  // Stats counter animation
-  const [stats, setStats] = useState({ members: 0, merchants: 0, cashback: 0 });
+  // Stats counter animation - defer until visible
+  const [stats, setStats] = useState({ members: 2500, merchants: 150, cashback: 45000 });
+  const [statsAnimated, setStatsAnimated] = useState(false);
+  
   useEffect(() => {
-    const targets = { members: 2500, merchants: 150, cashback: 45000 };
-    const duration = 2000;
-    const steps = 60;
-    const interval = duration / steps;
+    if (statsAnimated) return;
     
-    let step = 0;
-    const timer = setInterval(() => {
-      step++;
-      setStats({
-        members: Math.floor((targets.members / steps) * step),
-        merchants: Math.floor((targets.merchants / steps) * step),
-        cashback: Math.floor((targets.cashback / steps) * step)
-      });
-      if (step >= steps) clearInterval(timer);
-    }, interval);
+    // Only animate when user scrolls near stats section
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !statsAnimated) {
+        setStatsAnimated(true);
+        const targets = { members: 2500, merchants: 150, cashback: 45000 };
+        const duration = 2000;
+        const steps = 60;
+        const interval = duration / steps;
+        
+        let step = 0;
+        setStats({ members: 0, merchants: 0, cashback: 0 });
+        const timer = setInterval(() => {
+          step++;
+          setStats({
+            members: Math.floor((targets.members / steps) * step),
+            merchants: Math.floor((targets.merchants / steps) * step),
+            cashback: Math.floor((targets.cashback / steps) * step)
+          });
+          if (step >= steps) clearInterval(timer);
+        }, interval);
+      }
+    }, { threshold: 0.1 });
     
-    return () => clearInterval(timer);
-  }, []);
+    const statsSection = document.getElementById('stats-section');
+    if (statsSection) observer.observe(statsSection);
+    
+    return () => observer.disconnect();
+  }, [statsAnimated]);
 
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -293,7 +417,7 @@ export default function HomePage() {
               </div>
               
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto lg:mx-0">
+              <div id="stats-section" className="grid grid-cols-3 gap-4 max-w-lg mx-auto lg:mx-0">
                 <div className="text-center p-4 bg-slate-800/50 rounded-xl backdrop-blur-sm">
                   <p className="text-2xl sm:text-3xl font-bold text-amber-400">{stats.members.toLocaleString()}+</p>
                   <p className="text-slate-400 text-sm">{t('hero_stats_members')}</p>
@@ -316,6 +440,8 @@ export default function HomePage() {
                   src={IMAGES.heroCustomer} 
                   alt="Happy SDM customer"
                   className="w-full rounded-2xl shadow-2xl"
+                  loading="lazy"
+                  decoding="async"
                 />
                 {/* Floating card */}
                 <div className="absolute -bottom-6 -left-6 bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-xl">
