@@ -250,12 +250,16 @@ async def init_super_admin():
     try:
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         
+        # Read admin credentials from environment variables
+        admin_email = os.environ.get('ADMIN_EMAIL', 'admin@sdmrewards.com')
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'ChangeThisSecurePassword123!')
+        
         # Check if super admin exists
-        existing = await db.admins.find_one({"email": "emileparfait2003@gmail.com"})
+        existing = await db.admins.find_one({"email": admin_email})
         if not existing:
-            hashed_password = pwd_context.hash("Gerard0103@")
+            hashed_password = pwd_context.hash(admin_password)
             admin_data = {
-                "email": "emileparfait2003@gmail.com",
+                "email": admin_email,
                 "password": hashed_password,
                 "name": "Super Admin",
                 "role": "super_admin",
@@ -269,7 +273,7 @@ async def init_super_admin():
             # Ensure the account is active
             if not existing.get("is_active"):
                 await db.admins.update_one(
-                    {"email": "emileparfait2003@gmail.com"},
+                    {"email": admin_email},
                     {"$set": {"is_active": True, "updated_at": datetime.now(timezone.utc)}}
                 )
                 logger.info("✅ Super admin account reactivated")
