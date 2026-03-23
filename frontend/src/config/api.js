@@ -1,8 +1,8 @@
 /**
  * API Configuration for SDM Rewards
  * 
- * PRODUCTION: sdmrewards.com -> web-boost-seo.emergent.host
- * PREVIEW: *.emergentagent.com -> same origin
+ * Dynamically determines the API URL based on the current environment.
+ * For custom domains, the backend URL should be configured via REACT_APP_BACKEND_URL
  */
 
 const getApiUrl = () => {
@@ -10,29 +10,20 @@ const getApiUrl = () => {
     return '';
   }
   
+  // First check for explicitly configured backend URL (used in production with custom domains)
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+  
   const hostname = window.location.hostname;
-  
-  // PRODUCTION: sdmrewards.com uses the deployed backend
-  if (hostname === 'sdmrewards.com' || hostname === 'www.sdmrewards.com') {
-    return 'https://web-boost-seo.emergent.host';
-  }
-  
-  // DEPLOYED on Emergent: use same origin
-  if (hostname.includes('emergent.host')) {
-    return window.location.origin;
-  }
-  
-  // PREVIEW: use same origin
-  if (hostname.includes('emergentagent.com')) {
-    return window.location.origin;
-  }
   
   // LOCAL development
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'http://localhost:8001';
   }
   
-  // Fallback
+  // For all deployed environments (Emergent preview, production, custom domains),
+  // use same origin - the deployment platform handles routing
   return window.location.origin;
 };
 
