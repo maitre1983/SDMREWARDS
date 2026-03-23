@@ -7,8 +7,9 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 
-// API Base URL - Change this to your production URL
-const API_BASE_URL = 'https://web-boost-seo.preview.emergentagent.com/api';
+// API Base URL - Read from environment variable for deployment compatibility
+// Falls back to localhost for development
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001/api';
 
 // Create optimized axios instance
 const api = axios.create({

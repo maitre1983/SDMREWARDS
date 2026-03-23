@@ -98,22 +98,33 @@ app = FastAPI(
 )
 
 # ============== CORS ==============
-# IMPORTANT: Explicitly allow sdmrewards.com and other origins
-# Cannot use credentials=True with origins=["*"], so we list explicitly
-ALLOWED_ORIGINS = [
-    "https://sdmrewards.com",
-    "https://www.sdmrewards.com",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://web-boost-seo.preview.emergentagent.com",
-    "https://web-boost-seo.emergent.host",  # Production deployment
-    # Add any other domains here
-]
+# Read CORS origins from environment variable for deployment flexibility
+# Supports wildcard "*" or comma-separated list of domains
+CORS_ORIGINS_ENV = os.environ.get('CORS_ORIGINS', '*')
+
+if CORS_ORIGINS_ENV == '*':
+    # Allow all origins (no credentials)
+    ALLOWED_ORIGINS = ["*"]
+    ALLOW_CREDENTIALS = False
+else:
+    # Parse comma-separated list of allowed origins
+    ALLOWED_ORIGINS = [origin.strip() for origin in CORS_ORIGINS_ENV.split(',') if origin.strip()]
+    # Add common development origins as fallback
+    default_origins = [
+        "https://sdmrewards.com",
+        "https://www.sdmrewards.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+    for origin in default_origins:
+        if origin not in ALLOWED_ORIGINS:
+            ALLOWED_ORIGINS.append(origin)
+    ALLOW_CREDENTIALS = True
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=ALLOW_CREDENTIALS,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],  # Expose all headers to frontend
