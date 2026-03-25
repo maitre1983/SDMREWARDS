@@ -460,19 +460,51 @@ async def register_client(request: ClientRegisterRequest):
     )
     
     # If referred, create referral record
+    referred_by_merchant_id = None
     if request.referral_code:
-        referrer = await db.clients.find_one({"referral_code": request.referral_code.upper()})
-        if referrer:
-            from models.schemas import Referral
-            referral = Referral(
-                referrer_id=referrer["id"],
-                referred_id=client_data.id,
-                referral_code=request.referral_code.upper()
+        ref_code_upper = request.referral_code.upper()
+        
+        # Check if it's a merchant recruitment QR code (SDM-R-xxx pattern)
+        if ref_code_upper.startswith("SDM-R-"):
+            # Merchant referral
+            merchant_referrer = await db.merchants.find_one(
+                {"recruitment_qr_code": ref_code_upper},
+                {"_id": 0, "id": 1, "business_name": 1, "momo_number": 1, "momo_network": 1, 
+                 "bank_account_number": 1, "bank_code": 1, "preferred_payout_method": 1}
             )
-            await db.referrals.insert_one(referral.model_dump())
+            if merchant_referrer:
+                referred_by_merchant_id = merchant_referrer["id"]
+                logger.info(f"Client referred by merchant: {merchant_referrer.get('business_name')}")
+                
+                # Create merchant referral record for tracking
+                from datetime import timezone
+                merchant_referral_record = {
+                    "merchant_id": merchant_referrer["id"],
+                    "client_id": client_data.id,
+                    "referral_code": ref_code_upper,
+                    "bonus_amount": 3.0,  # GHS 3 per referral
+                    "status": "pending",  # Will be paid when client activates
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.merchant_client_referrals.insert_one(merchant_referral_record)
+        else:
+            # Client-to-client referral
+            referrer = await db.clients.find_one({"referral_code": ref_code_upper})
+            if referrer:
+                from models.schemas import Referral
+                referral = Referral(
+                    referrer_id=referrer["id"],
+                    referred_id=client_data.id,
+                    referral_code=ref_code_upper
+                )
+                await db.referrals.insert_one(referral.model_dump())
     
     # Prepare client doc - exclude None email to avoid duplicate key issues
     client_doc = client_data.model_dump()
+    
+    # Add merchant referral if applicable
+    if referred_by_merchant_id:
+        client_doc["referred_by_merchant_id"] = referred_by_merchant_id
     if client_doc.get("email") is None:
         del client_doc["email"]
     

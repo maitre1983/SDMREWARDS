@@ -173,6 +173,9 @@ async def process_card_purchase(payment: Dict):
     # Process referral bonus
     if referrer_id:
         await _process_referral_bonus(client_id, referrer_id, referrer_bonus, client)
+    
+    # Process merchant referral commission (if client was referred by a merchant)
+    await _process_merchant_referral_commission(client_id, client)
 
 
 async def _process_referral_bonus(client_id: str, referrer_id: str, referrer_bonus: float, client: Dict):
@@ -225,6 +228,151 @@ async def _process_referral_bonus(client_id: str, referrer_id: str, referrer_bon
             await sms.notify_referral_bonus(referrer["phone"], referrer_bonus, referred_name)
     except Exception as e:
         logger.error(f"Referral SMS error: {e}")
+
+
+async def _process_merchant_referral_commission(client_id: str, client: Dict):
+    """
+    Process merchant referral commission when a referred client activates their card.
+    
+    Commission: GHS 3 per referred client
+    Payment: Instant payout to merchant's configured MoMo/Bank account
+    """
+    db = get_db()
+    MERCHANT_REFERRAL_BONUS = 3.0  # GHS per referral
+    
+    # Check if client was referred by a merchant
+    referred_by_merchant_id = None
+    if client:
+        referred_by_merchant_id = client.get("referred_by_merchant_id")
+    
+    if not referred_by_merchant_id:
+        # Also check if referred_by contains a merchant QR code
+        referred_by = client.get("referred_by") if client else None
+        if referred_by and str(referred_by).startswith("SDM-R-"):
+            # Find merchant by recruitment QR
+            merchant = await db.merchants.find_one(
+                {"recruitment_qr_code": referred_by},
+                {"_id": 0, "id": 1}
+            )
+            if merchant:
+                referred_by_merchant_id = merchant["id"]
+    
+    if not referred_by_merchant_id:
+        return  # No merchant referral
+    
+    # Check if commission already paid
+    existing_payout = await db.merchant_referral_payouts.find_one({
+        "merchant_id": referred_by_merchant_id,
+        "client_id": client_id,
+        "status": {"$in": ["completed", "processing"]}
+    })
+    
+    if existing_payout:
+        logger.info(f"Merchant referral commission already paid for client {client_id}")
+        return
+    
+    # Get merchant details for payout
+    merchant = await db.merchants.find_one(
+        {"id": referred_by_merchant_id},
+        {"_id": 0, "id": 1, "business_name": 1, "momo_number": 1, "momo_network": 1,
+         "bank_account_number": 1, "bank_code": 1, "bank_name": 1, "preferred_payout_method": 1}
+    )
+    
+    if not merchant:
+        logger.warning(f"Merchant not found for referral commission: {referred_by_merchant_id}")
+        return
+    
+    referred_name = client.get("full_name", "New Customer") if client else "New Customer"
+    payout_ref = f"MREF-{str(uuid.uuid4())[:8].upper()}"
+    
+    # Create payout record
+    payout_record = {
+        "id": str(uuid.uuid4()),
+        "reference": payout_ref,
+        "merchant_id": referred_by_merchant_id,
+        "client_id": client_id,
+        "amount": MERCHANT_REFERRAL_BONUS,
+        "type": "referral_commission",
+        "description": f"Referral Commission - {referred_name} joined",
+        "status": "pending",
+        "payout_method": merchant.get("preferred_payout_method", "momo"),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.merchant_referral_payouts.insert_one(payout_record)
+    
+    # Process instant payout
+    try:
+        from services.hubtel_momo_service import get_hubtel_momo_service
+        hubtel = get_hubtel_momo_service(db)
+        
+        payout_method = merchant.get("preferred_payout_method", "momo")
+        
+        if payout_method == "bank" and merchant.get("bank_account_number") and merchant.get("bank_code"):
+            # Bank transfer
+            result = await hubtel.send_bank(
+                account_number=merchant["bank_account_number"],
+                bank_code=merchant["bank_code"],
+                amount=MERCHANT_REFERRAL_BONUS,
+                description=f"SDM Referral Commission - {payout_ref}",
+                client_reference=payout_ref,
+                recipient_name=merchant.get("business_name", "Merchant")
+            )
+        elif merchant.get("momo_number"):
+            # MoMo transfer
+            network_map = {
+                "MTN": "mtn-gh", "MTN MOMO": "mtn-gh",
+                "VODAFONE": "vodafone-gh", "VODAFONE CASH": "vodafone-gh",
+                "TELECEL": "tigo-gh", "TIGO": "tigo-gh", "AIRTELTIGO": "tigo-gh"
+            }
+            network = merchant.get("momo_network", "MTN")
+            channel = network_map.get(network.upper(), "mtn-gh")
+            
+            result = await hubtel.send_momo(
+                phone=merchant["momo_number"],
+                amount=MERCHANT_REFERRAL_BONUS,
+                description=f"SDM Referral Commission - {payout_ref}",
+                client_reference=payout_ref,
+                recipient_name=merchant.get("business_name", "Merchant"),
+                channel=channel
+            )
+        else:
+            logger.warning(f"Merchant {referred_by_merchant_id} has no payout method configured")
+            return
+        
+        if result.get("success"):
+            await db.merchant_referral_payouts.update_one(
+                {"id": payout_record["id"]},
+                {"$set": {
+                    "status": "completed",
+                    "provider_reference": result.get("transaction_id"),
+                    "completed_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Update merchant referral tracking record
+            await db.merchant_client_referrals.update_one(
+                {"merchant_id": referred_by_merchant_id, "client_id": client_id},
+                {"$set": {
+                    "status": "paid",
+                    "bonus_paid": True,
+                    "paid_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            logger.info(f"✅ Merchant referral commission of GHS {MERCHANT_REFERRAL_BONUS} paid to {merchant.get('business_name')}")
+        else:
+            await db.merchant_referral_payouts.update_one(
+                {"id": payout_record["id"]},
+                {"$set": {"status": "failed", "error": result.get("error")}}
+            )
+            logger.error(f"❌ Merchant referral payout failed: {result.get('error')}")
+            
+    except Exception as e:
+        logger.error(f"❌ Merchant referral commission error: {e}")
+        await db.merchant_referral_payouts.update_one(
+            {"id": payout_record["id"]},
+            {"$set": {"status": "failed", "error": str(e)}}
+        )
 
 
 # ============== MERCHANT PAYMENT ==============

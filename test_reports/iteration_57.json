@@ -1,0 +1,97 @@
+{
+  "summary": "Merchant Withdrawal Dashboard Refactoring - Complete testing of new referral performance dashboard. Backend APIs (referral-stats, referral-link) working correctly. Frontend MerchantWithdrawal.jsx successfully refactored to show referral stats instead of manual withdrawal UI. All old withdrawal elements removed as required.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "WebSocket /api/ws/merchant",
+        "issue": "Returns 403 Forbidden - WebSocket connection failing",
+        "priority": "LOW",
+        "note": "Not related to current feature - existing issue"
+      },
+      {
+        "endpoint": "SSE /api/notifications/sse/merchant",
+        "issue": "Returns 401 Unauthorized intermittently",
+        "priority": "LOW",
+        "note": "Not related to current feature - existing issue"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Withdrawal tab chart",
+        "issues": ["Console warning about chart width/height being -1 - minor rendering issue that doesn't affect functionality"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_merchant_referral_stats.py",
+    "/app/test_reports/pytest/merchant_referral_stats_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "✅ GET /api/merchants/referral-stats returns all required fields: total_referrals, total_earned, earnings_today, earnings_this_month, monthly_breakdown, recent_referrals",
+    "✅ GET /api/merchants/referral-link returns recruitment_qr_code, referral_link, share_messages for WhatsApp/SMS",
+    "✅ Merchant referral codes follow SDM-R-xxx pattern correctly",
+    "✅ Client registration in auth.py supports merchant referral codes (referred_by_merchant_id field)",
+    "✅ Commission processing in processing.py handles _process_merchant_referral_commission for GHS 3 per referral",
+    "✅ Frontend MerchantWithdrawal.jsx completely rewritten with referral performance dashboard",
+    "✅ All old manual withdrawal UI elements removed (amount input, quick buttons, balance cards)",
+    "✅ Auto-payout info banner displayed with MoMo/Bank destination",
+    "✅ French labels used throughout: 'Total gagné via parrainage', 'Nombre de filleuls', 'Aujourd'hui', 'Ce mois'",
+    "✅ 6-month revenue chart with monthly breakdown",
+    "✅ Share referral section with copy code and share button functionality"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_merchant_referral_stats.py"
+  ],
+  "success_rate": {
+    "backend": "100% - 10/10 tests passed",
+    "frontend": "100% - All new UI elements visible, all old elements removed"
+  },
+  "test_credentials": {
+    "merchant_phone": "+233500700500",
+    "merchant_password": "test123",
+    "merchant_name": "Li Beirut Restaurant",
+    "recruitment_qr_code": "SDM-R-8B12BE01"
+  },
+  "seed_data_creation": "No seed data needed - used existing test merchant",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Merchant referral dashboard feature fully tested. Backend endpoints: GET /api/merchants/referral-stats, GET /api/merchants/referral-link. Frontend: MerchantWithdrawal.jsx in Settings > Withdrawal tab now shows referral performance instead of manual withdrawal. Test merchant has recruitment_qr_code: SDM-R-8B12BE01. Commission is GHS 3 per referred client.",
+  "features_verified": {
+    "backend_apis": [
+      "GET /api/merchants/referral-stats - Returns referral statistics with monthly breakdown",
+      "GET /api/merchants/referral-link - Returns referral link and QR code with share messages",
+      "Both endpoints require merchant authentication",
+      "Bonus per referral correctly set to GHS 3"
+    ],
+    "frontend_new_elements": [
+      "Auto-payout info banner with MoMo/Bank destination display",
+      "Total earned from referrals card (GHS amount)",
+      "Total referrals count card",
+      "Today's earnings card",
+      "This month's earnings card",
+      "Commission info (GHS 3 per client)",
+      "6-month revenue chart with monthly breakdown",
+      "Share referral section with code display",
+      "Copy referral code button",
+      "Share button (WhatsApp/native share)"
+    ],
+    "frontend_removed_elements": [
+      "Manual withdrawal amount input",
+      "Quick amount buttons (50, 100, 500 GHS)",
+      "TOUT/ALL button",
+      "Available Balance card",
+      "Pending Balance card",
+      "Total Received card"
+    ]
+  },
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}
