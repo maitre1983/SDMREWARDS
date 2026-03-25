@@ -210,3 +210,102 @@ async def get_merchant_referral_link(current_merchant: dict = Depends(get_curren
             "sms": f"Gagne du cashback avec SDM REWARDS! Code: {recruitment_qr}. {referral_link}"
         }
     }
+
+
+@router.get("/referral-leaderboard")
+async def get_merchant_referral_leaderboard(
+    limit: int = 10,
+    current_merchant: dict = Depends(get_current_merchant)
+):
+    """
+    Get merchant referral leaderboard.
+    
+    Returns top merchants by referral count with the current merchant's rank.
+    """
+    db = get_db()
+    current_merchant_id = current_merchant["id"]
+    
+    # Get all merchants with their referral counts
+    # Using aggregation to count clients referred by each merchant
+    pipeline = [
+        # Get all merchants
+        {"$match": {"status": "active"}},
+        {"$project": {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "recruitment_qr_code": 1,
+            "logo_url": 1
+        }}
+    ]
+    
+    merchants = await db.merchants.aggregate(pipeline).to_list(1000)
+    
+    # For each merchant, count their referrals
+    leaderboard = []
+    for merchant in merchants:
+        merchant_id = merchant["id"]
+        recruitment_qr = merchant.get("recruitment_qr_code", "")
+        
+        # Count clients referred by this merchant
+        query = {
+            "$or": [
+                {"referred_by_merchant_id": merchant_id},
+                {"referred_by": recruitment_qr}
+            ]
+        }
+        referral_count = await db.clients.count_documents(query)
+        
+        if referral_count > 0:  # Only include merchants with referrals
+            leaderboard.append({
+                "merchant_id": merchant_id,
+                "business_name": merchant.get("business_name", "Unknown"),
+                "logo_url": merchant.get("logo_url"),
+                "referral_count": referral_count,
+                "total_earned": round(referral_count * MERCHANT_REFERRAL_BONUS, 2)
+            })
+    
+    # Sort by referral count descending
+    leaderboard.sort(key=lambda x: x["referral_count"], reverse=True)
+    
+    # Find current merchant's rank
+    current_merchant_rank = None
+    current_merchant_data = None
+    for idx, entry in enumerate(leaderboard, 1):
+        if entry["merchant_id"] == current_merchant_id:
+            current_merchant_rank = idx
+            current_merchant_data = entry
+            break
+    
+    # If current merchant not in leaderboard (0 referrals), add them
+    if current_merchant_rank is None:
+        current_merchant_doc = await db.merchants.find_one(
+            {"id": current_merchant_id},
+            {"_id": 0, "business_name": 1, "logo_url": 1}
+        )
+        current_merchant_rank = len(leaderboard) + 1
+        current_merchant_data = {
+            "merchant_id": current_merchant_id,
+            "business_name": current_merchant_doc.get("business_name", "Unknown") if current_merchant_doc else "Unknown",
+            "logo_url": current_merchant_doc.get("logo_url") if current_merchant_doc else None,
+            "referral_count": 0,
+            "total_earned": 0
+        }
+    
+    # Add rank to top entries
+    top_leaderboard = []
+    for idx, entry in enumerate(leaderboard[:limit], 1):
+        entry["rank"] = idx
+        entry["is_current_merchant"] = entry["merchant_id"] == current_merchant_id
+        top_leaderboard.append(entry)
+    
+    return {
+        "success": True,
+        "leaderboard": top_leaderboard,
+        "total_participants": len(leaderboard),
+        "current_merchant": {
+            "rank": current_merchant_rank,
+            **current_merchant_data
+        }
+    }
+

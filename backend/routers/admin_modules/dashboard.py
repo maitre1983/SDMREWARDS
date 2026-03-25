@@ -473,3 +473,95 @@ async def get_all_transactions(
         "limit": limit,
         "offset": offset
     }
+
+
+@router.get("/merchant-referral-leaderboard")
+async def get_admin_merchant_referral_leaderboard(
+    limit: int = 20,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get merchant referral leaderboard for admin dashboard.
+    
+    Returns all merchants ranked by referral count with detailed stats.
+    """
+    MERCHANT_REFERRAL_BONUS = 3.0  # GHS per referral
+    
+    # Get all merchants
+    merchants = await db.merchants.find(
+        {},
+        {
+            "_id": 0,
+            "id": 1,
+            "business_name": 1,
+            "recruitment_qr_code": 1,
+            "logo_url": 1,
+            "phone": 1,
+            "status": 1,
+            "created_at": 1
+        }
+    ).to_list(1000)
+    
+    # For each merchant, count their referrals and get details
+    leaderboard = []
+    total_referrals_all = 0
+    
+    for merchant in merchants:
+        merchant_id = merchant["id"]
+        recruitment_qr = merchant.get("recruitment_qr_code", "")
+        
+        # Count clients referred by this merchant
+        query = {
+            "$or": [
+                {"referred_by_merchant_id": merchant_id},
+                {"referred_by": recruitment_qr}
+            ]
+        }
+        referral_count = await db.clients.count_documents(query)
+        total_referrals_all += referral_count
+        
+        # Count this month's referrals
+        month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_query = {
+            **query,
+            "created_at": {"$gte": month_start.isoformat()}
+        }
+        referrals_this_month = await db.clients.count_documents(month_query)
+        
+        leaderboard.append({
+            "merchant_id": merchant_id,
+            "business_name": merchant.get("business_name", "Unknown"),
+            "phone": merchant.get("phone"),
+            "logo_url": merchant.get("logo_url"),
+            "status": merchant.get("status", "unknown"),
+            "referral_count": referral_count,
+            "referrals_this_month": referrals_this_month,
+            "total_earned": round(referral_count * MERCHANT_REFERRAL_BONUS, 2),
+            "earned_this_month": round(referrals_this_month * MERCHANT_REFERRAL_BONUS, 2),
+            "joined_at": merchant.get("created_at")
+        })
+    
+    # Sort by referral count descending
+    leaderboard.sort(key=lambda x: x["referral_count"], reverse=True)
+    
+    # Add rank
+    for idx, entry in enumerate(leaderboard, 1):
+        entry["rank"] = idx
+    
+    # Calculate summary stats
+    active_recruiters = len([m for m in leaderboard if m["referral_count"] > 0])
+    total_commissions_paid = round(total_referrals_all * MERCHANT_REFERRAL_BONUS, 2)
+    
+    return {
+        "success": True,
+        "leaderboard": leaderboard[:limit],
+        "summary": {
+            "total_merchants": len(merchants),
+            "active_recruiters": active_recruiters,
+            "total_referrals": total_referrals_all,
+            "total_commissions_paid": total_commissions_paid,
+            "bonus_per_referral": MERCHANT_REFERRAL_BONUS
+        },
+        "all_data": leaderboard  # Full list for admin export
+    }
+

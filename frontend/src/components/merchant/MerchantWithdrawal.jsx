@@ -32,7 +32,10 @@ import {
   BarChart3,
   RefreshCw,
   ExternalLink,
-  Gift
+  Gift,
+  Trophy,
+  Medal,
+  Crown
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
@@ -41,15 +44,23 @@ import { API_URL } from '../../config/api';
 export default function MerchantWithdrawal({ token, merchant, payoutSettings, onRefresh }) {
   const [loading, setLoading] = useState(true);
   const [referralStats, setReferralStats] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Fetch referral statistics
+  // Fetch referral statistics and leaderboard
   const fetchReferralStats = useCallback(async () => {
     setLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const res = await axios.get(`${API_URL}/api/merchants/referral-stats`, { headers });
-      setReferralStats(res.data);
+      
+      // Fetch both stats and leaderboard in parallel
+      const [statsRes, leaderboardRes] = await Promise.all([
+        axios.get(`${API_URL}/api/merchants/referral-stats`, { headers }),
+        axios.get(`${API_URL}/api/merchants/referral-leaderboard?limit=10`, { headers })
+      ]);
+      
+      setReferralStats(statsRes.data);
+      setLeaderboard(leaderboardRes.data);
     } catch (error) {
       console.error('Error fetching referral stats:', error);
       // Set default values if endpoint not ready
@@ -65,6 +76,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
         monthly_breakdown: [],
         recent_referrals: []
       });
+      setLeaderboard(null);
     } finally {
       setLoading(false);
     }
@@ -362,6 +374,101 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
           </Button>
         </div>
       </div>
+
+      {/* Leaderboard Section */}
+      {leaderboard && leaderboard.leaderboard && leaderboard.leaderboard.length > 0 && (
+        <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-amber-500/20">
+            <div className="flex items-center gap-2">
+              <Trophy className="text-amber-400" size={20} />
+              <h3 className="text-white font-semibold">Classement des Parrains</h3>
+            </div>
+            <span className="text-slate-400 text-sm">{leaderboard.total_participants} participants</span>
+          </div>
+
+          {/* Current Merchant Rank Highlight */}
+          {leaderboard.current_merchant && (
+            <div className="bg-blue-500/10 border-b border-blue-500/20 px-5 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center font-bold text-blue-400">
+                    #{leaderboard.current_merchant.rank}
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">Votre position</p>
+                    <p className="text-slate-400 text-xs">{leaderboard.current_merchant.referral_count} filleuls • {formatCurrency(leaderboard.current_merchant.total_earned)}</p>
+                  </div>
+                </div>
+                {leaderboard.current_merchant.rank <= 3 && (
+                  <div className="text-amber-400">
+                    {leaderboard.current_merchant.rank === 1 && <Crown size={24} />}
+                    {leaderboard.current_merchant.rank === 2 && <Medal size={24} />}
+                    {leaderboard.current_merchant.rank === 3 && <Medal size={24} className="text-orange-400" />}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Top 10 Leaderboard */}
+          <div className="divide-y divide-slate-700/30">
+            {leaderboard.leaderboard.slice(0, 10).map((entry, idx) => (
+              <div 
+                key={entry.merchant_id} 
+                className={`flex items-center justify-between px-5 py-3 ${
+                  entry.is_current_merchant ? 'bg-blue-500/10' : 'hover:bg-slate-700/30'
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Rank Badge */}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                    entry.rank === 1 ? 'bg-amber-500/30 text-amber-400' :
+                    entry.rank === 2 ? 'bg-slate-400/30 text-slate-300' :
+                    entry.rank === 3 ? 'bg-orange-500/30 text-orange-400' :
+                    'bg-slate-700 text-slate-400'
+                  }`}>
+                    {entry.rank <= 3 ? (
+                      entry.rank === 1 ? <Crown size={16} /> :
+                      entry.rank === 2 ? <Medal size={16} /> :
+                      <Medal size={16} />
+                    ) : entry.rank}
+                  </div>
+                  
+                  {/* Merchant Info */}
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium truncate ${
+                      entry.is_current_merchant ? 'text-blue-400' : 'text-white'
+                    }`}>
+                      {entry.business_name}
+                      {entry.is_current_merchant && <span className="ml-2 text-xs">(Vous)</span>}
+                    </p>
+                    <p className="text-slate-500 text-xs">{entry.referral_count} filleuls</p>
+                  </div>
+                </div>
+                
+                {/* Earnings */}
+                <div className="text-right flex-shrink-0 ml-2">
+                  <p className="text-emerald-400 font-semibold text-sm">
+                    {formatCurrency(entry.total_earned)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Motivation Message */}
+          {leaderboard.current_merchant && leaderboard.current_merchant.rank > 3 && (
+            <div className="px-5 py-3 bg-slate-800/30 border-t border-slate-700/30">
+              <p className="text-slate-400 text-xs text-center">
+                {leaderboard.current_merchant.rank <= 10 
+                  ? `Plus que ${leaderboard.leaderboard[leaderboard.current_merchant.rank - 2]?.referral_count - leaderboard.current_merchant.referral_count || 1} filleul(s) pour monter au classement!`
+                  : 'Parrainez plus de clients pour entrer dans le Top 10!'
+                }
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recent Referrals */}
       {stats.recent_referrals && stats.recent_referrals.length > 0 && (

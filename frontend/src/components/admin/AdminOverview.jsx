@@ -5,6 +5,7 @@ import {
   Banknote, Smartphone, Wallet, ArrowDownRight, ArrowUpRight
 } from 'lucide-react';
 import ServiceFeesAnalytics from './ServiceFeesAnalytics';
+import MerchantReferralLeaderboard from './MerchantReferralLeaderboard';
 
 export default function AdminOverview({
   stats,
@@ -622,6 +623,9 @@ export default function AdminOverview({
           </div>
         </div>
       </div>
+
+      {/* Merchant Referral Leaderboard */}
+      <MerchantReferralLeaderboard token={token} />
     </div>
   );
 }
