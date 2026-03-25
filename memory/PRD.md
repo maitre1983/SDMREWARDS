@@ -531,3 +531,47 @@ Il n'existe plus de notion de "solde à retirer" - tout est payé automatiquemen
 - P3: Optimize MongoDB queries with indexes
 - P3: Refactor `is_vas_test_mode()` in `hubtel_vas_service.py`
 
+---
+
+## 2026-03-25 - MERCHANT REFERRAL LEADERBOARD 🏆
+
+### Fonctionnalité
+Ajout d'un classement des meilleurs parrains marchands visible dans:
+1. **Dashboard Marchand** (section Withdrawal/Parrainage)
+2. **Dashboard Admin** (Overview)
+
+### Backend - Nouveaux Endpoints
+
+**Pour Marchands:**
+- `GET /api/merchants/referral-leaderboard?limit=10`
+  - Retourne le top 10 des marchands recruteurs
+  - Inclut le rang du marchand connecté (`current_merchant`)
+  - Champs: rank, business_name, referral_count, total_earned, is_current_merchant
+
+**Pour Admin:**
+- `GET /api/admin/merchant-referral-leaderboard?limit=50`
+  - Retourne tous les marchands avec stats détaillées
+  - Summary: total_merchants, active_recruiters, total_referrals, total_commissions_paid
+  - Champs supplémentaires: phone, status, referrals_this_month, earned_this_month
+  - `all_data` pour export CSV
+
+### Frontend - Composants
+
+**MerchantWithdrawal.jsx (Dashboard Marchand):**
+- Section "Classement des Parrains" avec fond gradient ambre/orange
+- Affichage du rang du marchand connecté ("Votre position")
+- Top 10 avec badges (Crown pour #1, Medal pour #2-3)
+- Message de motivation pour encourager à recruter
+
+**MerchantReferralLeaderboard.jsx (Dashboard Admin):**
+- Nouveau composant `/app/frontend/src/components/admin/MerchantReferralLeaderboard.jsx`
+- Stats résumées: Total Marchands, Recruteurs Actifs, Total Filleuls, Commissions Payées
+- Tableau complet avec colonnes: Rang, Marchand, Filleuls, Ce Mois, Total Gagné, Statut
+- Bouton Export CSV fonctionnel
+- Intégré dans AdminOverview.jsx
+
+### Testing
+- Backend: 12/13 tests passés
+- Frontend: 100% des composants UI fonctionnels
+- Test file: `/app/backend/tests/test_merchant_referral_leaderboard.py`
+
