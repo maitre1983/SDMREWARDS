@@ -1,0 +1,61 @@
+{
+  "summary": "Completed English translation verification for merchant and admin dashboards. All navigation tabs, labels, and API responses are now in English. Fixed one remaining French text 'Panier moyen' to 'Average Basket' in AdvancedDashboard.jsx.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "WebSocket connection", "issue": "WebSocket connection fails with 403 error - not blocking functionality", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_english_translation.py",
+    "/app/test_reports/pytest/english_translation_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/frontend/src/components/merchant/AdvancedDashboard.jsx"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "merchant": {
+      "phone": "+233500700500",
+      "password": "test123"
+    },
+    "admin": {
+      "email": "emileparfait2003@gmail.com",
+      "password": "Gerard0103@"
+    }
+  },
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "English translation verification complete. All merchant dashboard navigation tabs (Dashboard, Cash, QR Codes, History, Settings), settings sub-tabs (Cashback, Payment, Withdrawal, Payouts, Cashiers, Business, Security, API & Webhooks), and MerchantWithdrawal component labels are in English. Backend period_label returns English values (Today, This Week, This Month, This Year). Admin MerchantReferralLeaderboard is fully in English. PaymentCancelledPage is fully in English.",
+  "verified_translations": {
+    "merchant_dashboard_tabs": ["Dashboard", "Cash", "QR Codes", "History", "Settings"],
+    "settings_sub_tabs": ["Cashback", "Payment", "Withdrawal", "Payouts", "Cashiers", "Business", "Security", "API & Webhooks"],
+    "merchant_withdrawal_labels": ["Automatic Payouts Enabled", "Total Earned from Referrals", "Total Referrals", "TODAY", "THIS MONTH", "COMMISSION", "Last 6 Months Earnings", "Share and Earn!", "Your Referral Code", "No Referrals Yet", "Start Sharing"],
+    "backend_period_labels": ["Today", "This Week", "This Month", "This Year"],
+    "admin_leaderboard_labels": ["Merchant Referral Leaderboard", "Top customer recruiters", "Merchants", "Active Recruiters", "Total Referrals", "Commissions Paid", "RANK", "MERCHANT", "REFERRALS", "THIS MONTH", "TOTAL EARNED", "STATUS"],
+    "payment_cancelled_page": ["Payment Cancelled", "No worries", "Your purchase was not completed", "SDM Card Benefits", "Cashback on all your purchases", "Access to all partner merchants", "Attractive referral bonuses", "Retry Purchase", "Back to Home"]
+  },
+  "fixed_issues": [
+    {
+      "file": "/app/frontend/src/components/merchant/AdvancedDashboard.jsx",
+      "line": 222,
+      "old_text": "Panier moyen",
+      "new_text": "Average Basket"
+    }
+  ],
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  }
+}

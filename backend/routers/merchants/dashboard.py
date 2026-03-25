@@ -127,7 +127,7 @@ async def get_advanced_stats(
     
     return {
         "period": period,
-        "period_label": {"day": "Aujourd'hui", "week": "Cette semaine", "month": "Ce mois", "year": "Cette année"}.get(period, "Aujourd'hui"),
+        "period_label": {"day": "Today", "week": "This Week", "month": "This Month", "year": "This Year"}.get(period, "Today"),
         "current": {"volume": round(current_volume, 2), "cashback": round(current_cashback, 2), "transactions": current_count, "average_transaction": round(avg_transaction, 2)},
         "previous": {"volume": round(previous_volume, 2), "cashback": round(previous_cashback, 2), "transactions": previous_count, "average_transaction": round(prev_avg, 2)},
         "growth": {"volume": volume_growth, "cashback": cashback_growth, "transactions": count_growth, "average_transaction": avg_growth},

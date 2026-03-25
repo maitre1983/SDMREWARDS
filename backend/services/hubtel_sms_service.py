@@ -703,7 +703,7 @@ class HubtelSMSService:
     
     async def send_otp(self, phone: str, otp: str):
         """Send OTP verification code"""
-        message = f"SDM Rewards: Votre code de verification est {otp}. Valide pendant 10 minutes."
+        message = f"SDM Rewards: Your verification code is {otp}. Valid for 10 minutes."
         return await self.send_sms(phone, message, "otp")
 
 

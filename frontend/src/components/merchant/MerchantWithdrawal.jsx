@@ -1,15 +1,15 @@
 /**
  * MerchantWithdrawal Component - Performance Dashboard
  * =====================================================
- * Dashboard orienté performance de parrainage pour les marchands.
+ * Referral performance-oriented dashboard for merchants.
  * 
- * SDM ne retient plus les fonds marchands - après chaque paiement client,
- * la part du marchand est envoyée instantanément sur leur compte MoMo/Banque.
+ * SDM no longer holds merchant funds - after each customer payment,
+ * the merchant's share is sent instantly to their MoMo/Bank account.
  * 
- * Ce dashboard affiche:
- * - Total gagné via parrainage
- * - Nombre de filleuls
- * - Revenus aujourd'hui / ce mois / 6 derniers mois
+ * This dashboard displays:
+ * - Total earned from referrals
+ * - Number of referrals
+ * - Earnings today / this month / last 6 months
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -105,10 +105,10 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       try {
         await navigator.clipboard.writeText(code);
         setCopySuccess(true);
-        toast.success('Code copié!');
+        toast.success('Code copied!');
         setTimeout(() => setCopySuccess(false), 2000);
       } catch (err) {
-        toast.error('Erreur de copie');
+        toast.error('Copy failed');
       }
     }
   };
@@ -116,11 +116,11 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
   const shareReferralLink = () => {
     const code = referralStats?.recruitment_qr_code || merchant?.recruitment_qr_code;
     const link = `https://sdmrewards.com/join?ref=${code}`;
-    const text = `Rejoins SDM REWARDS et gagne du cashback! Utilise mon code: ${code}`;
+    const text = `Join SDM REWARDS and earn cashback! Use my code: ${code}`;
     
     if (navigator.share) {
       navigator.share({
-        title: 'SDM REWARDS - Parrainage',
+        title: 'SDM REWARDS - Referral',
         text: text,
         url: link
       }).catch(() => {});
@@ -148,18 +148,18 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             <Zap className="text-emerald-400" size={24} />
           </div>
           <div className="flex-1 w-full">
-            <h3 className="text-white text-lg font-semibold mb-1">Paiements Automatiques Activés</h3>
+            <h3 className="text-white text-lg font-semibold mb-1">Automatic Payouts Enabled</h3>
             <p className="text-slate-300 text-sm mb-3">
-              Après chaque paiement client, votre part est envoyée <span className="text-emerald-400 font-semibold">instantanément</span> sur votre compte configuré.
+              After each customer payment, your share is sent <span className="text-emerald-400 font-semibold">instantly</span> to your configured account.
               <br/>
-              <span className="text-amber-300">Les commissions de parrainage (GHS 3 par filleul) sont aussi envoyées automatiquement.</span>
+              <span className="text-amber-300">Referral commissions (GHS 3 per referral) are also sent automatically.</span>
             </p>
             <div className="flex items-center gap-3 bg-slate-800/50 rounded-lg px-4 py-3">
               {payoutSettings?.preferred_payout_method === 'bank' ? (
                 <>
                   <Building2 className="text-blue-400 flex-shrink-0" size={20} />
                   <div className="min-w-0">
-                    <p className="text-white font-medium truncate">{payoutSettings?.bank_name || 'Compte Bancaire'}</p>
+                    <p className="text-white font-medium truncate">{payoutSettings?.bank_name || 'Bank Account'}</p>
                     <p className="text-slate-400 text-sm">****{(payoutSettings?.bank_account || '').slice(-4)}</p>
                   </div>
                 </>
@@ -168,7 +168,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                   <Phone className="text-purple-400 flex-shrink-0" size={20} />
                   <div className="min-w-0">
                     <p className="text-white font-medium truncate">{payoutSettings?.momo_network || 'Mobile Money'}</p>
-                    <p className="text-slate-400 text-sm">{payoutSettings?.momo_number || 'Non configuré'}</p>
+                    <p className="text-slate-400 text-sm">{payoutSettings?.momo_number || 'Not configured'}</p>
                   </div>
                 </>
               )}
@@ -181,7 +181,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             {!payoutSettings?.momo_number && payoutSettings?.preferred_payout_method !== 'bank' && (
               <p className="text-amber-400 text-xs mt-2 flex items-center gap-1">
                 <Info size={14} />
-                Configurez votre MoMo dans Paramètres &gt; Paiement
+                Configure your MoMo in Settings &gt; Payment
               </p>
             )}
           </div>
@@ -196,13 +196,13 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             <div className="min-w-0 flex-1">
               <p className="text-slate-400 text-sm mb-1 flex items-center gap-2">
                 <Gift size={14} />
-                Total gagné via parrainage
+                Total Earned from Referrals
               </p>
               <p className="text-3xl sm:text-4xl font-bold text-emerald-400 truncate" data-testid="total-referral-earnings">
                 {formatCurrency(stats.total_earned)}
               </p>
               <p className="text-xs text-slate-500 mt-1">
-                GHS {stats.bonus_per_referral || 3} par filleul
+                GHS {stats.bonus_per_referral || 3} per referral
               </p>
             </div>
             <div className="w-12 h-12 bg-emerald-500/30 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -217,13 +217,13 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             <div className="min-w-0 flex-1">
               <p className="text-slate-400 text-sm mb-1 flex items-center gap-2">
                 <Users size={14} />
-                Nombre total de filleuls
+                Total Referrals
               </p>
               <p className="text-3xl sm:text-4xl font-bold text-purple-400" data-testid="total-referrals">
                 {stats.total_referrals || 0}
               </p>
               <p className="text-xs text-slate-500 mt-1">
-                Clients recrutés via votre lien
+                Customers recruited via your link
               </p>
             </div>
             <div className="w-12 h-12 bg-purple-500/30 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -238,28 +238,28 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
         {/* Today */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-400 text-xs uppercase tracking-wide">Aujourd'hui</p>
+            <p className="text-slate-400 text-xs uppercase tracking-wide">Today</p>
             <Calendar size={14} className="text-slate-500" />
           </div>
           <p className="text-xl font-bold text-white" data-testid="earnings-today">
             {formatCurrency(stats.earnings_today)}
           </p>
           <p className="text-xs text-emerald-400 mt-1">
-            +{stats.referrals_today || 0} filleul{(stats.referrals_today || 0) > 1 ? 's' : ''}
+            +{stats.referrals_today || 0} referral{(stats.referrals_today || 0) > 1 ? 's' : ''}
           </p>
         </div>
 
         {/* This Month */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-slate-400 text-xs uppercase tracking-wide">Ce mois</p>
+            <p className="text-slate-400 text-xs uppercase tracking-wide">This Month</p>
             <BarChart3 size={14} className="text-slate-500" />
           </div>
           <p className="text-xl font-bold text-white" data-testid="earnings-this-month">
             {formatCurrency(stats.earnings_this_month)}
           </p>
           <p className="text-xs text-emerald-400 mt-1">
-            +{stats.referrals_this_month || 0} filleul{(stats.referrals_this_month || 0) > 1 ? 's' : ''}
+            +{stats.referrals_this_month || 0} referral{(stats.referrals_this_month || 0) > 1 ? 's' : ''}
           </p>
         </div>
 
@@ -273,7 +273,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             GHS {stats.bonus_per_referral || 3}
           </p>
           <p className="text-xs text-slate-400 mt-1">
-            Par client recruté
+            Per recruited customer
           </p>
         </div>
       </div>
@@ -284,7 +284,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white font-semibold flex items-center gap-2">
               <TrendingUp size={18} className="text-emerald-400" />
-              Revenus des 6 derniers mois
+              Last 6 Months Earnings
             </h3>
             <button
               onClick={fetchReferralStats}
@@ -323,7 +323,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
               <div key={idx} className="bg-slate-900/50 rounded-lg p-3">
                 <p className="text-slate-400 text-xs">{month.month}</p>
                 <p className="text-white font-medium">{formatCurrency(month.earnings)}</p>
-                <p className="text-emerald-400 text-xs">+{month.referrals} filleuls</p>
+                <p className="text-emerald-400 text-xs">+{month.referrals} referrals</p>
               </div>
             ))}
           </div>
@@ -337,8 +337,8 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             <Share2 className="text-blue-400" size={20} />
           </div>
           <div>
-            <h3 className="text-white font-semibold">Partagez et Gagnez!</h3>
-            <p className="text-slate-400 text-xs">Gagnez GHS {stats.bonus_per_referral || 3} pour chaque nouveau client</p>
+            <h3 className="text-white font-semibold">Share and Earn!</h3>
+            <p className="text-slate-400 text-xs">Earn GHS {stats.bonus_per_referral || 3} for each new customer</p>
           </div>
         </div>
 
@@ -346,7 +346,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
           {/* Referral Code */}
           <div className="flex-1 bg-slate-800/80 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between">
             <div>
-              <p className="text-slate-500 text-xs">Votre code de parrainage</p>
+              <p className="text-slate-500 text-xs">Your Referral Code</p>
               <p className="text-white font-mono text-lg" data-testid="referral-code">
                 {stats.recruitment_qr_code || merchant?.recruitment_qr_code || '---'}
               </p>
@@ -370,7 +370,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             data-testid="share-referral-btn"
           >
             <ExternalLink size={18} className="mr-2" />
-            Partager
+            Share
           </Button>
         </div>
       </div>
@@ -381,7 +381,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
           <div className="flex items-center justify-between px-5 py-4 border-b border-amber-500/20">
             <div className="flex items-center gap-2">
               <Trophy className="text-amber-400" size={20} />
-              <h3 className="text-white font-semibold">Classement des Parrains</h3>
+              <h3 className="text-white font-semibold">Referral Leaderboard</h3>
             </div>
             <span className="text-slate-400 text-sm">{leaderboard.total_participants} participants</span>
           </div>
@@ -395,8 +395,8 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                     #{leaderboard.current_merchant.rank}
                   </div>
                   <div>
-                    <p className="text-white font-medium">Votre position</p>
-                    <p className="text-slate-400 text-xs">{leaderboard.current_merchant.referral_count} filleuls • {formatCurrency(leaderboard.current_merchant.total_earned)}</p>
+                    <p className="text-white font-medium">Your Position</p>
+                    <p className="text-slate-400 text-xs">{leaderboard.current_merchant.referral_count} referrals • {formatCurrency(leaderboard.current_merchant.total_earned)}</p>
                   </div>
                 </div>
                 {leaderboard.current_merchant.rank <= 3 && (
@@ -440,9 +440,9 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                       entry.is_current_merchant ? 'text-blue-400' : 'text-white'
                     }`}>
                       {entry.business_name}
-                      {entry.is_current_merchant && <span className="ml-2 text-xs">(Vous)</span>}
+                      {entry.is_current_merchant && <span className="ml-2 text-xs">(You)</span>}
                     </p>
-                    <p className="text-slate-500 text-xs">{entry.referral_count} filleuls</p>
+                    <p className="text-slate-500 text-xs">{entry.referral_count} referrals</p>
                   </div>
                 </div>
                 
@@ -461,8 +461,8 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
             <div className="px-5 py-3 bg-slate-800/30 border-t border-slate-700/30">
               <p className="text-slate-400 text-xs text-center">
                 {leaderboard.current_merchant.rank <= 10 
-                  ? `Plus que ${leaderboard.leaderboard[leaderboard.current_merchant.rank - 2]?.referral_count - leaderboard.current_merchant.referral_count || 1} filleul(s) pour monter au classement!`
-                  : 'Parrainez plus de clients pour entrer dans le Top 10!'
+                  ? `Only ${leaderboard.leaderboard[leaderboard.current_merchant.rank - 2]?.referral_count - leaderboard.current_merchant.referral_count || 1} more referral(s) to move up!`
+                  : 'Refer more customers to enter the Top 10!'
                 }
               </p>
             </div>
@@ -476,7 +476,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
             <div className="flex items-center gap-2">
               <UserPlus className="text-purple-400" size={18} />
-              <h3 className="text-white font-semibold">Filleuls Récents</h3>
+              <h3 className="text-white font-semibold">Recent Referrals</h3>
             </div>
             <span className="text-slate-500 text-sm">{stats.total_referrals} total</span>
           </div>
@@ -500,7 +500,7 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
                   <p className={`text-xs ${
                     referral.status === 'active' ? 'text-emerald-400' : 'text-amber-400'
                   }`}>
-                    {referral.status === 'active' ? 'Actif' : 'En attente'}
+                    {referral.status === 'active' ? 'Active' : 'Pending'}
                   </p>
                 </div>
               </div>
@@ -513,16 +513,16 @@ export default function MerchantWithdrawal({ token, merchant, payoutSettings, on
       {(!stats.recent_referrals || stats.recent_referrals.length === 0) && (
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8 text-center">
           <Users className="text-slate-600 mx-auto mb-3" size={48} />
-          <h3 className="text-white font-semibold mb-1">Pas encore de filleuls</h3>
+          <h3 className="text-white font-semibold mb-1">No Referrals Yet</h3>
           <p className="text-slate-400 text-sm mb-4">
-            Partagez votre code et gagnez GHS {stats.bonus_per_referral || 3} par nouveau client!
+            Share your code and earn GHS {stats.bonus_per_referral || 3} per new customer!
           </p>
           <Button
             onClick={shareReferralLink}
             className="bg-purple-600 hover:bg-purple-700"
           >
             <Share2 size={18} className="mr-2" />
-            Commencer à partager
+            Start Sharing
           </Button>
         </div>
       )}

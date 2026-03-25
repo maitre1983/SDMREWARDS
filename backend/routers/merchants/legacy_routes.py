@@ -344,11 +344,11 @@ async def get_advanced_stats(
     return {
         "period": period,
         "period_label": {
-            "day": "Aujourd'hui",
-            "week": "Cette semaine",
-            "month": "Ce mois",
-            "year": "Cette année"
-        }.get(period, "Aujourd'hui"),
+            "day": "Today",
+            "week": "This Week",
+            "month": "This Month",
+            "year": "This Year"
+        }.get(period, "Today"),
         "current": {
             "volume": round(current_volume, 2),
             "cashback": round(current_cashback, 2),

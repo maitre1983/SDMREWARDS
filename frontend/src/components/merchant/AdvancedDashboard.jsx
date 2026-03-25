@@ -219,7 +219,7 @@ export default function AdvancedDashboard({ token, basicStats, merchant }) {
             </div>
             <GrowthIndicator value={advancedStats?.growth?.average_transaction} />
           </div>
-          <p className="text-slate-400 text-sm">Panier moyen</p>
+          <p className="text-slate-400 text-sm">Average Basket</p>
           <p className="text-white text-xl font-bold">
             {formatCurrency(advancedStats?.current?.average_transaction)}
           </p>

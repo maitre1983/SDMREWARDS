@@ -17,7 +17,7 @@ const PaymentCancelledPage = () => {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-white mt-6 mb-2">Payment Cancelled</h1>
-          <p className="text-slate-400">Vous avez annulé le processus de paiement</p>
+          <p className="text-slate-400">You have cancelled the payment process</p>
         </div>
 
         {/* Info Card */}
@@ -27,9 +27,9 @@ const PaymentCancelledPage = () => {
               <CreditCard className="w-6 h-6 text-slate-400" />
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Pas de souci!</h3>
+              <h3 className="text-white font-semibold mb-1">No worries!</h3>
               <p className="text-slate-400 text-sm">
-                Votre achat n'a pas été finalisé. Vous pouvez réessayer à tout moment depuis votre tableau de bord.
+                Your purchase was not completed. You can try again anytime from your dashboard.
               </p>
             </div>
           </div>
@@ -37,19 +37,19 @@ const PaymentCancelledPage = () => {
 
         {/* Benefits Reminder */}
         <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 rounded-xl p-4 border border-purple-500/20 mb-6">
-          <h4 className="text-white font-medium mb-3">Avantages de la carte SDM:</h4>
+          <h4 className="text-white font-medium mb-3">SDM Card Benefits:</h4>
           <ul className="space-y-2 text-sm text-slate-300">
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-              Cashback sur tous vos achats
+              Cashback on all your purchases
             </li>
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-              Accès à tous les marchands partenaires
+              Access to all partner merchants
             </li>
             <li className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-              Bonus de parrainage attractifs
+              Attractive referral bonuses
             </li>
           </ul>
         </div>
@@ -60,14 +60,14 @@ const PaymentCancelledPage = () => {
             onClick={() => navigate("/client/dashboard")}
             className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-4 rounded-xl font-semibold transition-all shadow-lg shadow-purple-500/20"
           >
-            Réessayer l'achat
+            Retry Purchase
           </button>
           <button
             onClick={() => navigate("/")}
             className="w-full bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />
-            Retour à l'accueil
+            Back to Home
           </button>
         </div>
       </div>

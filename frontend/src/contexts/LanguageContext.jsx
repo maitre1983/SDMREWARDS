@@ -39,22 +39,16 @@ const defaultTranslations = {
 };
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState(() => {
-    // Try to get from localStorage first
-    const saved = localStorage.getItem('sdm_language');
-    if (saved) return saved;
-    
-    // Otherwise detect from browser
-    const browserLang = navigator.language?.split('-')[0] || 'en';
-    return ['en', 'fr'].includes(browserLang) ? browserLang : 'en';
-  });
+  // Force English as the default and only language
+  const [language, setLanguage] = useState('en');
   
   const [translations, setTranslations] = useState(defaultTranslations);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Detect and sync language on mount
+  // Set language to English on mount
   useEffect(() => {
-    detectAndSyncLanguage();
+    setLanguage('en');
+    localStorage.setItem('sdm_language', 'en');
   }, []);
 
   // Load translations when language changes

@@ -50,7 +50,7 @@ export default function MerchantReferralLeaderboard({ token }) {
   const exportToCSV = () => {
     if (!data?.all_data) return;
     
-    const headers = ['Rang', 'Marchand', 'Téléphone', 'Filleuls Total', 'Ce Mois', 'Total Gagné', 'Statut'];
+    const headers = ['Rank', 'Merchant', 'Phone', 'Total Referrals', 'This Month', 'Total Earned', 'Status'];
     const rows = data.all_data.map(m => [
       m.rank,
       m.business_name,
@@ -82,10 +82,10 @@ export default function MerchantReferralLeaderboard({ token }) {
     return (
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8 text-center">
         <Trophy className="text-slate-600 mx-auto mb-3" size={48} />
-        <p className="text-slate-400">Impossible de charger le classement</p>
+        <p className="text-slate-400">Unable to load leaderboard</p>
         <Button onClick={fetchLeaderboard} variant="outline" className="mt-4">
           <RefreshCw size={16} className="mr-2" />
-          Réessayer
+          Retry
         </Button>
       </div>
     );
@@ -102,8 +102,8 @@ export default function MerchantReferralLeaderboard({ token }) {
             <Trophy className="text-amber-400" size={22} />
           </div>
           <div>
-            <h3 className="text-white font-semibold">Classement Parrains Marchands</h3>
-            <p className="text-slate-400 text-xs">Top recruteurs de clients</p>
+            <h3 className="text-white font-semibold">Merchant Referral Leaderboard</h3>
+            <p className="text-slate-400 text-xs">Top customer recruiters</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -131,19 +131,19 @@ export default function MerchantReferralLeaderboard({ token }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-900/30 border-b border-slate-700">
         <div className="text-center">
           <p className="text-2xl font-bold text-white">{data.summary?.total_merchants || 0}</p>
-          <p className="text-slate-500 text-xs">Marchands</p>
+          <p className="text-slate-500 text-xs">Merchants</p>
         </div>
         <div className="text-center">
           <p className="text-2xl font-bold text-emerald-400">{data.summary?.active_recruiters || 0}</p>
-          <p className="text-slate-500 text-xs">Recruteurs actifs</p>
+          <p className="text-slate-500 text-xs">Active Recruiters</p>
         </div>
         <div className="text-center">
           <p className="text-2xl font-bold text-purple-400">{data.summary?.total_referrals || 0}</p>
-          <p className="text-slate-500 text-xs">Filleuls Total</p>
+          <p className="text-slate-500 text-xs">Total Referrals</p>
         </div>
         <div className="text-center">
           <p className="text-2xl font-bold text-amber-400">{formatCurrency(data.summary?.total_commissions_paid || 0)}</p>
-          <p className="text-slate-500 text-xs">Commissions payées</p>
+          <p className="text-slate-500 text-xs">Commissions Paid</p>
         </div>
       </div>
 
@@ -152,12 +152,12 @@ export default function MerchantReferralLeaderboard({ token }) {
         <table className="w-full">
           <thead className="bg-slate-900/50 text-slate-400 text-xs uppercase">
             <tr>
-              <th className="px-4 py-3 text-left">Rang</th>
-              <th className="px-4 py-3 text-left">Marchand</th>
-              <th className="px-4 py-3 text-center">Filleuls</th>
-              <th className="px-4 py-3 text-center hidden sm:table-cell">Ce Mois</th>
-              <th className="px-4 py-3 text-right">Total Gagné</th>
-              <th className="px-4 py-3 text-center hidden sm:table-cell">Statut</th>
+              <th className="px-4 py-3 text-left">Rank</th>
+              <th className="px-4 py-3 text-left">Merchant</th>
+              <th className="px-4 py-3 text-center">Referrals</th>
+              <th className="px-4 py-3 text-center hidden sm:table-cell">This Month</th>
+              <th className="px-4 py-3 text-right">Total Earned</th>
+              <th className="px-4 py-3 text-center hidden sm:table-cell">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/50">
@@ -210,8 +210,8 @@ export default function MerchantReferralLeaderboard({ token }) {
                       entry.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
                       'bg-red-500/20 text-red-400'
                     }`}>
-                      {entry.status === 'active' ? 'Actif' : 
-                       entry.status === 'pending' ? 'En attente' : 'Inactif'}
+                      {entry.status === 'active' ? 'Active' : 
+                       entry.status === 'pending' ? 'Pending' : 'Inactive'}
                     </span>
                   </td>
                 </tr>
@@ -219,7 +219,7 @@ export default function MerchantReferralLeaderboard({ token }) {
             ) : (
               <tr>
                 <td colSpan="6" className="px-4 py-8 text-center text-slate-500">
-                  Aucun marchand n'a encore parrainé de clients
+                  No merchants have referred customers yet
                 </td>
               </tr>
             )}
@@ -236,7 +236,7 @@ export default function MerchantReferralLeaderboard({ token }) {
             size="sm"
             className="text-slate-400"
           >
-            {showAll ? 'Afficher moins' : `Voir tous (${data.all_data.length})`}
+            {showAll ? 'Show Less' : `View All (${data.all_data.length})`}
           </Button>
         </div>
       )}
