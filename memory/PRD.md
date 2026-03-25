@@ -468,3 +468,66 @@ Les credentials sont stockés dans `.env`:
 - `HUBTEL_SMS_CLIENT_ID`
 - `HUBTEL_SMS_CLIENT_SECRET`
 - `HUBTEL_SMS_SENDER_ID` (par défaut: "SDMREWARDS")
+
+---
+
+## 2026-03-25 - MERCHANT WITHDRAWAL DASHBOARD REFACTORING 🎉
+
+### Contexte
+Les marchands reçoivent désormais leurs fonds **instantanément** après chaque transaction client (MoMo/Banque). 
+Il n'existe plus de notion de "solde à retirer" - tout est payé automatiquement.
+
+### Changements Apportés
+
+#### ❌ SUPPRIMÉ (Éléments de l'ancien système de retrait manuel)
+- Bloc "Manual Withdrawal" (input montant, boutons 50/100/500/TOUT, bouton Withdraw)
+- Cartes statistiques: Available Balance, Pending, Total Received
+
+#### ✅ NOUVELLE STRUCTURE - Dashboard Performance Parrainage
+
+**Backend - Nouveaux Endpoints:**
+- `GET /api/merchants/referral-stats` - Statistiques de parrainage:
+  - `total_referrals` - Nombre total de filleuls
+  - `total_earned` - Montant total gagné (GHS 3 × referrals)
+  - `earnings_today` - Revenus aujourd'hui
+  - `earnings_this_month` - Revenus ce mois
+  - `monthly_breakdown` - Ventilation sur 6 mois
+  - `recent_referrals` - Liste des 10 derniers filleuls
+- `GET /api/merchants/referral-link` - Lien de parrainage et QR code
+
+**Backend - Commission de Parrainage Automatique:**
+- Les marchands reçoivent **GHS 3** par client recruté via leur code `SDM-R-xxx`
+- Commission envoyée automatiquement sur MoMo/Banque quand le client active sa carte
+- Nouveau champ `referred_by_merchant_id` ajouté aux clients
+- Fonction `_process_merchant_referral_commission()` dans `processing.py`
+- Collection `merchant_referral_payouts` pour traquer les commissions
+
+**Frontend - MerchantWithdrawal.jsx Refactoré:**
+- Bannière "Paiements Automatiques Activés" (conservée)
+- Carte "Total gagné via parrainage" - GHS X.XX
+- Carte "Nombre total de filleuls" - X clients
+- Revenus: Aujourd'hui / Ce mois / Commission (GHS 3)
+- Graphique 6 derniers mois (barres)
+- Section "Partagez et Gagnez" avec:
+  - Code de parrainage (avec bouton copier)
+  - Bouton Partager (WhatsApp/natif)
+- Liste des filleuls récents
+
+**Fichiers Modifiés/Créés:**
+- `/app/backend/routers/merchant_referrals.py` (NOUVEAU)
+- `/app/backend/routers/payments/processing.py` (MODIFIÉ)
+- `/app/backend/routers/auth.py` (MODIFIÉ - support code SDM-R-xxx)
+- `/app/backend/server.py` (MODIFIÉ - ajout router)
+- `/app/frontend/src/components/merchant/MerchantWithdrawal.jsx` (RÉÉCRIT)
+
+**Testing:**
+- Backend: 10/10 tests passés
+- Frontend: 100% - Tous les nouveaux éléments visibles, anciens éléments supprimés
+- Test file: `/app/backend/tests/test_merchant_referral_stats.py`
+
+### Prochaines Tâches (Backlog)
+- P2: UI for Trusted Devices
+- P2: UI for IP Whitelisting in merchant dashboard
+- P3: Optimize MongoDB queries with indexes
+- P3: Refactor `is_vas_test_mode()` in `hubtel_vas_service.py`
+
