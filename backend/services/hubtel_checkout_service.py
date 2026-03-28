@@ -36,6 +36,7 @@ class HubtelCheckoutRequest(BaseModel):
     client_reference: str
     callback_url: Optional[str] = None
     cancellation_url: Optional[str] = None
+    return_url: Optional[str] = None  # URL to redirect after successful payment
 
 
 class HubtelCheckoutResponse(BaseModel):
@@ -104,9 +105,9 @@ class HubtelOnlineCheckoutService:
         # Normalize phone number
         customer_phone = self._normalize_phone(request.customer_phone)
         
-        # Prepare URLs
+        # Prepare URLs - use request URLs if provided, otherwise defaults
         callback_url = request.callback_url or f"{CALLBACK_BASE_URL}/api/payments/hubtel/callback"
-        return_url = f"{CALLBACK_BASE_URL}/payment/success?ref={request.client_reference}"
+        return_url = request.return_url or f"{CALLBACK_BASE_URL}/payment/success?ref={request.client_reference}"
         cancellation_url = request.cancellation_url or f"{CALLBACK_BASE_URL}/payment/cancelled"
         
         # Prepare request payload per Hubtel Online Checkout API spec

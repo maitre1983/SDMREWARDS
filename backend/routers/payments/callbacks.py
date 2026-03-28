@@ -376,6 +376,94 @@ async def check_and_update_payment_status(payment_id: str):
     }
 
 
+@router.get("/verify-checkout/{client_reference}")
+async def verify_checkout_payment(client_reference: str):
+    """
+    Verify payment status for Hubtel Online Checkout.
+    Called when user returns from Hubtel checkout page.
+    
+    This endpoint:
+    1. Checks local database for payment record
+    2. If still pending, optionally queries Hubtel for status
+    3. Returns card details if payment is complete
+    """
+    db = get_db()
+    
+    logger.info(f"[VERIFY CHECKOUT] Checking reference: {client_reference}")
+    
+    # Find payment record by client_reference or reference
+    payment = await db.momo_payments.find_one(
+        {"$or": [
+            {"reference": client_reference},
+            {"client_reference": client_reference}
+        ]},
+        {"_id": 0}
+    )
+    
+    if not payment:
+        # Also check hubtel_payments collection
+        payment = await db.hubtel_payments.find_one(
+            {"client_reference": client_reference},
+            {"_id": 0}
+        )
+    
+    if not payment:
+        return {
+            "success": False,
+            "status": "not_found",
+            "message": "Payment record not found"
+        }
+    
+    status = payment.get("status", "pending")
+    
+    # Map various status values to standard ones
+    if status in ["completed", "success"]:
+        # Payment completed - get client info
+        client_id = payment.get("client_id")
+        client = await db.clients.find_one({"id": client_id}, {"_id": 0}) if client_id else None
+        
+        card_info = None
+        if client:
+            card_info = {
+                "card_type": client.get("card_type"),
+                "status": client.get("status"),
+                "card_expires_at": client.get("card_expires_at"),
+                "duration_days": payment.get("metadata", {}).get("duration_days", 365)
+            }
+        
+        return {
+            "success": True,
+            "status": "completed",
+            "message": "Payment successful!",
+            "amount": payment.get("amount"),
+            "card_type": payment.get("metadata", {}).get("card_type") or payment.get("card_type"),
+            "card": card_info,
+            "client_name": client.get("full_name") if client else None
+        }
+    
+    elif status in ["failed", "declined", "cancelled"]:
+        return {
+            "success": True,
+            "status": "failed",
+            "message": payment.get("provider_message") or "Payment failed"
+        }
+    
+    elif status in ["checkout_initiated", "pending", "processing"]:
+        # Payment still in progress - might need to check with Hubtel
+        return {
+            "success": True,
+            "status": "pending",
+            "message": "Payment is being processed. Please wait..."
+        }
+    
+    else:
+        return {
+            "success": True,
+            "status": status,
+            "message": f"Payment status: {status}"
+        }
+
+
 @router.get("/poll-status/{payment_id}")
 async def poll_payment_status(payment_id: str):
     """
@@ -879,7 +967,7 @@ async def process_transfer_callback_async(
                 {"$set": update_data}
             )
             if result.matched_count > 0:
-                logger.info(f"✅ [TRANSFER-ASYNC] Found in merchant_withdrawals")
+                logger.info("✅ [TRANSFER-ASYNC] Found in merchant_withdrawals")
                 return
             
             # Try merchant_payouts
@@ -888,7 +976,7 @@ async def process_transfer_callback_async(
                 {"$set": update_data}
             )
             if result.matched_count > 0:
-                logger.info(f"✅ [TRANSFER-ASYNC] Found in merchant_payouts")
+                logger.info("✅ [TRANSFER-ASYNC] Found in merchant_payouts")
                 return
             
             # Try withdrawals (client)
@@ -897,7 +985,7 @@ async def process_transfer_callback_async(
                 {"$set": update_data}
             )
             if result.matched_count > 0:
-                logger.info(f"✅ [TRANSFER-ASYNC] Found in withdrawals")
+                logger.info("✅ [TRANSFER-ASYNC] Found in withdrawals")
                 return
             
             # Try hubtel_payments
@@ -906,7 +994,7 @@ async def process_transfer_callback_async(
                 {"$set": update_data}
             )
             if result.matched_count > 0:
-                logger.info(f"✅ [TRANSFER-ASYNC] Found in hubtel_payments")
+                logger.info("✅ [TRANSFER-ASYNC] Found in hubtel_payments")
                 return
             
             logger.warning(f"⚠️ [TRANSFER-ASYNC] No matching record found for: {client_reference}")

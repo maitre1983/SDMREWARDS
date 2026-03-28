@@ -384,22 +384,70 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
         
-        // Direct MoMo Prompt flow (no checkout redirect)
+        // Check if we should redirect to Hubtel Checkout
+        if (res.data.use_checkout && res.data.checkout_url) {
+          // Redirect to Hubtel Checkout page
+          toast.info('Redirecting to payment page...');
+          window.location.href = res.data.checkout_url;
+          return;
+        }
+        
+        // Test mode or direct flow - show confirmation button
         setPaymentStatus('pending');
         setIsPaymentTestMode(res.data.test_mode || false);
         
-        // In test mode, show confirm button
         if (res.data.test_mode) {
           toast.info('Test mode: Click "Confirm Payment" to simulate payment');
         } else {
           toast.success('MoMo prompt sent! Please approve on your phone.');
-          // Start polling for status
           startPolling(res.data.payment_id);
         }
       }
     } catch (error) {
       setPaymentStatus('failed');
       toast.error(error.response?.data?.detail || 'Payment initiation failed');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+  
+  // Initiate card upgrade payment
+  const initiateUpgradePayment = async (newCardType) => {
+    if (!client?.phone) {
+      toast.error('Phone number not available');
+      return;
+    }
+    
+    setIsProcessingPayment(true);
+    setPaymentStatus('processing');
+    
+    try {
+      const res = await axios.post(`${API_URL}/api/payments/card/upgrade`, {
+        phone: client.phone,
+        card_type: newCardType
+      });
+      
+      if (res.data.success) {
+        setPaymentId(res.data.payment_id);
+        
+        // Redirect to Hubtel Checkout for upgrade
+        if (res.data.use_checkout && res.data.checkout_url) {
+          toast.info('Redirecting to payment page...');
+          window.location.href = res.data.checkout_url;
+          return;
+        }
+        
+        // Test mode
+        setPaymentStatus('pending');
+        setIsPaymentTestMode(res.data.test_mode || false);
+        
+        if (res.data.test_mode) {
+          toast.info(`Test mode: Upgrade to ${newCardType} for GHS ${res.data.amount}`);
+        }
+      }
+    } catch (error) {
+      setPaymentStatus('failed');
+      toast.error(error.response?.data?.detail || 'Upgrade initiation failed');
     } finally {
       setIsProcessingPayment(false);
     }
