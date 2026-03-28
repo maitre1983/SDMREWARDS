@@ -384,30 +384,24 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
         
-        // Debug logging
-        console.log('Payment response:', res.data);
-        console.log('use_checkout:', res.data.use_checkout);
+        // DEBUG: Log to verify this code is being executed
+        console.log('=== CARD PAYMENT RESPONSE ===');
+        console.log('Full response:', JSON.stringify(res.data, null, 2));
         console.log('checkout_url:', res.data.checkout_url);
         
         // ALWAYS redirect to Hubtel Checkout if checkout_url is provided
         if (res.data.checkout_url) {
+          console.log('REDIRECTING TO HUBTEL CHECKOUT:', res.data.checkout_url);
           toast.info('Redirecting to payment page...');
-          console.log('Redirecting to:', res.data.checkout_url);
-          window.location.href = res.data.checkout_url;
+          // Force redirect
+          window.location.replace(res.data.checkout_url);
           return;
         }
         
-        // Fallback for test mode only
-        setPaymentStatus('pending');
-        setIsPaymentTestMode(res.data.test_mode || false);
-        
-        if (res.data.test_mode) {
-          toast.info('Test mode: Click "Confirm Payment" to simulate payment');
-        } else {
-          // This should NOT happen in production
-          console.error('No checkout_url received but not in test mode!');
-          toast.error('Payment system error. Please try again.');
-        }
+        // This should NOT happen - no checkout URL means error
+        console.error('ERROR: No checkout_url in response!');
+        toast.error('Payment error. Please try again.');
+        setPaymentStatus('failed');
       }
     } catch (error) {
       setPaymentStatus('failed');
@@ -1208,8 +1202,9 @@ export default function ClientDashboard() {
         setUpgradePaymentId(res.data.payment_id);
         setUpgradeWelcomeBonus(res.data.welcome_bonus || 0);
         
-        // Debug logging
-        console.log('Upgrade response:', res.data);
+        // DEBUG: Log to verify this code is being executed
+        console.log('=== CARD UPGRADE RESPONSE ===');
+        console.log('Full response:', JSON.stringify(res.data, null, 2));
         console.log('checkout_url:', res.data.checkout_url);
         
         // If fully paid with cashback
@@ -1222,22 +1217,15 @@ export default function ClientDashboard() {
           }, 2000);
         } else if (res.data.checkout_url) {
           // REDIRECT to Hubtel Checkout
+          console.log('REDIRECTING TO HUBTEL CHECKOUT:', res.data.checkout_url);
           toast.info('Redirecting to payment page...');
-          console.log('Redirecting to:', res.data.checkout_url);
-          window.location.href = res.data.checkout_url;
+          window.location.replace(res.data.checkout_url);
           return;
         } else {
-          // Test mode fallback
-          setIsUpgradeTestMode(res.data.test_mode || false);
-          setUpgradeStatus('pending');
-          
-          if (res.data.test_mode) {
-            toast.info('Test mode: Click "Confirm" to simulate payment');
-          } else {
-            // This should NOT happen in production
-            console.error('No checkout_url received but not in test mode!');
-            toast.error('Payment system error. Please try again.');
-          }
+          // This should NOT happen
+          console.error('ERROR: No checkout_url in upgrade response!');
+          toast.error('Payment error. Please try again.');
+          setUpgradeStatus('failed');
         }
       }
     } catch (error) {
