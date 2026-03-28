@@ -94,10 +94,22 @@ async def get_client_dashboard(current_client: dict = Depends(get_current_client
     # Get card info if active
     card = None
     if current_client.get("status") == ClientStatus.ACTIVE.value:
+        # First try to get from membership_cards collection
         card = await db.membership_cards.find_one(
             {"client_id": client_id, "is_active": True},
             {"_id": 0}
         )
+        
+        # If not found, build card info from client data
+        if not card and current_client.get("card_type"):
+            card = {
+                "client_id": client_id,
+                "card_type": current_client.get("card_type"),
+                "status": "active",
+                "expires_at": current_client.get("card_expires_at"),
+                "activated_at": current_client.get("card_activated_at"),
+                "is_active": True
+            }
     
     return {
         "client": current_client,

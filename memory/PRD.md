@@ -575,3 +575,67 @@ Ajout d'un classement des meilleurs parrains marchands visible dans:
 - Frontend: 100% des composants UI fonctionnels
 - Test file: `/app/backend/tests/test_merchant_referral_leaderboard.py`
 
+---
+
+## 2026-03-28 - HUBTEL CHECKOUT INTEGRATION FOR CARD PURCHASE & UPGRADE
+
+### Context
+Previously, card purchases used direct MoMo prompts (Hubtel MoMo Collection API). 
+Now, the system uses **Hubtel Online Checkout** which redirects users to a Hubtel payment page where they can choose:
+- Mobile Money (MTN, Vodafone, AirtelTigo)
+- Bank Card (Visa/Mastercard)
+
+### Backend Changes
+
+**New/Modified Endpoints:**
+- `POST /api/payments/card/initiate` - Uses Hubtel Checkout (returns `checkout_url` in production)
+- `POST /api/payments/card/upgrade` - New endpoint for card upgrades with checkout
+- `GET /api/payments/verify-checkout/{ref}` - Verify payment status after checkout return
+
+**Card Upgrade Logic:**
+- Upgrade price = new_card_price - current_card_price
+- Silver (30) → Gold (60) = 30 GHS
+- Silver (30) → Platinum (120) = 90 GHS
+- Gold (60) → Platinum (120) = 60 GHS
+
+**Test Mode Behavior:**
+- `test_mode: true, use_checkout: false` - Manual confirmation via test endpoint
+- Production: `use_checkout: true, checkout_url: "https://pay.hubtel.com/..."
+
+### Frontend Changes
+
+**ClientDashboard.jsx:**
+- `initiatePayment()` - Redirects to `checkout_url` if `use_checkout: true`
+- `initiateUpgradePayment()` - New function for card upgrades
+
+**PaymentSuccessPage.jsx:**
+- Updated to handle checkout return
+- Auto-retries status check for pending payments
+- Displays card info on success
+- All text in English
+
+**PaymentCancelledPage.jsx:**
+- Updated to English
+- "Retry Purchase" and "Back to Home" buttons
+
+### Files Modified
+- `/app/backend/routers/payments/card.py` - Complete rewrite with checkout
+- `/app/backend/routers/payments/callbacks.py` - Added verify-checkout endpoint
+- `/app/backend/services/hubtel_checkout_service.py` - Added return_url support
+- `/app/frontend/src/pages/ClientDashboard.jsx` - Checkout redirect logic
+- `/app/frontend/src/pages/PaymentSuccessPage.jsx` - Checkout return handling
+- `/app/frontend/src/pages/PaymentCancelledPage.jsx` - English translation
+
+### Bug Fix
+- `/api/clients/me` now returns `card` object from client data if not in membership_cards collection
+
+### Testing
+- Backend: 14/14 tests passed
+- Test file: `/app/backend/tests/test_hubtel_checkout_payments.py`
+
+### All Text in English
+- LanguageContext forced to English
+- All dashboard labels, buttons, messages in English
+- Backend API responses in English (period_label: Today, This Week, etc.)
+
+
