@@ -647,7 +647,8 @@ async def upgrade_card(
     # Create payment record
     payment_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
-    test_mode = os.environ.get("PAYMENT_TEST_MODE", "true").lower() == "true"
+    # FORCE using Hubtel Checkout - no test mode for card payments
+    test_mode = False
     
     payment_record = {
         "id": payment_id,

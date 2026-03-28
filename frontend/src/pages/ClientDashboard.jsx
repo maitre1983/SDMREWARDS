@@ -384,23 +384,29 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
         
-        // Check if we should redirect to Hubtel Checkout
-        if (res.data.use_checkout && res.data.checkout_url) {
-          // Redirect to Hubtel Checkout page
+        // Debug logging
+        console.log('Payment response:', res.data);
+        console.log('use_checkout:', res.data.use_checkout);
+        console.log('checkout_url:', res.data.checkout_url);
+        
+        // ALWAYS redirect to Hubtel Checkout if checkout_url is provided
+        if (res.data.checkout_url) {
           toast.info('Redirecting to payment page...');
+          console.log('Redirecting to:', res.data.checkout_url);
           window.location.href = res.data.checkout_url;
           return;
         }
         
-        // Test mode or direct flow - show confirmation button
+        // Fallback for test mode only
         setPaymentStatus('pending');
         setIsPaymentTestMode(res.data.test_mode || false);
         
         if (res.data.test_mode) {
           toast.info('Test mode: Click "Confirm Payment" to simulate payment');
         } else {
-          toast.success('MoMo prompt sent! Please approve on your phone.');
-          startPolling(res.data.payment_id);
+          // This should NOT happen in production
+          console.error('No checkout_url received but not in test mode!');
+          toast.error('Payment system error. Please try again.');
         }
       }
     } catch (error) {
@@ -430,14 +436,19 @@ export default function ClientDashboard() {
       if (res.data.success) {
         setPaymentId(res.data.payment_id);
         
-        // Redirect to Hubtel Checkout for upgrade
-        if (res.data.use_checkout && res.data.checkout_url) {
+        // Debug logging
+        console.log('Upgrade response:', res.data);
+        console.log('checkout_url:', res.data.checkout_url);
+        
+        // ALWAYS redirect to Hubtel Checkout if checkout_url is provided
+        if (res.data.checkout_url) {
           toast.info('Redirecting to payment page...');
+          console.log('Redirecting to:', res.data.checkout_url);
           window.location.href = res.data.checkout_url;
           return;
         }
         
-        // Test mode
+        // Fallback for test mode only
         setPaymentStatus('pending');
         setIsPaymentTestMode(res.data.test_mode || false);
         
@@ -1197,6 +1208,10 @@ export default function ClientDashboard() {
         setUpgradePaymentId(res.data.payment_id);
         setUpgradeWelcomeBonus(res.data.welcome_bonus || 0);
         
+        // Debug logging
+        console.log('Upgrade response:', res.data);
+        console.log('checkout_url:', res.data.checkout_url);
+        
         // If fully paid with cashback
         if (res.data.status === 'completed') {
           setUpgradeStatus('success');
@@ -1205,16 +1220,23 @@ export default function ClientDashboard() {
             setShowUpgradeModal(false);
             fetchDashboardData();
           }, 2000);
+        } else if (res.data.checkout_url) {
+          // REDIRECT to Hubtel Checkout
+          toast.info('Redirecting to payment page...');
+          console.log('Redirecting to:', res.data.checkout_url);
+          window.location.href = res.data.checkout_url;
+          return;
         } else {
-          // Direct MoMo Prompt flow
+          // Test mode fallback
           setIsUpgradeTestMode(res.data.test_mode || false);
           setUpgradeStatus('pending');
           
           if (res.data.test_mode) {
             toast.info('Test mode: Click "Confirm" to simulate payment');
           } else {
-            toast.success(`MoMo prompt sent for GHS ${res.data.momo_amount || res.data.amount}! Approve on your phone.`);
-            startPolling(res.data.payment_id);
+            // This should NOT happen in production
+            console.error('No checkout_url received but not in test mode!');
+            toast.error('Payment system error. Please try again.');
           }
         }
       }
@@ -2223,7 +2245,7 @@ export default function ClientDashboard() {
                   ) : (
                     <CreditCard className="mr-2" size={18} />
                   )}
-                  Pay with MoMo
+                  Proceed to Payment
                 </Button>
               </>
             )}
