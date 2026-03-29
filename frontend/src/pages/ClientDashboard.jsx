@@ -2135,13 +2135,13 @@ export default function ClientDashboard() {
                 <div className="relative">
                   <Loader2 className="text-amber-400 mx-auto mb-4 animate-spin" size={48} />
                 </div>
-                <p className="text-white text-lg font-semibold">MoMo Prompt Sent</p>
+                <p className="text-white text-lg font-semibold">Redirecting to Payment...</p>
                 <p className="text-slate-400 mt-2 text-sm">
-                  Please approve the payment on your phone
+                  Please wait while we redirect you to the payment page
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-2 text-amber-400">
                   <Loader2 className="animate-spin" size={16} />
-                  <span className="text-sm">Waiting for confirmation...</span>
+                  <span className="text-sm">Preparing checkout...</span>
                 </div>
                 
                 {/* I Have Paid Button */}

@@ -398,20 +398,17 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             setUpgradePaymentId(null);
             if (onRefresh) onRefresh();
           }, 2000);
+        } else if (res.data.checkout_url) {
+          // REDIRECT to Hubtel Checkout
+          console.log('REDIRECTING TO HUBTEL CHECKOUT:', res.data.checkout_url);
+          toast.info('Redirecting to payment page...');
+          window.location.replace(res.data.checkout_url);
+          return;
         } else {
-          // Direct MoMo Prompt flow
-          setUpgradeStatus('pending');
-          
-          if (res.data.test_mode) {
-            toast.info('Test mode: Waiting for confirmation');
-          } else {
-            toast.success('MoMo prompt sent! Please approve on your phone.');
-          }
-          
-          // Start polling for payment status
-          if (res.data.payment_id) {
-            startUpgradePolling(res.data.payment_id);
-          }
+          // Fallback - should not happen in production
+          console.error('No checkout_url in response:', res.data);
+          toast.error('Payment error. Please try again.');
+          setUpgradeStatus('failed');
         }
       }
     } catch (error) {
@@ -615,16 +612,16 @@ const ServicesPage = ({ balance, onBack, onRefresh, client }) => {
             
             {/* Status Title */}
             <p className="text-white text-xl font-bold">
-              {upgradeStatus === 'processing' ? 'Processing Payment...' : 'MoMo Prompt Sent!'}
+              {upgradeStatus === 'processing' ? 'Processing Payment...' : 'Redirecting to Payment...'}
             </p>
             
             {/* Instructions */}
             <div className="mt-3 space-y-2">
               <p className="text-amber-400 font-medium">
-                Check your phone for the payment prompt
+                Please wait while we redirect you
               </p>
               <p className="text-slate-400 text-sm">
-                Enter your MoMo PIN to approve the payment
+                You will be redirected to the payment page
               </p>
             </div>
             
