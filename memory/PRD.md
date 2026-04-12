@@ -45,6 +45,19 @@ Migration complète des services de paiement de BulkClix vers Hubtel pour la pla
 
 ## Completed Features
 
+### 2026-04-12 - VIRAL GROWTH SMS TEMPLATES ✅
+Added 5 new SMS templates for viral growth campaigns in the existing Personalized SMS system (`SettingsSMS.jsx`):
+1. 🚀 **Viral Referral Invite** - Encourage users to share and earn 3 GHS per referral
+2. 🏪 **Merchant Recruitment** - Recruit new merchants to join SDM Rewards  
+3. 🎊 **Recent Signup Welcome** - Welcome new users and encourage referrals
+4. 😴 **Inactivity Reminder** - Re-engage inactive users with their pending cashback
+5. 💸 **Cashback Received** - Notify users when they receive cashback
+
+All templates support personalization with variables: `{name}`, `{cashback}`, `{card}`
+Templates are accessible via: Admin > Settings > SMS Center > Personalized SMS > Compose
+
+
+
 ### 2026-03-21 (Fork) - PERFORMANCE OPTIMIZATION ⚡
 - ✅ **Route Preloading System** - Predictive loading based on navigation patterns
   - Created `useRoutePreload.js` hook

@@ -57,6 +57,38 @@ export default function SettingsSMS({ token }) {
 
   // Predefined SMS Templates - ALL IN ENGLISH
   const SMS_TEMPLATES = [
+    // === VIRAL GROWTH TEMPLATES ===
+    {
+      id: 'viral_referral_invite',
+      name: '🚀 Viral Referral Invite',
+      category: 'viral_growth',
+      message: 'Hi {name}! Share SDM Rewards with friends and earn 3 GHS for each signup! Your unique code is in the app. Start earning now!'
+    },
+    {
+      id: 'merchant_recruitment',
+      name: '🏪 Merchant Recruitment',
+      category: 'viral_growth',
+      message: 'Hi {name}! Want to boost your business? Join SDM Rewards as a merchant! Get customers, increase sales. Apply today: sdmrewards.com'
+    },
+    {
+      id: 'recent_signup_welcome',
+      name: '🎊 Recent Signup Welcome',
+      category: 'viral_growth',
+      message: 'Welcome {name}! You just joined SDM Rewards! Start earning cashback at 100+ partner merchants. Refer friends = earn 3 GHS each!'
+    },
+    {
+      id: 'inactivity_reminder',
+      name: '😴 Inactivity Reminder',
+      category: 'viral_growth',
+      message: 'Hi {name}, we haven\'t seen you in a while! Your {cashback} GHS cashback misses you. Come back and enjoy exclusive deals today!'
+    },
+    {
+      id: 'cashback_received',
+      name: '💸 Cashback Received',
+      category: 'viral_growth',
+      message: 'Great news {name}! You just received cashback! Your balance is now {cashback} GHS. Keep shopping to earn more! SDM Rewards'
+    },
+    // === ENGAGEMENT TEMPLATES ===
     {
       id: 'cashback_reminder',
       name: '💰 Cashback Reminder',
@@ -284,6 +316,7 @@ export default function SettingsSMS({ token }) {
   // Get template categories for grouping
   const getTemplatesByCategory = () => {
     const categories = {
+      viral_growth: { name: '🚀 Viral Growth', templates: [] },
       engagement: { name: 'Engagement', templates: [] },
       marketing: { name: 'Marketing', templates: [] },
       retention: { name: 'Retention', templates: [] },
