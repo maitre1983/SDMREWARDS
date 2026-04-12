@@ -791,3 +791,67 @@ async def get_push_notification_stats(
     
     stats = await push_service.get_app_stats()
     return stats
+
+
+
+# ============== VIRAL SMS AUTOMATION ==============
+
+@router.post("/automation/trigger-inactivity")
+async def trigger_inactivity_reminders(
+    days_threshold: int = 7,
+    batch_size: int = 50,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Manually trigger inactivity reminder SMS to inactive users.
+    Useful for testing or immediate processing.
+    
+    Args:
+        days_threshold: Days of inactivity before sending reminder (default: 7)
+        batch_size: Max users to process (default: 50)
+    """
+    from services.viral_sms_automation_service import process_inactive_users_batch
+    
+    result = await process_inactive_users_batch(days_threshold, batch_size)
+    
+    return {
+        "success": True,
+        "message": f"Inactivity reminders processed",
+        "result": result
+    }
+
+
+@router.get("/automation/logs")
+async def get_automation_logs(
+    limit: int = 50,
+    automation_type: Optional[str] = None,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get SMS automation logs for analytics.
+    
+    Args:
+        limit: Max logs to return (default: 50)
+        automation_type: Filter by type (viral_welcome, viral_cashback, inactivity_reminder)
+    """
+    query = {}
+    if automation_type:
+        query["type"] = automation_type
+    
+    logs = await db.sms_automation_logs.find(
+        query,
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    # Get stats
+    stats = {
+        "viral_welcome": await db.sms_automation_logs.count_documents({"type": "viral_welcome"}),
+        "viral_cashback": await db.sms_automation_logs.count_documents({"type": "viral_cashback"}),
+        "inactivity_reminder": await db.sms_automation_logs.count_documents({"type": "inactivity_reminder"})
+    }
+    
+    return {
+        "logs": logs,
+        "total": len(logs),
+        "stats": stats
+    }

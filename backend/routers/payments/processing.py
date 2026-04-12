@@ -487,6 +487,29 @@ async def process_merchant_payment(payment: Dict):
                 merchant.get("business_name", "Merchant"),
                 net_cashback
             )
+            
+            # Send viral cashback SMS (encourages sharing)
+            try:
+                from services.viral_sms_automation_service import get_viral_sms_service
+                viral_sms = get_viral_sms_service(db)
+                # Get updated client balance
+                updated_client = await db.clients.find_one(
+                    {"id": client_id}, 
+                    {"_id": 0, "cashback_balance": 1}
+                )
+                total_balance = updated_client.get("cashback_balance", 0) if updated_client else net_cashback
+                
+                import asyncio
+                asyncio.create_task(viral_sms.send_viral_cashback_sms(
+                    phone=client["phone"],
+                    client_name=client.get("full_name") or client.get("username") or "Friend",
+                    cashback_amount=net_cashback,
+                    total_balance=total_balance,
+                    merchant_name=merchant.get("business_name")
+                ))
+            except Exception as viral_err:
+                logger.error(f"Viral cashback SMS error (non-blocking): {viral_err}")
+                
         if merchant.get("phone"):
             client_name = client.get("full_name", "A customer") if client else "A customer"
             await sms.notify_merchant_payment(merchant["phone"], payment["amount"], client_name)

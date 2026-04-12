@@ -11,6 +11,7 @@ import jwt
 import uuid
 import logging
 import random
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -518,6 +519,19 @@ async def register_client(request: ClientRegisterRequest):
     
     # Create token
     token = create_token(client_data.id, "client")
+    
+    # Send viral welcome SMS (async, non-blocking)
+    try:
+        from services.viral_sms_automation_service import get_viral_sms_service
+        viral_sms = get_viral_sms_service(db)
+        asyncio.create_task(viral_sms.send_viral_welcome_sms(
+            phone=client_data.phone,
+            client_name=client_data.full_name or client_data.username,
+            referral_code=client_data.referral_code
+        ))
+        logger.info(f"Viral welcome SMS triggered for new client: {client_data.id[:8]}...")
+    except Exception as sms_error:
+        logger.error(f"Viral welcome SMS error (non-blocking): {sms_error}")
     
     return {
         "success": True,

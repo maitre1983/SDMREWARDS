@@ -76,15 +76,26 @@ async def lifespan(app: FastAPI):
     withdrawal_worker_task = asyncio.create_task(auto_withdrawal_worker())
     logger.info("💰 Auto-withdrawal worker started")
     
+    # Start inactivity reminder worker (sends viral SMS to inactive users daily at 10:00 UTC)
+    from services.viral_sms_automation_service import start_inactivity_reminder_worker
+    inactivity_worker_task = asyncio.create_task(start_inactivity_reminder_worker(
+        days_threshold=7,  # Users inactive for 7+ days
+        run_hour=10,       # Run at 10:00 UTC (11:00 Ghana time)
+        batch_size=50      # Process 50 users per run
+    ))
+    logger.info("📢 Inactivity reminder worker started (daily at 10:00 UTC)")
+    
     yield
     
     # Shutdown
     logger.info("🛑 SDM REWARDS Server Shutting Down...")
     sms_worker_task.cancel()
     withdrawal_worker_task.cancel()
+    inactivity_worker_task.cancel()
     try:
         await sms_worker_task
         await withdrawal_worker_task
+        await inactivity_worker_task
     except asyncio.CancelledError:
         pass
     client.close()

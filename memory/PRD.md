@@ -56,6 +56,30 @@ Added 5 new SMS templates for viral growth campaigns in the existing Personalize
 All templates support personalization with variables: `{name}`, `{cashback}`, `{card}`
 Templates are accessible via: Admin > Settings > SMS Center > Personalized SMS > Compose
 
+### 2026-04-12 - AUTOMATED VIRAL SMS SYSTEM ✅
+Implemented 3 automated SMS triggers for viral growth:
+
+1. **Viral Welcome SMS (After Signup)** ✅
+   - Triggered automatically when a new client registers
+   - Message includes referral code and incentive to share
+   - File: `auth.py` → `register_client()`
+
+2. **Viral Cashback SMS (After Cashback Received)** ✅
+   - Triggered automatically when client receives cashback from a transaction
+   - Encourages sharing with friends
+   - File: `payments/processing.py` → `complete_merchant_payment()`
+
+3. **Inactivity Reminder Worker** ✅
+   - Background worker runs daily at 10:00 UTC (11:00 Ghana time)
+   - Sends SMS to users inactive for 7+ days
+   - Processes 50 users per batch
+   - 7-day cooldown between reminders per user
+   - File: `services/viral_sms_automation_service.py`
+
+**Admin Endpoints:**
+- `POST /api/admin/sms/automation/trigger-inactivity` - Manually trigger inactivity batch
+- `GET /api/admin/sms/automation/logs` - View automation logs & stats
+
 
 
 ### 2026-03-21 (Fork) - PERFORMANCE OPTIMIZATION ⚡
